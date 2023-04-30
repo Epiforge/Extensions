@@ -7,8 +7,9 @@ General utilities to help with stuff in .NET Development, from Epiforge.
 Supports `netstandard2.0`.
 
 ![Azure Pipelines](https://dev.azure.com/epiforge/extensions/_apis/build/status/epiforge.extensions)
-![Build](https://img.shields.io/azure-devops/build/epiforge/extensions/4.svg?logo=microsoft&logoColor=white)
-![Tests](https://img.shields.io/azure-devops/tests/epiforge/extensions/4.svg?compact_message=&logo=microsoft&logoColor=white)
+![Build](https://img.shields.io/azure-devops/build/epiforge/extensions/4.svg?logo=azuredevops&logoColor=white)
+![Tests](https://img.shields.io/azure-devops/tests/epiforge/extensions/4.svg?compact_message=&logo=azuredevops&logoColor=white)
+![Coverage](https://img.shields.io/azure-devops/coverage/epiforge/extensions/4?logo=azuredevops)
 
 - [Libraries](#libraries)
   - [Components](#components)
