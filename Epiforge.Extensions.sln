@@ -1,0 +1,46 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.33530.505
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Epiforge.Extensions.Components", "Epiforge.Extensions.Components\Epiforge.Extensions.Components.csproj", "{5214AC70-BD51-47C3-8409-39EE98C789EB}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Configuration", "Configuration", "{BFE4E58F-AC85-4522-A710-F490EC01BFC5}"
+	ProjectSection(SolutionItems) = preProject
+		.editorconfig = .editorconfig
+		.gitignore = .gitignore
+		.ruleset = .ruleset
+		azure-pipelines.yml = azure-pipelines.yml
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Documentation", "Documentation", "{C279A752-FFA1-4A0A-8581-1129DC927471}"
+	ProjectSection(SolutionItems) = preProject
+		CONTRIBUTING.md = CONTRIBUTING.md
+		LICENSE = LICENSE
+		README.md = README.md
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Epiforge.Extensions.Components.Tests", "Epiforge.Extensions.Components.Tests\Epiforge.Extensions.Components.Tests.csproj", "{D3770F22-0BC6-40D9-ADD4-21F96E0BF30A}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{5214AC70-BD51-47C3-8409-39EE98C789EB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5214AC70-BD51-47C3-8409-39EE98C789EB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5214AC70-BD51-47C3-8409-39EE98C789EB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5214AC70-BD51-47C3-8409-39EE98C789EB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D3770F22-0BC6-40D9-ADD4-21F96E0BF30A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D3770F22-0BC6-40D9-ADD4-21F96E0BF30A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D3770F22-0BC6-40D9-ADD4-21F96E0BF30A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D3770F22-0BC6-40D9-ADD4-21F96E0BF30A}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {B8CCEE6B-2419-421B-9962-0230B950B5FC}
+	EndGlobalSection
+EndGlobal

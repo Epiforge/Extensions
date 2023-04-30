@@ -1,30 +1,4 @@
-![Epiforge Extensions Logo](Epiforge.Extensions.jpg) 
-
-<h1>Epiforge Extensions</h1>
-
-General utilities to help with stuff in .NET Development, from Epiforge.
-
-Supports `netstandard2.0`.
-
-![Azure Pipelines](https://dev.azure.com/epiforge/extensions/_apis/build/status/2)
-![Build](https://img.shields.io/azure-devops/build/epiforge/extensions/2.svg?logo=microsoft&logoColor=white)
-![Tests](https://img.shields.io/azure-devops/tests/epiforge/extensions/2.svg?compact_message=&logo=microsoft&logoColor=white)
-
-- [Libraries](#libraries)
-  - [Components](#components)
-    - [Property Change Notification](#property-change-notification)
-    - [Disposal](#disposal)
-- [License](#license)
-- [Contributing](#contributing)
-- [Acknowledgements](#acknowledgements)
-
-# Libraries
-
-## Components
-
-[![Epiforge.Extensions.Components Nuget](https://img.shields.io/nuget/v/Epiforge.Extensions.Components.svg)](https://www.nuget.org/packages/Epiforge.Extensions.Components)
-
-### Property Change Notification
+# Property Change Notification
 
 This library offers the `PropertyChangeNotifier` class, which you may inherit from to quickly get all the property utilities we're all tired of copying and pasting everywhere.
 Just call the protected `OnPropertyChanged` and `OnPropertyChanging` methods at the appropriate times from setters and compiler services will figure out what property you're in.
@@ -33,7 +7,7 @@ Or, if all you need to do is set the value of a field, `SetBackedProperty` could
 
 Be sure to set the protected `Logger` property if you want the abstract class to log what's going on with property change notification.
 
-### Disposal
+# Disposal
 
 This library features base classes that handle things we've written a thousand times over, this time involving disposal.
 If you want to go with an implementation of the tried and true `IDisposable`, just inherit from `SyncDisposable`.
@@ -53,15 +27,3 @@ This library provides the `IDisposalStatus` interface, which defines the `IsDisp
 This library also provides the `INotifyDisposing`, `INotifyDisposed`, and `INotifyDisposalOverridden` interfaces, which add events that notify of these occurrences.
 
 Be sure to set the protected `Logger` property if you want the abstract class to log what's going on with disposal.
-
-# License
-
-[Apache 2.0 License](LICENSE)
-
-# Contributing
-
-[Click here](CONTRIBUTING.md) to learn how to contribute.
-
-# Acknowledgements
-
-Makes use of the glorious [AsyncEx](https://github.com/StephenCleary/AsyncEx) library by Stephen Cleary and the [Poly#](https://github.com/Sergio0694/PolySharp/) NuGet package by Sergio Pedri because it's just great.

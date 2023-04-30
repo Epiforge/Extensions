@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <CheckEolTargetFramework>false</CheckEolTargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <IsPackable>false</IsPackable>
+        <IsTestProject>true</IsTestProject>
+        <LangVersion>latest</LangVersion>
+        <Nullable>enable</Nullable>
+        <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
+        <TargetFrameworks>net48;net6.0;net7.0</TargetFrameworks>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Extensions.Logging" Version="7.0.0" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.5.0" />
+        <PackageReference Include="Moq" Version="4.18.4" />
+        <PackageReference Include="MSTest.TestAdapter" Version="3.0.2" />
+        <PackageReference Include="MSTest.TestFramework" Version="3.0.2" />
+        <PackageReference Include="coverlet.collector" Version="3.2.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Epiforge.Extensions.Components\Epiforge.Extensions.Components.csproj" />
+    </ItemGroup>
+
+</Project>
