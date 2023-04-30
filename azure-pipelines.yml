@@ -9,6 +9,7 @@ steps:
   displayName: 'Install .NET Framework 4.8 SDK'
   inputs:
     packageName: 'netfx-4.8-devpack'
+    version: '4.8.0.20190930'
 
 - task: UseDotNet@2
   displayName: 'Install .NET 6 SDK'
