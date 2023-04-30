@@ -23,7 +23,7 @@ Supports `netstandard2.0`.
 
 ## Components
 
-[![Epiforge.Extensions.Components Nuget](https://img.shields.io/nuget/v/Epiforge.Extensions.Components.svg)](https://www.nuget.org/packages/Epiforge.Extensions.Components)
+[![Epiforge.Extensions.Components Nuget](https://img.shields.io/nuget/v/Epiforge.Extensions.Components.svg?logo=nuget) ![Downloads](https://img.shields.io/nuget/dt/epiforge.extensions.components)](https://www.nuget.org/packages/Epiforge.Extensions.Components)
 
 ### Property Change Notification
 
