@@ -1,6 +1,6 @@
-![Epiforge Extensions Logo](Epiforge.Extensions.jpg) 
+![Extensions Logo](Extensions.jpg) 
 
-<h1>Epiforge Extensions</h1>
+<h1>Extensions</h1>
 
 General utilities to help with stuff in .NET Development, from Epiforge.
 
