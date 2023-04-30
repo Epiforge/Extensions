@@ -5,11 +5,12 @@ variables:
   buildConfiguration: 'Release'
 
 steps:
-- task: ChocolateyInstaller@2
-  displayName: 'Install .NET Framework 4.8 SDK'
+- task: PowerShell@2
   inputs:
-    packageName: 'netfx-4.8-devpack'
-    version: '4.8.0.20190930'
+    targetType: 'inline'
+    script: |
+      Invoke-WebRequest -Uri 'https://download.visualstudio.microsoft.com/download/pr/6f083c7e-bd40-44d4-9e3f-ffba71ec8b09/9ba926620d8e7568cbd0b84c7177a984/ndp481-devpack-enu.exe' -OutFile 'ndp481-devpack-enu.exe'
+      Start-Process -FilePath 'ndp481-devpack-enu.exe' -ArgumentList '/quiet' -Wait
 
 - task: UseDotNet@2
   displayName: 'Install .NET 6 SDK'
