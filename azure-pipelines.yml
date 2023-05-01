@@ -6,7 +6,7 @@ variables:
 
 steps:
 - task: PowerShell@2
-  displayName: 'Install .NET Framework 4.8.1'
+  displayName: 'Install .NET 4.8.1'
   inputs:
     targetType: 'inline'
     script: |

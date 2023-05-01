@@ -4,6 +4,7 @@ namespace Epiforge.Extensions.Components.Tests;
 [ExcludeFromCodeCoverage]
 public class DynamicPropertyChangeNotifier
 {
+    [ExcludeFromCodeCoverage]
     public class Derivation :
         Components.DynamicPropertyChangeNotifier
     {
@@ -117,6 +118,7 @@ public class DynamicPropertyChangeNotifier
     }
 
     [TestMethod]
+    [ExcludeFromCodeCoverage]
     [ExpectedException(typeof(ArgumentNullException))]
     public void NullEqualityComparer()
     {
@@ -127,6 +129,7 @@ public class DynamicPropertyChangeNotifier
     }
 
     [TestMethod]
+    [ExcludeFromCodeCoverage]
     [ExpectedException(typeof(ArgumentNullException))]
     public void NullEqualityComparerWithoutIn()
     {
@@ -137,6 +140,7 @@ public class DynamicPropertyChangeNotifier
     }
 
     [TestMethod]
+    [ExcludeFromCodeCoverage]
     [ExpectedException(typeof(ArgumentNullException))]
     public void NullPropertyChangedEventArgs()
     {
@@ -145,6 +149,7 @@ public class DynamicPropertyChangeNotifier
     }
 
     [TestMethod]
+    [ExcludeFromCodeCoverage]
     [ExpectedException(typeof(ArgumentNullException))]
     public void NullPropertyChangedName()
     {
@@ -153,6 +158,7 @@ public class DynamicPropertyChangeNotifier
     }
 
     [TestMethod]
+    [ExcludeFromCodeCoverage]
     [ExpectedException(typeof(ArgumentNullException))]
     public void NullPropertyChangingEventArgs()
     {
@@ -161,6 +167,7 @@ public class DynamicPropertyChangeNotifier
     }
 
     [TestMethod]
+    [ExcludeFromCodeCoverage]
     [ExpectedException(typeof(ArgumentNullException))]
     public void NullPropertyChangingName()
     {
@@ -169,6 +176,7 @@ public class DynamicPropertyChangeNotifier
     }
 
     [TestMethod]
+    [ExcludeFromCodeCoverage]
     public void PropertyChanges()
     {
         var propertiesChanged = new List<string>();
@@ -176,6 +184,7 @@ public class DynamicPropertyChangeNotifier
         var mockLogger = new Mock<ILogger<Derivation>>();
         var derivation = new Derivation(mockLogger.Object, "text");
 
+        [ExcludeFromCodeCoverage]
         void propertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             var propertyName = e.PropertyName;
@@ -185,6 +194,7 @@ public class DynamicPropertyChangeNotifier
             propertiesChanged.Add(propertyName!);
         }
 
+        [ExcludeFromCodeCoverage]
         void propertyChanging(object? sender, PropertyChangingEventArgs e)
         {
             var propertyName = e.PropertyName;
@@ -225,6 +235,7 @@ public class DynamicPropertyChangeNotifier
     }
 
     [TestMethod]
+    [ExcludeFromCodeCoverage]
     public void PropertyChangesWithCachedEventArgs()
     {
         var propertiesChanged = new List<string>();
@@ -232,6 +243,7 @@ public class DynamicPropertyChangeNotifier
         var mockLogger = new Mock<ILogger<Derivation>>();
         var derivation = new Derivation(mockLogger.Object, "text");
 
+        [ExcludeFromCodeCoverage]
         void propertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             var propertyName = e.PropertyName;
@@ -241,6 +253,7 @@ public class DynamicPropertyChangeNotifier
             propertiesChanged.Add(propertyName!);
         }
 
+        [ExcludeFromCodeCoverage]
         void propertyChanging(object? sender, PropertyChangingEventArgs e)
         {
             var propertyName = e.PropertyName;
@@ -266,6 +279,7 @@ public class DynamicPropertyChangeNotifier
     }
 
     [TestMethod]
+    [ExcludeFromCodeCoverage]
     public void PropertyChangesWithoutInWithCachedEventArgs()
     {
         var propertiesChanged = new List<string>();
@@ -273,6 +287,7 @@ public class DynamicPropertyChangeNotifier
         var mockLogger = new Mock<ILogger<Derivation>>();
         var derivation = new Derivation(mockLogger.Object, "text");
 
+        [ExcludeFromCodeCoverage]
         void propertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             var propertyName = e.PropertyName;
@@ -282,6 +297,7 @@ public class DynamicPropertyChangeNotifier
             propertiesChanged.Add(propertyName!);
         }
 
+        [ExcludeFromCodeCoverage]
         void propertyChanging(object? sender, PropertyChangingEventArgs e)
         {
             var propertyName = e.PropertyName;
@@ -307,6 +323,7 @@ public class DynamicPropertyChangeNotifier
     }
 
     [TestMethod]
+    [ExcludeFromCodeCoverage]
     [ExpectedException(typeof(ArgumentNullException))]
     public void PropertyChangesWithCachedChangedEventArgsOnly()
     {
@@ -317,6 +334,7 @@ public class DynamicPropertyChangeNotifier
     }
 
     [TestMethod]
+    [ExcludeFromCodeCoverage]
     [ExpectedException(typeof(ArgumentNullException))]
     public void PropertyChangesWithCachedChangingEventArgsOnly()
     {
@@ -327,6 +345,7 @@ public class DynamicPropertyChangeNotifier
     }
 
     [TestMethod]
+    [ExcludeFromCodeCoverage]
     [ExpectedException(typeof(ArgumentNullException))]
     public void PropertyChangesWithCachedEventArgsAndNullComparer()
     {
@@ -337,6 +356,7 @@ public class DynamicPropertyChangeNotifier
     }
 
     [TestMethod]
+    [ExcludeFromCodeCoverage]
     [ExpectedException(typeof(ArgumentNullException))]
     public void PropertyChangesWithoutInWithCachedChangedEventArgsOnly()
     {
@@ -347,6 +367,7 @@ public class DynamicPropertyChangeNotifier
     }
 
     [TestMethod]
+    [ExcludeFromCodeCoverage]
     [ExpectedException(typeof(ArgumentNullException))]
     public void PropertyChangesWithoutInWithCachedChangingEventArgsOnly()
     {
@@ -357,6 +378,7 @@ public class DynamicPropertyChangeNotifier
     }
 
     [TestMethod]
+    [ExcludeFromCodeCoverage]
     [ExpectedException(typeof(ArgumentNullException))]
     public void PropertyChangesWithoutInWithCachedEventArgsAndNullComparer()
     {
@@ -367,6 +389,7 @@ public class DynamicPropertyChangeNotifier
     }
 
     [TestMethod]
+    [ExcludeFromCodeCoverage]
     public void PropertyChangesWithoutIn()
     {
         var propertiesChanged = new List<string>();
