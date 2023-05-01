@@ -15,6 +15,7 @@ public abstract class Disposable :
     /// <summary>
     /// Finalizes this object
     /// </summary>
+    [ExcludeFromCodeCoverage]
     ~Disposable()
     {
         Logger?.LogDebug("Finalizer called");

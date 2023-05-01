@@ -14,6 +14,7 @@ public abstract class AsyncDisposable :
     /// <summary>
     /// Finalizes this object
     /// </summary>
+    [ExcludeFromCodeCoverage]
     ~AsyncDisposable()
     {
         Logger?.LogDebug("Finalizer called");

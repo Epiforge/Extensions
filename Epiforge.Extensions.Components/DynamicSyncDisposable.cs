@@ -14,6 +14,7 @@ public abstract class DynamicSyncDisposable :
     /// <summary>
     /// Finalizes this object
     /// </summary>
+    [ExcludeFromCodeCoverage]
     ~DynamicSyncDisposable()
     {
         Logger?.LogDebug("Finalizer called");

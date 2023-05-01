@@ -14,6 +14,7 @@ public abstract class SyncDisposable :
     /// <summary>
     /// Finalizes this object
     /// </summary>
+    [ExcludeFromCodeCoverage]
     ~SyncDisposable()
     {
         Logger?.LogDebug("Finalizer called");
