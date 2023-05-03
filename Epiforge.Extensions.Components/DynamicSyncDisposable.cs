@@ -57,7 +57,7 @@ public abstract class DynamicSyncDisposable :
     /// </summary>
     public virtual void Dispose()
     {
-        Logger?.LogDebug("DisposeAsync called");
+        Logger?.LogDebug("Dispose called");
         lock (disposalAccess)
             if (!IsDisposed)
             {
