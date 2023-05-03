@@ -3,7 +3,6 @@ namespace Epiforge.Extensions.Components.Tests;
 [TestClass]
 public class DynamicSyncDisposable
 {
-    [ExcludeFromCodeCoverage]
     public class Derivation :
         Components.DynamicSyncDisposable
     {
@@ -27,7 +26,6 @@ public class DynamicSyncDisposable
     }
 
     [TestMethod]
-    [ExcludeFromCodeCoverage]
     public void Dispose()
     {
         var disposalNotificationEvents = new List<(string name, DisposalNotificationEventArgs args)>();
@@ -65,7 +63,6 @@ public class DynamicSyncDisposable
     }
 
     [TestMethod]
-    [ExcludeFromCodeCoverage]
     [ExpectedException(typeof(ObjectDisposedException))]
     public void ThrowIfDisposed()
     {

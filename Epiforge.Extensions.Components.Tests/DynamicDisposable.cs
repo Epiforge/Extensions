@@ -3,7 +3,6 @@ namespace Epiforge.Extensions.Components.Tests;
 [TestClass]
 public class DynamicDisposable
 {
-    [ExcludeFromCodeCoverage]
     public class Derivation :
         Components.Disposable
     {
@@ -34,7 +33,6 @@ public class DynamicDisposable
     }
 
     [TestMethod]
-    [ExcludeFromCodeCoverage]
     public void Dispose()
     {
         var disposalNotificationEvents = new List<(string name, DisposalNotificationEventArgs args)>();
@@ -72,7 +70,6 @@ public class DynamicDisposable
     }
 
     [TestMethod]
-    [ExcludeFromCodeCoverage]
     public async Task DisposeAsync()
     {
         var disposalNotificationEvents = new List<(string name, DisposalNotificationEventArgs args)>();
@@ -110,7 +107,6 @@ public class DynamicDisposable
     }
 
     [TestMethod]
-    [ExcludeFromCodeCoverage]
     [ExpectedException(typeof(ObjectDisposedException))]
     public void ThrowIfDisposed()
     {
@@ -123,7 +119,6 @@ public class DynamicDisposable
     }
 
     [TestMethod]
-    [ExcludeFromCodeCoverage]
     [ExpectedException(typeof(ObjectDisposedException))]
     public async Task ThrowIfDisposedAsync()
     {

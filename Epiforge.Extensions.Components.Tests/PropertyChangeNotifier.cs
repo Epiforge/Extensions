@@ -1,10 +1,8 @@
 namespace Epiforge.Extensions.Components.Tests;
 
 [TestClass]
-[ExcludeFromCodeCoverage]
 public class PropertyChangeNotifier
 {
-    [ExcludeFromCodeCoverage]
     public class Derivation :
         Components.PropertyChangeNotifier
     {
@@ -118,7 +116,6 @@ public class PropertyChangeNotifier
     }
 
     [TestMethod]
-    [ExcludeFromCodeCoverage]
     [ExpectedException(typeof(ArgumentNullException))]
     public void NullEqualityComparer()
     {
@@ -129,7 +126,6 @@ public class PropertyChangeNotifier
     }
 
     [TestMethod]
-    [ExcludeFromCodeCoverage]
     [ExpectedException(typeof(ArgumentNullException))]
     public void NullEqualityComparerWithoutIn()
     {
@@ -140,7 +136,6 @@ public class PropertyChangeNotifier
     }
 
     [TestMethod]
-    [ExcludeFromCodeCoverage]
     [ExpectedException(typeof(ArgumentNullException))]
     public void NullPropertyChangedEventArgs()
     {
@@ -149,7 +144,6 @@ public class PropertyChangeNotifier
     }
 
     [TestMethod]
-    [ExcludeFromCodeCoverage]
     [ExpectedException(typeof(ArgumentNullException))]
     public void NullPropertyChangedName()
     {
@@ -158,7 +152,6 @@ public class PropertyChangeNotifier
     }
 
     [TestMethod]
-    [ExcludeFromCodeCoverage]
     [ExpectedException(typeof(ArgumentNullException))]
     public void NullPropertyChangingEventArgs()
     {
@@ -167,7 +160,6 @@ public class PropertyChangeNotifier
     }
 
     [TestMethod]
-    [ExcludeFromCodeCoverage]
     [ExpectedException(typeof(ArgumentNullException))]
     public void NullPropertyChangingName()
     {
@@ -176,7 +168,6 @@ public class PropertyChangeNotifier
     }
 
     [TestMethod]
-    [ExcludeFromCodeCoverage]
     public void PropertyChanges()
     {
         var propertiesChanged = new List<string>();
@@ -184,7 +175,6 @@ public class PropertyChangeNotifier
         var mockLogger = new Mock<ILogger<Derivation>>();
         var derivation = new Derivation(mockLogger.Object, "text");
 
-        [ExcludeFromCodeCoverage]
         void propertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             var propertyName = e.PropertyName;
@@ -194,7 +184,6 @@ public class PropertyChangeNotifier
             propertiesChanged.Add(propertyName!);
         }
 
-        [ExcludeFromCodeCoverage]
         void propertyChanging(object? sender, PropertyChangingEventArgs e)
         {
             var propertyName = e.PropertyName;
@@ -235,7 +224,6 @@ public class PropertyChangeNotifier
     }
 
     [TestMethod]
-    [ExcludeFromCodeCoverage]
     public void PropertyChangesWithCachedEventArgs()
     {
         var propertiesChanged = new List<string>();
@@ -243,7 +231,6 @@ public class PropertyChangeNotifier
         var mockLogger = new Mock<ILogger<Derivation>>();
         var derivation = new Derivation(mockLogger.Object, "text");
 
-        [ExcludeFromCodeCoverage]
         void propertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             var propertyName = e.PropertyName;
@@ -253,7 +240,6 @@ public class PropertyChangeNotifier
             propertiesChanged.Add(propertyName!);
         }
 
-        [ExcludeFromCodeCoverage]
         void propertyChanging(object? sender, PropertyChangingEventArgs e)
         {
             var propertyName = e.PropertyName;
@@ -279,7 +265,6 @@ public class PropertyChangeNotifier
     }
 
     [TestMethod]
-    [ExcludeFromCodeCoverage]
     public void PropertyChangesWithoutInWithCachedEventArgs()
     {
         var propertiesChanged = new List<string>();
@@ -287,7 +272,6 @@ public class PropertyChangeNotifier
         var mockLogger = new Mock<ILogger<Derivation>>();
         var derivation = new Derivation(mockLogger.Object, "text");
 
-        [ExcludeFromCodeCoverage]
         void propertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             var propertyName = e.PropertyName;
@@ -297,7 +281,6 @@ public class PropertyChangeNotifier
             propertiesChanged.Add(propertyName!);
         }
 
-        [ExcludeFromCodeCoverage]
         void propertyChanging(object? sender, PropertyChangingEventArgs e)
         {
             var propertyName = e.PropertyName;
@@ -323,7 +306,6 @@ public class PropertyChangeNotifier
     }
 
     [TestMethod]
-    [ExcludeFromCodeCoverage]
     [ExpectedException(typeof(ArgumentNullException))]
     public void PropertyChangesWithCachedChangedEventArgsOnly()
     {
@@ -334,7 +316,6 @@ public class PropertyChangeNotifier
     }
 
     [TestMethod]
-    [ExcludeFromCodeCoverage]
     [ExpectedException(typeof(ArgumentNullException))]
     public void PropertyChangesWithCachedChangingEventArgsOnly()
     {
@@ -345,7 +326,6 @@ public class PropertyChangeNotifier
     }
 
     [TestMethod]
-    [ExcludeFromCodeCoverage]
     [ExpectedException(typeof(ArgumentNullException))]
     public void PropertyChangesWithCachedEventArgsAndNullComparer()
     {
@@ -356,7 +336,6 @@ public class PropertyChangeNotifier
     }
 
     [TestMethod]
-    [ExcludeFromCodeCoverage]
     [ExpectedException(typeof(ArgumentNullException))]
     public void PropertyChangesWithoutInWithCachedChangedEventArgsOnly()
     {
@@ -367,7 +346,6 @@ public class PropertyChangeNotifier
     }
 
     [TestMethod]
-    [ExcludeFromCodeCoverage]
     [ExpectedException(typeof(ArgumentNullException))]
     public void PropertyChangesWithoutInWithCachedChangingEventArgsOnly()
     {
@@ -378,7 +356,6 @@ public class PropertyChangeNotifier
     }
 
     [TestMethod]
-    [ExcludeFromCodeCoverage]
     [ExpectedException(typeof(ArgumentNullException))]
     public void PropertyChangesWithoutInWithCachedEventArgsAndNullComparer()
     {
@@ -396,7 +373,6 @@ public class PropertyChangeNotifier
         var mockLogger = new Mock<ILogger<Derivation>>();
         var derivation = new Derivation(mockLogger.Object, "text");
 
-        [ExcludeFromCodeCoverage]
         void propertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             var propertyName = e.PropertyName;
@@ -406,7 +382,6 @@ public class PropertyChangeNotifier
             propertiesChanged.Add(propertyName!);
         }
 
-        [ExcludeFromCodeCoverage]
         void propertyChanging(object? sender, PropertyChangingEventArgs e)
         {
             var propertyName = e.PropertyName;
