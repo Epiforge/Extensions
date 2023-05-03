@@ -16,8 +16,8 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Documentation", "Documentation", "{C279A752-FFA1-4A0A-8581-1129DC927471}"
 	ProjectSection(SolutionItems) = preProject
 		CONTRIBUTING.md = CONTRIBUTING.md
-		Extensions.jpg = Extensions.jpg
 		LICENSE = LICENSE
+		Extensions.jpg = Extensions.jpg
 		README.md = README.md
 	EndProjectSection
 EndProject
