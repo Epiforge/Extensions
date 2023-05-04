@@ -40,7 +40,15 @@ steps:
   displayName: 'Test'
   inputs:
     command: 'test'
-    arguments: '--configuration $(buildConfiguration) --no-build --collect "Code coverage"'
+    arguments: '--configuration $(buildConfiguration) --no-build --collect "Code coverage" /p:Exclude="[moq.*]*"'
+    publishTestResults: true
+    testRunTitle: 'Unit Tests'
+
+- task: PublishCodeCoverageResults@1
+  displayName: 'Code coverage'
+  inputs:
+    codeCoverageTool: Cobertura
+    summaryFileLocation: '$(System.DefaultWorkingDirectory)/**/coverage.cobertura.xml'
 
 - task: CopyFiles@2
   displayName: 'Copy artifacts to staging'
