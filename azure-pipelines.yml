@@ -39,8 +39,8 @@ steps:
 - task: DotNetCoreCLI@2
   displayName: 'Test'
   inputs:
-    command: 'test'
-    arguments: '--configuration $(buildConfiguration) --no-build --collect "Code coverage"'
+    command: test
+    arguments: '--configuration $(buildConfiguration) --no-build --collect "Code coverage" --settings .runsettings'
     publishTestResults: true
 
 - task: PublishCodeCoverageResults@1
