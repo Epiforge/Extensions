@@ -40,9 +40,8 @@ steps:
   displayName: 'Test'
   inputs:
     command: 'test'
-    arguments: '--configuration $(buildConfiguration) --no-build --collect "Code coverage" /p:Exclude="[moq]*"'
+    arguments: '--configuration $(buildConfiguration) --no-build --collect "Code coverage"'
     publishTestResults: true
-    testRunTitle: 'Unit Tests'
 
 - task: PublishCodeCoverageResults@1
   displayName: 'Code coverage'
