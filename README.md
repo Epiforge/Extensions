@@ -65,4 +65,4 @@ Be sure to set the protected `Logger` property if you want the abstract class to
 
 # Acknowledgements
 
-Makes use of the glorious [AsyncEx](https://github.com/StephenCleary/AsyncEx) library by Stephen Cleary and the [Poly#](https://github.com/Sergio0694/PolySharp/) NuGet package by Sergio Pedri because it's just great.
+Makes use of the glorious [AsyncEx](https://github.com/StephenCleary/AsyncEx) library by Stephen Cleary.
