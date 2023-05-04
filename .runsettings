@@ -8,7 +8,6 @@
                         <ModulePaths>
                             <Exclude>
                                 <ModulePath>moq.*</ModulePath>
-                                <ModulePath>*.Tests.*</ModulePath>
                                 <!-- Add more ModulePath nodes here. -->
                             </Exclude>
                         </ModulePaths>
