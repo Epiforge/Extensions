@@ -40,5 +40,3 @@ To address this, this library offers the following extension methods which will 
 * `PropertyInfo.FastSetValue`
 
 Use of these methods in .NET 7 or later will simply call the built-in methods, as they are now optimized.
-
-Also includes extension methods for `Type` which search for implementations of events, methods, and properties.
