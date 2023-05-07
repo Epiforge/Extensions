@@ -15,6 +15,7 @@ Supports `netstandard2.0`.
   - [Components](#components)
     - [Property Change Notification](#property-change-notification)
     - [Disposal](#disposal)
+    - [Reflection](#reflection)
 - [License](#license)
 - [Contributing](#contributing)
 - [Acknowledgements](#acknowledgements)
