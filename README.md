@@ -4,7 +4,7 @@
 
 General utilities to help with stuff in .NET Development, from Epiforge.
 
-Supports `netstandard2.0`.
+Supports `net462`, `net6.0`, `net7.0`, and `netstandard2.1`.
 
 ![Azure Pipelines](https://dev.azure.com/epiforge/extensions/_apis/build/status/epiforge.extensions)
 ![Build](https://img.shields.io/azure-devops/build/epiforge/extensions/4.svg?logo=azuredevops&logoColor=white)
