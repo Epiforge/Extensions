@@ -22,13 +22,12 @@
         <RepositoryType>GitHub</RepositoryType>
         <RepositoryUrl>https://github.com/Epiforge/Epiforge.Extensions</RepositoryUrl>
         <SymbolPackageFormat>snupkg</SymbolPackageFormat>
-        <TargetFrameworks>netstandard2.0;net6.0</TargetFrameworks>
+        <TargetFrameworks>net462;netstandard2.1;net6.0;net7.0</TargetFrameworks>
         <WarningsAsErrors>CS8600;CS8602;CS8603</WarningsAsErrors>
         <Version>1.0.0</Version>
-    </PropertyGroup>
-
-    <PropertyGroup>
-        <DefineConstants Condition="'$(TargetFramework)' == 'net6.0'">$(DefineConstants);IS_NET_6_0_OR_GREATER</DefineConstants>
+        <DefineConstants Condition="'$(TargetFramework)' == 'netstandard2.1' or '$(TargetFramework)' == 'net6.0' or '$(TargetFramework)' == 'net7.0'">$(DefineConstants);IS_NET_STANDARD_2_1_OR_GREATER</DefineConstants>
+        <DefineConstants Condition="'$(TargetFramework)' == 'net6.0' or '$(TargetFramework)' == 'net7.0'">$(DefineConstants);IS_NET_6_0_OR_GREATER</DefineConstants>
+        <DefineConstants Condition="'$(TargetFramework)' == 'net7.0'">$(DefineConstants);IS_NET_7_0_OR_GREATER</DefineConstants>
     </PropertyGroup>
 
     <Target Name="PreparePackageReleaseNotesFromFile" BeforeTargets="GenerateNuspec">
@@ -41,9 +40,12 @@
     </Target>
 
     <ItemGroup>
+        <PackageReference Include="Ben.Demystifier" Version="0.4.1" />
         <PackageReference Include="Microsoft.Extensions.Logging" Version="7.0.0" />
         <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.1" PrivateAssets="all" />
         <PackageReference Include="Nito.AsyncEx" Version="5.1.2" />
+        <PackageReference Include="System.Text.Json" Version="7.0.2" />
+        <PackageReference Include="System.Threading.Tasks.Dataflow" Version="7.0.0" />
     </ItemGroup>
 
     <ItemGroup>

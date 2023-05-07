@@ -8,7 +8,7 @@
         <LangVersion>latest</LangVersion>
         <Nullable>enable</Nullable>
         <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
-        <TargetFrameworks>net48;net6.0;net7.0</TargetFrameworks>
+        <TargetFrameworks>net462;net6.0;net7.0</TargetFrameworks>
     </PropertyGroup>
 
     <ItemGroup>
@@ -18,6 +18,7 @@
         <PackageReference Include="MSTest.TestAdapter" Version="3.0.2" />
         <PackageReference Include="MSTest.TestFramework" Version="3.0.2" />
         <PackageReference Include="coverlet.collector" Version="3.2.0" />
+        <PackageReference Include="System.Net.Http" Version="4.3.4" />
     </ItemGroup>
 
     <ItemGroup>

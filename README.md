@@ -55,6 +55,21 @@ This library also provides the `INotifyDisposing`, `INotifyDisposed`, and `INoti
 
 Be sure to set the protected `Logger` property if you want the abstract class to log what's going on with disposal.
 
+### Reflection
+
+This library has useful tools for when you can't be certain of some things at compile time, such as types, methods, etc.
+While .NET reflection is immensely powerful, prior to .NET 7, it's not very quick.
+To address this, this library offers the following extension methods which will emit IL, generate delegates, and cache them for expedited use of Reflection:
+
+* `ConstructorInfo.FastInvoke`
+* `MethodInfo.FastInvoke`
+* `PropertyInfo.FastGetValue`
+* `PropertyInfo.FastSetValue`
+
+Use of these methods in .NET 7 or later will simply call the built-in methods, as they are now optimized.
+
+Also includes extension methods for `Type` which search for implementations of events, methods, and properties.
+
 # License
 
 [Apache 2.0 License](LICENSE)

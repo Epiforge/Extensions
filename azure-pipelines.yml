@@ -6,12 +6,20 @@ variables:
 
 steps:
 - task: PowerShell@2
-  displayName: 'Install .NET 4.8.1'
+  displayName: 'Install .NET 4.6.2'
   inputs:
     targetType: 'inline'
     script: |
-      Invoke-WebRequest -Uri 'https://download.visualstudio.microsoft.com/download/pr/6f083c7e-bd40-44d4-9e3f-ffba71ec8b09/9ba926620d8e7568cbd0b84c7177a984/ndp481-devpack-enu.exe' -OutFile 'ndp481-devpack-enu.exe'
-      Start-Process -FilePath 'ndp481-devpack-enu.exe' -ArgumentList '/quiet' -Wait
+      Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/?linkid=2099466' -OutFile 'ndp462-devpack-kb3151934-enu'
+      Start-Process -FilePath 'ndp462-devpack-kb3151934-enu' -ArgumentList '/quiet' -Wait
+
+#- task: PowerShell@2
+#  displayName: 'Install .NET 4.8.1'
+#  inputs:
+#    targetType: 'inline'
+#    script: |
+#      Invoke-WebRequest -Uri 'https://download.visualstudio.microsoft.com/download/pr/6f083c7e-bd40-44d4-9e3f-ffba71ec8b09/9ba926620d8e7568cbd0b84c7177a984/ndp481-devpack-enu.exe' -OutFile 'ndp481-devpack-enu.exe'
+#      Start-Process -FilePath 'ndp481-devpack-enu.exe' -ArgumentList '/quiet' -Wait
 
 - task: UseDotNet@2
   displayName: 'Install .NET 6'
@@ -42,12 +50,6 @@ steps:
     command: test
     arguments: '--configuration $(buildConfiguration) --no-build --collect "Code coverage" --settings .runsettings'
     publishTestResults: true
-
-- task: PublishCodeCoverageResults@1
-  displayName: 'Code coverage'
-  inputs:
-    codeCoverageTool: Cobertura
-    summaryFileLocation: '$(System.DefaultWorkingDirectory)/**/coverage.cobertura.xml'
 
 - task: CopyFiles@2
   displayName: 'Copy artifacts to staging'
