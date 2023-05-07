@@ -5,21 +5,21 @@ variables:
   buildConfiguration: 'Release'
 
 steps:
-- task: PowerShell@2
-  displayName: 'Install .NET 4.6.2'
-  inputs:
-    targetType: 'inline'
-    script: |
-      Invoke-WebRequest -Uri 'https://download.visualstudio.microsoft.com/download/pr/ea744c52-1db4-4173-943d-a5d18e7e0d97/105c0e17be525bb0cebc7795d7aa1c32/ndp462-devpack-kb3151934-enu.exe' -OutFile 'ndp462-devpack-kb3151934-enu'
-      Start-Process -FilePath 'ndp462-devpack-kb3151934-enu' -ArgumentList '/quiet' -Wait
+# - task: PowerShell@2
+#   displayName: 'Install .NET 4.6.2'
+#   inputs:
+#     targetType: 'inline'
+#     script: |
+#       Invoke-WebRequest -Uri 'https://download.visualstudio.microsoft.com/download/pr/ea744c52-1db4-4173-943d-a5d18e7e0d97/105c0e17be525bb0cebc7795d7aa1c32/ndp462-devpack-kb3151934-enu.exe' -OutFile 'ndp462-devpack-kb3151934-enu'
+#       Start-Process -FilePath 'ndp462-devpack-kb3151934-enu' -ArgumentList '/quiet' -Wait
 
-#- task: PowerShell@2
-#  displayName: 'Install .NET 4.8.1'
-#  inputs:
-#    targetType: 'inline'
-#    script: |
-#      Invoke-WebRequest -Uri 'https://download.visualstudio.microsoft.com/download/pr/6f083c7e-bd40-44d4-9e3f-ffba71ec8b09/9ba926620d8e7568cbd0b84c7177a984/ndp481-devpack-enu.exe' -OutFile 'ndp481-devpack-enu.exe'
-#      Start-Process -FilePath 'ndp481-devpack-enu.exe' -ArgumentList '/quiet' -Wait
+- task: PowerShell@2
+ displayName: 'Install .NET 4.8.1'
+ inputs:
+   targetType: 'inline'
+   script: |
+     Invoke-WebRequest -Uri 'https://download.visualstudio.microsoft.com/download/pr/6f083c7e-bd40-44d4-9e3f-ffba71ec8b09/9ba926620d8e7568cbd0b84c7177a984/ndp481-devpack-enu.exe' -OutFile 'ndp481-devpack-enu.exe'
+     Start-Process -FilePath 'ndp481-devpack-enu.exe' -ArgumentList '/quiet' -Wait
 
 - task: UseDotNet@2
   displayName: 'Install .NET 6'
