@@ -1,7 +1,3 @@
-using System.Diagnostics;
-using System.Drawing;
-using System.Reflection;
-
 namespace Epiforge.Extensions.Components.Tests;
 
 [TestClass]
@@ -14,6 +10,25 @@ public class ReflectionExtensions
         var result = constructor.FastInvoke("{85D27B78-67DA-4EC7-A968-40564E33F3AA}");
         Assert.IsInstanceOfType(result, typeof(Guid));
     }
+
+    [TestMethod]
+    public void DefaultInteger()
+    {
+        var result = typeof(int).FastDefault();
+        Assert.AreEqual(0, result);
+    }
+
+    [TestMethod]
+    public void DefaultString()
+    {
+        var result = typeof(string).FastDefault();
+        Assert.IsNull(result);
+    }
+
+    [TestMethod]
+    [ExpectedException(typeof(ArgumentNullException))]
+    public void DefaultNullType() =>
+        ((Type?)null!).FastDefault();
 
     [TestMethod]
     public void IndexerPropertyInfoFastGetValue()

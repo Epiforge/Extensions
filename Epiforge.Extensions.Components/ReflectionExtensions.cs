@@ -1,11 +1,3 @@
-using System.Reflection;
-using System.Linq;
-
-#if !IS_NET_7_0_OR_GREATER
-using System.Collections.Concurrent;
-using System.Reflection.Emit;
-#endif
-
 namespace Epiforge.Extensions.Components;
 
 /// <summary>
@@ -13,6 +5,20 @@ namespace Epiforge.Extensions.Components;
 /// </summary>
 public static class ReflectionExtensions
 {
+    static readonly ConcurrentDictionary<Type, MethodInfo> getDefaultValueByType = new();
+
+#if IS_NET_STANDARD_2_1_OR_GREATER
+    static T? GetDefaultValue<T>() =>
+        default;
+#endif
+
+    static MethodInfo GetDefaultValueByTypeValueFactory(Type type) =>
+#if IS_NET_STANDARD_2_1_OR_GREATER
+        typeof(ReflectionExtensions).GetMethod(nameof(GetDefaultValue), BindingFlags.NonPublic | BindingFlags.Static)!.MakeGenericMethod(type);
+    #else
+        typeof(ReflectionExtensions).GetMethod(nameof(GetDefaultValue), BindingFlags.Public | BindingFlags.Static)!.MakeGenericMethod(type);
+#endif
+
 #if !IS_NET_7_0_OR_GREATER
     delegate object InvokeConstructorDelegate(object?[] arguments);
     delegate object? InvokeMethodDelegate(object? instance, object?[] arguments);
@@ -72,6 +78,21 @@ public static class ReflectionExtensions
         return (InvokeMethodDelegate)dynamicMethod.CreateDelegate(typeof(InvokeMethodDelegate));
     }
 #endif
+
+    /// <summary>
+    /// Returns the default value for the specified type as quickly as possible
+    /// </summary>
+    /// <param name="type">The type</param>
+    public static object? FastDefault(this Type type)
+    {
+#if IS_NET_6_0_OR_GREATER
+        ArgumentNullException.ThrowIfNull(type);
+#else
+        if (type is null)
+            throw new ArgumentNullException(nameof(type));
+#endif
+        return getDefaultValueByType.GetOrAdd(type, GetDefaultValueByTypeValueFactory).FastInvoke(null);
+    }
 
     /// <summary>
     /// Returns the value for the specified property of the specified object as quickly as possible
@@ -160,4 +181,14 @@ public static class ReflectionExtensions
         FastInvoke(setMethod, instance, index.Concat(new object?[] { value }).ToArray());
 #endif
     }
+
+#if !IS_NET_STANDARD_2_1_OR_GREATER
+    /// <summary>
+    /// This method is used to perform silly reflection tricks and should not be used by callers (use the default keyword in your own code instead)
+    /// </summary>
+    /// <typeparam name="T">Type</typeparam>
+    [Obsolete("This method is used to perform silly reflection tricks and should not be used by callers (use the default keyword in your own code instead)", true)]
+    public static T? GetDefaultValue<T>() =>
+        default;
+#endif
 }

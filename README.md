@@ -62,12 +62,15 @@ This library has useful tools for when you can't be certain of some things at co
 While .NET reflection is immensely powerful, prior to .NET 7, it's not very quick.
 To address this, this library offers the following extension methods which will emit IL, generate delegates, and cache them for expedited use of Reflection:
 
-* `ConstructorInfo.FastInvoke`
-* `MethodInfo.FastInvoke`
-* `PropertyInfo.FastGetValue`
-* `PropertyInfo.FastSetValue`
+* `ConstructorInfo.FastInvoke`: call a constructor only known at runtime quickly
+* `MethodInfo.FastInvoke`: call a method only known at runtime quickly
+* `PropertyInfo.FastGetValue`: get the value of a property only known at runtime quickly
+* `PropertyInfo.FastSetValue`: set the value of a property only known at runtime quickly
+* `Type.FastDefault`: get the default value of a type only known at runtime quickly
 
 Use of these methods in .NET 7 or later will simply call the built-in methods, as they are now optimized.
+
+This library also offers `FastComparer` and `FastEqualityComparer`, which implement `IComparer` and `IEqualityComaprer`, respectively, but quickly use the methods of `Comparer<>.Default` and `EqualityComaprer<>.Default`, respectively, to do their work.
 
 # License
 
@@ -79,4 +82,6 @@ Use of these methods in .NET 7 or later will simply call the built-in methods, a
 
 # Acknowledgements
 
-Makes use of the glorious [AsyncEx](https://github.com/StephenCleary/AsyncEx) library by Stephen Cleary.
+Makes use of the following excellent libraries:
+* [AsyncEx](https://github.com/StephenCleary/AsyncEx) by Stephen Cleary
+* [Ben.Demystifier](https://github.com/benaadams/Ben.Demystifier) by Ben Adams
