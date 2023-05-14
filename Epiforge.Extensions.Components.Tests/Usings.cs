@@ -1,7 +1,12 @@
+global using Microsoft.Extensions.DependencyInjection;
 global using Microsoft.Extensions.Logging;
 global using Microsoft.VisualStudio.TestTools.UnitTesting;
 global using Moq;
+global using System;
+global using System.Collections.Generic;
 global using System.ComponentModel;
 global using System.Diagnostics;
 global using System.Drawing;
+global using System.Linq;
 global using System.Reflection;
+global using System.Threading.Tasks;

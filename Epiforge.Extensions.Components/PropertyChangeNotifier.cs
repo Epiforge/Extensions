@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Epiforge.Extensions.Components;
 
 /// <summary>
@@ -29,8 +31,12 @@ public abstract class PropertyChangeNotifier :
     /// <exception cref="ArgumentNullException"><paramref name="e"/> is null</exception>
     protected virtual void OnPropertyChanged(PropertyChangedEventArgs e)
     {
+#if IS_NET_6_0_OR_GREATER
+        ArgumentNullException.ThrowIfNull(e);
+#else
         if (e is null)
             throw new ArgumentNullException(nameof(e));
+#endif
         Logger?.LogDebug("Raising PropertyChanged event for property \"{PropertyName}\"", e.PropertyName);
         PropertyChanged?.Invoke(this, e);
         Logger?.LogDebug("Raised PropertyChanged event for property \"{PropertyName}\"", e.PropertyName);
@@ -43,8 +49,12 @@ public abstract class PropertyChangeNotifier :
 	/// <exception cref="ArgumentNullException"><paramref name="propertyName"/> is null</exception>
     protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
+#if IS_NET_6_0_OR_GREATER
+        ArgumentNullException.ThrowIfNull(propertyName);
+#else
         if (propertyName is null)
             throw new ArgumentNullException(nameof(propertyName));
+#endif
         OnPropertyChanged(new PropertyChangedEventArgs(propertyName));
     }
 
@@ -55,8 +65,12 @@ public abstract class PropertyChangeNotifier :
     /// <exception cref="ArgumentNullException"><paramref name="e"/> is null</exception>
     protected virtual void OnPropertyChanging(PropertyChangingEventArgs e)
     {
+#if IS_NET_6_0_OR_GREATER
+        ArgumentNullException.ThrowIfNull(e);
+#else
         if (e is null)
             throw new ArgumentNullException(nameof(e));
+#endif
         Logger?.LogDebug("Raising PropertyChanging event for property \"{PropertyName}\"", e.PropertyName);
         PropertyChanging?.Invoke(this, e);
         Logger?.LogDebug("Raised PropertyChanging event for property \"{PropertyName}\"", e.PropertyName);
@@ -69,8 +83,12 @@ public abstract class PropertyChangeNotifier :
     /// <exception cref="ArgumentNullException"><paramref name="propertyName"/> is null</exception>
     protected void OnPropertyChanging([CallerMemberName] string? propertyName = null)
     {
+#if IS_NET_6_0_OR_GREATER
+        ArgumentNullException.ThrowIfNull(propertyName);
+#else
         if (propertyName is null)
             throw new ArgumentNullException(nameof(propertyName));
+#endif
         OnPropertyChanging(new PropertyChangingEventArgs(propertyName));
     }
 

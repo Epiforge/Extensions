@@ -15,8 +15,16 @@ public class FastComparer :
     /// Gets a <see cref="FastComparer"/> for the specified type
     /// </summary>
     /// <param name="type">The type</param>
-    public static FastComparer Get(Type type) =>
-        type is null ? throw new ArgumentNullException(nameof(type)) : comparers.GetOrAdd(type, ComparersValueFactory);
+    public static FastComparer Get(Type type)
+    {
+#if IS_NET_6_0_OR_GREATER
+        ArgumentNullException.ThrowIfNull(type);
+#else
+        if (type is null)
+            throw new ArgumentNullException(nameof(type));
+#endif
+        return comparers.GetOrAdd(type, ComparersValueFactory);
+    }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="FastEqualityComparer"/> class
