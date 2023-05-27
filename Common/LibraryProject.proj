@@ -1,20 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
-
-    <PropertyGroup>
-        <Product>Epiforge.Extensions.Components</Product>
-        <Version>1.0.0</Version>
-        <Description>This package assists in building components.</Description>
-    </PropertyGroup>
-
-    <ItemGroup>
-        <PackageReference Include="Ben.Demystifier" Version="0.4.1" />
-        <PackageReference Include="Microsoft.Extensions.Logging" Version="7.0.0" />
-        <PackageReference Include="Microsoft.Extensions.ObjectPool" Version="7.0.5" />
-        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.1" PrivateAssets="all" />
-        <PackageReference Include="Nito.AsyncEx" Version="5.1.2" />
-        <PackageReference Include="System.Text.Json" Version="7.0.2" />
-        <PackageReference Include="System.Threading.Tasks.Dataflow" Version="7.0.0" />
-    </ItemGroup>
+<Project>
 
     <PropertyGroup>
         <Authors>Epiforge</Authors>
@@ -54,12 +38,12 @@
     </Target>
 
     <ItemGroup>
-        <Compile Include="..\Common\AssemblyInfo.cs" Link="AssemblyInfo.cs" />
+      <Compile Include="..\Common\AssemblyInfo.cs" Link="AssemblyInfo.cs" />
     </ItemGroup>
 
     <ItemGroup>
         <None Include="README.md" Pack="True" PackagePath="" />
         <None Include="NuGet.jpg" Pack="True" PackagePath="" />
     </ItemGroup>
-
+    
 </Project>

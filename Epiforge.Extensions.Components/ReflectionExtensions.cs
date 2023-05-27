@@ -7,6 +7,40 @@ public static class ReflectionExtensions
 {
     static readonly ConcurrentDictionary<Type, MethodInfo> getDefaultValueByType = new();
 
+    static string EscapeCharacter(char c)
+    {
+        return c switch
+        {
+            '\0' => "\\0",
+            '\a' => "\\a",
+            '\b' => "\\b",
+            '\f' => "\\f",
+            '\n' => "\\n",
+            '\r' => "\\r",
+            '\t' => "\\t",
+            '\v' => "\\v",
+            '\\' => "\\\\",
+            '\'' => "\\'",
+            '\"' => "\\\"",
+            var nonPrintable when IsNonPrintableAsciiCharacter(nonPrintable) => $"\\x{(int)nonPrintable:x2}",
+            _ => throw new ArgumentException($"Invalid character: {c}")
+        };
+    }
+
+    static string EscapeStringLiteral(string input)
+    {
+        var escapedString = new StringBuilder();
+        for (int i = 0, ii = input.Length; i < ii; ++i)
+        {
+            var c = input[i];
+            if (ShouldEscapeCharacter(c))
+                escapedString.Append(EscapeCharacter(c));
+            else
+                escapedString.Append(c);
+        }
+        return escapedString.ToString();
+    }
+
 #if IS_NET_STANDARD_2_1_OR_GREATER
     static T? GetDefaultValue<T>() =>
         default;
@@ -15,7 +49,7 @@ public static class ReflectionExtensions
     static MethodInfo GetDefaultValueByTypeValueFactory(Type type) =>
 #if IS_NET_STANDARD_2_1_OR_GREATER
         typeof(ReflectionExtensions).GetMethod(nameof(GetDefaultValue), BindingFlags.NonPublic | BindingFlags.Static)!.MakeGenericMethod(type);
-    #else
+#else
         typeof(ReflectionExtensions).GetMethod(nameof(GetDefaultValue), BindingFlags.Public | BindingFlags.Static)!.MakeGenericMethod(type);
 #endif
 
@@ -191,4 +225,49 @@ public static class ReflectionExtensions
     public static T? GetDefaultValue<T>() =>
         default;
 #endif
+
+    static bool IsNonPrintableAsciiCharacter(char c) =>
+        c is < ' ' or > '~';
+
+    static bool ShouldEscapeCharacter(char c) =>
+        c switch
+        {
+            '\0' or '\a' or '\b' or '\f' or '\n' or '\r' or '\t' or '\v' or '\\' or '\'' or '\"' => true,
+            var nonPrintable when IsNonPrintableAsciiCharacter(nonPrintable) => true,
+            _ => false
+        };
+
+    /// <summary>
+    /// Produces a string representation of the specified object that can be used as a literal in C# source code
+    /// </summary>
+    /// <param name="obj">The object</param>
+    public static string ToObjectLiteral(this object? obj) =>
+        obj switch
+        {
+            bool b => b ? "true" : "false",
+            byte b => $"0x{b:X2}",
+            sbyte sb => $"0x{sb:X2}",
+            short s => $"(short){s}",
+            ushort us => $"(ushort){us}",
+            int i => i.ToString(),
+            uint ui => $"{ui}u",
+            long l => $"{l}L",
+            ulong ul => $"{ul}UL",
+            float f => $"{f}f",
+            double d => $"{d}d",
+            decimal d => $"{d}m",
+            char nonPrintable when IsNonPrintableAsciiCharacter(nonPrintable) => $"'\\x{(int)nonPrintable:x2}'",
+            char shouldEscape when ShouldEscapeCharacter(shouldEscape) => $"'{EscapeCharacter(shouldEscape)}'",
+            Guid guid => $"new Guid(\"{guid}\")",
+            DateTime dateTime => $"new DateTime({dateTime.Ticks}L, DateTimeKind.{dateTime.Kind})",
+            TimeSpan timeSpan => $"new TimeSpan({timeSpan.Ticks}L)",
+            DateTimeOffset dateTimeOffset => $"new DateTimeOffset({dateTimeOffset.Ticks}L, new TimeSpan({dateTimeOffset.Offset.Ticks}L))",
+            Enum e => $"{e.GetType().FullName}.{e}",
+            char c => $"'{c}'",
+            string s => $"\"{EscapeStringLiteral(s)}\"",
+            IDictionary dictionary when obj.GetType().IsConstructedGenericType => $"new {obj.GetType().FullName} {{ {string.Join(", ", dictionary.Keys.Cast<object>().Select(key => $"{ToObjectLiteral(key)}, {ToObjectLiteral(dictionary[key])}"))} }}",
+            IEnumerable enumerable => $"new {obj.GetType().FullName} {{ {string.Join(", ", enumerable.Cast<object>().Select(ToObjectLiteral))} }}",
+            null => "null",
+            _ => obj.ToString() ?? "null"
+        };
 }

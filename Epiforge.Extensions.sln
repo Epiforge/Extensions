@@ -24,6 +24,13 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Documentation", "Documentat
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Epiforge.Extensions.Components.Tests", "Epiforge.Extensions.Components.Tests\Epiforge.Extensions.Components.Tests.csproj", "{D3770F22-0BC6-40D9-ADD4-21F96E0BF30A}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Common", "Common", "{30D1B25A-632D-4BDF-B01A-2B1D80D38E0D}"
+	ProjectSection(SolutionItems) = preProject
+		Common\AssemblyInfo.cs = Common\AssemblyInfo.cs
+		Common\LibraryProject.proj = Common\LibraryProject.proj
+		Common\LibraryTestProject.proj = Common\LibraryTestProject.proj
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU

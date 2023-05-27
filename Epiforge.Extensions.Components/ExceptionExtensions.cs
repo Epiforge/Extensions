@@ -5,7 +5,9 @@ namespace Epiforge.Extensions.Components;
 /// </summary>
 public static class ExceptionExtensions
 {
+    static readonly Regex newLinePattern = new(@"(\r\n|\r|\n)", RegexOptions.Compiled);
     static readonly ConcurrentDictionary<Type, IReadOnlyList<PropertyInfo>> propertiesByType = new();
+    static readonly Regex stackTraceIndentation = new(@"^   ", RegexOptions.Compiled | RegexOptions.Multiline);
     static readonly ConcurrentDictionary<Type, DefaultObjectPool<XmlSerializer>> xmlSerializerObjectPoolByType = new();
 
     static IReadOnlyList<PropertyInfo> PropertiesByTypeValueFactory(Type type) =>
@@ -189,10 +191,18 @@ public static class ExceptionExtensions
                     json.WriteString(name, uriValue.ToString());
                 else if (value is Version versionValue)
                     json.WriteString(name, versionValue.ToString());
-                else if (value is { })
-                    json.WriteString(name, value.ToString());
                 else
-                    json.WriteNull(name);
+                {
+                    json.WritePropertyName(name);
+                    try
+                    {
+                        JsonSerializer.Serialize(json, value);
+                    }
+                    catch (NotSupportedException)
+                    {
+                        JsonSerializer.Serialize(json, value?.ToString());
+                    }
+                }
             }
             json.WriteEndObject();
         }
@@ -257,41 +267,58 @@ public static class ExceptionExtensions
 
     static string GetFullDetailsInPlainText(Exception? ex, int indent)
     {
-        var exceptionMessages = new List<string>();
+        var exceptionDetails = new List<string>();
         var top = true;
         while (ex is not null)
         {
             var indentation = new string(' ', indent * 3);
-            if (string.IsNullOrWhiteSpace(ex.StackTrace))
+            var additionalLineIndentation = new string(' ', (indent + 1) * 3);
+            var additionalLines = new StringBuilder();
+            var reflectionTypeLoad = ex as ReflectionTypeLoadException;
+            if (reflectionTypeLoad?.Types.Length > 0)
+                additionalLines.Append($"{Environment.NewLine}Types: {string.Join(", ", reflectionTypeLoad.Types.Where(t => t is not null).Select(t => t!.FullName))}");
+            if (ex.Data?.Count > 0)
+                foreach (var key in ex.Data.Keys)
+                {
+                    object? value = null;
+                    try
+                    {
+                        if (key is not null)
+                            value = ex.Data[key];
+                    }
+                    catch (KeyNotFoundException)
+                    {
+                        // do nothing
+                    }
+                    additionalLines.Append($"{Environment.NewLine}.Data[{key.ToObjectLiteral()}] = {value.ToObjectLiteral()}");
+                }
+            var additionalProperties = GetAdditionalProperties(ex, ex.GetType());
+            if (additionalProperties.Any())
+                foreach (var (name, value) in additionalProperties)
+                    additionalLines.Append($"{Environment.NewLine}.{name} = {value.ToObjectLiteral()}");
 #if IS_NET_STANDARD_2_1_OR_GREATER
-                exceptionMessages.Add($"{indentation}{(top ? "-- " : "   ")}{ex.GetType().Name}: {ex.Message}".Replace($"{Environment.NewLine}", $"{Environment.NewLine}{indentation}", StringComparison.OrdinalIgnoreCase));
+            exceptionDetails.Add(newLinePattern.Replace($"{indentation}{(top ? "-- " : "   ")}{ex.GetType().Name}: {ex.Message}{additionalLines}{(string.IsNullOrWhiteSpace(ex.StackTrace) ? string.Empty : $"{Environment.NewLine}{stackTraceIndentation.Replace(ex.StackTrace, string.Empty)}")}", $"{Environment.NewLine}{additionalLineIndentation}"));
 #else
-                exceptionMessages.Add($"{indentation}{(top ? "-- " : "   ")}{ex.GetType().Name}: {ex.Message}".Replace($"{Environment.NewLine}", $"{Environment.NewLine}{indentation}"));
+            exceptionDetails.Add(newLinePattern.Replace($"{indentation}{(top ? "-- " : "   ")}{ex.GetType().Name}: {ex.Message}{additionalLines}{(string.IsNullOrWhiteSpace(ex.StackTrace) ? string.Empty : $"{Environment.NewLine}{stackTraceIndentation.Replace(ex.StackTrace, string.Empty)}")}", $"{Environment.NewLine}{additionalLineIndentation}"));
 #endif
-            else
-#if IS_NET_STANDARD_2_1_OR_GREATER
-                exceptionMessages.Add($"{indentation}{(top ? "-- " : "   ")}{ex.GetType().Name}: {ex.Message}{Environment.NewLine}{ex.StackTrace}".Replace($"{Environment.NewLine}", $"{Environment.NewLine}{indentation}", StringComparison.OrdinalIgnoreCase));
-#else
-                exceptionMessages.Add($"{indentation}{(top ? "-- " : "   ")}{ex.GetType().Name}: {ex.Message}{Environment.NewLine}{ex.StackTrace}".Replace($"{Environment.NewLine}", $"{Environment.NewLine}{indentation}"));
-#endif
-            if (ex is ReflectionTypeLoadException reflectedTypeLoad && reflectedTypeLoad.LoaderExceptions?.Length > 0)
+            if (reflectionTypeLoad?.LoaderExceptions?.Length > 0)
             {
-                foreach (var loader in reflectedTypeLoad.LoaderExceptions)
+                foreach (var loader in reflectionTypeLoad.LoaderExceptions)
                     if (loader is not null)
-                        exceptionMessages.Add(GetFullDetailsInPlainText(loader, indent + 1));
+                        exceptionDetails.Add(GetFullDetailsInPlainText(loader, indent + 1));
                 break;
             }
             else if (ex is AggregateException aggregate && aggregate.InnerExceptions?.Count > 0)
             {
                 foreach (var inner in aggregate.InnerExceptions)
-                    exceptionMessages.Add(GetFullDetailsInPlainText(inner, indent + 1));
+                    exceptionDetails.Add(GetFullDetailsInPlainText(inner, indent + 1));
                 break;
             }
             else
                 ex = ex.InnerException;
             top = false;
         }
-        return string.Join(string.Join("{0}{0}", Environment.NewLine), exceptionMessages);
+        return string.Join($"{Environment.NewLine}{Environment.NewLine}", exceptionDetails);
     }
 
     [SuppressMessage("Maintainability", "CA1502: Avoid excessive complexity")]
