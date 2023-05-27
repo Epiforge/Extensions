@@ -233,7 +233,6 @@ public static class ReflectionExtensions
         c switch
         {
             '\0' or '\a' or '\b' or '\f' or '\n' or '\r' or '\t' or '\v' or '\\' or '\'' or '\"' => true,
-            var nonPrintable when IsNonPrintableAsciiCharacter(nonPrintable) => true,
             _ => false
         };
 
@@ -245,29 +244,30 @@ public static class ReflectionExtensions
         obj switch
         {
             bool b => b ? "true" : "false",
-            byte b => $"0x{b:X2}",
-            sbyte sb => $"0x{sb:X2}",
+            byte b => $"(byte)0x{b:X2}",
+            sbyte sb => $"(sbyte)0x{sb:X2}",
             short s => $"(short){s}",
             ushort us => $"(ushort){us}",
             int i => i.ToString(),
-            uint ui => $"{ui}u",
+            uint ui => $"{ui}U",
             long l => $"{l}L",
             ulong ul => $"{ul}UL",
-            float f => $"{f}f",
-            double d => $"{d}d",
-            decimal d => $"{d}m",
-            char nonPrintable when IsNonPrintableAsciiCharacter(nonPrintable) => $"'\\x{(int)nonPrintable:x2}'",
+            float f => $"{f}F",
+            double d => $"{d}D",
+            decimal d => $"{d}M",
             char shouldEscape when ShouldEscapeCharacter(shouldEscape) => $"'{EscapeCharacter(shouldEscape)}'",
+            char nonPrintable when IsNonPrintableAsciiCharacter(nonPrintable) => $"'\\u{(int)nonPrintable:X4}'",
             Guid guid => $"new Guid(\"{guid}\")",
             DateTime dateTime => $"new DateTime({dateTime.Ticks}L, DateTimeKind.{dateTime.Kind})",
             TimeSpan timeSpan => $"new TimeSpan({timeSpan.Ticks}L)",
             DateTimeOffset dateTimeOffset => $"new DateTimeOffset({dateTimeOffset.Ticks}L, new TimeSpan({dateTimeOffset.Offset.Ticks}L))",
-            Enum e => $"{e.GetType().FullName}.{e}",
+            Enum e => $"{e.GetType().Name}.{e}",
             char c => $"'{c}'",
             string s => $"\"{EscapeStringLiteral(s)}\"",
-            IDictionary dictionary when obj.GetType().IsConstructedGenericType => $"new {obj.GetType().FullName} {{ {string.Join(", ", dictionary.Keys.Cast<object>().Select(key => $"{ToObjectLiteral(key)}, {ToObjectLiteral(dictionary[key])}"))} }}",
-            IEnumerable enumerable => $"new {obj.GetType().FullName} {{ {string.Join(", ", enumerable.Cast<object>().Select(ToObjectLiteral))} }}",
             null => "null",
+            IDictionary dictionary when obj.GetType() is { } type && type.IsConstructedGenericType => $"new {type.GetGenericTypeDefinition().Name.Split('`')[0]}<{string.Join(", ", type.GenericTypeArguments.Select(gta => gta.Name))}> {{ {string.Join(", ", dictionary.Keys.Cast<object>().Select(key => $"{{ {ToObjectLiteral(key)}, {ToObjectLiteral(dictionary[key])} }}"))} }}",
+            IEnumerable enumerable when obj.GetType() is { } type && type.IsConstructedGenericType => $"new {type.GetGenericTypeDefinition().Name.Split('`')[0]}<{type.GetGenericArguments()[0].Name}> {{ {string.Join(", ", enumerable.Cast<object>().Select(ToObjectLiteral))} }}",
+            IEnumerable enumerable when obj.GetType() is { } type && type.IsArray => $"new {type.GetElementType()?.Name ?? "object"}[] {{ {string.Join(", ", enumerable.Cast<object>().Select(ToObjectLiteral))} }}",
             _ => obj.ToString() ?? "null"
         };
 }

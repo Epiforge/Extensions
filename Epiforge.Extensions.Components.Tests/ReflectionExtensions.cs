@@ -106,6 +106,101 @@ public class ReflectionExtensions
     }
 
     [TestMethod]
+    public void ToObjectLiteralBoolean()
+    {
+        Assert.AreEqual("false", false.ToObjectLiteral());
+        Assert.AreEqual("true", true.ToObjectLiteral());
+    }
+
+    [TestMethod]
+    public void ToObjectLiteralArray() =>
+        Assert.AreEqual("new Int32[] { 1, 2, 3 }", new int[] { 1, 2, 3 }.ToObjectLiteral());
+
+    [TestMethod]
+    public void ToObjectLiteralByte() =>
+        Assert.AreEqual("(byte)0x00", ((byte)0).ToObjectLiteral());
+
+    [TestMethod]
+    public void ToObjectLiteralCharacter() =>
+        Assert.AreEqual("'a'", 'a'.ToObjectLiteral());
+
+    [TestMethod]
+    public void ToObjectLiteralDateTime() =>
+        Assert.AreEqual("new DateTime(0L, DateTimeKind.Unspecified)", DateTime.MinValue.ToObjectLiteral());
+
+    [TestMethod]
+    public void ToObjectLiteralDateTimeOffset() =>
+        Assert.AreEqual("new DateTimeOffset(0L, new TimeSpan(0L))", DateTimeOffset.MinValue.ToObjectLiteral());
+
+    [TestMethod]
+    public void ToObjectLiteraDecimal() =>
+        Assert.AreEqual("0M", 0M.ToObjectLiteral());
+
+    [TestMethod]
+    public void ToObjectLiteralDictionary() =>
+        Assert.AreEqual("new Dictionary<String, Int32> { { \"a\", 1 }, { \"b\", 2 } }", new Dictionary<string, int> { { "a", 1 }, { "b", 2 } }.ToObjectLiteral());
+
+    [TestMethod]
+    public void ToObjectLiteralDoubleFloatingPoint() =>
+        Assert.AreEqual("0D", 0D.ToObjectLiteral());
+
+    [TestMethod]
+    public void ToObjectLiteralEnum() =>
+        Assert.AreEqual("DayOfWeek.Sunday", DayOfWeek.Sunday.ToObjectLiteral());
+
+    [TestMethod]
+    public void ToObjectLiteralEnumerable() =>
+        Assert.AreEqual("new List<Int32> { 1, 2, 3 }", new List<int> { 1, 2, 3 }.ToObjectLiteral());
+
+    [TestMethod]
+    public void ToObjectLiteralEscapedCharacter() =>
+        Assert.AreEqual("'\\n'", '\n'.ToObjectLiteral());
+
+    [TestMethod]
+    public void ToObjectLiteralFloatingPoint() =>
+        Assert.AreEqual("0F", 0F.ToObjectLiteral());
+
+    [TestMethod]
+    public void ToObjectLiteralGuid() =>
+        Assert.AreEqual("new Guid(\"00000000-0000-0000-0000-000000000000\")", Guid.Empty.ToObjectLiteral());
+
+    [TestMethod]
+    public void ToObjectLiteralInteger() =>
+        Assert.AreEqual("0", 0.ToObjectLiteral());
+
+    [TestMethod]
+    public void ToObjectLiteralLongInteger() =>
+        Assert.AreEqual("0L", 0L.ToObjectLiteral());
+
+    [TestMethod]
+    public void ToObjectLiteralShort() =>
+        Assert.AreEqual("(short)0", ((short)0).ToObjectLiteral());
+
+    [TestMethod]
+    public void ToObjectLiteralSignedByte() =>
+        Assert.AreEqual("(sbyte)0x00", ((sbyte)0).ToObjectLiteral());
+
+    [TestMethod]
+    public void ToObjectLiteralTimeSpan() =>
+        Assert.AreEqual("new TimeSpan(0L)", TimeSpan.Zero.ToObjectLiteral());
+
+    [TestMethod]
+    public void ToObjectLiteralUnprintableCharacter() =>
+        Assert.AreEqual("\'\\u007F'", '\u007F'.ToObjectLiteral());
+
+    [TestMethod]
+    public void ToObjectLiteralUnsignedInteger() =>
+        Assert.AreEqual("0U", 0U.ToObjectLiteral());
+
+    [TestMethod]
+    public void ToObjectLiteralUnsignedLongInteger() =>
+        Assert.AreEqual("0UL", 0UL.ToObjectLiteral());
+
+    [TestMethod]
+    public void ToObjectLiteralUnsignedShort() =>
+        Assert.AreEqual("(ushort)0", ((ushort)0).ToObjectLiteral());
+
+    [TestMethod]
     public void VoidMethodInfoFastInvoke()
     {
         var instance = new Stopwatch();
