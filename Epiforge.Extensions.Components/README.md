@@ -43,3 +43,9 @@ To address this, this library offers the following extension methods which will 
 Use of these methods in .NET 7 or later will simply call the built-in methods, as they are now optimized.
 
 This library also offers `FastComparer` and `FastEqualityComparer`, which implement `IComparer` and `IEqualityComaprer`, respectively, but quickly use the methods of `Comparer<>.Default` and `EqualityComaprer<>.Default`, respectively, to do their work.
+
+# Exceptions
+
+This library provides extension methods for dealing with exceptions:
+
+* `GetFullDetails` - creates a representation of an exception and all of its inner exceptions, including exception types, messages, and stack traces, and traversing multiple inner exceptions in the case of `AggregateException` and `ReflectionTypeLoadException`
