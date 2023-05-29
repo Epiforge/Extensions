@@ -1,0 +1,1 @@
+Added HashCode struct to stand-in for .NET Framework.
