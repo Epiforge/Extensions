@@ -331,15 +331,13 @@ public struct HashCode
     /// <inheritdoc/>
     [Obsolete("HashCode is a mutable struct and should not be compared with other HashCodes.", error: true)]
     [EditorBrowsable(EditorBrowsableState.Never)]
-    [SuppressMessage("Style", "IDE0251: Make member 'readonly'", Justification = "Code analyzer defect")]
-    public override bool Equals(object? obj) =>
+    public override readonly bool Equals(object? obj) =>
         throw new NotSupportedException();
 
     /// <inheritdoc/>
     [Obsolete("HashCode is a mutable struct and should not be compared with other HashCodes. Use ToHashCode to retrieve the computed hash code.", error: true)]
     [EditorBrowsable(EditorBrowsableState.Never)]
-    [SuppressMessage("Style", "IDE0251: Make member 'readonly'", Justification = "Code analyzer defect")]
-    public override int GetHashCode() =>
+    public override readonly int GetHashCode() =>
         throw new NotSupportedException();
 #pragma warning restore 0809
 
