@@ -1,5 +1,7 @@
 namespace Epiforge.Extensions.Components.Tests;
 
+#pragma warning disable CS0618
+
 [TestClass]
 public class HashCode
 {
