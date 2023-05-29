@@ -24,7 +24,7 @@ Supports `net462`, `net6.0`, `net7.0`, and `netstandard2.1`.
 
 # Libraries
 
-<img src="Epiforge.Extensions.Components/NuGet.jpg" alt="Components" style="float: left; padding-right: 0.5em;">
+<img src="Epiforge.Extensions.Components/NuGet.jpg" alt="Components" style="float: left !important; padding-right: 0.5em !important;">
 
 ## Components
 [![Epiforge.Extensions.Components Nuget](https://img.shields.io/nuget/v/Epiforge.Extensions.Components.svg?logo=nuget) ![Downloads](https://img.shields.io/nuget/dt/epiforge.extensions.components)](https://www.nuget.org/packages/Epiforge.Extensions.Components)
@@ -79,7 +79,7 @@ This library provides extension methods for dealing with exceptions:
 
 ---
 
-<img src="Epiforge.Extensions.Collections/NuGet.jpg" alt="Collections" style="float: left; padding-right: 0.5em;">
+<img src="Epiforge.Extensions.Collections/NuGet.jpg" alt="Collections" style="float: left !important; padding-right: 0.5em !important;">
 
 ## Collections
 [![Epiforge.Extensions.Collections Nuget](https://img.shields.io/nuget/v/Epiforge.Extensions.Collections.svg?logo=nuget) ![Downloads](https://img.shields.io/nuget/dt/epiforge.extensions.collections)](https://www.nuget.org/packages/Epiforge.Extensions.Collections)
