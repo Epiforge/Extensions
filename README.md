@@ -12,21 +12,19 @@ Supports `net462`, `net6.0`, `net7.0`, and `netstandard2.1`.
 ![Coverage](https://img.shields.io/azure-devops/coverage/epiforge/extensions/4?logo=azuredevops)
 
 - [Libraries](#libraries)
-  - [Components](#components)
+  - [ Components](#-components)
     - [Property Change Notification](#property-change-notification)
     - [Disposal](#disposal)
     - [Reflection](#reflection)
     - [Exceptions](#exceptions)
-  - [Collections](#collections)
+  - [ Collections](#-collections)
 - [License](#license)
 - [Contributing](#contributing)
 - [Acknowledgements](#acknowledgements)
 
 # Libraries
 
-<img src="Epiforge.Extensions.Components/NuGet.jpg" alt="Components" style="float: left !important; padding-right: 0.5em !important;">
-
-## Components
+## <img src="Epiforge.Extensions.Components/NuGet.jpg" alt="Components" style="float: left !important; padding-right: 0.5em !important;"> Components
 [![Epiforge.Extensions.Components Nuget](https://img.shields.io/nuget/v/Epiforge.Extensions.Components.svg?logo=nuget) ![Downloads](https://img.shields.io/nuget/dt/epiforge.extensions.components)](https://www.nuget.org/packages/Epiforge.Extensions.Components)
 
 ### Property Change Notification
@@ -79,9 +77,7 @@ This library provides extension methods for dealing with exceptions:
 
 ---
 
-<img src="Epiforge.Extensions.Collections/NuGet.jpg" alt="Collections" style="float: left !important; padding-right: 0.5em !important;">
-
-## Collections
+## <img src="Epiforge.Extensions.Collections/NuGet.jpg" alt="Collections" style="float: left !important; padding-right: 0.5em !important;"> Collections
 [![Epiforge.Extensions.Collections Nuget](https://img.shields.io/nuget/v/Epiforge.Extensions.Collections.svg?logo=nuget) ![Downloads](https://img.shields.io/nuget/dt/epiforge.extensions.collections)](https://www.nuget.org/packages/Epiforge.Extensions.Collections)
 
 This library provides a number of utilities surrounding collections:
