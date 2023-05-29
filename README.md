@@ -17,6 +17,7 @@ Supports `net462`, `net6.0`, `net7.0`, and `netstandard2.1`.
     - [Disposal](#disposal)
     - [Reflection](#reflection)
     - [Exceptions](#exceptions)
+  - [Collections](#collections)
 - [License](#license)
 - [Contributing](#contributing)
 - [Acknowledgements](#acknowledgements)
@@ -24,11 +25,9 @@ Supports `net462`, `net6.0`, `net7.0`, and `netstandard2.1`.
 # Libraries
 
 ## Components
-
 [![Epiforge.Extensions.Components Nuget](https://img.shields.io/nuget/v/Epiforge.Extensions.Components.svg?logo=nuget) ![Downloads](https://img.shields.io/nuget/dt/epiforge.extensions.components)](https://www.nuget.org/packages/Epiforge.Extensions.Components)
 
 ### Property Change Notification
-
 This library offers the `PropertyChangeNotifier` class, which you may inherit from to quickly get all the property utilities we're all tired of copying and pasting everywhere.
 Just call the protected `OnPropertyChanged` and `OnPropertyChanging` methods at the appropriate times from setters and compiler services will figure out what property you're in.
 Or, if all you need to do is set the value of a field, `SetBackedProperty` couldn't make it any easier or convenient to handle that as efficiently as possible.
@@ -37,7 +36,6 @@ Or, if all you need to do is set the value of a field, `SetBackedProperty` could
 Be sure to set the protected `Logger` property if you want the abstract class to log what's going on with property change notification.
 
 ### Disposal
-
 This library features base classes that handle things we've written a thousand times over, this time involving disposal.
 If you want to go with an implementation of the tried and true `IDisposable`, just inherit from `SyncDisposable`.
 Want a taste of the new `IAsyncDisposable`? Then, inherit from `AsyncDisposable`.
@@ -58,7 +56,6 @@ This library also provides the `INotifyDisposing`, `INotifyDisposed`, and `INoti
 Be sure to set the protected `Logger` property if you want the abstract class to log what's going on with disposal.
 
 ### Reflection
-
 This library has useful tools for when you can't be certain of some things at compile time, such as types, methods, etc.
 While .NET reflection is immensely powerful, prior to .NET 7, it's not very quick.
 To address this, this library offers the following extension methods which will emit IL, generate delegates, and cache them for expedited use of Reflection:
@@ -74,10 +71,16 @@ Use of these methods in .NET 7 or later will simply call the built-in methods, a
 This library also offers `FastComparer` and `FastEqualityComparer`, which implement `IComparer` and `IEqualityComaprer`, respectively, but quickly use the methods of `Comparer<>.Default` and `EqualityComaprer<>.Default`, respectively, to do their work.
 
 ### Exceptions
-
 This library provides extension methods for dealing with exceptions:
 
 * `GetFullDetails` - creates a representation of an exception and all of its inner exceptions, including exception types, messages, and stack traces, and traversing multiple inner exceptions in the case of `AggregateException` and `ReflectionTypeLoadException`
+
+## Collections
+[![Epiforge.Extensions.Collections Nuget](https://img.shields.io/nuget/v/Epiforge.Extensions.Collections.svg?logo=nuget) ![Downloads](https://img.shields.io/nuget/dt/epiforge.extensions.collections)](https://www.nuget.org/packages/Epiforge.Extensions.Collections)
+
+This library provides a number of utilities surrounding collections:
+
+* `EquatableList<T>` is an immutable list of items which may be compared with other instances of the same type and produces a hash code based on the permutation of its contents.
 
 # License
 

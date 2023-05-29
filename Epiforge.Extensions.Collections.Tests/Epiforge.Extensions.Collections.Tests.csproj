@@ -25,4 +25,10 @@
         <ProjectReference Include="..\Epiforge.Extensions.Collections\Epiforge.Extensions.Collections.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+        <None Remove="Epiforge.Extensions.Collections.Tests.net462.v3.ncrunchproject" />
+        <None Remove="Epiforge.Extensions.Collections.Tests.net6.0.v3.ncrunchproject" />
+        <None Remove="Epiforge.Extensions.Collections.Tests.net7.0.v3.ncrunchproject" />
+    </ItemGroup>
+
 </Project>
