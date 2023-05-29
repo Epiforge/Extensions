@@ -24,6 +24,8 @@ Supports `net462`, `net6.0`, `net7.0`, and `netstandard2.1`.
 
 # Libraries
 
+<img src="Epiforge.Extensions.Components/NuGet.jpg" alt="Components" style="float: left; padding-right: 0.5em;">
+
 ## Components
 [![Epiforge.Extensions.Components Nuget](https://img.shields.io/nuget/v/Epiforge.Extensions.Components.svg?logo=nuget) ![Downloads](https://img.shields.io/nuget/dt/epiforge.extensions.components)](https://www.nuget.org/packages/Epiforge.Extensions.Components)
 
@@ -74,6 +76,10 @@ This library also offers `FastComparer` and `FastEqualityComparer`, which implem
 This library provides extension methods for dealing with exceptions:
 
 * `GetFullDetails` - creates a representation of an exception and all of its inner exceptions, including exception types, messages, and stack traces, and traversing multiple inner exceptions in the case of `AggregateException` and `ReflectionTypeLoadException`
+
+---
+
+<img src="Epiforge.Extensions.Collections/NuGet.jpg" alt="Collections" style="float: left; padding-right: 0.5em;">
 
 ## Collections
 [![Epiforge.Extensions.Collections Nuget](https://img.shields.io/nuget/v/Epiforge.Extensions.Collections.svg?logo=nuget) ![Downloads](https://img.shields.io/nuget/dt/epiforge.extensions.collections)](https://www.nuget.org/packages/Epiforge.Extensions.Collections)
