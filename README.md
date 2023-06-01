@@ -97,3 +97,4 @@ This library provides a number of utilities surrounding collections:
 Makes use of the following excellent libraries:
 * [AsyncEx](https://github.com/StephenCleary/AsyncEx) by Stephen Cleary
 * [Ben.Demystifier](https://github.com/benaadams/Ben.Demystifier) by Ben Adams
+* [PolySharp](https://github.com/Sergio0694/PolySharp) by Sergio Pedri

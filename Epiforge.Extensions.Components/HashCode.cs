@@ -31,9 +31,9 @@ public struct HashCode
     /// <param name="value1">The first value to combine into the hash code</param>
     /// <param name="value2">The second value to combine into the hash code</param>
     /// <returns>The hash code that represents the two values</returns>
-    [SuppressMessage("Style", "IDE0022: Use expression body for method")]
 #if IS_NET_STANDARD_2_1_OR_GREATER
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [SuppressMessage("Style", "IDE0022: Use expression body for method")]
 #endif
     public static int Combine<T1, T2>(T1 value1, T2 value2)
     {
@@ -60,9 +60,9 @@ public struct HashCode
     /// <param name="value2">The second value to combine into the hash code</param>
     /// <param name="value3">The third value to combine into the hash code</param>
     /// <returns>The hash code that represents the three values</returns>
-    [SuppressMessage("Style", "IDE0022: Use expression body for method")]
 #if IS_NET_STANDARD_2_1_OR_GREATER
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [SuppressMessage("Style", "IDE0022: Use expression body for method")]
 #endif
     public static int Combine<T1, T2, T3>(T1 value1, T2 value2, T3 value3)
     {
@@ -92,9 +92,9 @@ public struct HashCode
     /// <param name="value3">The third value to combine into the hash code</param>
     /// <param name="value4">The fourth value to combine into the hash code</param>
     /// <returns>The hash code that represents the four values</returns>
-    [SuppressMessage("Style", "IDE0022: Use expression body for method")]
 #if IS_NET_STANDARD_2_1_OR_GREATER
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [SuppressMessage("Style", "IDE0022: Use expression body for method")]
 #endif
     public static int Combine<T1, T2, T3, T4>(T1 value1, T2 value2, T3 value3, T4 value4)
     {
@@ -127,9 +127,9 @@ public struct HashCode
     /// <param name="value4">The fourth value to combine into the hash code</param>
     /// <param name="value5">The fifth value to combine into the hash code</param>
     /// <returns>The hash code that represents the five values</returns>
-    [SuppressMessage("Style", "IDE0022: Use expression body for method")]
 #if IS_NET_STANDARD_2_1_OR_GREATER
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [SuppressMessage("Style", "IDE0022: Use expression body for method")]
 #endif
     public static int Combine<T1, T2, T3, T4, T5>(T1 value1, T2 value2, T3 value3, T4 value4, T5 value5)
     {
@@ -165,9 +165,9 @@ public struct HashCode
     /// <param name="value5">The fifth value to combine into the hash code</param>
     /// <param name="value6">The sixth value to combine into the hash code</param>
     /// <returns>The hash code that represents the six values</returns>
-    [SuppressMessage("Style", "IDE0022: Use expression body for method")]
 #if IS_NET_STANDARD_2_1_OR_GREATER
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [SuppressMessage("Style", "IDE0022: Use expression body for method")]
 #endif
     public static int Combine<T1, T2, T3, T4, T5, T6>(T1 value1, T2 value2, T3 value3, T4 value4, T5 value5, T6 value6)
     {
@@ -206,9 +206,9 @@ public struct HashCode
     /// <param name="value6">The sixth value to combine into the hash code</param>
     /// <param name="value7">The seventh value to combine into the hash code</param>
     /// <returns>The hash code that represents the seven values</returns>
-    [SuppressMessage("Style", "IDE0022: Use expression body for method")]
 #if IS_NET_STANDARD_2_1_OR_GREATER
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [SuppressMessage("Style", "IDE0022: Use expression body for method")]
 #endif
     public static int Combine<T1, T2, T3, T4, T5, T6, T7>(T1 value1, T2 value2, T3 value3, T4 value4, T5 value5, T6 value6, T7 value7)
     {
@@ -250,9 +250,9 @@ public struct HashCode
     /// <param name="value7">The seventh value to combine into the hash code</param>
     /// <param name="value8">The eighth value to combine into the hash code</param>
     /// <returns>The hash code that represents the eight values</returns>
-    [SuppressMessage("Style", "IDE0022: Use expression body for method")]
 #if IS_NET_STANDARD_2_1_OR_GREATER
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [SuppressMessage("Style", "IDE0022: Use expression body for method")]
 #endif
     public static int Combine<T1, T2, T3, T4, T5, T6, T7, T8>(T1 value1, T2 value2, T3 value3, T4 value4, T5 value5, T6 value6, T7 value7, T8 value8)
     {
@@ -311,9 +311,9 @@ public struct HashCode
     /// <typeparam name="T">The type of the value to add to the hash code</typeparam>
     /// <param name="value">The value to add to the hash code</param>
     /// <param name="comparer">The <see cref="IEqualityComparer{T}"/> to use to calculate the hash code</param>
-    [SuppressMessage("Style", "IDE0022: Use expression body for method")]
 #if IS_NET_STANDARD_2_1_OR_GREATER
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [SuppressMessage("Style", "IDE0022: Use expression body for method")]
 #endif
     public void Add<T>(T value, IEqualityComparer<T>? comparer)
     {
@@ -331,13 +331,15 @@ public struct HashCode
     /// <inheritdoc/>
     [Obsolete("HashCode is a mutable struct and should not be compared with other HashCodes.", error: true)]
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public override readonly bool Equals(object? obj) =>
+    [SuppressMessage("Style", "IDE0251: Make member 'readonly'", Justification = "This is a mutable struct.")]
+    public override bool Equals(object? obj) =>
         throw new NotSupportedException();
 
     /// <inheritdoc/>
     [Obsolete("HashCode is a mutable struct and should not be compared with other HashCodes. Use ToHashCode to retrieve the computed hash code.", error: true)]
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public override readonly int GetHashCode() =>
+    [SuppressMessage("Style", "IDE0251: Make member 'readonly'", Justification = "This is a mutable struct.")]
+    public override int GetHashCode() =>
         throw new NotSupportedException();
 #pragma warning restore 0809
 
@@ -348,6 +350,7 @@ public struct HashCode
 #if IS_NET_STANDARD_2_1_OR_GREATER
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
 #endif
+    [SuppressMessage("Style", "IDE0251: Make member 'readonly'", Justification = "This is a mutable struct.")]
     public int ToHashCode() =>
 #if IS_NET_STANDARD_2_1_OR_GREATER
         hashCode.ToHashCode();
