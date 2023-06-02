@@ -1,5 +1,7 @@
 namespace Epiforge.Extensions.Collections;
 
+#pragma warning disable CS8714
+
 /// <summary>
 /// Represents a collection of key/value pairs that are sorted on the key in which a key may be <c>null</c>
 /// </summary>
@@ -226,7 +228,7 @@ public sealed class NullableKeySortedDictionary<TKey, TValue> :
             return false;
         }
 #if IS_NET_STANDARD_2_1_OR_GREATER
-        return dict.Remove(key, out value);
+        return dict.Remove(key, out value!);
 #else
         if (dict.TryGetValue(key, out value))
         {
@@ -298,6 +300,6 @@ public sealed class NullableKeySortedDictionary<TKey, TValue> :
             value = default!;
             return false;
         }
-        return dict.TryGetValue(key, out value);
+        return dict.TryGetValue(key, out value!);
     }
 }
