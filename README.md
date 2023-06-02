@@ -82,8 +82,9 @@ This library provides extension methods for dealing with exceptions:
 
 This library provides a number of utilities surrounding collections:
 
-* `EquatableList<T>` is an immutable list of items which may be compared with other instances of the same type and produces a hash code based on the permutation of its contents.
-
+* `EquatableList<T>` is an immutable list of items which may be compared with other instances of the same type and produces a hash code based on the permutation of its contents; and,
+* `NullableKeyDictionary<TKey, TValue>` and `NullableKeySortedDictionary<TKey, TValue>` are very slim implementations of `IDictionary<TKey, TValue>` that allow a single null key (useful for some edge cases in which a null key is simply going to happen and you need to be able to deal with it; otherwise, use other dictionary classes);
+* 
 # License
 
 [Apache 2.0 License](LICENSE)
