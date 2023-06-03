@@ -7,6 +7,7 @@ public class ObservableDictionary
 
     class DerivationWithGetDictionaryEnumerator<TKey, TValue> :
         ObservableDictionary<TKey, TValue>
+        where TKey : notnull
     {
         public DerivationWithGetDictionaryEnumerator()
         {
@@ -43,6 +44,7 @@ public class ObservableDictionary
 
     class DerivationWithNullOnChangedArgs<TKey, TValue> :
         ObservableDictionary<TKey, TValue>
+        where TKey : notnull
     {
         public DerivationWithNullOnChangedArgs()
         {
@@ -79,6 +81,7 @@ public class ObservableDictionary
 
     class DerivationWithUnsupportedNotifyDictionaryChangedAction<TKey, TValue> :
         ObservableDictionary<TKey, TValue>
+        where TKey : notnull
     {
         public DerivationWithUnsupportedNotifyDictionaryChangedAction()
         {
@@ -330,31 +333,31 @@ public class ObservableDictionary
         var collectionChangeObserved = false;
         var dictionaryChangeObserved = false;
         var boxedDictionaryChangeObserved = false;
-        void collectionChangedHandler(object sender, NotifyCollectionChangedEventArgs args)
+        void collectionChangedHandler(object? sender, NotifyCollectionChangedEventArgs args)
         {
             collectionChangeObserved = true;
-            Assert.AreEqual(NotifyCollectionChangedAction.Add, args.Action);
-            Assert.AreEqual(1, args.NewItems.Count);
-            Assert.AreEqual("key", ((KeyValuePair<string, string>)args.NewItems[0]).Key);
-            Assert.AreEqual("value", ((KeyValuePair<string, string>)args.NewItems[0]).Value);
+            Assert.AreEqual(NotifyCollectionChangedAction.Add, args!.Action);
+            Assert.AreEqual(1, args!.NewItems!.Count);
+            Assert.AreEqual("key", ((KeyValuePair<string, string>)args!.NewItems[0]!).Key);
+            Assert.AreEqual("value", ((KeyValuePair<string, string>)args!.NewItems[0]!).Value);
         }
         observableDictionary.CollectionChanged += collectionChangedHandler;
-        void dictionaryChangedHandler(object sender, NotifyDictionaryChangedEventArgs<string, string> args)
+        void dictionaryChangedHandler(object? sender, NotifyDictionaryChangedEventArgs<string, string> args)
         {
             dictionaryChangeObserved = true;
-            Assert.AreEqual(NotifyDictionaryChangedAction.Add, args.Action);
-            Assert.AreEqual(1, args.NewItems.Count);
-            Assert.AreEqual("key", args.NewItems[0].Key);
-            Assert.AreEqual("value", args.NewItems[0].Value);
+            Assert.AreEqual(NotifyDictionaryChangedAction.Add, args!.Action);
+            Assert.AreEqual(1, args!.NewItems!.Count);
+            Assert.AreEqual("key", args!.NewItems[0]!.Key);
+            Assert.AreEqual("value", args!.NewItems[0]!.Value);
         }
         observableDictionary.DictionaryChanged += dictionaryChangedHandler;
-        void nonGenericDictionaryChangedHandler(object sender, NotifyDictionaryChangedEventArgs<object?, object?> args)
+        void nonGenericDictionaryChangedHandler(object? sender, NotifyDictionaryChangedEventArgs<object?, object?> args)
         {
             boxedDictionaryChangeObserved = true;
-            Assert.AreEqual(NotifyDictionaryChangedAction.Add, args.Action);
-            Assert.AreEqual(1, args.NewItems.Count);
-            Assert.AreEqual("key", args.NewItems[0].Key);
-            Assert.AreEqual("value", args.NewItems[0].Value);
+            Assert.AreEqual(NotifyDictionaryChangedAction.Add, args!.Action);
+            Assert.AreEqual(1, args!.NewItems!.Count);
+            Assert.AreEqual("key", args!.NewItems[0]!.Key);
+            Assert.AreEqual("value", args!.NewItems[0]!.Value);
         }
         ((INotifyDictionaryChanged)observableDictionary).DictionaryChanged += nonGenericDictionaryChangedHandler;
         observableDictionary.Add("key", "value");
@@ -377,31 +380,31 @@ public class ObservableDictionary
         {
             collectionChangeObserved = true;
             Assert.AreEqual(NotifyCollectionChangedAction.Add, args.Action);
-            Assert.AreEqual(2, args.NewItems.Count);
-            Assert.AreEqual("key1", ((KeyValuePair<string, string>)args.NewItems[0]).Key);
-            Assert.AreEqual("value1", ((KeyValuePair<string, string>)args.NewItems[0]).Value);
-            Assert.AreEqual("key2", ((KeyValuePair<string, string>)args.NewItems[1]).Key);
-            Assert.AreEqual("value2", ((KeyValuePair<string, string>)args.NewItems[1]).Value);
+            Assert.AreEqual(2, args.NewItems!.Count);
+            Assert.AreEqual("key1", ((KeyValuePair<string, string>)args.NewItems[0]!).Key);
+            Assert.AreEqual("value1", ((KeyValuePair<string, string>)args.NewItems[0]!).Value);
+            Assert.AreEqual("key2", ((KeyValuePair<string, string>)args.NewItems[1]!).Key);
+            Assert.AreEqual("value2", ((KeyValuePair<string, string>)args.NewItems[1]!).Value);
         };
         observableDictionary.DictionaryChanged += (sender, args) =>
         {
             dictionaryChangeObserved = true;
             Assert.AreEqual(NotifyDictionaryChangedAction.Add, args.Action);
-            Assert.AreEqual(2, args.NewItems.Count);
-            Assert.AreEqual("key1", args.NewItems[0].Key);
-            Assert.AreEqual("value1", args.NewItems[0].Value);
-            Assert.AreEqual("key2", args.NewItems[1].Key);
-            Assert.AreEqual("value2", args.NewItems[1].Value);
+            Assert.AreEqual(2, args.NewItems!.Count);
+            Assert.AreEqual("key1", args.NewItems[0]!.Key);
+            Assert.AreEqual("value1", args.NewItems[0]!.Value);
+            Assert.AreEqual("key2", args.NewItems[1]!.Key);
+            Assert.AreEqual("value2", args.NewItems[1]!.Value);
         };
         ((INotifyDictionaryChanged)observableDictionary).DictionaryChanged += (sender, args) =>
         {
             boxedDictionaryChangeObserved = true;
             Assert.AreEqual(NotifyDictionaryChangedAction.Add, args.Action);
-            Assert.AreEqual(2, args.NewItems.Count);
-            Assert.AreEqual("key1", args.NewItems[0].Key);
-            Assert.AreEqual("value1", args.NewItems[0].Value);
-            Assert.AreEqual("key2", args.NewItems[1].Key);
-            Assert.AreEqual("value2", args.NewItems[1].Value);
+            Assert.AreEqual(2, args.NewItems!.Count);
+            Assert.AreEqual("key1", args.NewItems[0]!.Key);
+            Assert.AreEqual("value1", args.NewItems[0]!.Value);
+            Assert.AreEqual("key2", args.NewItems[1]!.Key);
+            Assert.AreEqual("value2", args.NewItems[1]!.Value);
         };
         observableDictionary.AddRange(new Dictionary<string, string>
         {
@@ -451,26 +454,26 @@ public class ObservableDictionary
         observableDictionary.CollectionChanged += (sender, args) =>
         {
             collectionChangeObserved = true;
-            Assert.AreEqual(NotifyCollectionChangedAction.Add, args.Action);
-            Assert.AreEqual(1, args.NewItems.Count);
-            Assert.AreEqual("key", ((KeyValuePair<string, string>)args.NewItems[0]).Key);
-            Assert.AreEqual("value", ((KeyValuePair<string, string>)args.NewItems[0]).Value);
+            Assert.AreEqual(NotifyCollectionChangedAction.Add, args!.Action);
+            Assert.AreEqual(1, args!.NewItems!.Count);
+            Assert.AreEqual("key", ((KeyValuePair<string, string>)args!.NewItems[0]!).Key);
+            Assert.AreEqual("value", ((KeyValuePair<string, string>)args!.NewItems[0]!).Value);
         };
         observableDictionary.DictionaryChanged += (sender, args) =>
         {
             dictionaryChangeObserved = true;
-            Assert.AreEqual(NotifyDictionaryChangedAction.Add, args.Action);
-            Assert.AreEqual(1, args.NewItems.Count);
-            Assert.AreEqual("key", args.NewItems[0].Key);
-            Assert.AreEqual("value", args.NewItems[0].Value);
+            Assert.AreEqual(NotifyDictionaryChangedAction.Add, args!.Action);
+            Assert.AreEqual(1, args!.NewItems!.Count);
+            Assert.AreEqual("key", args!.NewItems[0]!.Key);
+            Assert.AreEqual("value", args!.NewItems[0]!.Value);
         };
         ((INotifyDictionaryChanged)observableDictionary).DictionaryChanged += (sender, args) =>
         {
             boxedDictionaryChangeObserved = true;
-            Assert.AreEqual(NotifyDictionaryChangedAction.Add, args.Action);
-            Assert.AreEqual(1, args.NewItems.Count);
-            Assert.AreEqual("key", args.NewItems[0].Key);
-            Assert.AreEqual("value", args.NewItems[0].Value);
+            Assert.AreEqual(NotifyDictionaryChangedAction.Add, args!.Action);
+            Assert.AreEqual(1, args!.NewItems!.Count);
+            Assert.AreEqual("key", args!.NewItems[0]!.Key);
+            Assert.AreEqual("value", args!.NewItems[0]!.Value);
         };
         ((ICollection<KeyValuePair<string, string>>)observableDictionary).Add(new KeyValuePair<string, string>("key", "value"));
         Assert.IsTrue(collectionChangeObserved);
@@ -488,26 +491,26 @@ public class ObservableDictionary
         observableDictionary.CollectionChanged += (sender, args) =>
         {
             collectionChangeObserved = true;
-            Assert.AreEqual(NotifyCollectionChangedAction.Add, args.Action);
-            Assert.AreEqual(1, args.NewItems.Count);
-            Assert.AreEqual("key", ((KeyValuePair<string, string>)args.NewItems[0]).Key);
-            Assert.AreEqual("value", ((KeyValuePair<string, string>)args.NewItems[0]).Value);
+            Assert.AreEqual(NotifyCollectionChangedAction.Add, args!.Action);
+            Assert.AreEqual(1, args!.NewItems!.Count);
+            Assert.AreEqual("key", ((KeyValuePair<string, string>)args!.NewItems[0]!).Key);
+            Assert.AreEqual("value", ((KeyValuePair<string, string>)args!.NewItems[0]!).Value);
         };
         observableDictionary.DictionaryChanged += (sender, args) =>
         {
             dictionaryChangeObserved = true;
-            Assert.AreEqual(NotifyDictionaryChangedAction.Add, args.Action);
-            Assert.AreEqual(1, args.NewItems.Count);
-            Assert.AreEqual("key", args.NewItems[0].Key);
-            Assert.AreEqual("value", args.NewItems[0].Value);
+            Assert.AreEqual(NotifyDictionaryChangedAction.Add, args!.Action);
+            Assert.AreEqual(1, args!.NewItems!.Count);
+            Assert.AreEqual("key", args!.NewItems[0]!.Key);
+            Assert.AreEqual("value", args!.NewItems[0]!.Value);
         };
         ((INotifyDictionaryChanged)observableDictionary).DictionaryChanged += (sender, args) =>
         {
             boxedDictionaryChangeObserved = true;
-            Assert.AreEqual(NotifyDictionaryChangedAction.Add, args.Action);
-            Assert.AreEqual(1, args.NewItems.Count);
-            Assert.AreEqual("key", args.NewItems[0].Key);
-            Assert.AreEqual("value", args.NewItems[0].Value);
+            Assert.AreEqual(NotifyDictionaryChangedAction.Add, args!.Action);
+            Assert.AreEqual(1, args!.NewItems!.Count);
+            Assert.AreEqual("key", args!.NewItems[0]!.Key);
+            Assert.AreEqual("value", args!.NewItems[0]!.Value);
         };
         ((IDictionary)observableDictionary).Add("key", "value");
         Assert.IsTrue(collectionChangeObserved);
@@ -525,26 +528,26 @@ public class ObservableDictionary
         observableDictionary.CollectionChanged += (sender, args) =>
         {
             collectionChangeObserved = true;
-            Assert.AreEqual(NotifyCollectionChangedAction.Remove, args.Action);
-            Assert.AreEqual(1, args.OldItems.Count);
-            Assert.AreEqual("key", ((KeyValuePair<string, string>)args.OldItems[0]).Key);
-            Assert.AreEqual("value", ((KeyValuePair<string, string>)args.OldItems[0]).Value);
+            Assert.AreEqual(NotifyCollectionChangedAction.Remove, args!.Action);
+            Assert.AreEqual(1, args!.OldItems!.Count);
+            Assert.AreEqual("key", ((KeyValuePair<string, string>)args!.OldItems[0]!).Key);
+            Assert.AreEqual("value", ((KeyValuePair<string, string>)args!.OldItems[0]!).Value);
         };
         observableDictionary.DictionaryChanged += (sender, args) =>
         {
             dictionaryChangeObserved = true;
-            Assert.AreEqual(NotifyDictionaryChangedAction.Remove, args.Action);
-            Assert.AreEqual(1, args.OldItems.Count);
-            Assert.AreEqual("key", args.OldItems[0].Key);
-            Assert.AreEqual("value", args.OldItems[0].Value);
+            Assert.AreEqual(NotifyDictionaryChangedAction.Remove, args!.Action);
+            Assert.AreEqual(1, args!.OldItems!.Count);
+            Assert.AreEqual("key", args!.OldItems[0]!.Key);
+            Assert.AreEqual("value", args!.OldItems[0]!.Value);
         };
         ((INotifyDictionaryChanged)observableDictionary).DictionaryChanged += (sender, args) =>
         {
             boxedDictionaryChangeObserved = true;
-            Assert.AreEqual(NotifyDictionaryChangedAction.Remove, args.Action);
-            Assert.AreEqual(1, args.OldItems.Count);
-            Assert.AreEqual("key", args.OldItems[0].Key);
-            Assert.AreEqual("value", args.OldItems[0].Value);
+            Assert.AreEqual(NotifyDictionaryChangedAction.Remove, args!.Action);
+            Assert.AreEqual(1, args!.OldItems!.Count);
+            Assert.AreEqual("key", args!.OldItems[0]!.Key);
+            Assert.AreEqual("value", args!.OldItems[0]!.Value);
         };
         observableDictionary.Remove("key");
         Assert.IsTrue(collectionChangeObserved);
@@ -562,35 +565,35 @@ public class ObservableDictionary
         observableDictionary.CollectionChanged += (sender, args) =>
         {
             collectionChangeObserved = true;
-            Assert.AreEqual(NotifyCollectionChangedAction.Replace, args.Action);
-            Assert.AreEqual(1, args.OldItems.Count);
-            Assert.AreEqual("key", ((KeyValuePair<string, string>)args.OldItems[0]).Key);
-            Assert.AreEqual("value", ((KeyValuePair<string, string>)args.OldItems[0]).Value);
-            Assert.AreEqual(1, args.NewItems.Count);
-            Assert.AreEqual("key", ((KeyValuePair<string, string>)args.NewItems[0]).Key);
-            Assert.AreEqual("new value", ((KeyValuePair<string, string>)args.NewItems[0]).Value);
+            Assert.AreEqual(NotifyCollectionChangedAction.Replace, args!.Action);
+            Assert.AreEqual(1, args!.OldItems!.Count);
+            Assert.AreEqual("key", ((KeyValuePair<string, string>)args!.OldItems[0]!).Key);
+            Assert.AreEqual("value", ((KeyValuePair<string, string>)args!.OldItems[0]!).Value);
+            Assert.AreEqual(1, args!.NewItems!.Count);
+            Assert.AreEqual("key", ((KeyValuePair<string, string>)args!.NewItems[0]!).Key);
+            Assert.AreEqual("new value", ((KeyValuePair<string, string>)args!.NewItems[0]!).Value);
         };
         observableDictionary.DictionaryChanged += (sender, args) =>
         {
             dictionaryChangeObserved = true;
-            Assert.AreEqual(NotifyDictionaryChangedAction.Replace, args.Action);
-            Assert.AreEqual(1, args.OldItems.Count);
-            Assert.AreEqual("key", args.OldItems[0].Key);
-            Assert.AreEqual("value", args.OldItems[0].Value);
-            Assert.AreEqual(1, args.NewItems.Count);
-            Assert.AreEqual("key", args.NewItems[0].Key);
-            Assert.AreEqual("new value", args.NewItems[0].Value);
+            Assert.AreEqual(NotifyDictionaryChangedAction.Replace, args!.Action);
+            Assert.AreEqual(1, args!.OldItems!.Count);
+            Assert.AreEqual("key", args!.OldItems[0]!.Key);
+            Assert.AreEqual("value", args!.OldItems[0]!.Value);
+            Assert.AreEqual(1, args!.NewItems!.Count);
+            Assert.AreEqual("key", args!.NewItems[0]!.Key);
+            Assert.AreEqual("new value", args!.NewItems[0]!.Value);
         };
         ((INotifyDictionaryChanged)observableDictionary).DictionaryChanged += (sender, args) =>
         {
             boxedDictionaryChangeObserved = true;
             Assert.AreEqual(NotifyDictionaryChangedAction.Replace, args.Action);
-            Assert.AreEqual(1, args.OldItems.Count);
-            Assert.AreEqual("key", args.OldItems[0].Key);
-            Assert.AreEqual("value", args.OldItems[0].Value);
-            Assert.AreEqual(1, args.NewItems.Count);
-            Assert.AreEqual("key", args.NewItems[0].Key);
-            Assert.AreEqual("new value", args.NewItems[0].Value);
+            Assert.AreEqual(1, args!.OldItems.Count);
+            Assert.AreEqual("key", args!.OldItems[0]!.Key);
+            Assert.AreEqual("value", args!.OldItems[0]!.Value);
+            Assert.AreEqual(1, args!.NewItems!.Count);
+            Assert.AreEqual("key", args!.NewItems[0]!.Key);
+            Assert.AreEqual("new value", args!.NewItems[0]!.Value);
         };
         observableDictionary["key"] = "new value";
         Assert.IsTrue(collectionChangeObserved);

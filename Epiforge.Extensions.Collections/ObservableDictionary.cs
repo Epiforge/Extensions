@@ -18,6 +18,7 @@ public class ObservableDictionary<TKey, TValue> :
     IObservableRangeDictionary<TKey, TValue>,
     IReadOnlyCollection<KeyValuePair<TKey, TValue>>,
     IReadOnlyDictionary<TKey, TValue>
+    where TKey : notnull
 {
     /// <summary>
     /// Initializes a new instance of the <see cref="ObservableDictionary{TKey, TValue}"/> class that is empty, has the default initial capacity, and uses the default equality comparer for the key type
@@ -167,7 +168,7 @@ public class ObservableDictionary<TKey, TValue> :
     void ICollection<KeyValuePair<TKey, TValue>>.Add(KeyValuePair<TKey, TValue> item) =>
         Add(item);
 
-    void IDictionary.Add(object key, object value) =>
+    void IDictionary.Add(object key, object? value) =>
         Add(key, value);
 
     /// <summary>
@@ -175,7 +176,7 @@ public class ObservableDictionary<TKey, TValue> :
     /// </summary>
     /// <param name="key">The object to use as the key of the element to add</param>
     /// <param name="value">The object to use as the value of the element to add</param>
-    protected virtual void Add(object key, object value)
+    protected virtual void Add(object key, object? value)
     {
 #if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(key);
@@ -186,7 +187,7 @@ public class ObservableDictionary<TKey, TValue> :
         if (key is TKey typedKey && !gd.ContainsKey(typedKey))
             NotifyCountChanging();
         di.Add(key, value);
-        OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, (TKey)key, (TValue)value));
+        OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, (TKey)key, (TValue)value!));
         NotifyCountChanged();
     }
 
@@ -400,7 +401,7 @@ public class ObservableDictionary<TKey, TValue> :
     /// </summary>
     /// <param name="key">The key of the element to get</param>
     /// <returns>The element with the specified key, or <c>null</c> if the key does not exist</returns>
-    protected virtual object? GetValue(object? key) =>
+    protected virtual object? GetValue(object key) =>
         di[key];
 
     /// <summary>
@@ -718,7 +719,7 @@ public class ObservableDictionary<TKey, TValue> :
     /// </summary>
     /// <param name="key">The key of the element to set</param>
     /// <param name="value">The new value for the element</param>
-    protected virtual void SetValue(object? key, object? value)
+    protected virtual void SetValue(object key, object? value)
     {
         var oldValue = GetValue(key);
         di[key] = value;
@@ -819,7 +820,7 @@ public class ObservableDictionary<TKey, TValue> :
     protected virtual (bool valueRetrieved, TValue value) TryGetValue(TKey key)
     {
         var valueRetrieved = gd.TryGetValue(key, out var value);
-        return (valueRetrieved, value);
+        return (valueRetrieved, value!);
     }
 
     /// <summary>
@@ -862,7 +863,7 @@ public class ObservableDictionary<TKey, TValue> :
         }
     }
 
-    object? IDictionary.this[object? key]
+    object? IDictionary.this[object key]
     {
         get => GetValue(key);
         set => SetValue(key, value);
