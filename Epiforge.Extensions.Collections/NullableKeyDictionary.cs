@@ -221,7 +221,7 @@ public sealed class NullableKeyDictionary<TKey, TValue> :
         foreach (var kvp in dict)
             newDictionary.Add(kvp.Key, kvp.Value);
         dict = newDictionary;
-        return dict.Count;
+        return dict.Count > capacity ? capacity : dict.Count;
 #endif
     }
 

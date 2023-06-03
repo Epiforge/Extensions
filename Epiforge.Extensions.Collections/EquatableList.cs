@@ -43,7 +43,7 @@ public readonly struct EquatableList<T> :
         EqualityComparer = null;
         elements = sequence.ToImmutableArray();
 #if IS_NET_STANDARD_2_1_OR_GREATER
-        var hashCode = new HashCode();
+        var hashCode = new System.HashCode();
         foreach (var element in elements)
             hashCode.Add(element);
         this.hashCode = hashCode.ToHashCode();
@@ -74,7 +74,7 @@ public readonly struct EquatableList<T> :
         EqualityComparer = equalityComparer;
         elements = sequence.ToImmutableArray();
 #if IS_NET_STANDARD_2_1_OR_GREATER
-        var hashCode = new HashCode();
+        var hashCode = new System.HashCode();
         foreach (var element in elements)
             hashCode.Add(element, EqualityComparer);
         this.hashCode = hashCode.ToHashCode();
