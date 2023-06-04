@@ -128,7 +128,7 @@ public class ObservableSortedDictionary<TKey, TValue> :
     void ICollection<KeyValuePair<TKey, TValue>>.Add(KeyValuePair<TKey, TValue> item) =>
         Add(item);
 
-    void IDictionary.Add(object key, object value) =>
+    void IDictionary.Add(object key, object? value) =>
         Add(key, value);
 
     /// <summary>
@@ -136,7 +136,7 @@ public class ObservableSortedDictionary<TKey, TValue> :
     /// </summary>
     /// <param name="key">The object to use as the key of the element to add</param>
     /// <param name="value">The object to use as the value of the element to add</param>
-    protected virtual void Add(object key, object value)
+    protected virtual void Add(object key, object? value)
     {
 #if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(key);
@@ -147,7 +147,7 @@ public class ObservableSortedDictionary<TKey, TValue> :
         if (key is TKey typedKey && !gsd.ContainsKey(typedKey))
             NotifyCountChanging();
         di.Add(key, value);
-        OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, (TKey)key, (TValue)value));
+        OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, (TKey)key, (TValue)value!));
         NotifyCountChanged();
     }
 
@@ -688,7 +688,7 @@ public class ObservableSortedDictionary<TKey, TValue> :
     protected virtual (bool valueRetrieved, TValue value) TryGetValue(TKey key)
     {
         var valueRetrieved = gsd.TryGetValue(key, out var value);
-        return (valueRetrieved, value);
+        return (valueRetrieved, value!);
     }
 
     /// <summary>
