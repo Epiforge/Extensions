@@ -1,12 +1,12 @@
 namespace Epiforge.Extensions.Collections;
 
 /// <summary>
-/// Represents a collection of keys and values that supports bulk operations and notifies listeners of dynamic changes, such as when an item is added and removed or the whole list is cleared
+/// Represents a collection of key/value pairs that are sorted on the key, that supports bulk operations and notifies listeners of dynamic changes, such as when an item is added and removed or the whole list is cleared
 /// </summary>
 /// <typeparam name="TKey">The type of the keys in the dictionary</typeparam>
 /// <typeparam name="TValue">The type of the values in the dictionary</typeparam>
 [SuppressMessage("Code Analysis", "CA1033: Interface methods should be callable by child types")]
-public class ObservableDictionary<TKey, TValue> :
+public class ObservableSortedDictionary<TKey, TValue> :
     PropertyChangeNotifier,
     ICollection,
     ICollection<KeyValuePair<TKey, TValue>>,
@@ -14,117 +14,77 @@ public class ObservableDictionary<TKey, TValue> :
     IDictionary<TKey, TValue>,
     IEnumerable,
     IEnumerable<KeyValuePair<TKey, TValue>>,
-    IHashKeys<TKey>,
     IObservableRangeDictionary<TKey, TValue>,
     IReadOnlyCollection<KeyValuePair<TKey, TValue>>,
-    IReadOnlyDictionary<TKey, TValue>
+    IReadOnlyDictionary<TKey, TValue>,
+    ISortKeys<TKey>
     where TKey : notnull
 {
     /// <summary>
-    /// Initializes a new instance of the <see cref="ObservableDictionary{TKey, TValue}"/> class that is empty, has the default initial capacity, and uses the default equality comparer for the key type
+    /// Initializes a new instance of the <see cref="ObservableSortedDictionary{TKey, TValue}"/> class that is empty and uses the default <see cref="IComparer{T}"/> implementation for the key type
     /// </summary>
-    public ObservableDictionary()
+    public ObservableSortedDictionary()
     {
-        gd = new Dictionary<TKey, TValue>();
-        ci = gd;
-        gci = gd;
-        di = gd;
-        gdi = gd;
-        ei = gd;
-        gei = gd;
-        grodi = gd;
-        comparer = gd.Comparer;
+        gsd = new SortedDictionary<TKey, TValue>();
+        ci = gsd;
+        gci = gsd;
+        di = gsd;
+        gdi = gsd;
+        ei = gsd;
+        gei = gsd;
+        grodi = gsd;
     }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="ObservableDictionary{TKey, TValue}"/> class that contains elements copied from the specified <see cref="IDictionary{TKey, TValue}"/> and uses the default equality comparer for the key type
+    /// Initializes a new instance of the <see cref="ObservableSortedDictionary{TKey, TValue}"/> class that is empty and uses the specified <see cref="IComparer{T}"/> implementation to compare keys
     /// </summary>
-    /// <param name="dictionary">The <see cref="IDictionary{TKey, TValue}"/> whose elements are copied to the new <see cref="ObservableDictionary{TKey, TValue}"/></param>
-    public ObservableDictionary(IDictionary<TKey, TValue> dictionary)
+    /// <param name="comparer">The <see cref="IComparer{T}"/> implementation to use when comparing keys, or <c>null</c> to use the default <see cref="Comparer{T}"/> for the type of the key</param>
+    public ObservableSortedDictionary(IComparer<TKey> comparer)
     {
-        gd = new Dictionary<TKey, TValue>(dictionary);
-        ci = gd;
-        gci = gd;
-        di = gd;
-        gdi = gd;
-        ei = gd;
-        gei = gd;
-        grodi = gd;
-        comparer = gd.Comparer;
+        gsd = new SortedDictionary<TKey, TValue>(comparer);
+        ci = gsd;
+        gci = gsd;
+        di = gsd;
+        gdi = gsd;
+        ei = gsd;
+        gei = gsd;
+        grodi = gsd;
     }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="ObservableDictionary{TKey, TValue}"/> class that is empty, has the default initial capacity, and uses the specified <see cref="IEqualityComparer{T}"/>
+    /// Initializes a new instance of the <see cref="ObservableSortedDictionary{TKey, TValue}"/> class that contains elements copied from the specified <see cref="IDictionary{TKey, TValue}"/> and uses the default <see cref="IComparer{T}"/> implementation for the key type
     /// </summary>
-    /// <param name="comparer">The <see cref="IEqualityComparer{T}"/> implementation to use when comparing keys, or <c>null</c> to use the default <see cref="EqualityComparer{T}"/> for the type of the key</param>
-    public ObservableDictionary(IEqualityComparer<TKey> comparer)
+    /// <param name="dictionary">The <see cref="IDictionary{TKey, TValue}"/> whose elements are copied to the new <see cref="ObservableSortedDictionary{TKey, TValue}"/></param>
+    public ObservableSortedDictionary(IDictionary<TKey, TValue> dictionary)
     {
-        gd = new Dictionary<TKey, TValue>(comparer);
-        ci = gd;
-        gci = gd;
-        di = gd;
-        gdi = gd;
-        ei = gd;
-        gei = gd;
-        grodi = gd;
-        this.comparer = comparer;
+        gsd = new SortedDictionary<TKey, TValue>(dictionary);
+        ci = gsd;
+        gci = gsd;
+        di = gsd;
+        gdi = gsd;
+        ei = gsd;
+        gei = gsd;
+        grodi = gsd;
     }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="ObservableDictionary{TKey, TValue}"/> class that is empty, has the specified initial capacity, and uses the default equality comparer for the key type
+    /// Initializes a new instance of the <see cref="ObservableSortedDictionary{TKey, TValue}"/> class that contains elements copied from the specified <see cref="IDictionary{TKey, TValue}"/> and uses the specified <see cref="IComparer{T}"/> implementation to compare keys
     /// </summary>
-    /// <param name="capacity">The initial number of elements that the <see cref="ObservableDictionary{TKey, TValue}"/> can contain</param>
-    public ObservableDictionary(int capacity)
+    /// <param name="dictionary">The <see cref="IDictionary{TKey, TValue}"/> whose elements are copied to the new <see cref="ObservableSortedDictionary{TKey, TValue}"/></param>
+    /// <param name="comparer">The <see cref="IComparer{T}"/> implementation to use when comparing keys, or <c>null</c> to use the default <see cref="Comparer{T}"/> for the type of the key</param>
+    public ObservableSortedDictionary(IDictionary<TKey, TValue> dictionary, IComparer<TKey> comparer)
     {
-        gd = new Dictionary<TKey, TValue>(capacity);
-        ci = gd;
-        gci = gd;
-        di = gd;
-        gdi = gd;
-        ei = gd;
-        gei = gd;
-        grodi = gd;
-        comparer = gd.Comparer;
+        gsd = new SortedDictionary<TKey, TValue>(dictionary, comparer);
+        ci = gsd;
+        gci = gsd;
+        di = gsd;
+        gdi = gsd;
+        ei = gsd;
+        gei = gsd;
+        grodi = gsd;
     }
 
-    /// <summary>
-    /// Initializes a new instance of the <see cref="ObservableDictionary{TKey, TValue}"/> class that contains elements copied from the specified <see cref="IDictionary{TKey, TValue}"/> and uses the specified <see cref="IEqualityComparer{T}"/>
-    /// </summary>
-    /// <param name="dictionary">The <see cref="IDictionary{TKey, TValue}"/> whose elements are copied to the new <see cref="ObservableDictionary{TKey, TValue}"/></param>
-    /// <param name="comparer">The <see cref="IEqualityComparer{T}"/> implementation to use when comparing keys, or <c>null</c> to use the default <see cref="EqualityComparer{T}"/> for the type of the key</param>
-    public ObservableDictionary(IDictionary<TKey, TValue> dictionary, IEqualityComparer<TKey> comparer)
-    {
-        gd = new Dictionary<TKey, TValue>(dictionary, comparer);
-        ci = gd;
-        gci = gd;
-        di = gd;
-        gdi = gd;
-        ei = gd;
-        gei = gd;
-        grodi = gd;
-        this.comparer = comparer;
-    }
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="ObservableDictionary{TKey, TValue}"/> class that is empty, has the specified initial capacity, and uses the specified <see cref="IEqualityComparer{T}"/>
-    /// </summary>
-    /// <param name="capacity">The initial number of elements that the <see cref="ObservableDictionary{TKey, TValue}"/> can contain</param>
-    /// <param name="comparer">The <see cref="IEqualityComparer{T}"/> implementation to use when comparing keys, or <c>null</c> to use the default <see cref="EqualityComparer{T}"/> for the type of the key</param>
-    public ObservableDictionary(int capacity, IEqualityComparer<TKey> comparer)
-    {
-        gd = new Dictionary<TKey, TValue>(capacity, comparer);
-        ci = gd;
-        gci = gd;
-        di = gd;
-        gdi = gd;
-        ei = gd;
-        gei = gd;
-        grodi = gd;
-        this.comparer = comparer;
-    }
-
-    readonly IEqualityComparer<TKey> comparer;
-    Dictionary<TKey, TValue> gd;
+    SortedDictionary<TKey, TValue> gsd;
     ICollection ci;
     ICollection<KeyValuePair<TKey, TValue>> gci;
     IDictionary di;
@@ -158,9 +118,9 @@ public class ObservableDictionary<TKey, TValue> :
         if (key is null)
             throw new ArgumentNullException(nameof(key));
 #endif
-        if (!gd.ContainsKey(key))
+        if (!gsd.ContainsKey(key))
             NotifyCountChanging();
-        gd.Add(key, value);
+        gsd.Add(key, value);
         OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, key, value));
         NotifyCountChanged();
     }
@@ -168,7 +128,7 @@ public class ObservableDictionary<TKey, TValue> :
     void ICollection<KeyValuePair<TKey, TValue>>.Add(KeyValuePair<TKey, TValue> item) =>
         Add(item);
 
-    void IDictionary.Add(object key, object? value) =>
+    void IDictionary.Add(object key, object value) =>
         Add(key, value);
 
     /// <summary>
@@ -176,7 +136,7 @@ public class ObservableDictionary<TKey, TValue> :
     /// </summary>
     /// <param name="key">The object to use as the key of the element to add</param>
     /// <param name="value">The object to use as the value of the element to add</param>
-    protected virtual void Add(object key, object? value)
+    protected virtual void Add(object key, object value)
     {
 #if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(key);
@@ -184,10 +144,10 @@ public class ObservableDictionary<TKey, TValue> :
         if (key is null)
             throw new ArgumentNullException(nameof(key));
 #endif
-        if (key is TKey typedKey && !gd.ContainsKey(typedKey))
+        if (key is TKey typedKey && !gsd.ContainsKey(typedKey))
             NotifyCountChanging();
         di.Add(key, value);
-        OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, (TKey)key, (TValue)value!));
+        OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, (TKey)key, (TValue)value));
         NotifyCountChanged();
     }
 
@@ -197,9 +157,9 @@ public class ObservableDictionary<TKey, TValue> :
     /// <param name="item">The object to add to the <see cref="ICollection{T}"/></param>
     protected virtual void Add(KeyValuePair<TKey, TValue> item)
     {
-        if (item.Key is not { } key)
-            throw new ArgumentException("item key must not be null");
-        if (!gd.ContainsKey(key))
+        if (item.Key is null)
+            throw new ArgumentException("item key cannot be null");
+        if (!gsd.ContainsKey(item.Key))
             NotifyCountChanging();
         gci.Add(item);
         OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, item));
@@ -211,7 +171,7 @@ public class ObservableDictionary<TKey, TValue> :
     /// </summary>
     /// <param name="keyValuePairs">The key-value pairs to add</param>
     public virtual void AddRange(IEnumerable<KeyValuePair<TKey, TValue>> keyValuePairs) =>
-        AddRange(keyValuePairs?.ToImmutableArray()!);
+        AddRange(keyValuePairs.ToImmutableArray());
 
     /// <summary>
     /// Adds elements with the provided keys and values to the <see cref="IRangeDictionary{TKey, TValue}"/>
@@ -219,19 +179,15 @@ public class ObservableDictionary<TKey, TValue> :
     /// <param name="keyValuePairs">The key-value pairs to add</param>
     public virtual void AddRange(IReadOnlyList<KeyValuePair<TKey, TValue>> keyValuePairs)
     {
-#if IS_NET_6_0_OR_GREATER
-        ArgumentNullException.ThrowIfNull(keyValuePairs);
-#else
         if (keyValuePairs is null)
             throw new ArgumentNullException(nameof(keyValuePairs));
-#endif
-        if (keyValuePairs.Any(kvp => kvp.Key is null || gd.ContainsKey(kvp.Key)))
+        if (keyValuePairs.Any(kvp => kvp.Key is null || gsd.ContainsKey(kvp.Key)))
             throw new ArgumentException("One of the keys was null or already found in the dictionary", nameof(keyValuePairs));
         if (keyValuePairs.Count > 0)
         {
             NotifyCountChanging();
             foreach (var keyValuePair in keyValuePairs)
-                gd.Add(keyValuePair.Key, keyValuePair.Value);
+                gsd.Add(keyValuePair.Key, keyValuePair.Value);
             OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, keyValuePairs));
             NotifyCountChanged();
         }
@@ -239,25 +195,25 @@ public class ObservableDictionary<TKey, TValue> :
 
     void CastAndNotifyReset()
     {
-        ci = gd;
-        gci = gd;
-        di = gd;
-        gdi = gd;
-        ei = gd;
-        gei = gd;
-        grodi = gd;
+        ci = gsd;
+        gci = gsd;
+        di = gsd;
+        gdi = gsd;
+        ei = gsd;
+        gei = gsd;
+        grodi = gsd;
         OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Reset));
     }
 
     /// <summary>
-    /// Removes all keys and values from the <see cref="ObservableDictionary{TKey, TValue}"/>
+    /// Removes all elements from the <see cref="ObservableSortedDictionary{TKey, TValue}"/>
     /// </summary>
     public virtual void Clear()
     {
         if (Count > 0)
         {
             NotifyCountChanging();
-            gd.Clear();
+            gsd.Clear();
             OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Reset));
             NotifyCountChanged();
         }
@@ -291,21 +247,18 @@ public class ObservableDictionary<TKey, TValue> :
     /// <param name="key">The key to locate in the <see cref="IDictionary{TKey, TValue}"/></param>
     /// <returns><c>true</c> if the <see cref="IDictionary{TKey, TValue}"/> contains an element with the key; otherwise, <c>false</c></returns>
     public virtual bool ContainsKey(TKey key) =>
-        gd.ContainsKey(key);
+        gsd.ContainsKey(key);
 
     /// <summary>
-    /// Determines whether the <see cref="ObservableDictionary{TKey, TValue}"/> contains a specific value
+    /// Determines whether the <see cref="ObservableSortedDictionary{TKey, TValue}"/> contains an element with the specified value
     /// </summary>
-    /// <param name="value">The value to locate in the <see cref="ObservableDictionary{TKey, TValue}"/></param>
-    /// <returns><c>true</c> if the <see cref="ObservableDictionary{TKey, TValue}"/> contains an element with the specified value; otherwise, <c>false</c></returns>
+    /// <param name="value">The value to locate in the <see cref="ObservableSortedDictionary{TKey, TValue}"/></param>
+    /// <returns><c>true</c> if the <see cref="ObservableSortedDictionary{TKey, TValue}"/> contains an element with the specified value; otherwise, <c>false</c></returns>
     public virtual bool ContainsValue(TValue value) =>
-        gd.ContainsValue(value);
+        gsd.ContainsValue(value);
 
     void ICollection.CopyTo(Array array, int index) =>
         CopyTo(array, index);
-
-    void ICollection<KeyValuePair<TKey, TValue>>.CopyTo(KeyValuePair<TKey, TValue>[] array, int arrayIndex) =>
-        CopyTo(array, arrayIndex);
 
     /// <summary>
     /// Copies the elements of the <see cref="ICollection"/> to an <see cref="Array"/>, starting at a particular <see cref="Array"/> index
@@ -319,37 +272,9 @@ public class ObservableDictionary<TKey, TValue> :
     /// Copies the elements of the <see cref="ICollection{T}"/> to an <see cref="Array"/>, starting at a particular <see cref="Array"/> index
     /// </summary>
     /// <param name="array">The one-dimensional <see cref="Array"/> that is the destination of the elements copied from <see cref="ICollection{T}"/> (the <see cref="Array"/> must have zero-based indexing)</param>
-    /// <param name="arrayIndex">The zero-based index in <paramref name="array"/> at which copying begins</param>
-    protected virtual void CopyTo(KeyValuePair<TKey, TValue>[] array, int arrayIndex) =>
-        gci.CopyTo(array, arrayIndex);
-
-    /// <summary>
-    /// Ensures that the dictionary can hold up to a specified number of entries without any further expansion of its backing storage
-    /// </summary>
-    /// <param name="capacity">The number of entries</param>
-    /// <returns>The current capacity of the <see cref="ObservableDictionary{TKey, TValue}"/></returns>
-#if IS_NET_STANDARD_2_1_OR_GREATER
-    [SuppressMessage("Style", "IDE0022: Use expression body for method")]
-#endif
-    public virtual int EnsureCapacity(int capacity)
-    {
-#if IS_NET_STANDARD_2_1_OR_GREATER
-        return gd.EnsureCapacity(capacity);
-#else
-        var oldGd = gd;
-        gd = new Dictionary<TKey, TValue>(capacity, comparer);
-        foreach (var kvp in oldGd)
-            gd.Add(kvp.Key, kvp.Value);
-        ci = gd;
-        gci = gd;
-        di = gd;
-        gdi = gd;
-        ei = gd;
-        gei = gd;
-        grodi = gd;
-        return gd.Count > capacity ? capacity : gd.Count;
-#endif
-    }
+    /// <param name="index">The zero-based index in <paramref name="array"/> at which copying begins</param>
+    public virtual void CopyTo(KeyValuePair<TKey, TValue>[] array, int index) =>
+        gsd.CopyTo(array, index);
 
     /// <summary>
     /// Returns an <see cref="IDictionaryEnumerator"/> object for the <see cref="IDictionary"/> object
@@ -359,11 +284,11 @@ public class ObservableDictionary<TKey, TValue> :
         di.GetEnumerator();
 
     /// <summary>
-    /// Returns an enumerator that iterates through the <see cref="ObservableDictionary{TKey, TValue}"/>
+    /// Returns an enumerator that iterates through the <see cref="ObservableSortedDictionary{TKey, TValue}"/>
     /// </summary>
-    /// <returns>A <see cref="Dictionary{TKey, TValue}.Enumerator"/> structure for the <see cref="ObservableDictionary{TKey, TValue}"/></returns>
-    public virtual Dictionary<TKey, TValue>.Enumerator GetEnumerator() =>
-        gd.GetEnumerator();
+    /// <returns>A <see cref="SortedDictionary{TKey, TValue}.Enumerator"/> for the <see cref="ObservableSortedDictionary{TKey, TValue}"/></returns>
+    public virtual SortedDictionary<TKey, TValue>.Enumerator GetEnumerator() =>
+        gsd.GetEnumerator();
 
     IDictionaryEnumerator IDictionary.GetEnumerator() =>
         GetDictionaryEnumerator();
@@ -394,7 +319,7 @@ public class ObservableDictionary<TKey, TValue> :
     /// <param name="keys">The keys of the elements to get</param>
     /// <returns>The elements with the specified keys</returns>
     public virtual IReadOnlyList<KeyValuePair<TKey, TValue>> GetRange(IEnumerable<TKey> keys) =>
-        keys.Select(key => new KeyValuePair<TKey, TValue>(key, gd[key])).ToImmutableArray();
+        keys.Select(key => new KeyValuePair<TKey, TValue>(key, this[key])).ToImmutableArray();
 
     /// <summary>
     /// Gets the element with the specified key
@@ -428,7 +353,7 @@ public class ObservableDictionary<TKey, TValue> :
         if (e is null)
             throw new ArgumentNullException(nameof(e));
 #endif
-        if (CollectionChanged is not null)
+        if (CollectionChanged != null)
             switch (e.Action)
             {
                 case NotifyDictionaryChangedAction.Add:
@@ -444,7 +369,7 @@ public class ObservableDictionary<TKey, TValue> :
                     OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
                     break;
             }
-        if (DictionaryChangedBoxed is not null)
+        if (DictionaryChangedBoxed != null)
             switch (e.Action)
             {
                 case NotifyDictionaryChangedAction.Add:
@@ -485,16 +410,16 @@ public class ObservableDictionary<TKey, TValue> :
         DictionaryChangedBoxed?.Invoke(this, e);
 
     /// <summary>
-    /// Removes the element with the specified key from the <see cref="IDictionary{TKey, TValue}"/>
+    /// Removes the value with the specified key from the <see cref="ObservableDictionary{TKey, TValue}"/>
     /// </summary>
     /// <param name="key">The key of the element to remove</param>
-    /// <returns><c>true</c> if the element is successfully removed; otherwise, <c>false</c> (this method also returns <c>false</c> if key was not found in the original <see cref="IDictionary{TKey, TValue}"/>)</returns>
+    /// <returns><c>true</c> if the element is successfully found and removed; otherwise, <c>false</c> (this method returns false if key is not found in the <see cref="ObservableDictionary{TKey, TValue}"/>)</returns>
     public virtual bool Remove(TKey key)
     {
-        if (gd.TryGetValue(key, out var value))
+        if (gsd.TryGetValue(key, out var value))
         {
             NotifyCountChanging();
-            gd.Remove(key);
+            gsd.Remove(key);
             OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Remove, key, value));
             NotifyCountChanged();
             return true;
@@ -570,12 +495,12 @@ public class ObservableDictionary<TKey, TValue> :
             throw new ArgumentNullException(nameof(predicate));
 #endif
         var removed = new List<KeyValuePair<TKey, TValue>>();
-        foreach (var kv in gd.ToList())
+        foreach (var kv in gsd.ToList())
             if (predicate(kv.Key, kv.Value))
             {
                 if (removed.Count == 0)
                     NotifyCountChanging();
-                gd.Remove(kv.Key);
+                gsd.Remove(kv.Key);
                 removed.Add(kv);
             }
         if (removed.Count > 0)
@@ -601,7 +526,7 @@ public class ObservableDictionary<TKey, TValue> :
 #endif
         var removingKeyValuePairs = new List<KeyValuePair<TKey, TValue>>();
         foreach (var key in keys)
-            if (gd.TryGetValue(key, out var value))
+            if (gsd.TryGetValue(key, out var value))
                 removingKeyValuePairs.Add(new KeyValuePair<TKey, TValue>(key, value));
         var removedKeys = new List<TKey>();
         if (removingKeyValuePairs.Any())
@@ -609,7 +534,7 @@ public class ObservableDictionary<TKey, TValue> :
             NotifyCountChanging();
             foreach (var removingKeyValuePair in removingKeyValuePairs)
             {
-                gd.Remove(removingKeyValuePair.Key);
+                gsd.Remove(removingKeyValuePair.Key);
                 removedKeys.Add(removingKeyValuePair.Key);
             }
             OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Remove, removingKeyValuePairs));
@@ -630,11 +555,11 @@ public class ObservableDictionary<TKey, TValue> :
         if (keyValuePairs is null)
             throw new ArgumentNullException(nameof(keyValuePairs));
 #endif
-        if (keyValuePairs.Any(kvp => !gd.ContainsKey(kvp.Key)))
+        if (keyValuePairs.Any(kvp => !gsd.ContainsKey(kvp.Key)))
             throw new ArgumentException("One of the keys was not found in the dictionary", nameof(keyValuePairs));
         var oldItems = GetRange(keyValuePairs.Select(kv => kv.Key));
         foreach (var keyValuePair in keyValuePairs)
-            gd[keyValuePair.Key] = keyValuePair.Value;
+            gsd[keyValuePair.Key] = keyValuePair.Value;
         OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Replace, keyValuePairs, oldItems));
     }
 
@@ -647,20 +572,17 @@ public class ObservableDictionary<TKey, TValue> :
     public virtual IReadOnlyList<TKey> ReplaceRange(IEnumerable<TKey> removeKeys, IEnumerable<KeyValuePair<TKey, TValue>> newKeyValuePairs)
     {
 #if IS_NET_6_0_OR_GREATER
-        ArgumentNullException.ThrowIfNull(removeKeys);
         ArgumentNullException.ThrowIfNull(newKeyValuePairs);
 #else
-        if (removeKeys is null)
-            throw new ArgumentNullException(nameof(removeKeys));
         if (newKeyValuePairs is null)
             throw new ArgumentNullException(nameof(newKeyValuePairs));
 #endif
         var removingKeys = removeKeys.ToImmutableHashSet();
-        if (newKeyValuePairs.Where(kvp => !removingKeys.Contains(kvp.Key)).Any(kvp => kvp.Key is null || gd.ContainsKey(kvp.Key)))
+        if (newKeyValuePairs.Where(kvp => !removingKeys.Contains(kvp.Key)).Any(kvp => kvp.Key is null || gsd.ContainsKey(kvp.Key)))
             throw new ArgumentException("One of the new keys was null or already found in the dictionary", nameof(newKeyValuePairs));
         var removingKeyValuePairs = new List<KeyValuePair<TKey, TValue>>();
         foreach (var key in removingKeys)
-            if (gd.TryGetValue(key, out var value))
+            if (gsd.TryGetValue(key, out var value))
                 removingKeyValuePairs.Add(new KeyValuePair<TKey, TValue>(key, value));
         var countChanging = removingKeyValuePairs.Count != newKeyValuePairs.Count();
         if (countChanging)
@@ -668,11 +590,11 @@ public class ObservableDictionary<TKey, TValue> :
         var removedKeys = new List<TKey>();
         foreach (var removingKeyValuePair in removingKeyValuePairs)
         {
-            gd.Remove(removingKeyValuePair.Key);
+            gsd.Remove(removingKeyValuePair.Key);
             removedKeys.Add(removingKeyValuePair.Key);
         }
         foreach (var keyValuePair in newKeyValuePairs)
-            gd.Add(keyValuePair.Key, keyValuePair.Value);
+            gsd.Add(keyValuePair.Key, keyValuePair.Value);
         OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Replace, newKeyValuePairs, removingKeyValuePairs));
         if (countChanging)
             NotifyCountChanged();
@@ -680,35 +602,29 @@ public class ObservableDictionary<TKey, TValue> :
     }
 
     /// <summary>
-    /// Reinitializes the hash table used internally by the <see cref="ObservableDictionary{TKey, TValue}"/>, removing all elements
+    /// Reinitializes the binary search tree used internally by the <see cref="ObservableSortedDictionary{TKey, TValue}"/>, removing all elements
     /// </summary>
     public virtual void Reset()
     {
-        var countChanging = gd.Count > 0;
+        var countChanging = gsd.Count > 0;
         if (countChanging)
             NotifyCountChanging();
-        gd = comparer is null ? new Dictionary<TKey, TValue>() : new Dictionary<TKey, TValue>(comparer);
+        gsd = new SortedDictionary<TKey, TValue>(gsd.Comparer);
         CastAndNotifyReset();
         if (countChanging)
             NotifyCountChanged();
     }
 
     /// <summary>
-    /// Reinitializes the hash table used internally by the <see cref="ObservableDictionary{TKey, TValue}"/> with the elements from the specified dictionary
+    /// Reinitializes the binary search tree used internally by the <see cref="ObservableSortedDictionary{TKey, TValue}"/> with the elements from the specified dictionary
     /// </summary>
     /// <param name="dictionary">The dictionary from which to retrieve the initial elements</param>
     public virtual void Reset(IDictionary<TKey, TValue> dictionary)
     {
-#if IS_NET_6_0_OR_GREATER
-        ArgumentNullException.ThrowIfNull(dictionary);
-#else
-        if (dictionary is null)
-            throw new ArgumentNullException(nameof(dictionary));
-#endif
-        var countChanging = gd.Count != dictionary.Count;
+        var countChanging = gsd.Count > 0;
         if (countChanging)
             NotifyCountChanging();
-        gd = comparer is null ? new Dictionary<TKey, TValue>(dictionary) : new Dictionary<TKey, TValue>(dictionary, comparer);
+        gsd = new SortedDictionary<TKey, TValue>(dictionary, gsd.Comparer);
         CastAndNotifyReset();
         if (countChanging)
             NotifyCountChanged();
@@ -723,55 +639,7 @@ public class ObservableDictionary<TKey, TValue> :
     {
         var oldValue = GetValue(key);
         di[key] = value;
-        OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Replace, (TKey)key!, (TValue)value!, (TValue)oldValue!));
-    }
-
-    /// <summary>
-    /// Sets the capacity of this dictionary to what it would be if it had been originally initialized with all its entries
-    /// </summary>
-#if IS_NET_STANDARD_2_1_OR_GREATER
-    [SuppressMessage("Style", "IDE0022: Use expression body for method")]
-#endif
-    public void TrimExcess()
-    {
-#if IS_NET_STANDARD_2_1_OR_GREATER
-        gd.TrimExcess();
-#else
-        gd = new Dictionary<TKey, TValue>(gd, comparer);
-        ci = gd;
-        gci = gd;
-        di = gd;
-        gdi = gd;
-        ei = gd;
-        gei = gd;
-        grodi = gd;
-#endif
-    }
-
-    /// <summary>
-    /// Sets the capacity of this dictionary to hold up a specified number of entries without any further expansion of its backing storage
-    /// </summary>
-    /// <param name="capacity">The new capacity</param>
-#if IS_NET_STANDARD_2_1_OR_GREATER
-    [SuppressMessage("Style", "IDE0022: Use expression body for method")]
-#endif
-    public virtual void TrimExcess(int capacity)
-    {
-#if IS_NET_STANDARD_2_1_OR_GREATER
-        gd.TrimExcess(capacity);
-#else
-        var oldGd = gd;
-        gd = new Dictionary<TKey, TValue>(capacity, comparer);
-        foreach (var kvp in oldGd)
-            gd.Add(kvp.Key, kvp.Value);
-        ci = gd;
-        gci = gd;
-        di = gd;
-        gdi = gd;
-        ei = gd;
-        gei = gd;
-        grodi = gd;
-#endif
+        OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Replace, (TKey)key, (TValue)value!, (TValue)oldValue!));
     }
 
     /// <summary>
@@ -788,10 +656,10 @@ public class ObservableDictionary<TKey, TValue> :
         if (key is null)
             throw new ArgumentNullException(nameof(key));
 #endif
-        if (!gd.ContainsKey(key))
+        if (!gsd.ContainsKey(key))
         {
             NotifyCountChanging();
-            gd.Add(key, value);
+            gsd.Add(key, value);
             OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, key, value));
             NotifyCountChanged();
             return true;
@@ -819,8 +687,8 @@ public class ObservableDictionary<TKey, TValue> :
     /// <returns><c>true</c> if the object that implements <see cref="IDictionary{TKey, TValue}"/> contains an element with the specified key and the value that was found; otherwise, <c>false</c> and the default value of <typeparamref name="TValue"/></returns>
     protected virtual (bool valueRetrieved, TValue value) TryGetValue(TKey key)
     {
-        var valueRetrieved = gd.TryGetValue(key, out var value);
-        return (valueRetrieved, value!);
+        var valueRetrieved = gsd.TryGetValue(key, out var value);
+        return (valueRetrieved, value);
     }
 
     /// <summary>
@@ -830,10 +698,10 @@ public class ObservableDictionary<TKey, TValue> :
     /// <returns><c>true</c> if the object that implements <see cref="IDictionary{TKey, TValue}"/> contained an element with the specified key and the value that was removed; otherwise, <c>false</c> and the default value of <typeparamref name="TValue"/></returns>
     protected virtual (bool valueRemoved, TValue value) TryRemove(TKey key)
     {
-        if (gd.TryGetValue(key, out var value))
+        if (gsd.TryGetValue(key, out var value))
         {
             NotifyCountChanging();
-            gd.Remove(key);
+            gsd.Remove(key);
             OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Remove, key, value));
             NotifyCountChanged();
             return (true, value);
@@ -854,11 +722,11 @@ public class ObservableDictionary<TKey, TValue> :
     /// <returns>The value associated with the specified key</returns>
     public virtual TValue this[TKey key]
     {
-        get => gd[key];
+        get => gsd[key];
         set
         {
-            var oldValue = gd[key];
-            gd[key] = value;
+            var oldValue = gsd[key];
+            gsd[key] = value;
             OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Replace, key, value, oldValue));
         }
     }
@@ -870,16 +738,16 @@ public class ObservableDictionary<TKey, TValue> :
     }
 
     /// <summary>
-    /// Gets the <see cref="IEqualityComparer{T}"/> that is used to determine equality of keys for the dictionary
+    /// Gets the <see cref="IComparer{T}"/> used to order the elements of the <see cref="ObservableSortedDictionary{TKey, TValue}"/>
     /// </summary>
-    public virtual IEqualityComparer<TKey> Comparer =>
-        gd.Comparer;
+    public virtual IComparer<TKey> Comparer =>
+        gsd.Comparer;
 
     /// <summary>
     /// Gets the number of elements in the collection
     /// </summary>
     public virtual int Count =>
-        gd.Count;
+        gsd.Count;
 
     /// <summary>
     /// Gets a value that indicates whether the <see cref="IDictionary"/> is read-only
@@ -920,8 +788,8 @@ public class ObservableDictionary<TKey, TValue> :
     /// <summary>
     /// Gets an <see cref="ICollection{T}"/> containing the keys of the <see cref="IDictionary{TKey, TValue}"/>
     /// </summary>
-    public virtual Dictionary<TKey, TValue>.KeyCollection Keys =>
-        gd.Keys;
+    public virtual SortedDictionary<TKey, TValue>.KeyCollection Keys =>
+        gsd.Keys;
 
     ICollection IDictionary.Keys =>
         KeysCollection;
@@ -965,8 +833,8 @@ public class ObservableDictionary<TKey, TValue> :
     /// <summary>
     /// Gets an <see cref="ICollection{T}"/> containing the values in the <see cref="IDictionary{TKey, TValue}"/>
     /// </summary>
-    public virtual Dictionary<TKey, TValue>.ValueCollection Values =>
-        gd.Values;
+    public virtual SortedDictionary<TKey, TValue>.ValueCollection Values =>
+        gsd.Values;
 
     ICollection IDictionary.Values =>
         ValuesCollection;
@@ -993,7 +861,7 @@ public class ObservableDictionary<TKey, TValue> :
         gdi.Values;
 
     /// <summary>
-    /// Gets an enumerable collection that contains the values in the read-only dictionary
+    /// Gets a collection containing the values in the <see cref="ObservableDictionary{TKey, TValue}"/>
     /// </summary>
     protected virtual IEnumerable<TValue> ValuesGenericEnumerable =>
         grodi.Values;
