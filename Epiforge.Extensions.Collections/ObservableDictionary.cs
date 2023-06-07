@@ -257,8 +257,9 @@ public class ObservableDictionary<TKey, TValue> :
         if (Count > 0)
         {
             NotifyCountChanging();
+            var currentKeyValuePairs = gd.ToImmutableArray();
             gd.Clear();
-            OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Reset));
+            OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Remove, currentKeyValuePairs));
             NotifyCountChanged();
         }
     }

@@ -213,8 +213,9 @@ public class ObservableSortedDictionary<TKey, TValue> :
         if (Count > 0)
         {
             NotifyCountChanging();
+            var currentKeyValuePairs = gsd.ToImmutableArray();
             gsd.Clear();
-            OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Reset));
+            OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Remove, currentKeyValuePairs));
             NotifyCountChanged();
         }
     }

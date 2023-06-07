@@ -106,7 +106,7 @@ public static class DictionaryExtensions
         if (key is null)
             throw new ArgumentNullException(nameof(key));
 #endif
-        if (dictionary.TryGetValue(key, out value))
+        if (dictionary.TryGetValue(key, out value!))
         {
             dictionary.Remove(key);
             return true;

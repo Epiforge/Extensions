@@ -8,6 +8,8 @@ namespace Epiforge.Extensions.Collections;
 public sealed class NotifyDictionaryChangedEventArgs<TKey, TValue> :
     EventArgs
 {
+    static readonly IReadOnlyList<KeyValuePair<TKey, TValue>> emptyList = Enumerable.Empty<KeyValuePair<TKey, TValue>>().ToImmutableArray();
+
     /// <summary>
     /// Initializes a new instance of the <see cref="NotifyDictionaryChangedEventArgs{TKey, TValue}"/> class that describes a <see cref="NotifyDictionaryChangedAction.Reset"/> change
     /// </summary>
@@ -119,10 +121,10 @@ public sealed class NotifyDictionaryChangedEventArgs<TKey, TValue> :
     /// <summary>
     /// Gets the list of new items involved in the change
     /// </summary>
-    public IReadOnlyList<KeyValuePair<TKey, TValue>> NewItems { get; private set; } = Enumerable.Empty<KeyValuePair<TKey, TValue>>().ToImmutableArray();
+    public IReadOnlyList<KeyValuePair<TKey, TValue>> NewItems { get; private set; } = emptyList;
 
     /// <summary>
     /// Gets the list of items affected by a <see cref="NotifyDictionaryChangedAction.Replace"/> or <see cref="NotifyDictionaryChangedAction.Remove"/> action
     /// </summary>
-    public IReadOnlyList<KeyValuePair<TKey, TValue>> OldItems { get; private set; } = Enumerable.Empty<KeyValuePair<TKey, TValue>>().ToImmutableArray();
+    public IReadOnlyList<KeyValuePair<TKey, TValue>> OldItems { get; private set; } = emptyList;
 }

@@ -335,17 +335,29 @@ public class ObservableSortedDictionary
         observableSortedDictionary.CollectionChanged += (sender, args) =>
         {
             collectionChangeObserved = true;
-            Assert.AreEqual(NotifyCollectionChangedAction.Reset, args.Action);
+            Assert.AreEqual(NotifyCollectionChangedAction.Remove, args.Action);
+            Assert.AreEqual(1, args.OldItems!.Count);
+            Assert.AreEqual("key", ((KeyValuePair<string, string>)args.OldItems![0]!).Key);
+            Assert.AreEqual("value", ((KeyValuePair<string, string>)args.OldItems![0]!).Value);
+            Assert.IsNull(args.NewItems);
         };
         observableSortedDictionary.DictionaryChanged += (sender, args) =>
         {
             dictionaryChangeObserved = true;
-            Assert.AreEqual(NotifyDictionaryChangedAction.Reset, args.Action);
+            Assert.AreEqual(NotifyDictionaryChangedAction.Remove, args.Action);
+            Assert.AreEqual(1, args.OldItems!.Count);
+            Assert.AreEqual("key", args.OldItems![0]!.Key);
+            Assert.AreEqual("value", args.OldItems![0]!.Value);
+            Assert.AreEqual(0, args.NewItems!.Count);
         };
         ((INotifyDictionaryChanged)observableSortedDictionary).DictionaryChanged += (sender, args) =>
         {
             boxedDictionaryChangeObserved = true;
-            Assert.AreEqual(NotifyDictionaryChangedAction.Reset, args.Action);
+            Assert.AreEqual(NotifyDictionaryChangedAction.Remove, args.Action);
+            Assert.AreEqual(1, args.OldItems!.Count);
+            Assert.AreEqual("key", args.OldItems![0]!.Key);
+            Assert.AreEqual("value", args.OldItems![0]!.Value);
+            Assert.AreEqual(0, args.NewItems!.Count);
         };
         observableSortedDictionary.Clear();
         Assert.IsTrue(collectionChangeObserved);

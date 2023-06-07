@@ -192,16 +192,6 @@ public static class EnumerableExtensions
         }
     }
 
-    static IEnumerable<int> TypedIndiciesOf(Array array, object? item)
-    {
-        var index = Array.IndexOf(array, item);
-        while (index >= 0)
-        {
-            yield return index;
-            index = Array.IndexOf(array, item, index + 1);
-        }
-    }
-
     /// <summary>
     /// Finds the indicies of the specified item in the source
     /// </summary>

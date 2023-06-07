@@ -175,11 +175,8 @@ public class NullableKeySortedDictionary
 
     [TestMethod]
     [ExpectedException(typeof(KeyNotFoundException))]
-    public void IndexerGetterNonNullKeyNotFound()
-    {
-        var dictionary = new NullableKeySortedDictionary<string?, int>();
-        dictionary["one"].ToString();
-    }
+    public void IndexerGetterNonNullKeyNotFound() =>
+        _ = new NullableKeySortedDictionary<string?, int>()["one"];
 
     [TestMethod]
     public void IndexerGetterNullKey()
@@ -190,11 +187,8 @@ public class NullableKeySortedDictionary
 
     [TestMethod]
     [ExpectedException(typeof(KeyNotFoundException))]
-    public void IndexerGetterNullKeyNotFound()
-    {
-        var dictionary = new NullableKeySortedDictionary<string?, int>();
-        dictionary[null].ToString();
-    }
+    public void IndexerGetterNullKeyNotFound() =>
+        _ = new NullableKeySortedDictionary<string?, int>()[null];
 
     [TestMethod]
     public void IndexerSetterNonNullKey()

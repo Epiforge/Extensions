@@ -5,7 +5,7 @@ public class EquatableList
 {
     [TestMethod]
     public void Count() =>
-        new Collections.EquatableList<int>(Enumerable.Range(0, 5)).Count.ToString();
+        Assert.AreEqual(5, new Collections.EquatableList<int>(Enumerable.Range(0, 5)).Count);
 
     [TestMethod]
     public void Equality()
@@ -59,7 +59,7 @@ public class EquatableList
 
     [TestMethod]
     public void Index() =>
-        new Collections.EquatableList<int>(Enumerable.Range(0, 5))[1].ToString();
+        Assert.AreEqual(1, new Collections.EquatableList<int>(Enumerable.Range(0, 5))[1]);
 
     [TestMethod]
     public void Inequality()

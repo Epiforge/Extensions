@@ -201,11 +201,8 @@ public class NullableKeyDictionary
 
     [TestMethod]
     [ExpectedException(typeof(KeyNotFoundException))]
-    public void IndexerGetterNonNullKeyNotFound()
-    {
-        var dictionary = new NullableKeyDictionary<string?, int>();
-        dictionary["one"].ToString();
-    }
+    public void IndexerGetterNonNullKeyNotFound() =>
+        _ = new NullableKeyDictionary<string?, int>()["one"];
 
     [TestMethod]
     public void IndexerGetterNullKey()
@@ -216,11 +213,8 @@ public class NullableKeyDictionary
 
     [TestMethod]
     [ExpectedException(typeof(KeyNotFoundException))]
-    public void IndexerGetterNullKeyNotFound()
-    {
-        var dictionary = new NullableKeyDictionary<string?, int>();
-        dictionary[null].ToString();
-    }
+    public void IndexerGetterNullKeyNotFound() =>
+        _ = new NullableKeyDictionary<string?, int>()[null];
 
     [TestMethod]
     public void IndexerSetterNonNullKey()

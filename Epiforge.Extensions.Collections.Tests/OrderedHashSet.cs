@@ -175,7 +175,7 @@ public class OrderedHashSet
     [TestMethod]
     [ExpectedException(typeof(InvalidOperationException))]
     public void FirstEmpty() =>
-        new OrderedHashSet<int>().First.ToString();
+        _ = new OrderedHashSet<int>().First;
 
     [TestMethod]
     public void GetEnumerator()
@@ -284,7 +284,7 @@ public class OrderedHashSet
     [TestMethod]
     [ExpectedException(typeof(InvalidOperationException))]
     public void LastEmpty() =>
-        new OrderedHashSet<int>().Last.ToString();
+        _ = new OrderedHashSet<int>().Last;
 
     [TestMethod]
     public void MoveToFirst()
