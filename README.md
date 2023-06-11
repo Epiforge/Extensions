@@ -83,6 +83,18 @@ This library provides extension methods for dealing with exceptions:
 This library provides a number of utilities surrounding collections:
 
 * `EquatableList<T>` is an immutable list of items which may be compared with other instances of the same type and produces a hash code based on the permutation of its contents.
+* `RangeObservableCollection<T>` is a counterpart to the BCL's `ObservableCollection<T>` which implements:
+  * `AddRange` - Adds objects to the end of the collection
+  * `GetAndRemoveAll` - Removes all object from the collection that satisfy a predicate
+  * `GetAndRemoveAt` - Gets the element at the specified index and removes it from the collection
+  * `GetRange` - Gets the elements in the range starting at the specified index and of the specified length
+  * `InsertRange` - Inserts elements into the collection at the specified index
+  * `MoveRange` - Moves the items at the specified index to a new location in the collection
+  * `RemoveAll` - Removes all object from the collection that satisfy a predicate
+  * `RemoveRange` - Removes the specified items from the collection *or* removes the specified range of items from the collection
+  * `ReplaceAll` - Replace all items in the collection with the items in the specified collection
+  * `ReplaceRange` - Replaces the specified range of items from the collection with the items in the specified collection
+  * `Reset` - Resets the collection with the specified collection of items
 * `NullableKeyDictionary<TKey, TValue>` and `NullableKeySortedDictionary<TKey, TValue>` are very slim implementations of `IDictionary<TKey, TValue>` that allow a single null key (useful for some edge cases in which a null key is simply going to happen and you need to be able to deal with it; otherwise, use other dictionary classes).
 * `ObservableDictionary<TKey, TValue>`, `ObservableSortedDictionary<TKey, TValue>`, `ObservableConcurrentDictionary<TKey, TValue>` are counterparts to the BCL's `Dictionary<TKey, TValue>`, `SortedDictionary<TKey, TValue>`, and `ConcurrentDictionary<TKey, TValue>`, respectively, that implement the also included `IRangeDictionary<TKey, TValue>` and `INotifyDictionaryChanged<TKey, TValue>`. Ever want to add multiple items to a dictionary at once... or keep an eye on what's being done to it? Now you can.
 * `OrderedHashSet<T>` is a counterpart to the BCL's `HashSet<T>` that maintains the order of the elements in the set. All operations are still *O(1)*, just like the original, but if you enumerate over it you will get elements in the exact order they were added. There are also methods for manipulating the order.
