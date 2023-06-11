@@ -11,6 +11,10 @@ This library provides a number of extension methods for collections and dictiona
   * `GetOrAdd` - Adds a key/value pair to the specified `IDictionary` or `IDictionary<TKey, TValue>` by using the specified function if the key does not already exist (returns the new value, or the existing value if the key exists)
   * `TryRemove` - Attempts to remove and return the value that has the specified key from the specified `IDictionary` or `IDictionary<TKey, TValue>`
 
+# Generic
+
+* `ReadOnlyDictionary<TKey, TValue>` is a read-only wrapper any classes implementing `IReadOnlyDictionary<TKey, TValue>`.
+
 # ObjectModel
 
 * `RangeObservableCollection<T>` is a counterpart to the BCL's `ObservableCollection<T>` which implements:
