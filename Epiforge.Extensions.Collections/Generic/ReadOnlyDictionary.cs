@@ -26,13 +26,53 @@ public class ReadOnlyDictionary<TKey, TValue> :
     readonly IReadOnlyDictionary<TKey, TValue> readOnlyDictionary;
 
     /// <summary>
+    /// Gets the element that has the specified key in the read-only dictionary
+    /// </summary>
+    /// <param name="key">The key to locate</param>
+    /// <returns>The element that has the specified key in the read-only dictionary</returns>
+    public TValue this[TKey key]
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => readOnlyDictionary[key];
+    }
+
+    /// <summary>
+    /// Gets the number of elements in the read-only dictionary
+    /// </summary>
+    public int Count
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => readOnlyDictionary.Count;
+    }
+
+    /// <summary>
+    /// Gets an enumerable collection that contains the keys in the read-only dictionary
+    /// </summary>
+    public IEnumerable<TKey> Keys
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => readOnlyDictionary.Keys;
+    }
+
+    /// <summary>
+    /// Gets an enumerable collection that contains the values in the read-only dictionary
+    /// </summary>
+    public IEnumerable<TValue> Values
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => readOnlyDictionary.Values;
+    }
+
+    /// <summary>
     /// Determines whether the read-only dictionary contains an element that has the specified key
     /// </summary>
     /// <param name="key">The key to locate</param>
     /// <returns><c>true</c> if the dictionary contains the key; otherwise, <c>false</c></returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool ContainsKey(TKey key) =>
         readOnlyDictionary.ContainsKey(key);
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     IEnumerator IEnumerable.GetEnumerator() =>
         readOnlyDictionary.GetEnumerator();
 
@@ -40,6 +80,7 @@ public class ReadOnlyDictionary<TKey, TValue> :
     /// Returns an enumerator that iterates through the read-only dictionary
     /// </summary>
     /// <returns>An enumerator that can be used to iterate through the dictionary</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator() =>
         readOnlyDictionary.GetEnumerator();
 
@@ -49,32 +90,7 @@ public class ReadOnlyDictionary<TKey, TValue> :
     /// <param name="key">The key to locate</param>
     /// <param name="value">When this method returns, the value associated with the specified key, if the key is found; otherwise, the default value for the type of the value parameter</param>
     /// <returns><c>true</c> if the read-only dictionary contains the key; otherwise, <c>false</c></returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool TryGetValue(TKey key, out TValue value) =>
         readOnlyDictionary.TryGetValue(key, out value!);
-
-    /// <summary>
-    /// Gets the element that has the specified key in the read-only dictionary
-    /// </summary>
-    /// <param name="key">The key to locate</param>
-    /// <returns>The element that has the specified key in the read-only dictionary</returns>
-    public TValue this[TKey key] =>
-        readOnlyDictionary[key];
-
-    /// <summary>
-    /// Gets the number of elements in the read-only dictionary
-    /// </summary>
-    public int Count =>
-        readOnlyDictionary.Count;
-
-    /// <summary>
-    /// Gets an enumerable collection that contains the keys in the read-only dictionary
-    /// </summary>
-    public IEnumerable<TKey> Keys =>
-        readOnlyDictionary.Keys;
-
-    /// <summary>
-    /// Gets an enumerable collection that contains the values in the read-only dictionary
-    /// </summary>
-    public IEnumerable<TValue> Values =>
-        readOnlyDictionary.Values;
 }
