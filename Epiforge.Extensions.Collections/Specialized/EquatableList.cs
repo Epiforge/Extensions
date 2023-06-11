@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Collections;
+namespace Epiforge.Extensions.Collections.Specialized;
 
 // TODO: dotnet8 Frozen
 
@@ -48,7 +48,7 @@ public readonly struct EquatableList<T> :
             hashCode.Add(element);
         this.hashCode = hashCode.ToHashCode();
 #else
-        var hashCode = new Components.HashCode();
+        var hashCode = new HashCode();
         foreach (var element in elements)
             hashCode.Add(element);
         this.hashCode = hashCode.ToHashCode();
@@ -79,7 +79,7 @@ public readonly struct EquatableList<T> :
             hashCode.Add(element, EqualityComparer);
         this.hashCode = hashCode.ToHashCode();
 #else
-        var hashCode = new Components.HashCode();
+        var hashCode = new HashCode();
         foreach (var element in elements)
             hashCode.Add(element, EqualityComparer);
         this.hashCode = hashCode.ToHashCode();

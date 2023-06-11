@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Collections;
+namespace Epiforge.Extensions.Collections.Generic;
 
 /// <summary>
 /// Represents a keyed data structure that uses an <see cref="IComparer{T}"/> to sort keys

@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Collections;
+namespace Epiforge.Extensions.Collections.Specialized;
 
 /// <summary>
 /// Notifies listeners of dynamic changes, such as when a value is added and removed or the whole dictionary is cleared

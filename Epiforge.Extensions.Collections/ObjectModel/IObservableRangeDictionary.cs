@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Collections;
+namespace Epiforge.Extensions.Collections.ObjectModel;
 
 /// <summary>
 /// Represents a generic collection of key/value pairs that supports bulk operations and notifies listeners of dynamic changes, such as when an item is added and removed or the whole list is cleared

@@ -1,12 +1,12 @@
-namespace Epiforge.Extensions.Collections.Tests;
+namespace Epiforge.Extensions.Collections.Tests.ObjectModel;
 
 [TestClass]
-public class ObservableSortedDictionary
+public class ObservableDictionary
 {
     #region Derivations
 
     class DerivationWithGetDictionaryEnumerator<TKey, TValue> :
-        ObservableSortedDictionary<TKey, TValue>
+        ObservableDictionary<TKey, TValue>
         where TKey : notnull
     {
         public DerivationWithGetDictionaryEnumerator()
@@ -18,7 +18,7 @@ public class ObservableSortedDictionary
     }
 
     class DerivationWithNullOnChangedArgs<TKey, TValue> :
-        ObservableSortedDictionary<TKey, TValue>
+        ObservableDictionary<TKey, TValue>
         where TKey : notnull
     {
         public DerivationWithNullOnChangedArgs()
@@ -30,7 +30,7 @@ public class ObservableSortedDictionary
     }
 
     class DerivationWithUnsupportedNotifyDictionaryChangedAction<TKey, TValue> :
-        ObservableSortedDictionary<TKey, TValue>
+        ObservableDictionary<TKey, TValue>
         where TKey : notnull
     {
         public DerivationWithUnsupportedNotifyDictionaryChangedAction()
@@ -46,62 +46,74 @@ public class ObservableSortedDictionary
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
     public void AddNullKey() =>
-        new ObservableSortedDictionary<string, string>().Add(null!, "value");
+        new ObservableDictionary<string, string>().Add(null!, "value");
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentException))]
     public void AddRangeNullKey() =>
-        new ObservableSortedDictionary<string, string>().AddRange(new KeyValuePair<string, string>[] { new KeyValuePair<string, string>(null!, "value") });
+        new ObservableDictionary<string, string>().AddRange(new KeyValuePair<string, string>[] { new KeyValuePair<string, string>(null!, "value") });
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
     public void AddRangeNullList() =>
-        new ObservableSortedDictionary<string, string>().AddRange(null!);
+        new ObservableDictionary<string, string>().AddRange(null!);
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentException))]
     public void CollectionAddNullKey() =>
-        ((ICollection<KeyValuePair<string, string>>)new ObservableSortedDictionary<string, string>()).Add(new KeyValuePair<string, string>(null!, "value"));
+        ((ICollection<KeyValuePair<string, string>>)new ObservableDictionary<string, string>()).Add(new KeyValuePair<string, string>(null!, "value"));
 
     [TestMethod]
     public void CollectionContains() =>
-        Assert.IsTrue(((ICollection<KeyValuePair<string, string>>)new ObservableSortedDictionary<string, string>() { { "key", "value" } }).Contains(new KeyValuePair<string, string>("key", "value")));
+        Assert.IsTrue(((ICollection<KeyValuePair<string, string>>)new ObservableDictionary<string, string>() { { "key", "value" } }).Contains(new KeyValuePair<string, string>("key", "value")));
 
     [TestMethod]
     public void CollectionCopyTo()
     {
         var array = new KeyValuePair<string, string>[1];
-        ((ICollection<KeyValuePair<string, string>>)new ObservableSortedDictionary<string, string>() { { "key", "value" } }).CopyTo(array, 0);
+        ((ICollection<KeyValuePair<string, string>>)new ObservableDictionary<string, string>() { { "key", "value" } }).CopyTo(array, 0);
         Assert.AreEqual("key", array[0].Key);
         Assert.AreEqual("value", array[0].Value);
     }
 
     [TestMethod]
     public void CollectionIsReadOnly() =>
-        Assert.IsFalse(((ICollection<KeyValuePair<string, string>>)new ObservableSortedDictionary<string, string>()).IsReadOnly);
+        Assert.IsFalse(((ICollection<KeyValuePair<string, string>>)new ObservableDictionary<string, string>()).IsReadOnly);
 
     [TestMethod]
     public void CollectionIsSynchronized() =>
-        Assert.IsFalse(((ICollection)new ObservableSortedDictionary<string, string>()).IsSynchronized);
+        Assert.IsFalse(((ICollection)new ObservableDictionary<string, string>()).IsSynchronized);
 
     [TestMethod]
     public void CollectionRemove() =>
-        Assert.IsTrue(((ICollection<KeyValuePair<string, string>>)new ObservableSortedDictionary<string, string> { { "key", "value" } }).Remove(new KeyValuePair<string, string>("key", "value")));
+        Assert.IsTrue(((ICollection<KeyValuePair<string, string>>)new ObservableDictionary<string, string> { { "key", "value" } }).Remove(new KeyValuePair<string, string>("key", "value")));
 
     [TestMethod]
     public void CollectionRemoveNotFound() =>
-        Assert.IsFalse(((ICollection<KeyValuePair<string, string>>)new ObservableSortedDictionary<string, string> { { "key", "value" } }).Remove(new KeyValuePair<string, string>("other key", "value")));
+        Assert.IsFalse(((ICollection<KeyValuePair<string, string>>)new ObservableDictionary<string, string> { { "key", "value" } }).Remove(new KeyValuePair<string, string>("other key", "value")));
 
     [TestMethod]
     public void Construction() =>
-        Assert.AreEqual(0, new ObservableSortedDictionary<string, string>().Count);
+        Assert.AreEqual(0, new ObservableDictionary<string, string>().Count);
+
+    [TestMethod]
+    public void ConstructionWithCapacity() =>
+        Assert.AreEqual(0, new ObservableDictionary<string, string>(10).Count);
+
+    [TestMethod]
+    public void ConstructionWithCapacityAndComparer()
+    {
+        var observableDictionary = new ObservableDictionary<string, string>(10, StringComparer.OrdinalIgnoreCase);
+        Assert.AreSame(StringComparer.OrdinalIgnoreCase, observableDictionary.Comparer);
+        Assert.AreEqual(0, observableDictionary.Count);
+    }
 
     [TestMethod]
     public void ConstructionWithComparer()
     {
-        var observableSortedDictionary = new ObservableSortedDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        Assert.AreSame(StringComparer.OrdinalIgnoreCase, observableSortedDictionary.Comparer);
-        Assert.AreEqual(0, observableSortedDictionary.Count);
+        var observableDictionary = new ObservableDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        Assert.AreSame(StringComparer.OrdinalIgnoreCase, observableDictionary.Comparer);
+        Assert.AreEqual(0, observableDictionary.Count);
     }
 
     [TestMethod]
@@ -113,11 +125,11 @@ public class ObservableSortedDictionary
             { "key2", "value2" },
             { "key3", "value3" },
         };
-        var observableSortedDictionary = new ObservableSortedDictionary<string, string>(dictionary);
-        Assert.AreEqual(3, observableSortedDictionary.Count);
-        Assert.AreEqual("value1", observableSortedDictionary["key1"]);
-        Assert.AreEqual("value2", observableSortedDictionary["key2"]);
-        Assert.AreEqual("value3", observableSortedDictionary["key3"]);
+        var observableDictionary = new ObservableDictionary<string, string>(dictionary);
+        Assert.AreEqual(3, observableDictionary.Count);
+        Assert.AreEqual("value1", observableDictionary["key1"]);
+        Assert.AreEqual("value2", observableDictionary["key2"]);
+        Assert.AreEqual("value3", observableDictionary["key3"]);
     }
 
     [TestMethod]
@@ -129,45 +141,49 @@ public class ObservableSortedDictionary
             { "key2", "value2" },
             { "key3", "value3" },
         };
-        var observableSortedDictionary = new ObservableSortedDictionary<string, string>(dictionary, StringComparer.OrdinalIgnoreCase);
-        Assert.AreSame(StringComparer.OrdinalIgnoreCase, observableSortedDictionary.Comparer);
-        Assert.AreEqual(3, observableSortedDictionary.Count);
-        Assert.AreEqual("value1", observableSortedDictionary["key1"]);
-        Assert.AreEqual("value2", observableSortedDictionary["key2"]);
-        Assert.AreEqual("value3", observableSortedDictionary["key3"]);
+        var observableDictionary = new ObservableDictionary<string, string>(dictionary, StringComparer.OrdinalIgnoreCase);
+        Assert.AreSame(StringComparer.OrdinalIgnoreCase, observableDictionary.Comparer);
+        Assert.AreEqual(3, observableDictionary.Count);
+        Assert.AreEqual("value1", observableDictionary["key1"]);
+        Assert.AreEqual("value2", observableDictionary["key2"]);
+        Assert.AreEqual("value3", observableDictionary["key3"]);
     }
 
     [TestMethod]
     public void ContainsKey() =>
-        Assert.IsTrue(new ObservableSortedDictionary<string, string> { { "key", "value" } }.ContainsKey("key"));
+        Assert.IsTrue(new ObservableDictionary<string, string> { { "key", "value" } }.ContainsKey("key"));
 
     [TestMethod]
     public void ContainsValue() =>
-        Assert.IsTrue(new ObservableSortedDictionary<string, string> { { "key", "value" } }.ContainsValue("value"));
+        Assert.IsTrue(new ObservableDictionary<string, string> { { "key", "value" } }.ContainsValue("value"));
 
     [TestMethod]
     public void DictionaryIsFixedSize() =>
-        Assert.IsFalse(((IDictionary)new ObservableSortedDictionary<string, string>()).IsFixedSize);
+        Assert.IsFalse(((IDictionary)new ObservableDictionary<string, string>()).IsFixedSize);
 
     [TestMethod]
     public void DictionaryIsReadOnly() =>
-        Assert.IsFalse(((IDictionary)new ObservableSortedDictionary<string, string>()).IsReadOnly);
+        Assert.IsFalse(((IDictionary)new ObservableDictionary<string, string>()).IsReadOnly);
 
     [TestMethod]
     public void DictionaryKeys() =>
-        Assert.AreEqual(0, ((IDictionary)new ObservableSortedDictionary<string, string>()).Keys.Count);
+        Assert.AreEqual(0, ((IDictionary)new ObservableDictionary<string, string>()).Keys.Count);
 
     [TestMethod]
     public void DictionaryValues() =>
-        Assert.AreEqual(0, ((IDictionary)new ObservableSortedDictionary<string, string>()).Values.Count);
+        Assert.AreEqual(0, ((IDictionary)new ObservableDictionary<string, string>()).Values.Count);
+
+    [TestMethod]
+    public void EnsureCapacity() =>
+        new ObservableDictionary<string, string> { { "key", "value" } }.EnsureCapacity(10);
 
     [TestMethod]
     public void GenericDictionaryKeys() =>
-        Assert.AreEqual(0, ((IDictionary<string, string>)new ObservableSortedDictionary<string, string>()).Keys.Count);
+        Assert.AreEqual(0, ((IDictionary<string, string>)new ObservableDictionary<string, string>()).Keys.Count);
 
     [TestMethod]
     public void GenericDictionaryValues() =>
-        Assert.AreEqual(0, ((IDictionary<string, string>)new ObservableSortedDictionary<string, string>()).Values.Count);
+        Assert.AreEqual(0, ((IDictionary<string, string>)new ObservableDictionary<string, string>()).Values.Count);
 
     [TestMethod]
     public void GetDictionaryEnumerator() =>
@@ -175,60 +191,60 @@ public class ObservableSortedDictionary
 
     [TestMethod]
     public void GetEnumerator() =>
-        Assert.IsNotNull(new ObservableSortedDictionary<string, string>().GetEnumerator());
+        Assert.IsNotNull(new ObservableDictionary<string, string>().GetEnumerator());
 
     [TestMethod]
     public void GetKeyValuePairEnumerator() =>
-        Assert.IsNotNull(((IEnumerable<KeyValuePair<string, string>>)new ObservableSortedDictionary<string, string>()).GetEnumerator());
+        Assert.IsNotNull(((IEnumerable<KeyValuePair<string, string>>)new ObservableDictionary<string, string>()).GetEnumerator());
 
     [TestMethod]
     public void GetRange() =>
-        Assert.AreEqual(1, new ObservableSortedDictionary<string, string> { { "key", "value" } }.GetRange(new[] { "key" }).Count);
+        Assert.AreEqual(1, new ObservableDictionary<string, string> { { "key", "value" } }.GetRange(new[] { "key" }).Count);
 
     [TestMethod]
     public void Keys() =>
-        Assert.AreEqual(0, new ObservableSortedDictionary<string, string>().Keys.Count);
+        Assert.AreEqual(0, new ObservableDictionary<string, string>().Keys.Count);
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
     public void NonGenericAddNullKey() =>
-        ((IDictionary)new ObservableSortedDictionary<string, string>()).Add(null!, "value");
+        ((IDictionary)new ObservableDictionary<string, string>()).Add(null!, "value");
 
     [TestMethod]
     public void NonGenericCollectionCopyTo()
     {
         var array = new KeyValuePair<string, string>[1];
-        ((ICollection)new ObservableSortedDictionary<string, string>() { { "key", "value" } }).CopyTo(array, 0);
+        ((ICollection)new ObservableDictionary<string, string>() { { "key", "value" } }).CopyTo(array, 0);
         Assert.AreEqual("key", array[0].Key);
         Assert.AreEqual("value", array[0].Value);
     }
 
     [TestMethod]
     public void NonGenericContains() =>
-        Assert.IsTrue(((IDictionary)new ObservableSortedDictionary<string, string> { { "key", "value" } }).Contains("key"));
+        Assert.IsTrue(((IDictionary)new ObservableDictionary<string, string> { { "key", "value" } }).Contains("key"));
 
     [TestMethod]
     public void NonGenericGetEnumerator()
     {
-        Assert.IsNotNull(((IEnumerable)new ObservableSortedDictionary<string, string>()).GetEnumerator());
-        Assert.IsNotNull(((IDictionary)new ObservableSortedDictionary<string, string>()).GetEnumerator());
+        Assert.IsNotNull(((IEnumerable)new ObservableDictionary<string, string>()).GetEnumerator());
+        Assert.IsNotNull(((IDictionary)new ObservableDictionary<string, string>()).GetEnumerator());
     }
 
     [TestMethod]
     public void NonGenericIndexerGetter() =>
-        Assert.AreEqual("value", ((IDictionary)new ObservableSortedDictionary<string, string> { { "key", "value" } })["key"]);
+        Assert.AreEqual("value", ((IDictionary)new ObservableDictionary<string, string> { { "key", "value" } })["key"]);
 
     [TestMethod]
     public void NonGenericIndexerSetter()
     {
-        var observableSortedDictionary = new ObservableSortedDictionary<string, string>();
-        ((IDictionary)observableSortedDictionary)["key"] = "value";
-        Assert.AreEqual("value", observableSortedDictionary["key"]);
+        var observableDictionary = new ObservableDictionary<string, string>();
+        ((IDictionary)observableDictionary)["key"] = "value";
+        Assert.AreEqual("value", observableDictionary["key"]);
     }
 
     [TestMethod]
     public void NonGenericRemove() =>
-        ((IDictionary)new ObservableSortedDictionary<string, string> { { "key", "value" } }).Remove("key");
+        ((IDictionary)new ObservableDictionary<string, string> { { "key", "value" } }).Remove("key");
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
@@ -238,7 +254,7 @@ public class ObservableSortedDictionary
     [TestMethod]
     public void ObservedAdd()
     {
-        var observableSortedDictionary = new ObservableSortedDictionary<string, string>();
+        var observableDictionary = new ObservableDictionary<string, string>();
         var collectionChangeObserved = false;
         var dictionaryChangeObserved = false;
         var boxedDictionaryChangeObserved = false;
@@ -250,7 +266,7 @@ public class ObservableSortedDictionary
             Assert.AreEqual("key", ((KeyValuePair<string, string>)args!.NewItems[0]!).Key);
             Assert.AreEqual("value", ((KeyValuePair<string, string>)args!.NewItems[0]!).Value);
         }
-        observableSortedDictionary.CollectionChanged += collectionChangedHandler;
+        observableDictionary.CollectionChanged += collectionChangedHandler;
         void dictionaryChangedHandler(object? sender, NotifyDictionaryChangedEventArgs<string, string> args)
         {
             dictionaryChangeObserved = true;
@@ -259,7 +275,7 @@ public class ObservableSortedDictionary
             Assert.AreEqual("key", args!.NewItems[0]!.Key);
             Assert.AreEqual("value", args!.NewItems[0]!.Value);
         }
-        observableSortedDictionary.DictionaryChanged += dictionaryChangedHandler;
+        observableDictionary.DictionaryChanged += dictionaryChangedHandler;
         void nonGenericDictionaryChangedHandler(object? sender, NotifyDictionaryChangedEventArgs<object?, object?> args)
         {
             boxedDictionaryChangeObserved = true;
@@ -268,24 +284,24 @@ public class ObservableSortedDictionary
             Assert.AreEqual("key", args!.NewItems[0]!.Key);
             Assert.AreEqual("value", args!.NewItems[0]!.Value);
         }
-        ((INotifyDictionaryChanged)observableSortedDictionary).DictionaryChanged += nonGenericDictionaryChangedHandler;
-        observableSortedDictionary.Add("key", "value");
+        ((INotifyDictionaryChanged)observableDictionary).DictionaryChanged += nonGenericDictionaryChangedHandler;
+        observableDictionary.Add("key", "value");
         Assert.IsTrue(collectionChangeObserved);
         Assert.IsTrue(dictionaryChangeObserved);
         Assert.IsTrue(boxedDictionaryChangeObserved);
-        observableSortedDictionary.CollectionChanged -= collectionChangedHandler;
-        observableSortedDictionary.DictionaryChanged -= dictionaryChangedHandler;
-        ((INotifyDictionaryChanged)observableSortedDictionary).DictionaryChanged -= nonGenericDictionaryChangedHandler;
+        observableDictionary.CollectionChanged -= collectionChangedHandler;
+        observableDictionary.DictionaryChanged -= dictionaryChangedHandler;
+        ((INotifyDictionaryChanged)observableDictionary).DictionaryChanged -= nonGenericDictionaryChangedHandler;
     }
 
     [TestMethod]
     public void ObservedAddRange()
     {
-        var observableSortedDictionary = new ObservableSortedDictionary<string, string>();
+        var observableDictionary = new ObservableDictionary<string, string>();
         var collectionChangeObserved = false;
         var dictionaryChangeObserved = false;
         var boxedDictionaryChangeObserved = false;
-        observableSortedDictionary.CollectionChanged += (sender, args) =>
+        observableDictionary.CollectionChanged += (sender, args) =>
         {
             collectionChangeObserved = true;
             Assert.AreEqual(NotifyCollectionChangedAction.Add, args.Action);
@@ -295,7 +311,7 @@ public class ObservableSortedDictionary
             Assert.AreEqual("key2", ((KeyValuePair<string, string>)args.NewItems[1]!).Key);
             Assert.AreEqual("value2", ((KeyValuePair<string, string>)args.NewItems[1]!).Value);
         };
-        observableSortedDictionary.DictionaryChanged += (sender, args) =>
+        observableDictionary.DictionaryChanged += (sender, args) =>
         {
             dictionaryChangeObserved = true;
             Assert.AreEqual(NotifyDictionaryChangedAction.Add, args.Action);
@@ -305,7 +321,7 @@ public class ObservableSortedDictionary
             Assert.AreEqual("key2", args.NewItems[1]!.Key);
             Assert.AreEqual("value2", args.NewItems[1]!.Value);
         };
-        ((INotifyDictionaryChanged)observableSortedDictionary).DictionaryChanged += (sender, args) =>
+        ((INotifyDictionaryChanged)observableDictionary).DictionaryChanged += (sender, args) =>
         {
             boxedDictionaryChangeObserved = true;
             Assert.AreEqual(NotifyDictionaryChangedAction.Add, args.Action);
@@ -315,7 +331,7 @@ public class ObservableSortedDictionary
             Assert.AreEqual("key2", args.NewItems[1]!.Key);
             Assert.AreEqual("value2", args.NewItems[1]!.Value);
         };
-        observableSortedDictionary.AddRange(new Dictionary<string, string>
+        observableDictionary.AddRange(new Dictionary<string, string>
         {
             { "key1", "value1" },
             { "key2", "value2" },
@@ -328,11 +344,11 @@ public class ObservableSortedDictionary
     [TestMethod]
     public void ObservedClear()
     {
-        var observableSortedDictionary = new ObservableSortedDictionary<string, string> { { "key", "value" } };
+        var observableDictionary = new ObservableDictionary<string, string> { { "key", "value" } };
         var collectionChangeObserved = false;
         var dictionaryChangeObserved = false;
         var boxedDictionaryChangeObserved = false;
-        observableSortedDictionary.CollectionChanged += (sender, args) =>
+        observableDictionary.CollectionChanged += (sender, args) =>
         {
             collectionChangeObserved = true;
             Assert.AreEqual(NotifyCollectionChangedAction.Remove, args.Action);
@@ -341,7 +357,7 @@ public class ObservableSortedDictionary
             Assert.AreEqual("value", ((KeyValuePair<string, string>)args.OldItems![0]!).Value);
             Assert.IsNull(args.NewItems);
         };
-        observableSortedDictionary.DictionaryChanged += (sender, args) =>
+        observableDictionary.DictionaryChanged += (sender, args) =>
         {
             dictionaryChangeObserved = true;
             Assert.AreEqual(NotifyDictionaryChangedAction.Remove, args.Action);
@@ -350,7 +366,7 @@ public class ObservableSortedDictionary
             Assert.AreEqual("value", args.OldItems![0]!.Value);
             Assert.AreEqual(0, args.NewItems!.Count);
         };
-        ((INotifyDictionaryChanged)observableSortedDictionary).DictionaryChanged += (sender, args) =>
+        ((INotifyDictionaryChanged)observableDictionary).DictionaryChanged += (sender, args) =>
         {
             boxedDictionaryChangeObserved = true;
             Assert.AreEqual(NotifyDictionaryChangedAction.Remove, args.Action);
@@ -359,7 +375,7 @@ public class ObservableSortedDictionary
             Assert.AreEqual("value", args.OldItems![0]!.Value);
             Assert.AreEqual(0, args.NewItems!.Count);
         };
-        observableSortedDictionary.Clear();
+        observableDictionary.Clear();
         Assert.IsTrue(collectionChangeObserved);
         Assert.IsTrue(dictionaryChangeObserved);
         Assert.IsTrue(boxedDictionaryChangeObserved);
@@ -368,11 +384,11 @@ public class ObservableSortedDictionary
     [TestMethod]
     public void ObservedCollectionAdd()
     {
-        var observableSortedDictionary = new ObservableSortedDictionary<string, string>();
+        var observableDictionary = new ObservableDictionary<string, string>();
         var collectionChangeObserved = false;
         var dictionaryChangeObserved = false;
         var boxedDictionaryChangeObserved = false;
-        observableSortedDictionary.CollectionChanged += (sender, args) =>
+        observableDictionary.CollectionChanged += (sender, args) =>
         {
             collectionChangeObserved = true;
             Assert.AreEqual(NotifyCollectionChangedAction.Add, args!.Action);
@@ -380,7 +396,7 @@ public class ObservableSortedDictionary
             Assert.AreEqual("key", ((KeyValuePair<string, string>)args!.NewItems[0]!).Key);
             Assert.AreEqual("value", ((KeyValuePair<string, string>)args!.NewItems[0]!).Value);
         };
-        observableSortedDictionary.DictionaryChanged += (sender, args) =>
+        observableDictionary.DictionaryChanged += (sender, args) =>
         {
             dictionaryChangeObserved = true;
             Assert.AreEqual(NotifyDictionaryChangedAction.Add, args!.Action);
@@ -388,7 +404,7 @@ public class ObservableSortedDictionary
             Assert.AreEqual("key", args!.NewItems[0]!.Key);
             Assert.AreEqual("value", args!.NewItems[0]!.Value);
         };
-        ((INotifyDictionaryChanged)observableSortedDictionary).DictionaryChanged += (sender, args) =>
+        ((INotifyDictionaryChanged)observableDictionary).DictionaryChanged += (sender, args) =>
         {
             boxedDictionaryChangeObserved = true;
             Assert.AreEqual(NotifyDictionaryChangedAction.Add, args!.Action);
@@ -396,7 +412,7 @@ public class ObservableSortedDictionary
             Assert.AreEqual("key", args!.NewItems[0]!.Key);
             Assert.AreEqual("value", args!.NewItems[0]!.Value);
         };
-        ((ICollection<KeyValuePair<string, string>>)observableSortedDictionary).Add(new KeyValuePair<string, string>("key", "value"));
+        ((ICollection<KeyValuePair<string, string>>)observableDictionary).Add(new KeyValuePair<string, string>("key", "value"));
         Assert.IsTrue(collectionChangeObserved);
         Assert.IsTrue(dictionaryChangeObserved);
         Assert.IsTrue(boxedDictionaryChangeObserved);
@@ -405,11 +421,11 @@ public class ObservableSortedDictionary
     [TestMethod]
     public void ObservedNonGenericDictionaryAdd()
     {
-        var observableSortedDictionary = new ObservableSortedDictionary<string, string>();
+        var observableDictionary = new ObservableDictionary<string, string>();
         var collectionChangeObserved = false;
         var dictionaryChangeObserved = false;
         var boxedDictionaryChangeObserved = false;
-        observableSortedDictionary.CollectionChanged += (sender, args) =>
+        observableDictionary.CollectionChanged += (sender, args) =>
         {
             collectionChangeObserved = true;
             Assert.AreEqual(NotifyCollectionChangedAction.Add, args!.Action);
@@ -417,7 +433,7 @@ public class ObservableSortedDictionary
             Assert.AreEqual("key", ((KeyValuePair<string, string>)args!.NewItems[0]!).Key);
             Assert.AreEqual("value", ((KeyValuePair<string, string>)args!.NewItems[0]!).Value);
         };
-        observableSortedDictionary.DictionaryChanged += (sender, args) =>
+        observableDictionary.DictionaryChanged += (sender, args) =>
         {
             dictionaryChangeObserved = true;
             Assert.AreEqual(NotifyDictionaryChangedAction.Add, args!.Action);
@@ -425,7 +441,7 @@ public class ObservableSortedDictionary
             Assert.AreEqual("key", args!.NewItems[0]!.Key);
             Assert.AreEqual("value", args!.NewItems[0]!.Value);
         };
-        ((INotifyDictionaryChanged)observableSortedDictionary).DictionaryChanged += (sender, args) =>
+        ((INotifyDictionaryChanged)observableDictionary).DictionaryChanged += (sender, args) =>
         {
             boxedDictionaryChangeObserved = true;
             Assert.AreEqual(NotifyDictionaryChangedAction.Add, args!.Action);
@@ -433,7 +449,7 @@ public class ObservableSortedDictionary
             Assert.AreEqual("key", args!.NewItems[0]!.Key);
             Assert.AreEqual("value", args!.NewItems[0]!.Value);
         };
-        ((IDictionary)observableSortedDictionary).Add("key", "value");
+        ((IDictionary)observableDictionary).Add("key", "value");
         Assert.IsTrue(collectionChangeObserved);
         Assert.IsTrue(dictionaryChangeObserved);
         Assert.IsTrue(boxedDictionaryChangeObserved);
@@ -442,11 +458,11 @@ public class ObservableSortedDictionary
     [TestMethod]
     public void ObservedRemove()
     {
-        var observableSortedDictionary = new ObservableSortedDictionary<string, string> { { "key", "value" } };
+        var observableDictionary = new ObservableDictionary<string, string> { { "key", "value" } };
         var collectionChangeObserved = false;
         var dictionaryChangeObserved = false;
         var boxedDictionaryChangeObserved = false;
-        observableSortedDictionary.CollectionChanged += (sender, args) =>
+        observableDictionary.CollectionChanged += (sender, args) =>
         {
             collectionChangeObserved = true;
             Assert.AreEqual(NotifyCollectionChangedAction.Remove, args!.Action);
@@ -454,7 +470,7 @@ public class ObservableSortedDictionary
             Assert.AreEqual("key", ((KeyValuePair<string, string>)args!.OldItems[0]!).Key);
             Assert.AreEqual("value", ((KeyValuePair<string, string>)args!.OldItems[0]!).Value);
         };
-        observableSortedDictionary.DictionaryChanged += (sender, args) =>
+        observableDictionary.DictionaryChanged += (sender, args) =>
         {
             dictionaryChangeObserved = true;
             Assert.AreEqual(NotifyDictionaryChangedAction.Remove, args!.Action);
@@ -462,7 +478,7 @@ public class ObservableSortedDictionary
             Assert.AreEqual("key", args!.OldItems[0]!.Key);
             Assert.AreEqual("value", args!.OldItems[0]!.Value);
         };
-        ((INotifyDictionaryChanged)observableSortedDictionary).DictionaryChanged += (sender, args) =>
+        ((INotifyDictionaryChanged)observableDictionary).DictionaryChanged += (sender, args) =>
         {
             boxedDictionaryChangeObserved = true;
             Assert.AreEqual(NotifyDictionaryChangedAction.Remove, args!.Action);
@@ -470,7 +486,7 @@ public class ObservableSortedDictionary
             Assert.AreEqual("key", args!.OldItems[0]!.Key);
             Assert.AreEqual("value", args!.OldItems[0]!.Value);
         };
-        observableSortedDictionary.Remove("key");
+        observableDictionary.Remove("key");
         Assert.IsTrue(collectionChangeObserved);
         Assert.IsTrue(dictionaryChangeObserved);
         Assert.IsTrue(boxedDictionaryChangeObserved);
@@ -479,11 +495,11 @@ public class ObservableSortedDictionary
     [TestMethod]
     public void ObservedReplace()
     {
-        var observableSortedDictionary = new ObservableSortedDictionary<string, string> { { "key", "value" } };
+        var observableDictionary = new ObservableDictionary<string, string> { { "key", "value" } };
         var collectionChangeObserved = false;
         var dictionaryChangeObserved = false;
         var boxedDictionaryChangeObserved = false;
-        observableSortedDictionary.CollectionChanged += (sender, args) =>
+        observableDictionary.CollectionChanged += (sender, args) =>
         {
             collectionChangeObserved = true;
             Assert.AreEqual(NotifyCollectionChangedAction.Replace, args!.Action);
@@ -494,7 +510,7 @@ public class ObservableSortedDictionary
             Assert.AreEqual("key", ((KeyValuePair<string, string>)args!.NewItems[0]!).Key);
             Assert.AreEqual("new value", ((KeyValuePair<string, string>)args!.NewItems[0]!).Value);
         };
-        observableSortedDictionary.DictionaryChanged += (sender, args) =>
+        observableDictionary.DictionaryChanged += (sender, args) =>
         {
             dictionaryChangeObserved = true;
             Assert.AreEqual(NotifyDictionaryChangedAction.Replace, args!.Action);
@@ -505,7 +521,7 @@ public class ObservableSortedDictionary
             Assert.AreEqual("key", args!.NewItems[0]!.Key);
             Assert.AreEqual("new value", args!.NewItems[0]!.Value);
         };
-        ((INotifyDictionaryChanged)observableSortedDictionary).DictionaryChanged += (sender, args) =>
+        ((INotifyDictionaryChanged)observableDictionary).DictionaryChanged += (sender, args) =>
         {
             boxedDictionaryChangeObserved = true;
             Assert.AreEqual(NotifyDictionaryChangedAction.Replace, args.Action);
@@ -516,7 +532,7 @@ public class ObservableSortedDictionary
             Assert.AreEqual("key", args!.NewItems[0]!.Key);
             Assert.AreEqual("new value", args!.NewItems[0]!.Value);
         };
-        observableSortedDictionary["key"] = "new value";
+        observableDictionary["key"] = "new value";
         Assert.IsTrue(collectionChangeObserved);
         Assert.IsTrue(dictionaryChangeObserved);
         Assert.IsTrue(boxedDictionaryChangeObserved);
@@ -525,26 +541,26 @@ public class ObservableSortedDictionary
     [TestMethod]
     public void ObservedReset()
     {
-        var observableSortedDictionary = new ObservableSortedDictionary<string, string> { { "key", "value" } };
+        var observableDictionary = new ObservableDictionary<string, string> { { "key", "value" } };
         var collectionChangeObserved = false;
         var dictionaryChangeObserved = false;
         var boxedDictionaryChangeObserved = false;
-        observableSortedDictionary.CollectionChanged += (sender, args) =>
+        observableDictionary.CollectionChanged += (sender, args) =>
         {
             collectionChangeObserved = true;
             Assert.AreEqual(NotifyCollectionChangedAction.Reset, args.Action);
         };
-        observableSortedDictionary.DictionaryChanged += (sender, args) =>
+        observableDictionary.DictionaryChanged += (sender, args) =>
         {
             dictionaryChangeObserved = true;
             Assert.AreEqual(NotifyDictionaryChangedAction.Reset, args.Action);
         };
-        ((INotifyDictionaryChanged)observableSortedDictionary).DictionaryChanged += (sender, args) =>
+        ((INotifyDictionaryChanged)observableDictionary).DictionaryChanged += (sender, args) =>
         {
             boxedDictionaryChangeObserved = true;
             Assert.AreEqual(NotifyDictionaryChangedAction.Reset, args.Action);
         };
-        observableSortedDictionary.Reset(new Dictionary<string, string> { { "other key", "other value" } });
+        observableDictionary.Reset(new Dictionary<string, string> { { "other key", "other value" } });
         Assert.IsTrue(collectionChangeObserved);
         Assert.IsTrue(dictionaryChangeObserved);
         Assert.IsTrue(boxedDictionaryChangeObserved);
@@ -552,158 +568,174 @@ public class ObservableSortedDictionary
 
     [TestMethod]
     public void RangeDictionaryKeys() =>
-        Assert.AreEqual(0, ((IRangeDictionary<string, string>)new ObservableSortedDictionary<string, string>()).Keys.Count());
+        Assert.AreEqual(0, ((IRangeDictionary<string, string>)new ObservableDictionary<string, string>()).Keys.Count());
 
     [TestMethod]
     public void RangeDictionaryValues() =>
-        Assert.AreEqual(0, ((IRangeDictionary<string, string>)new ObservableSortedDictionary<string, string>()).Values.Count());
+        Assert.AreEqual(0, ((IRangeDictionary<string, string>)new ObservableDictionary<string, string>()).Values.Count());
 
     [TestMethod]
     public void ReadOnlyDictionaryKeys() =>
-        Assert.AreEqual(0, ((IReadOnlyDictionary<string, string>)new ObservableSortedDictionary<string, string>()).Keys.Count());
+        Assert.AreEqual(0, ((IReadOnlyDictionary<string, string>)new ObservableDictionary<string, string>()).Keys.Count());
 
     [TestMethod]
     public void ReadOnlyDictionaryValues() =>
-        Assert.AreEqual(0, ((IReadOnlyDictionary<string, string>)new ObservableSortedDictionary<string, string>()).Values.Count());
+        Assert.AreEqual(0, ((IReadOnlyDictionary<string, string>)new ObservableDictionary<string, string>()).Values.Count());
 
     [TestMethod]
     public void RemoveAll()
     {
-        var observableSortedDictionary = new ObservableSortedDictionary<string, string> { { "key", "value" } };
-        observableSortedDictionary.RemoveAll((k, v) => k.StartsWith("k"));
-        Assert.AreEqual(0, observableSortedDictionary.Count);
+        var observableDictionary = new ObservableDictionary<string, string> { { "key", "value" } };
+        observableDictionary.RemoveAll((k, v) => k.StartsWith("k"));
+        Assert.AreEqual(0, observableDictionary.Count);
     }
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
     public void RemoveAllNullPredicate() =>
-        new ObservableSortedDictionary<string, string> { { "key", "value" } }.RemoveAll(null!);
+        new ObservableDictionary<string, string> { { "key", "value" } }.RemoveAll(null!);
 
     [TestMethod]
     public void RemoveAndGetValue()
     {
-        var observableSortedDictionary = new ObservableSortedDictionary<string, string> { { "key", "value" } };
-        Assert.IsTrue(observableSortedDictionary.Remove("key", out var value));
+        var observableDictionary = new ObservableDictionary<string, string> { { "key", "value" } };
+        Assert.IsTrue(observableDictionary.Remove("key", out var value));
         Assert.AreEqual("value", value);
-        Assert.IsFalse(observableSortedDictionary.ContainsKey("key"));
+        Assert.IsFalse(observableDictionary.ContainsKey("key"));
     }
 
     [TestMethod]
     public void RemoveAndGetValueNotFound()
     {
-        var observableSortedDictionary = new ObservableSortedDictionary<string, string> { { "key", "value" } };
-        Assert.IsFalse(observableSortedDictionary.Remove("other key", out var value));
+        var observableDictionary = new ObservableDictionary<string, string> { { "key", "value" } };
+        Assert.IsFalse(observableDictionary.Remove("other key", out var value));
         Assert.IsNull(value);
     }
 
     [TestMethod]
     public void RemoveNotFound() =>
-        Assert.IsFalse(new ObservableSortedDictionary<string, string> { { "key", "value" } }.Remove("other key"));
+        Assert.IsFalse(new ObservableDictionary<string, string> { { "key", "value" } }.Remove("other key"));
 
     [TestMethod]
     public void RemoveRange()
     {
-        var observableSortedDictionary = new ObservableSortedDictionary<string, string> { { "key", "value" } };
-        observableSortedDictionary.RemoveRange(new[] { "key" });
-        Assert.AreEqual(0, observableSortedDictionary.Count);
+        var observableDictionary = new ObservableDictionary<string, string> { { "key", "value" } };
+        observableDictionary.RemoveRange(new[] { "key" });
+        Assert.AreEqual(0, observableDictionary.Count);
     }
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
     public void RemoveRangeNullKeys() =>
-        new ObservableSortedDictionary<string, string> { { "key", "value" } }.RemoveRange(null!);
+        new ObservableDictionary<string, string> { { "key", "value" } }.RemoveRange(null!);
 
     [TestMethod]
     public void ReplaceRange()
     {
-        var observableSortedDictionary = new ObservableSortedDictionary<string, string> { { "key", "value" } };
-        observableSortedDictionary.ReplaceRange(new Dictionary<string, string> { { "key", "other value" } });
-        Assert.AreEqual(1, observableSortedDictionary.Count);
-        Assert.AreEqual("other value", observableSortedDictionary["key"]);
+        var observableDictionary = new ObservableDictionary<string, string> { { "key", "value" } };
+        observableDictionary.ReplaceRange(new Dictionary<string, string> { { "key", "other value" } });
+        Assert.AreEqual(1, observableDictionary.Count);
+        Assert.AreEqual("other value", observableDictionary["key"]);
     }
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentException))]
     public void ReplaceRangeKeyNotFound() =>
-        new ObservableSortedDictionary<string, string> { { "key", "value" } }.ReplaceRange(new Dictionary<string, string> { { "other key", "other value" } });
+        new ObservableDictionary<string, string> { { "key", "value" } }.ReplaceRange(new Dictionary<string, string> { { "other key", "other value" } });
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
     public void ReplaceRangeNullDictionary() =>
-        new ObservableSortedDictionary<string, string> { { "key", "value" } }.ReplaceRange(null!);
+        new ObservableDictionary<string, string> { { "key", "value" } }.ReplaceRange(null!);
 
     [TestMethod]
     public void ReplaceRangeWithKeys()
     {
-        var observableSortedDictionary = new ObservableSortedDictionary<string, string> { { "key", "value" } };
-        observableSortedDictionary.ReplaceRange(new[] { "key" }, new Dictionary<string, string> { { "key", "other value" }, { "yet another key", "yet another value" } });
-        Assert.AreEqual(2, observableSortedDictionary.Count);
-        Assert.AreEqual("other value", observableSortedDictionary["key"]);
-        Assert.AreEqual("yet another value", observableSortedDictionary["yet another key"]);
+        var observableDictionary = new ObservableDictionary<string, string> { { "key", "value" } };
+        observableDictionary.ReplaceRange(new[] { "key" }, new Dictionary<string, string> { { "key", "other value" }, { "yet another key", "yet another value" } });
+        Assert.AreEqual(2, observableDictionary.Count);
+        Assert.AreEqual("other value", observableDictionary["key"]);
+        Assert.AreEqual("yet another value", observableDictionary["yet another key"]);
     }
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentException))]
     public void ReplaceRangeWithKeysKeyNotFound() =>
-        new ObservableSortedDictionary<string, string> { { "key", "value" } }.ReplaceRange(new[] { "other key" }, new Dictionary<string, string> { { "key", "other value" } });
+        new ObservableDictionary<string, string> { { "key", "value" } }.ReplaceRange(new[] { "other key" }, new Dictionary<string, string> { { "key", "other value" } });
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
     public void ReplaceRangeWithKeysNullReplaceKeys() =>
-        new ObservableSortedDictionary<string, string> { { "key", "value" } }.ReplaceRange(null!, new Dictionary<string, string> { { "key", "other value" } });
+        new ObservableDictionary<string, string> { { "key", "value" } }.ReplaceRange(null!, new Dictionary<string, string> { { "key", "other value" } });
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
     public void ReplaceRangeWithKeysNullReplaceValues() =>
-        new ObservableSortedDictionary<string, string> { { "key", "value" } }.ReplaceRange(new[] { "key" }, null!);
+        new ObservableDictionary<string, string> { { "key", "value" } }.ReplaceRange(new[] { "key" }, null!);
 
     [TestMethod]
     public void Reset() =>
-        new ObservableSortedDictionary<string, string> { { "key", "value" } }.Reset();
+        new ObservableDictionary<string, string> { { "key", "value" } }.Reset();
 
     [TestMethod]
     public void ResetWithDictionary()
     {
-        var observableSortedDictionary = new ObservableSortedDictionary<string, string> { { "key", "value" } };
-        observableSortedDictionary.Reset(new Dictionary<string, string> { { "other key", "other value" }, { "yet another key", "yet another value" } });
-        Assert.AreEqual(2, observableSortedDictionary.Count);
-        Assert.AreEqual("other value", observableSortedDictionary["other key"]);
-        Assert.AreEqual("yet another value", observableSortedDictionary["yet another key"]);
+        var observableDictionary = new ObservableDictionary<string, string> { { "key", "value" } };
+        observableDictionary.Reset(new Dictionary<string, string> { { "other key", "other value" }, { "yet another key", "yet another value" } });
+        Assert.AreEqual(2, observableDictionary.Count);
+        Assert.AreEqual("other value", observableDictionary["other key"]);
+        Assert.AreEqual("yet another value", observableDictionary["yet another key"]);
     }
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
     public void ResetWithDictionaryNullDictionary() =>
-        new ObservableSortedDictionary<string, string> { { "key", "value" } }.Reset(null!);
+        new ObservableDictionary<string, string> { { "key", "value" } }.Reset(null!);
 
     [TestMethod]
     public void SyncRoot() =>
-        Assert.IsNotNull(((ICollection)new ObservableSortedDictionary<string, string>()).SyncRoot);
+        Assert.IsNotNull(((ICollection)new ObservableDictionary<string, string>()).SyncRoot);
+
+    [TestMethod]
+    public void TrimExcess()
+    {
+        var observableDictionary = new ObservableDictionary<string, string> { { "key", "value" } };
+        observableDictionary.TrimExcess();
+        Assert.AreEqual(1, observableDictionary.Count);
+    }
+
+    [TestMethod]
+    public void TrimExcessWithCapacity()
+    {
+        var observableDictionary = new ObservableDictionary<string, string> { { "key", "value" } };
+        observableDictionary.TrimExcess(1);
+        Assert.AreEqual(1, observableDictionary.Count);
+    }
 
     [TestMethod]
     public void TryAdd()
     {
-        var observableSortedDictionary = new ObservableSortedDictionary<string, string>();
-        Assert.IsTrue(observableSortedDictionary.TryAdd("key", "value"));
-        Assert.AreEqual(1, observableSortedDictionary.Count);
-        Assert.AreEqual("value", observableSortedDictionary["key"]);
-        Assert.IsFalse(observableSortedDictionary.TryAdd("key", "other value"));
-        Assert.AreEqual(1, observableSortedDictionary.Count);
-        Assert.AreEqual("value", observableSortedDictionary["key"]);
+        var observableDictionary = new ObservableDictionary<string, string>();
+        Assert.IsTrue(observableDictionary.TryAdd("key", "value"));
+        Assert.AreEqual(1, observableDictionary.Count);
+        Assert.AreEqual("value", observableDictionary["key"]);
+        Assert.IsFalse(observableDictionary.TryAdd("key", "other value"));
+        Assert.AreEqual(1, observableDictionary.Count);
+        Assert.AreEqual("value", observableDictionary["key"]);
     }
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
     public void TryAddNullKey() =>
-        new ObservableSortedDictionary<string, string>().TryAdd(null!, "value");
+        new ObservableDictionary<string, string>().TryAdd(null!, "value");
 
     [TestMethod]
     public void TryGetValue()
     {
-        var observableSortedDictionary = new ObservableSortedDictionary<string, string> { { "key", "value" } };
-        Assert.IsTrue(observableSortedDictionary.TryGetValue("key", out var value));
+        var observableDictionary = new ObservableDictionary<string, string> { { "key", "value" } };
+        Assert.IsTrue(observableDictionary.TryGetValue("key", out var value));
         Assert.AreEqual("value", value);
-        Assert.IsFalse(observableSortedDictionary.TryGetValue("other key", out value));
+        Assert.IsFalse(observableDictionary.TryGetValue("other key", out value));
         Assert.IsNull(value);
     }
 
@@ -715,8 +747,8 @@ public class ObservableSortedDictionary
     [TestMethod]
     public void Values()
     {
-        var observableSortedDictionary = new ObservableSortedDictionary<string, string> { { "key", "value" } };
-        var values = observableSortedDictionary.Values;
+        var observableDictionary = new ObservableDictionary<string, string> { { "key", "value" } };
+        var values = observableDictionary.Values;
         Assert.AreEqual(1, values.Count);
         Assert.AreEqual("value", values.First());
     }

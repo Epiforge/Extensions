@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Collections;
+namespace Epiforge.Extensions.Collections.Generic;
 
 /// <summary>
 /// Represents a generic collection of key/value pairs that supports bulk operations

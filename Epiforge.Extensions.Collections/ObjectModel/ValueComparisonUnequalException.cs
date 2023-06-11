@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Collections;
+namespace Epiforge.Extensions.Collections.ObjectModel;
 
 /// <summary>
 /// Represents when the valueFactory used by <see cref="ObservableConcurrentDictionary{TKey, TValue}.TryUpdate(TKey, TValue, TValue)"/> finds the oldValue and comparisonValue are unequal

@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Collections;
+namespace Epiforge.Extensions.Collections.Specialized;
 
 /// <summary>
 /// Describes the action that caused a <see cref="INotifyDictionaryChanged{TKey, TValue}.DictionaryChanged"/> event

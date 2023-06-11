@@ -1,6 +1,4 @@
-using System.Diagnostics.CodeAnalysis;
-
-namespace Epiforge.Extensions.Collections.Tests;
+namespace Epiforge.Extensions.Collections.Tests.ObjectModel;
 
 [TestClass]
 public class ObservableConcurrentDictionary
@@ -109,7 +107,7 @@ public class ObservableConcurrentDictionary
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
     public void ConstructionWithComparerAndNullCollection() =>
-        new ObservableConcurrentDictionary<string, string>((IDictionary<string, string>)null!, StringComparer.OrdinalIgnoreCase);
+        new ObservableConcurrentDictionary<string, string>(null!, StringComparer.OrdinalIgnoreCase);
 
     [TestMethod]
     public void ConstructionWithComparer()
@@ -244,8 +242,8 @@ public class ObservableConcurrentDictionary
         var dictionary = new ObservableConcurrentDictionary<string, string>(new Dictionary<string, string> { { "key", "value" } });
         var enumerator = dictionary.GetEnumerator();
         Assert.IsTrue(enumerator.MoveNext());
-        Assert.AreEqual("key", ((KeyValuePair<string, string>)enumerator.Current).Key);
-        Assert.AreEqual("value", ((KeyValuePair<string, string>)enumerator.Current).Value);
+        Assert.AreEqual("key", enumerator.Current.Key);
+        Assert.AreEqual("value", enumerator.Current.Value);
     }
 
     [TestMethod]

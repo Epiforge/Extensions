@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Collections;
+namespace Epiforge.Extensions.Collections.Specialized;
 
 #pragma warning disable CS8714
 
@@ -124,12 +124,10 @@ public sealed class NullableKeyDictionary<TKey, TValue> :
         set
         {
             if (key is null)
-            {
                 if (hasNullKeyedValue)
                     nullKeyedValue = value;
                 else
                     throw new KeyNotFoundException();
-            }
             else
                 dict[key] = value;
         }
@@ -303,10 +301,10 @@ public sealed class NullableKeyDictionary<TKey, TValue> :
         dict = new Dictionary<TKey, TValue>(dict);
 #endif
 
-/// <summary>
-/// Sets the capacity of this dictionary to hold up a specified number of entries without any further expansion of its backing storage
-/// </summary>
-/// <param name="capacity">The new capacity</param>
+    /// <summary>
+    /// Sets the capacity of this dictionary to hold up a specified number of entries without any further expansion of its backing storage
+    /// </summary>
+    /// <param name="capacity">The new capacity</param>
 #if IS_NET_STANDARD_2_1_OR_GREATER
     [SuppressMessage("Style", "IDE0022: Use expression body for method")]
 #endif

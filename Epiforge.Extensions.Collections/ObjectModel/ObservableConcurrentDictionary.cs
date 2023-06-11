@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Collections;
+namespace Epiforge.Extensions.Collections.ObjectModel;
 
 /// <summary>
 /// Represents a thread-safe collection of key/value pairs that can be accessed by multiple threads concurrently

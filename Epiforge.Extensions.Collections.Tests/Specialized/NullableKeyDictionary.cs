@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Collections.Tests;
+namespace Epiforge.Extensions.Collections.Tests.Specialized;
 
 [TestClass]
 public class NullableKeyDictionary
@@ -104,7 +104,7 @@ public class NullableKeyDictionary
         new NullableKeyDictionary<string, int>(null!, StringComparer.OrdinalIgnoreCase);
 
     [TestMethod]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1806: Do not ignore method results")]
+    [SuppressMessage("Performance", "CA1806: Do not ignore method results")]
     public void ConstructionWithCapacity() =>
         new NullableKeyDictionary<string, int>(5);
 
@@ -163,17 +163,13 @@ public class NullableKeyDictionary
         var dictionary = new NullableKeyDictionary<string?, int> { { null, 1 }, { "two", 2 } };
         Assert.AreEqual(2, dictionary.Count);
         foreach (var pair in dictionary)
-        {
             if (pair.Key == null)
-            {
                 Assert.AreEqual(1, pair.Value);
-            }
             else
             {
                 Assert.AreEqual("two", pair.Key);
                 Assert.AreEqual(2, pair.Value);
             }
-        }
     }
 
     [TestMethod]

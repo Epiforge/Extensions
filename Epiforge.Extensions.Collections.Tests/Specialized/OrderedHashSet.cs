@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Collections.Tests;
+namespace Epiforge.Extensions.Collections.Tests.Specialized;
 
 [TestClass]
 public class OrderedHashSet

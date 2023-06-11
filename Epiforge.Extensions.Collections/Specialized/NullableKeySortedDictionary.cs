@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Collections;
+namespace Epiforge.Extensions.Collections.Specialized;
 
 #pragma warning disable CS8714
 
@@ -106,12 +106,10 @@ public sealed class NullableKeySortedDictionary<TKey, TValue> :
         set
         {
             if (key is null)
-            {
                 if (hasNullKeyedValue)
                     nullKeyedValue = value;
                 else
                     throw new KeyNotFoundException();
-            }
             else
                 dict[key] = value;
         }

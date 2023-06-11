@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Collections.Tests;
+namespace Epiforge.Extensions.Collections.Tests.Specialized;
 
 [TestClass]
 public class NullableKeySortedDictionary
@@ -137,17 +137,13 @@ public class NullableKeySortedDictionary
         var dictionary = new NullableKeySortedDictionary<string?, int> { { null, 1 }, { "two", 2 } };
         Assert.AreEqual(2, dictionary.Count);
         foreach (var pair in dictionary)
-        {
             if (pair.Key == null)
-            {
                 Assert.AreEqual(1, pair.Value);
-            }
             else
             {
                 Assert.AreEqual("two", pair.Key);
                 Assert.AreEqual(2, pair.Value);
             }
-        }
     }
 
     [TestMethod]

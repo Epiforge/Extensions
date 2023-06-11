@@ -1,6 +1,4 @@
-using System.Text.RegularExpressions;
-
-namespace Epiforge.Extensions.Collections;
+namespace Epiforge.Extensions.Collections.Specialized;
 
 /// <summary>
 /// Represents an ordered set of values
@@ -492,12 +490,10 @@ public sealed class OrderedHashSet<T> :
             throw new ArgumentNullException(nameof(other));
 #endif
         foreach (var item in GetSet(other))
-        {
             if (dict.ContainsKey(item))
                 Remove(item);
             else
                 Add(item);
-        }
     }
 
     /// <summary>
