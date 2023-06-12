@@ -14,6 +14,7 @@ This library provides a number of extension methods for collections and dictiona
 # Generic
 
 * `ReadOnlyDictionary<TKey, TValue>` is a read-only wrapper any classes implementing `IReadOnlyDictionary<TKey, TValue>`.
+* `ReadOnlyRangeDictionary<TKey, TValue>` is a read-only wrapper any classes implementing `IRangeDictionary<TKey, TValue>`.
 
 # ObjectModel
 
