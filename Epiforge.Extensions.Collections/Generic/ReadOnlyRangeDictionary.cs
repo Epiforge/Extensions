@@ -41,6 +41,7 @@ public class ReadOnlyRangeDictionary<TKey, TValue> :
     /// </summary>
     /// <param name="item">The key/value pair to locate in the read-only range dictionary</param>
     /// <returns><c>true</c> if the item is found in the read-only range dictionary; otherwise, <c>false</c></returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Contains(KeyValuePair<TKey, TValue> item) =>
         rangeDictionary.Contains(item);
 
@@ -49,6 +50,7 @@ public class ReadOnlyRangeDictionary<TKey, TValue> :
     /// </summary>
     /// <param name="array">The one-dimensional <see cref="Array"/> that is the destination of the elements copied from read-only range dictionary (the <see cref="Array"/> must have zero-based indexing)</param>
     /// <param name="arrayIndex">The zero-based index in array at which copying begins</param>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void CopyTo(KeyValuePair<TKey, TValue>[] array, int arrayIndex) =>
         rangeDictionary.CopyTo(array, arrayIndex);
 
@@ -57,6 +59,7 @@ public class ReadOnlyRangeDictionary<TKey, TValue> :
     /// </summary>
     /// <param name="keys">The keys of the elements to get</param>
     /// <returns>The elements with the specified keys</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public IReadOnlyList<KeyValuePair<TKey, TValue>> GetRange(IEnumerable<TKey> keys) =>
         rangeDictionary.GetRange(keys);
 
@@ -84,23 +87,31 @@ public class ReadOnlyRangeDictionary<TKey, TValue> :
     void IRangeDictionary<TKey, TValue>.Reset(IDictionary<TKey, TValue> dictionary) =>
         throw new NotSupportedException();
 
-    ICollection<TKey> IDictionary<TKey, TValue>.Keys =>
-        ((IDictionary<TKey, TValue>)rangeDictionary).Keys;
+    ICollection<TKey> IDictionary<TKey, TValue>.Keys
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => ((IDictionary<TKey, TValue>)rangeDictionary).Keys;
+    }
 
-    ICollection<TValue> IDictionary<TKey, TValue>.Values =>
-        ((IDictionary<TKey, TValue>)rangeDictionary).Values;
+    ICollection<TValue> IDictionary<TKey, TValue>.Values
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => ((IDictionary<TKey, TValue>)rangeDictionary).Values;
+    }
 
     bool ICollection<KeyValuePair<TKey, TValue>>.IsReadOnly =>
         true;
 
     TValue IDictionary<TKey, TValue>.this[TKey key]
     {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => rangeDictionary[key];
         set => throw new NotSupportedException();
     }
 
     TValue IRangeDictionary<TKey, TValue>.this[TKey key]
     {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => rangeDictionary[key];
         set => throw new NotSupportedException();
     }
