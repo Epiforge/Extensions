@@ -21,6 +21,7 @@ Supports `net462`, `net6.0`, `net7.0`, and `netstandard2.1`.
     - [Generic](#generic)
     - [ObjectModel](#objectmodel)
     - [Specialized](#specialized)
+  - [ Expressions](#-expressions)
 - [License](#license)
 - [Contributing](#contributing)
 - [Acknowledgements](#acknowledgements)
@@ -124,6 +125,13 @@ This library provides a number of extension methods for collections and dictiona
 * `EquatableList<T>` is an immutable list of items which may be compared with other instances of the same type and produces a hash code based on the permutation of its contents.
 * `NullableKeyDictionary<TKey, TValue>` and `NullableKeySortedDictionary<TKey, TValue>` are very slim implementations of `IDictionary<TKey, TValue>` that allow a single null key (useful for some edge cases in which a null key is simply going to happen and you need to be able to deal with it; otherwise, use other dictionary classes).
 * `OrderedHashSet<T>` is a counterpart to the BCL's `HashSet<T>` that maintains the order of the elements in the set. All operations are still *O(1)*, just like the original, but if you enumerate over it you will get elements in the exact order they were added. There are also methods for manipulating the order.
+
+## <img src="Epiforge.Extensions.Expressions/NuGet.jpg" alt="Expressions" style="float: left !important; padding-right: 0.5em !important;"> Expressions
+[![Epiforge.Extensions.Expressions Nuget](https://img.shields.io/nuget/v/Epiforge.Extensions.Expressions.svg?logo=nuget) ![Downloads](https://img.shields.io/nuget/dt/epiforge.extensions.expressions)](https://www.nuget.org/packages/Epiforge.Extensions.Expressions)
+
+This library has useful tools for dealing with expressions:
+
+* `SubstituteMethods` - Recursively scans an expression tree to replace invocations of specific methods with replacement methods
 
 # License
 

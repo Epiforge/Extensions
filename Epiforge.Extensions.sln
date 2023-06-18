@@ -33,7 +33,11 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Common", "Common", "{30D1B2
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Epiforge.Extensions.Collections", "Epiforge.Extensions.Collections\Epiforge.Extensions.Collections.csproj", "{5FB25E05-C2AD-48FF-A03D-B32DD642C3F5}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Epiforge.Extensions.Collections.Tests", "Epiforge.Extensions.Collections.Tests\Epiforge.Extensions.Collections.Tests.csproj", "{694D1E69-4842-469F-AC60-7220A771B70E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Epiforge.Extensions.Collections.Tests", "Epiforge.Extensions.Collections.Tests\Epiforge.Extensions.Collections.Tests.csproj", "{694D1E69-4842-469F-AC60-7220A771B70E}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Epiforge.Extensions.Expressions", "Epiforge.Extensions.Expressions\Epiforge.Extensions.Expressions.csproj", "{CC0A8D40-7B06-49D0-84DE-44E921076576}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Epiforge.Extensions.Expressions.Tests", "Epiforge.Extensions.Expressions.Tests\Epiforge.Extensions.Expressions.Tests.csproj", "{2F9337A3-60A9-4003-92DD-032FE37AE1A1}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -57,6 +61,14 @@ Global
 		{694D1E69-4842-469F-AC60-7220A771B70E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{694D1E69-4842-469F-AC60-7220A771B70E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{694D1E69-4842-469F-AC60-7220A771B70E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CC0A8D40-7B06-49D0-84DE-44E921076576}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CC0A8D40-7B06-49D0-84DE-44E921076576}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CC0A8D40-7B06-49D0-84DE-44E921076576}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CC0A8D40-7B06-49D0-84DE-44E921076576}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2F9337A3-60A9-4003-92DD-032FE37AE1A1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2F9337A3-60A9-4003-92DD-032FE37AE1A1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2F9337A3-60A9-4003-92DD-032FE37AE1A1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2F9337A3-60A9-4003-92DD-032FE37AE1A1}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
