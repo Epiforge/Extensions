@@ -568,7 +568,7 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
     /// Raises the <see cref="INotifyPropertyChanged.PropertyChanged"/> event for the <see cref="Count"/> property
     /// </summary>
     protected virtual void NotifyCountChanged() =>
-        OnPropertyChanged(nameof(Count));
+        OnPropertyChanged(CommonPropertyChangeNotificationEventArgs.CountChanged);
 
     /// <summary>
     /// Calls <see cref="OnDictionaryChanged(NotifyDictionaryChangedEventArgs{TKey, TValue})"/> and also calls <see cref="OnCollectionChanged(NotifyCollectionChangedEventArgs)"/>, and <see cref="OnDictionaryChangedBoxed(NotifyDictionaryChangedEventArgs{object, object})"/> when applicable

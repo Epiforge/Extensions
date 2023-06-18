@@ -193,7 +193,7 @@ public class RangeObservableCollection<T> :
     }
 
     void NotifyCountChanged() =>
-        OnPropertyChanged(new PropertyChangedEventArgs(nameof(Count)));
+        OnPropertyChanged(CommonPropertyChangeNotificationEventArgs.CountChanged);
 
     /// <summary>
     /// Removes all object from the <see cref="RangeObservableCollection{T}"/> that satisfy the <paramref name="predicate"/>
