@@ -5,6 +5,21 @@ namespace Epiforge.Extensions.Expressions;
 /// </summary>
 public static class ExpressionExtensions
 {
+    /// <summary>
+    /// Duplicates the specified expression tree
+    /// </summary>
+    /// <param name="expression">The expression tree</param>
+    public static Expression Duplicate(this Expression expression)
+    {
+#if IS_NET_6_0_OR_GREATER
+        ArgumentNullException.ThrowIfNull(expression);
+#else
+        if (expression is null)
+            throw new ArgumentNullException(nameof(expression));
+#endif
+        return new DuplicateExpressionVisitor().Visit(expression);
+    }
+
     static MethodInfo SubstituteMethod(MethodInfo methodInfo, (MethodInfo replace, MethodInfo substitution)[] substitutions)
     {
         if (substitutions.FirstOrDefault(s => s.replace == methodInfo).substitution is { } substitution)

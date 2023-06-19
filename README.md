@@ -131,7 +131,10 @@ This library provides a number of extension methods for collections and dictiona
 
 This library has useful tools for dealing with expressions:
 
-* `SubstituteMethods` - Recursively scans an expression tree to replace invocations of specific methods with replacement methods
+* `ExpressionEqualityComparer` - Defines methods to support the comparison of expression trees for equality
+* `ExpressionExtensions`, providing:
+  * `Duplicate` - Duplicates the specified expression tree
+  * `SubstituteMethods` - Recursively scans an expression tree to replace invocations of specific methods with replacement methods
 
 # License
 
