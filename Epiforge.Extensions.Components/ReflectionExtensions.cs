@@ -125,7 +125,7 @@ public static class ReflectionExtensions
         if (type is null)
             throw new ArgumentNullException(nameof(type));
 #endif
-        return getDefaultValueByType.GetOrAdd(type, GetDefaultValueByTypeValueFactory).FastInvoke(null);
+        return type.IsValueType ? getDefaultValueByType.GetOrAdd(type, GetDefaultValueByTypeValueFactory).FastInvoke(null) : null;
     }
 
     /// <summary>
