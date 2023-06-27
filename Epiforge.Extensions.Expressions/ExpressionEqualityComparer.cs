@@ -44,7 +44,7 @@ public sealed class ExpressionEqualityComparer :
     public int GetHashCode(Expression obj)
     {
 #if IS_NET_STANDARD_2_1_OR_GREATER
-        var hashCode = new HashCode();
+        var hashCode = new System.HashCode();
 #else
         var hashCode = new Components.HashCode();
 #endif

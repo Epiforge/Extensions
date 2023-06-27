@@ -1,0 +1,852 @@
+namespace Epiforge.Extensions.Expressions.Observable;
+
+/// <summary>
+/// Represents an observer of expressions
+/// </summary>
+public class ExpressionObserver :
+    IExpressionObserver
+{
+    static readonly ConcurrentDictionary<MethodInfo, PropertyInfo?> propertyGetMethodToProperty = new();
+
+    static PropertyInfo? GetPropertyFromGetMethod(MethodInfo getMethod) =>
+        getMethod.DeclaringType?.GetProperties().FirstOrDefault(property => property.GetMethod == getMethod);
+
+    static Expression ReplaceParameters(Dictionary<ParameterExpression, ConstantExpression> parameterTranslation, Expression expression)
+    {
+        switch (expression)
+        {
+            case BinaryExpression binaryExpression:
+                return Expression.MakeBinary(binaryExpression.NodeType, ReplaceParameters(parameterTranslation, binaryExpression.Left), ReplaceParameters(parameterTranslation, binaryExpression.Right), binaryExpression.IsLiftedToNull, binaryExpression.Method, binaryExpression.Conversion);
+            case ConditionalExpression conditionalExpression:
+                return Expression.Condition(ReplaceParameters(parameterTranslation, conditionalExpression.Test), ReplaceParameters(parameterTranslation, conditionalExpression.IfTrue), ReplaceParameters(parameterTranslation, conditionalExpression.IfFalse), conditionalExpression.Type);
+            case ConstantExpression constantExpression:
+                return constantExpression;
+            case InvocationExpression invocationExpression:
+                return Expression.Invoke(ReplaceParameters(parameterTranslation, invocationExpression.Expression), invocationExpression.Arguments.Select(argument => ReplaceParameters(parameterTranslation, argument)).ToArray());
+            case IndexExpression indexExpression:
+                return Expression.MakeIndex(ReplaceParameters(parameterTranslation, indexExpression.Object!), indexExpression.Indexer, indexExpression.Arguments.Select(argument => ReplaceParameters(parameterTranslation, argument)));
+            case LambdaExpression lambdaExpression:
+                return lambdaExpression;
+            case MemberExpression memberExpression:
+                return Expression.MakeMemberAccess(memberExpression.Expression is { } instanceExpression ? ReplaceParameters(parameterTranslation, instanceExpression) : null, memberExpression.Member);
+            case MemberInitExpression memberInitExpression:
+                return Expression.MemberInit((NewExpression)ReplaceParameters(parameterTranslation, memberInitExpression.NewExpression)!, memberInitExpression.Bindings.Cast<MemberAssignment>().Select(memberAssignment => memberAssignment.Update(ReplaceParameters(parameterTranslation, memberAssignment.Expression))).ToArray());
+            case MethodCallExpression methodCallExpression:
+                return methodCallExpression.Object is null ? Expression.Call(methodCallExpression.Method, methodCallExpression.Arguments.Select(argument => ReplaceParameters(parameterTranslation, argument))) : Expression.Call(ReplaceParameters(parameterTranslation, methodCallExpression.Object), methodCallExpression.Method, methodCallExpression.Arguments.Select(argument => ReplaceParameters(parameterTranslation, argument)));
+            case NewArrayExpression newArrayInitExpression when newArrayInitExpression.NodeType == ExpressionType.NewArrayInit:
+                return Expression.NewArrayInit(newArrayInitExpression.Type.GetElementType()!, newArrayInitExpression.Expressions.Select(expression => ReplaceParameters(parameterTranslation, expression)));
+            case NewExpression newExpression:
+                var newArguments = newExpression.Arguments.Select(argument => ReplaceParameters(parameterTranslation, argument));
+                return newExpression.Constructor is null ? newExpression : newExpression.Members is null ? Expression.New(newExpression.Constructor, newArguments) : Expression.New(newExpression.Constructor, newArguments, newExpression.Members);
+            case ParameterExpression parameterExpression:
+                return parameterTranslation[parameterExpression];
+            case TypeBinaryExpression typeBinaryExpression:
+                return Expression.TypeIs(ReplaceParameters(parameterTranslation, typeBinaryExpression.Expression), typeBinaryExpression.TypeOperand);
+            case UnaryExpression unaryExpression:
+                return Expression.MakeUnary(unaryExpression.NodeType, ReplaceParameters(parameterTranslation, unaryExpression.Operand), unaryExpression.Type, unaryExpression.Method);
+            default:
+                throw new NotSupportedException($"Cannot replace parameters in {expression?.GetType().Name ?? "null expression"}");
+        }
+    }
+
+    /// <summary>
+    /// Instantiates an expression observer with the default options
+    /// </summary>
+    public ExpressionObserver() :
+        this(new ExpressionObserverOptions())
+    {
+    }
+
+    /// <summary>
+    /// Instantiates an expression observer with the specified options
+    /// </summary>
+    /// <param name="options">The options</param>
+    public ExpressionObserver(ExpressionObserverOptions options)
+    {
+#if IS_NET_6_0_OR_GREATER
+        ArgumentNullException.ThrowIfNull(options);
+#else
+        if (options is null)
+            throw new ArgumentNullException(nameof(options));
+#endif
+        BlockOnAsyncDisposal = options.BlockOnAsyncDisposal;
+        ConstantExpressionsListenForCollectionChanged = options.ConstantExpressionsListenForCollectionChanged;
+        ConstantExpressionsListenForDictionaryChanged = options.ConstantExpressionsListenForDictionaryChanged;
+        DisposeConstructedObjects = options.DisposeConstructedObjects;
+        DisposeStaticMethodReturnValues = options.DisposeStaticMethodReturnValues;
+        MemberExpressionsListenToGeneratedTypesFieldValuesForCollectionChanged = options.MemberExpressionsListenToGeneratedTypesFieldValuesForCollectionChanged;
+        MemberExpressionsListenToGeneratedTypesFieldValuesForDictionaryChanged = options.MemberExpressionsListenToGeneratedTypesFieldValuesForDictionaryChanged;
+        Optimizer = options.Optimizer;
+        PreferAsyncDisposal = options.PreferAsyncDisposal;
+        disposeConstructedTypes = options.DisposeConstructedTypes.Keys.ToImmutableHashSet();
+        disposeMethodReturnValues = options.DisposeMethodReturnValues.Keys.ToImmutableHashSet();
+        ignoredPropertyChangeNotifications = options.IgnoredPropertyChangeNotifications.Keys.ToImmutableHashSet();
+    }
+
+    readonly Dictionary<Expression, IDisposable> cachedDoubleArgumentObservableExpressions = new(ExpressionEqualityComparer.Default);
+    readonly object cachedDoubleArgumentObservableExpressionsAccess = new();
+    readonly Dictionary<BinaryExpression, ObservableBinaryExpression> cachedObservableBinaryExpressions = new(ExpressionEqualityComparer.Default);
+    readonly object cachedObservableBinaryExpressionsAccess = new();
+    readonly Dictionary<ConditionalExpression, ObservableConditionalExpression> cachedObservableConditionalExpressions = new(ExpressionEqualityComparer.Default);
+    readonly object cachedObservableConditionalExpressionsAccess = new();
+    readonly Dictionary<ConstantExpression, ObservableConstantExpression> cachedObservableConstantExpressionExpressions = new(ConstantExpressionExpressionEqualityComparer.Default);
+    readonly Dictionary<ConstantExpression, ObservableConstantExpression> cachedObservableConstantExpressions = new(ExpressionEqualityComparer.Default);
+    readonly object cachedObservableConstantExpressionsAccess = new();
+    readonly Dictionary<Expression, IDisposable> cachedObservableExpressions = new(ExpressionEqualityComparer.Default);
+    readonly object cachedObservableExpressionsAccess = new();
+    readonly Dictionary<IndexExpression, ObservableIndexExpression> cachedObservableIndexExpressions = new(ExpressionEqualityComparer.Default);
+    readonly object cachedObservableIndexExpressionsAccess = new();
+    readonly Dictionary<InvocationExpression, ObservableInvocationExpression> cachedObservableInvocationExpressions = new(ExpressionEqualityComparer.Default);
+    readonly object cachedObservableInvocationExpressionsAccess = new();
+    readonly Dictionary<MemberExpression, ObservableMemberExpression> cachedObservableMemberExpressions = new(ExpressionEqualityComparer.Default);
+    readonly object cachedObservableMemberExpressionsAccess = new();
+    readonly Dictionary<MemberInitExpression, ObservableMemberInitExpression> cachedObservableMemberInitExpressions = new(ExpressionEqualityComparer.Default);
+    readonly object cachedObservableMemberInitExpressionsAccess = new();
+    readonly Dictionary<MethodCallExpression, ObservableMethodCallExpression> cachedObservableMethodCallExpressions = new(ExpressionEqualityComparer.Default);
+    readonly object cachedObservableMethodCallExpressionsAccess = new();
+    readonly Dictionary<NewArrayExpression, ObservableNewArrayInitExpression> cachedObservableNewArrayInitExpressions = new(ExpressionEqualityComparer.Default);
+    readonly object cachedObservableNewArrayInitExpressionsAccess = new();
+    readonly Dictionary<NewExpression, ObservableNewExpression> cachedObservableNewExpressions = new(ExpressionEqualityComparer.Default);
+    readonly object cachedObservableNewExpressionsAccess = new();
+    readonly Dictionary<TypeBinaryExpression, ObservableTypeBinaryExpression> cachedObservableTypeBinaryExpressions = new(ExpressionEqualityComparer.Default);
+    readonly object cachedObservableTypeBinaryExpressionsAccess = new();
+    readonly Dictionary<Expression, IDisposable> cachedSingleArgumentObservableExpressions = new(ExpressionEqualityComparer.Default);
+    readonly object cachedSingleArgumentObservableExpressionsAccess = new();
+    readonly Dictionary<Expression, IDisposable> cachedTripleArgumentObservableExpressions = new(ExpressionEqualityComparer.Default);
+    readonly object cachedTripleArgumentObservableExpressionsAccess = new();
+    readonly Dictionary<UnaryExpression, ObservableUnaryExpression> cachedObservableUnaryExpressions = new(ExpressionEqualityComparer.Default);
+    readonly object cachedObservableUnaryExpressionsAccess = new();
+    readonly ImmutableHashSet<(Type type, EquatableList<Type> constuctorParameterTypes)> disposeConstructedTypes;
+    readonly ImmutableHashSet<MethodInfo> disposeMethodReturnValues;
+    readonly ImmutableHashSet<PropertyInfo> ignoredPropertyChangeNotifications;
+
+    /// <inheritdoc/>
+    public bool BlockOnAsyncDisposal { get; }
+
+    /// <inheritdoc/>
+    public int CachedObservableExpressions =>
+        cachedDoubleArgumentObservableExpressions.Count +
+        cachedObservableBinaryExpressions.Count +
+        cachedObservableConditionalExpressions.Count +
+        cachedObservableConstantExpressionExpressions.Count +
+        cachedObservableConstantExpressions.Count +
+        cachedObservableExpressions.Count +
+        cachedObservableIndexExpressions.Count +
+        cachedObservableInvocationExpressions.Count +
+        cachedObservableMemberExpressions.Count +
+        cachedObservableMemberInitExpressions.Count +
+        cachedObservableMethodCallExpressions.Count +
+        cachedObservableNewArrayInitExpressions.Count +
+        cachedObservableNewExpressions.Count +
+        cachedObservableTypeBinaryExpressions.Count +
+        cachedSingleArgumentObservableExpressions.Count +
+        cachedTripleArgumentObservableExpressions.Count +
+        cachedObservableUnaryExpressions.Count;
+
+    /// <inheritdoc/>
+    public bool ConstantExpressionsListenForCollectionChanged { get; }
+
+    /// <inheritdoc/>
+    public bool ConstantExpressionsListenForDictionaryChanged { get; }
+
+    /// <inheritdoc/>
+    public bool DisposeConstructedObjects { get; }
+
+    /// <inheritdoc/>
+    public bool DisposeStaticMethodReturnValues { get; }
+
+    /// <inheritdoc/>
+    public bool MemberExpressionsListenToGeneratedTypesFieldValuesForCollectionChanged { get; }
+
+    /// <inheritdoc/>
+    public bool MemberExpressionsListenToGeneratedTypesFieldValuesForDictionaryChanged { get; }
+
+    /// <inheritdoc/>
+    public Func<Expression, Expression>? Optimizer { get; }
+
+    /// <inheritdoc/>
+    public bool PreferAsyncDisposal { get; }
+
+    /// <inheritdoc/>
+    public Task ConditionAsync(Expression<Func<bool>> condition) =>
+        ConditionAsync(condition, CancellationToken.None);
+
+    /// <inheritdoc/>
+    //[SuppressMessage("Reliability", "CA2000: Dispose objects before losing scope")]
+    public Task ConditionAsync(Expression<Func<bool>> condition, CancellationToken cancellationToken)
+    {
+        var taskCompletionSource = new TaskCompletionSource<object?>();
+        IObservableExpression<bool>? observableExpression = null;
+        void cancellationTokenCancelled()
+        {
+            observableExpression.PropertyChanged -= propertyChangedHandler;
+            observableExpression.Dispose();
+            taskCompletionSource.SetCanceled();
+        }
+        void propertyChangedHandler(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(IObservableExpression<bool>.Evaluation))
+            {
+                if (observableExpression!.Evaluation.Fault is { } fault)
+                {
+                    observableExpression.PropertyChanged -= propertyChangedHandler;
+                    observableExpression.Dispose();
+                    taskCompletionSource!.SetException(fault);
+                }
+                else if (observableExpression!.Evaluation.Result)
+                {
+                    observableExpression.PropertyChanged -= propertyChangedHandler;
+                    observableExpression.Dispose();
+                    taskCompletionSource!.SetResult(null);
+                }
+            }
+        }
+        if (cancellationToken.CanBeCanceled && cancellationToken.IsCancellationRequested)
+            return Task.FromCanceled(cancellationToken);
+        observableExpression = Observe(condition);
+        var (observableExpressionFault, observableExpressionResult) = observableExpression.Evaluation;
+        if (observableExpressionFault is not null)
+        {
+            observableExpression.Dispose();
+            return Task.FromException(observableExpressionFault);
+        }
+        else if (observableExpressionResult)
+        {
+            observableExpression.Dispose();
+            return Task.CompletedTask;
+        }
+        if (cancellationToken.CanBeCanceled)
+            cancellationToken.Register(cancellationTokenCancelled);
+        observableExpression.PropertyChanged += propertyChangedHandler;
+        return taskCompletionSource.Task;
+    }
+
+    internal bool Disposed(ObservableBinaryExpression observableBinaryExpression)
+    {
+        lock (cachedObservableBinaryExpressionsAccess)
+        {
+            if (--observableBinaryExpression.Observations == 0)
+            {
+                cachedObservableBinaryExpressions.Remove(observableBinaryExpression.BinaryExpression);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    internal bool Disposed(ObservableConditionalExpression observableConditionalExpression)
+    {
+        lock (cachedObservableConditionalExpressionsAccess)
+        {
+            if (--observableConditionalExpression.Observations == 0)
+            {
+                cachedObservableConditionalExpressions.Remove(observableConditionalExpression.ConditionalExpression);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    internal bool Disposed(ObservableConstantExpression observableConstantExpression)
+    {
+        var cachedExpressions = typeof(Expression).IsAssignableFrom(observableConstantExpression.ConstantExpression.Type) ? cachedObservableConstantExpressionExpressions : cachedObservableConstantExpressions;
+        lock (cachedObservableConstantExpressionsAccess)
+        {
+            if (--observableConstantExpression.Observations == 0)
+            {
+                cachedExpressions.Remove(observableConstantExpression.ConstantExpression);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    internal bool Disposed(ObservableIndexExpression observableIndexExpression)
+    {
+        lock (cachedObservableIndexExpressionsAccess)
+        {
+            if (--observableIndexExpression.Observations == 0)
+            {
+                cachedObservableIndexExpressions.Remove(observableIndexExpression.IndexExpression);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    internal bool Disposed(ObservableInvocationExpression observableInvocationExpression)
+    {
+        lock (cachedObservableInvocationExpressionsAccess)
+        {
+            if (--observableInvocationExpression.Observations == 0)
+            {
+                cachedObservableInvocationExpressions.Remove(observableInvocationExpression.InvocationExpression);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    internal bool Disposed(ObservableMemberExpression observableMemberExpression)
+    {
+        lock (cachedObservableMemberExpressionsAccess)
+        {
+            if (--observableMemberExpression.Observations == 0)
+            {
+                cachedObservableMemberExpressions.Remove(observableMemberExpression.MemberExpression);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    internal bool Disposed(ObservableMemberInitExpression observableMemberInitExpression)
+    {
+        lock (cachedObservableMemberInitExpressionsAccess)
+        {
+            if (--observableMemberInitExpression.Observations == 0)
+            {
+                cachedObservableMemberInitExpressions.Remove(observableMemberInitExpression.MemberInitExpression);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    internal bool Disposed(ObservableMethodCallExpression observableMethodCallExpression)
+    {
+        lock (cachedObservableMethodCallExpressionsAccess)
+        {
+            if (--observableMethodCallExpression.Observations == 0)
+            {
+                cachedObservableMethodCallExpressions.Remove(observableMethodCallExpression.MethodCallExpression);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    internal bool Disposed(ObservableNewArrayInitExpression observableNewArrayInitExpression)
+    {
+        lock (cachedObservableNewArrayInitExpressionsAccess)
+        {
+            if (--observableNewArrayInitExpression.Observations == 0)
+            {
+                cachedObservableNewArrayInitExpressions.Remove(observableNewArrayInitExpression.NewArrayExpression);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    internal bool Disposed(ObservableNewExpression observableNewExpression)
+    {
+        lock (cachedObservableNewExpressionsAccess)
+        {
+            if (--observableNewExpression.Observations == 0)
+            {
+                cachedObservableNewExpressions.Remove(observableNewExpression.NewExpression);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    internal bool Disposed(ObservableTypeBinaryExpression observableTypeBinaryExpression)
+    {
+        lock (cachedObservableTypeBinaryExpressionsAccess)
+        {
+            if (--observableTypeBinaryExpression.Observations == 0)
+            {
+                cachedObservableTypeBinaryExpressions.Remove(observableTypeBinaryExpression.TypeBinaryExpression);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    internal bool Disposed(ObservableUnaryExpression observableUnaryExpression)
+    {
+        lock (cachedObservableUnaryExpressionsAccess)
+        {
+            if (--observableUnaryExpression.Observations == 0)
+            {
+                cachedObservableUnaryExpressions.Remove(observableUnaryExpression.UnaryExpression);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    internal bool Disposed<TArgument, TResult>(ObservableExpression<TArgument, TResult> observableExpression)
+    {
+        lock (cachedSingleArgumentObservableExpressionsAccess)
+        {
+            if (--observableExpression.Observations == 0)
+            {
+                cachedSingleArgumentObservableExpressions.Remove(observableExpression.Expression);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    internal bool Disposed<TArgument1, TArgument2, TResult>(ObservableExpression<TArgument1, TArgument2, TResult> observableExpression)
+    {
+        lock (cachedDoubleArgumentObservableExpressionsAccess)
+        {
+            if (--observableExpression.Observations == 0)
+            {
+                cachedDoubleArgumentObservableExpressions.Remove(observableExpression.Expression);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    internal bool Disposed<TArgument1, TArgument2, TArgument3, TResult>(ObservableExpression<TArgument1, TArgument2, TArgument3, TResult> observableExpression)
+    {
+        lock (cachedTripleArgumentObservableExpressionsAccess)
+        {
+            if (--observableExpression.Observations == 0)
+            {
+                cachedTripleArgumentObservableExpressions.Remove(observableExpression.Expression);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    internal ObservableExpression GetObservableExpression(Expression expression, bool deferEvaluation)
+    {
+        var observableExpression = expression switch
+        {
+            BinaryExpression binaryExpression => GetObservableExpression(binaryExpression, deferEvaluation),
+            ConditionalExpression conditionalExpression => GetObservableExpression(conditionalExpression, deferEvaluation),
+            ConstantExpression constantExpression => GetObservableExpression(constantExpression, deferEvaluation),
+            IndexExpression indexExpression => GetObservableExpression(indexExpression, deferEvaluation),
+            InvocationExpression invocationExpression => GetObservableExpression(invocationExpression, deferEvaluation),
+            MemberExpression memberExpression => GetObservableExpression(memberExpression, deferEvaluation),
+            MemberInitExpression memberInitExpression => GetObservableExpression(memberInitExpression, deferEvaluation),
+            MethodCallExpression methodCallExpressionForPropertyGet when propertyGetMethodToProperty.GetOrAdd(methodCallExpressionForPropertyGet.Method, GetPropertyFromGetMethod) is { } property => GetObservableExpression(methodCallExpressionForPropertyGet.Arguments.Count > 0 ? Expression.MakeIndex(methodCallExpressionForPropertyGet.Object!, property, methodCallExpressionForPropertyGet.Arguments) : Expression.MakeMemberAccess(methodCallExpressionForPropertyGet.Object, property), deferEvaluation),
+            MethodCallExpression methodCallExpression => GetObservableExpression(methodCallExpression, deferEvaluation),
+            NewArrayExpression newArrayExpression when newArrayExpression.NodeType is ExpressionType.NewArrayInit => GetObservableExpression(newArrayExpression, deferEvaluation),
+            NewExpression newExpression => GetObservableExpression(newExpression, deferEvaluation),
+            TypeBinaryExpression typeBinaryExpression when typeBinaryExpression.NodeType is not ExpressionType.TypeAs => GetObservableExpression(typeBinaryExpression, deferEvaluation),
+            UnaryExpression unaryExpression when unaryExpression.NodeType is ExpressionType.Quote => GetObservableExpression(Expression.Constant(unaryExpression.Operand), deferEvaluation),
+            UnaryExpression unaryExpression => GetObservableExpression(unaryExpression, deferEvaluation),
+            _ => throw new NotSupportedException()
+        };
+        lock (observableExpression.InitializationAccess)
+        {
+            if (observableExpression.InitializationException is { } initializationException)
+                ExceptionDispatchInfo.Capture(initializationException).Throw();
+            try
+            {
+                if (!observableExpression.IsInitialized)
+                {
+                    observableExpression.Initialize();
+                    observableExpression.IsInitialized = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                observableExpression.InitializationException = ex;
+                observableExpression.Dispose();
+                ExceptionDispatchInfo.Capture(ex).Throw();
+            }
+        }
+        if (!deferEvaluation)
+            observableExpression.EvaluateIfDeferred();
+        return observableExpression;
+    }
+
+    ObservableBinaryExpression GetObservableExpression(BinaryExpression binaryExpression, bool deferEvaluation)
+    {
+        lock (cachedObservableBinaryExpressionsAccess)
+        {
+            if (!cachedObservableBinaryExpressions.TryGetValue(binaryExpression, out var observableBinaryExpression))
+            {
+                observableBinaryExpression = binaryExpression.NodeType switch
+                {
+                    ExpressionType.AndAlso => new ObservableAndAlsoExpression(this, binaryExpression, deferEvaluation),
+                    ExpressionType.Coalesce => new ObservableCoalesceExpression(this, binaryExpression, deferEvaluation),
+                    ExpressionType.OrElse => new ObservableOrElseExpression(this, binaryExpression, deferEvaluation),
+                    _ => new ObservableBinaryExpression(this, binaryExpression, deferEvaluation)
+                };
+                cachedObservableBinaryExpressions.Add(binaryExpression, observableBinaryExpression);
+            }
+            ++observableBinaryExpression.Observations;
+            return observableBinaryExpression;
+        }
+    }
+
+    ObservableConditionalExpression GetObservableExpression(ConditionalExpression conditionalExpression, bool deferEvaluation)
+    {
+        lock (cachedObservableConditionalExpressionsAccess)
+        {
+            if (!cachedObservableConditionalExpressions.TryGetValue(conditionalExpression, out var observableConditionalExpression))
+            {
+                observableConditionalExpression = new ObservableConditionalExpression(this, conditionalExpression, deferEvaluation);
+                cachedObservableConditionalExpressions.Add(conditionalExpression, observableConditionalExpression);
+            }
+            ++observableConditionalExpression.Observations;
+            return observableConditionalExpression;
+        }
+    }
+
+    ObservableConstantExpression GetObservableExpression(ConstantExpression constantExpression, bool deferEvaluation)
+    {
+        lock (cachedObservableConstantExpressionsAccess)
+        {
+            var cachedExpressions = typeof(Expression).IsAssignableFrom(constantExpression.Type) ? cachedObservableConstantExpressionExpressions : cachedObservableConstantExpressions;
+            if (!cachedExpressions.TryGetValue(constantExpression, out var observableConstantExpression))
+            {
+                observableConstantExpression = new ObservableConstantExpression(this, constantExpression, deferEvaluation);
+                cachedExpressions.Add(constantExpression, observableConstantExpression);
+            }
+            ++observableConstantExpression.Observations;
+            return observableConstantExpression;
+        }
+    }
+
+    ObservableIndexExpression GetObservableExpression(IndexExpression indexExpression, bool deferEvaluation)
+    {
+        lock (cachedObservableIndexExpressionsAccess)
+        {
+            if (!cachedObservableIndexExpressions.TryGetValue(indexExpression, out var observableIndexExpression))
+            {
+                observableIndexExpression = new ObservableIndexExpression(this, indexExpression, deferEvaluation);
+                cachedObservableIndexExpressions.Add(indexExpression, observableIndexExpression);
+            }
+            ++observableIndexExpression.Observations;
+            return observableIndexExpression;
+        }
+    }
+
+    ObservableInvocationExpression GetObservableExpression(InvocationExpression invocationExpression, bool deferEvaluation)
+    {
+        lock (cachedObservableInvocationExpressionsAccess)
+        {
+            if (!cachedObservableInvocationExpressions.TryGetValue(invocationExpression, out var observableInvocationExpression))
+            {
+                observableInvocationExpression = new ObservableInvocationExpression(this, invocationExpression, deferEvaluation);
+                cachedObservableInvocationExpressions.Add(invocationExpression, observableInvocationExpression);
+            }
+            ++observableInvocationExpression.Observations;
+            return observableInvocationExpression;
+        }
+    }
+
+    ObservableMemberExpression GetObservableExpression(MemberExpression memberExpression, bool deferEvaluation)
+    {
+        lock (cachedObservableMemberExpressionsAccess)
+        {
+            if (!cachedObservableMemberExpressions.TryGetValue(memberExpression, out var observableInvocationExpression))
+            {
+                observableInvocationExpression = new ObservableMemberExpression(this, memberExpression, deferEvaluation);
+                cachedObservableMemberExpressions.Add(memberExpression, observableInvocationExpression);
+            }
+            ++observableInvocationExpression.Observations;
+            return observableInvocationExpression;
+        }
+    }
+
+    ObservableMemberInitExpression GetObservableExpression(MemberInitExpression memberInitExpression, bool deferEvaluation)
+    {
+        lock (cachedObservableMemberInitExpressionsAccess)
+        {
+            if (!cachedObservableMemberInitExpressions.TryGetValue(memberInitExpression, out var observableInvocationExpression))
+            {
+                observableInvocationExpression = new ObservableMemberInitExpression(this, memberInitExpression, deferEvaluation);
+                cachedObservableMemberInitExpressions.Add(memberInitExpression, observableInvocationExpression);
+            }
+            ++observableInvocationExpression.Observations;
+            return observableInvocationExpression;
+        }
+    }
+
+    ObservableMethodCallExpression GetObservableExpression(MethodCallExpression methodCallExpression, bool deferEvaluation)
+    {
+        lock (cachedObservableMethodCallExpressionsAccess)
+        {
+            if (!cachedObservableMethodCallExpressions.TryGetValue(methodCallExpression, out var observableMethodCallExpression))
+            {
+                observableMethodCallExpression = new ObservableMethodCallExpression(this, methodCallExpression, deferEvaluation);
+                cachedObservableMethodCallExpressions.Add(methodCallExpression, observableMethodCallExpression);
+            }
+            ++observableMethodCallExpression.Observations;
+            return observableMethodCallExpression;
+        }
+    }
+
+    ObservableNewArrayInitExpression GetObservableExpression(NewArrayExpression newArrayInitExpression, bool deferEvaluation)
+    {
+        lock (cachedObservableNewArrayInitExpressionsAccess)
+        {
+            if (!cachedObservableNewArrayInitExpressions.TryGetValue(newArrayInitExpression, out var observableNewArrayInitExpression))
+            {
+                observableNewArrayInitExpression = new ObservableNewArrayInitExpression(this, newArrayInitExpression, deferEvaluation);
+                cachedObservableNewArrayInitExpressions.Add(newArrayInitExpression, observableNewArrayInitExpression);
+            }
+            ++observableNewArrayInitExpression.Observations;
+            return observableNewArrayInitExpression;
+        }
+    }
+
+    ObservableNewExpression GetObservableExpression(NewExpression newExpression, bool deferEvaluation)
+    {
+        lock (cachedObservableNewExpressionsAccess)
+        {
+            if (!cachedObservableNewExpressions.TryGetValue(newExpression, out var observableNewExpression))
+            {
+                observableNewExpression = new ObservableNewExpression(this, newExpression, deferEvaluation);
+                cachedObservableNewExpressions.Add(newExpression, observableNewExpression);
+            }
+            ++observableNewExpression.Observations;
+            return observableNewExpression;
+        }
+    }
+
+    ObservableTypeBinaryExpression GetObservableExpression(TypeBinaryExpression typeBinaryExpression, bool deferEvaluation)
+    {
+        lock (cachedObservableTypeBinaryExpressionsAccess)
+        {
+            if (!cachedObservableTypeBinaryExpressions.TryGetValue(typeBinaryExpression, out var observableTypeBinaryExpression))
+            {
+                observableTypeBinaryExpression = new ObservableTypeBinaryExpression(this, typeBinaryExpression, deferEvaluation);
+                cachedObservableTypeBinaryExpressions.Add(typeBinaryExpression, observableTypeBinaryExpression);
+            }
+            ++observableTypeBinaryExpression.Observations;
+            return observableTypeBinaryExpression;
+        }
+    }
+
+    ObservableUnaryExpression GetObservableExpression(UnaryExpression unaryExpression, bool deferEvaluation)
+    {
+        lock (cachedObservableUnaryExpressionsAccess)
+        {
+            if (!cachedObservableUnaryExpressions.TryGetValue(unaryExpression, out var observableUnaryExpression))
+            {
+                observableUnaryExpression = new ObservableUnaryExpression(this, unaryExpression, deferEvaluation);
+                cachedObservableUnaryExpressions.Add(unaryExpression, observableUnaryExpression);
+            }
+            ++observableUnaryExpression.Observations;
+            return observableUnaryExpression;
+        }
+    }
+
+    internal bool IsConstructedTypeDisposed(Type type, EquatableList<Type> constructorParameterTypes) =>
+        DisposeConstructedObjects || disposeConstructedTypes.Contains((type, constructorParameterTypes));
+
+    /// <inheritdoc/>
+    public bool IsConstructedTypeDisposed(Type type, params Type[] constructorParameterTypes) =>
+        IsConstructedTypeDisposed(type, new EquatableList<Type>(constructorParameterTypes));
+
+    /// <inheritdoc/>
+    public bool IsConstructedTypeDisposed(ConstructorInfo constructor)
+    {
+#if IS_NET_6_0_OR_GREATER
+        ArgumentNullException.ThrowIfNull(constructor);
+#else
+        if (constructor is null)
+            throw new ArgumentNullException(nameof(constructor));
+#endif
+        if (constructor.DeclaringType is not { } declaringType)
+            throw new ArgumentException("the constructor specified does not have a declaring type", nameof(constructor));
+        return disposeConstructedTypes.Contains((declaringType, new EquatableList<Type>(constructor.GetParameters().Select(parameterInfo => parameterInfo.ParameterType).ToList())));
+    }
+
+    /// <inheritdoc/>
+    public bool IsExpressionValueDisposed<T>(Expression<Func<T>> lambda)
+    {
+#if IS_NET_6_0_OR_GREATER
+        ArgumentNullException.ThrowIfNull(lambda);
+#else
+        if (lambda is null)
+            throw new ArgumentNullException(nameof(lambda));
+#endif
+        return lambda.Body switch
+        {
+            BinaryExpression binary when binary.Method is { } method => IsMethodReturnValueDisposed(method),
+            IndexExpression index when index.Indexer is { } indexer => IsPropertyValueDisposed(indexer),
+            NewExpression @new when @new.Constructor is { } constructor => IsConstructedTypeDisposed(constructor),
+            MemberExpression member when member.Member is PropertyInfo property => IsPropertyValueDisposed(property),
+            MethodCallExpression methodCallExpressionForPropertyGet when methodCallExpressionForPropertyGet.Method is { } method && ExpressionObserverOptions.PropertyGetMethodToProperty.GetOrAdd(method, ExpressionObserverOptions.GetPropertyFromGetMethod) is { } property => IsPropertyValueDisposed(property),
+            MethodCallExpression methodCall when methodCall.Method is { } method => IsMethodReturnValueDisposed(method),
+            UnaryExpression unary when unary.Method is { } method => IsMethodReturnValueDisposed(method),
+            _ => throw new NotSupportedException(),
+        };
+    }
+
+    /// <inheritdoc/>
+    public bool IsIgnoredPropertyChangeNotification(PropertyInfo property)
+    {
+#if IS_NET_6_0_OR_GREATER
+        ArgumentNullException.ThrowIfNull(property);
+#else
+        if (property is null)
+            throw new ArgumentNullException(nameof(property));
+#endif
+        return ignoredPropertyChangeNotifications.Contains(property);
+    }
+
+    /// <inheritdoc/>
+    public bool IsMethodReturnValueDisposed(MethodInfo method)
+    {
+#if IS_NET_6_0_OR_GREATER
+        ArgumentNullException.ThrowIfNull(method);
+#else
+        if (method is null)
+            throw new ArgumentNullException(nameof(method));
+#endif
+        return method.IsStatic && DisposeStaticMethodReturnValues || disposeMethodReturnValues.Contains(method) || method.IsGenericMethod && disposeMethodReturnValues.Contains(ExpressionObserverOptions.GenericMethodToGenericMethodDefinition.GetOrAdd(method, ExpressionObserverOptions.GetGenericMethodDefinitionFromGenericMethod));
+    }
+
+    /// <inheritdoc/>
+    public bool IsPropertyValueDisposed(PropertyInfo property)
+    {
+#if IS_NET_6_0_OR_GREATER
+        ArgumentNullException.ThrowIfNull(property);
+#else
+        if (property is null)
+            throw new ArgumentNullException(nameof(property));
+#endif
+        if (property.GetMethod is not { } getMethod)
+            throw new ArgumentException("the property specified does not have a getter", nameof(property));
+        return IsMethodReturnValueDisposed(getMethod);
+    }
+
+    /// <inheritdoc/>
+    public IObservableExpression<TResult> Observe<TResult>(LambdaExpression lambdaExpression, params object?[] arguments)
+    {
+#if IS_NET_6_0_OR_GREATER
+        ArgumentNullException.ThrowIfNull(lambdaExpression);
+        ArgumentNullException.ThrowIfNull(arguments);
+#else
+        if (lambdaExpression is null)
+            throw new ArgumentNullException(nameof(lambdaExpression));
+        if (arguments is null)
+            throw new ArgumentNullException(nameof(arguments));
+#endif
+        var parameterReplacedExpression = ReplaceParameters(lambdaExpression, arguments);
+        lock (cachedObservableExpressionsAccess)
+        {
+            ObservableExpression<TResult> typedInstance;
+            if (cachedObservableExpressions.TryGetValue(parameterReplacedExpression!, out var instance))
+                typedInstance = (ObservableExpression<TResult>)instance;
+            else
+            {
+                typedInstance = new ObservableExpression<TResult>(this, parameterReplacedExpression!, GetObservableExpression(parameterReplacedExpression!, false), arguments);
+                cachedObservableExpressions.Add(parameterReplacedExpression!, typedInstance);
+            }
+            ++typedInstance.Observations;
+            return typedInstance;
+        }
+    }
+
+    internal bool Disregard<TResult>(ObservableExpression<TResult> observableExpression)
+    {
+        lock (cachedObservableExpressionsAccess)
+        {
+            if (--observableExpression.Observations == 0)
+            {
+                cachedObservableExpressions.Remove(observableExpression.Expression);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// <inheritdoc/>
+    public IObservableExpression<TResult> Observe<TResult>(Expression<Func<TResult>> expression) =>
+        Observe<TResult>((LambdaExpression)expression);
+
+    /// <inheritdoc/>
+    public IObservableExpression<TArgument, TResult> Observe<TArgument, TResult>(Expression<Func<TArgument, TResult>> expression, TArgument argument)
+    {
+#if IS_NET_6_0_OR_GREATER
+        ArgumentNullException.ThrowIfNull(expression);
+#else
+        if (expression is null)
+            throw new ArgumentNullException(nameof(expression));
+#endif
+        var parameterReplacedExpression = ReplaceParameters(expression, argument);
+        lock (cachedSingleArgumentObservableExpressionsAccess)
+        {
+            ObservableExpression<TArgument, TResult> typedInstance;
+            if (cachedSingleArgumentObservableExpressions.TryGetValue(parameterReplacedExpression!, out var instance))
+                typedInstance = (ObservableExpression<TArgument, TResult>)instance;
+            else
+            {
+                typedInstance = new ObservableExpression<TArgument, TResult>(this, parameterReplacedExpression!, GetObservableExpression(parameterReplacedExpression!, false), argument);
+                cachedSingleArgumentObservableExpressions.Add(parameterReplacedExpression!, typedInstance);
+            }
+            ++typedInstance.Observations;
+            return typedInstance;
+        }
+    }
+
+    /// <inheritdoc/>
+    public IObservableExpression<TArgument1, TArgument2, TResult> Observe<TArgument1, TArgument2, TResult>(Expression<Func<TArgument1, TArgument2, TResult>> expression, TArgument1 argument1, TArgument2 argument2)
+    {
+#if IS_NET_6_0_OR_GREATER
+        ArgumentNullException.ThrowIfNull(expression);
+#else
+        if (expression is null)
+            throw new ArgumentNullException(nameof(expression));
+#endif
+        var parameterReplacedExpression = ReplaceParameters(expression, argument1, argument2);
+        lock (cachedDoubleArgumentObservableExpressionsAccess)
+        {
+            ObservableExpression<TArgument1, TArgument2, TResult> typedInstance;
+            if (cachedDoubleArgumentObservableExpressions.TryGetValue(parameterReplacedExpression!, out var instance))
+                typedInstance = (ObservableExpression<TArgument1, TArgument2, TResult>)instance;
+            else
+            {
+                typedInstance = new ObservableExpression<TArgument1, TArgument2, TResult>(this, parameterReplacedExpression!, GetObservableExpression(parameterReplacedExpression!, false), argument1, argument2);
+                cachedDoubleArgumentObservableExpressions.Add(parameterReplacedExpression!, typedInstance);
+            }
+            ++typedInstance.Observations;
+            return typedInstance;
+        }
+    }
+
+    /// <inheritdoc/>
+    public IObservableExpression<TArgument1, TArgument2, TArgument3, TResult> Observe<TArgument1, TArgument2, TArgument3, TResult>(Expression<Func<TArgument1, TArgument2, TArgument3, TResult>> expression, TArgument1 argument1, TArgument2 argument2, TArgument3 argument3)
+    {
+#if IS_NET_6_0_OR_GREATER
+        ArgumentNullException.ThrowIfNull(expression);
+#else
+        if (expression is null)
+            throw new ArgumentNullException(nameof(expression));
+#endif
+        var parameterReplacedExpression = ReplaceParameters(expression, argument1, argument2, argument3);
+        lock (cachedTripleArgumentObservableExpressionsAccess)
+        {
+            ObservableExpression<TArgument1, TArgument2, TArgument3, TResult> typedInstance;
+            if (cachedTripleArgumentObservableExpressions.TryGetValue(parameterReplacedExpression!, out var instance))
+                typedInstance = (ObservableExpression<TArgument1, TArgument2, TArgument3, TResult>)instance;
+            else
+            {
+                typedInstance = new ObservableExpression<TArgument1, TArgument2, TArgument3, TResult>(this, parameterReplacedExpression!, GetObservableExpression(parameterReplacedExpression!, false), argument1, argument2, argument3);
+                cachedTripleArgumentObservableExpressions.Add(parameterReplacedExpression!, typedInstance);
+            }
+            ++typedInstance.Observations;
+            return typedInstance;
+        }
+    }
+
+    internal Expression? ReplaceParameters(LambdaExpression lambdaExpression, params object?[] arguments)
+    {
+        var parameterTranslation = new Dictionary<ParameterExpression, ConstantExpression>();
+        lambdaExpression = (LambdaExpression)(Optimizer?.Invoke(lambdaExpression) ?? lambdaExpression);
+        for (var i = 0; i < lambdaExpression.Parameters.Count; ++i)
+        {
+            var parameter = lambdaExpression.Parameters[i];
+            var constant = Expression.Constant(arguments[i], parameter.Type);
+            parameterTranslation.Add(parameter, constant);
+        }
+        return ReplaceParameters(parameterTranslation, lambdaExpression.Body);
+    }
+}

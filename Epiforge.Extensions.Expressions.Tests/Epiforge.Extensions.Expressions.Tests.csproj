@@ -9,15 +9,18 @@
         <Nullable>enable</Nullable>
         <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
         <TargetFrameworks>net462;net6.0;net7.0</TargetFrameworks>
+        <DefineConstants Condition="'$(TargetFramework)' == 'netstandard2.1' or '$(TargetFramework)' == 'net6.0' or '$(TargetFramework)' == 'net7.0'">$(DefineConstants);IS_NET_STANDARD_2_1_OR_GREATER</DefineConstants>
+        <DefineConstants Condition="'$(TargetFramework)' == 'net7.0'">$(DefineConstants);IS_NET_7_0_OR_GREATER</DefineConstants>
     </PropertyGroup>
 
     <ItemGroup>
-      <None Remove="Epiforge.Extensions.Expressions.Tests.net462.v3.ncrunchproject" />
-      <None Remove="Epiforge.Extensions.Expressions.Tests.net6.0.v3.ncrunchproject" />
-      <None Remove="Epiforge.Extensions.Expressions.Tests.net7.0.v3.ncrunchproject" />
+        <None Remove="Epiforge.Extensions.Expressions.Tests.net462.v3.ncrunchproject" />
+        <None Remove="Epiforge.Extensions.Expressions.Tests.net6.0.v3.ncrunchproject" />
+        <None Remove="Epiforge.Extensions.Expressions.Tests.net7.0.v3.ncrunchproject" />
     </ItemGroup>
 
     <ItemGroup>
+        <PackageReference Include="Linq.Expression.Optimizer" Version="1.0.15" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.6.0" />
         <PackageReference Include="MSTest.TestAdapter" Version="3.0.3" />
         <PackageReference Include="MSTest.TestFramework" Version="3.0.3" />
@@ -28,7 +31,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\Epiforge.Extensions.Expressions\Epiforge.Extensions.Expressions.csproj" />
+        <ProjectReference Include="..\Epiforge.Extensions.Expressions\Epiforge.Extensions.Expressions.csproj" />
     </ItemGroup>
 
 </Project>
