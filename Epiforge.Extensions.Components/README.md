@@ -44,6 +44,8 @@ Use of these methods in .NET 7 or later will simply call the built-in methods, a
 
 This library also offers `FastComparer` and `FastEqualityComparer`, which implement `IComparer` and `IEqualityComaprer`, respectively, but quickly use the methods of `Comparer<>.Default` and `EqualityComaprer<>.Default`, respectively, to do their work.
 
+In addition (pun intended), this library offers `GenericAddition`, `GenericSubtraction`, `GenericMultiplication`, and `GenericDivision`, which will produce delegates that will perform the respective operations with values of supplied generic type arguments.
+
 # Exceptions
 
 This library provides extension methods for dealing with exceptions:

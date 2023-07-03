@@ -1,1 +1,1 @@
-Revised FastDefault not to attempt to use the default keyword for reference types as if they are not public then .NET Framework will throw an exception.
+We added GenericAddition, GenericSubtraction, GenericMultiplication, and GenericDivision.
