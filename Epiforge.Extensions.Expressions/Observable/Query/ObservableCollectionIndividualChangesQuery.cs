@@ -70,6 +70,7 @@ class ObservableCollectionIndividualChangesQuery<TElement> :
     void ElementsPropertyChanged(object? sender, PropertyChangedEventArgs e) =>
         OnPropertyChanged(e);
 
+    [SuppressMessage("Maintainability", "CA1502: Avoid excessive complexity")]
     void SourceCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         if (e.Action is NotifyCollectionChangedAction.Reset)
