@@ -1,5 +1,4 @@
 # Property Change Notification
-
 This library offers the `PropertyChangeNotifier` class, which you may inherit from to quickly get all the property utilities we're all tired of copying and pasting everywhere.
 Just call the protected `OnPropertyChanged` and `OnPropertyChanging` methods at the appropriate times from setters and compiler services will figure out what property you're in.
 Or, if all you need to do is set the value of a field, `SetBackedProperty` couldn't make it any easier or convenient to handle that as efficiently as possible.
@@ -8,7 +7,6 @@ Or, if all you need to do is set the value of a field, `SetBackedProperty` could
 Be sure to set the protected `Logger` property if you want the abstract class to log what's going on with property change notification.
 
 # Disposal
-
 This library features base classes that handle things we've written a thousand times over, this time involving disposal.
 If you want to go with an implementation of the tried and true `IDisposable`, just inherit from `SyncDisposable`.
 Want a taste of the new `IAsyncDisposable`? Then, inherit from `AsyncDisposable`.
@@ -29,7 +27,6 @@ This library also provides the `INotifyDisposing`, `INotifyDisposed`, and `INoti
 Be sure to set the protected `Logger` property if you want the abstract class to log what's going on with disposal.
 
 # Reflection
-
 This library has useful tools for when you can't be certain of some things at compile time, such as types, methods, etc.
 While .NET reflection is immensely powerful, prior to .NET 7, it's not very quick.
 To address this, this library offers the following extension methods which will emit IL, generate delegates, and cache them for expedited use of Reflection:
@@ -47,7 +44,11 @@ This library also offers `FastComparer` and `FastEqualityComparer`, which implem
 In addition (pun intended), this library offers `GenericAddition`, `GenericSubtraction`, `GenericMultiplication`, and `GenericDivision`, which will produce delegates that will perform the respective operations with values of supplied generic type arguments.
 
 # Exceptions
-
 This library provides extension methods for dealing with exceptions:
 
 * `GetFullDetails` - creates a representation of an exception and all of its inner exceptions, including exception types, messages, and stack traces, and traversing multiple inner exceptions in the case of `AggregateException` and `ReflectionTypeLoadException`
+
+# Threading
+This library provides classes for use in threading scenarios:
+
+* `AsyncSynchronizationContext` - A SynchronizationContext that uses the Task Parallel Library (TPL) to process callbacks asynchronously

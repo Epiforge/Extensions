@@ -17,6 +17,7 @@ Supports `net462`, `net6.0`, `net7.0`, and `netstandard2.1`.
     - [Disposal](#disposal)
     - [Reflection](#reflection)
     - [Exceptions](#exceptions)
+- [Threading](#threading)
   - [ Collections](#-collections)
     - [Generic](#generic)
     - [ObjectModel](#objectmodel)
@@ -81,6 +82,11 @@ In addition (pun intended), this library offers `GenericAddition`, `GenericSubtr
 This library provides extension methods for dealing with exceptions:
 
 * `GetFullDetails` - creates a representation of an exception and all of its inner exceptions, including exception types, messages, and stack traces, and traversing multiple inner exceptions in the case of `AggregateException` and `ReflectionTypeLoadException`
+
+# Threading
+This library provides classes for use in threading scenarios:
+
+* `AsyncSynchronizationContext` - A SynchronizationContext that uses the Task Parallel Library (TPL) to process callbacks asynchronously
 
 ---
 
