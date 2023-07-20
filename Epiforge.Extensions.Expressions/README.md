@@ -100,7 +100,7 @@ var expr = observer.Observe<bool>(lambda, false, false);
 // (because Augustus De Morgan said they're essentially the same thing, but this involves less steps)
 ```
 
-# Observable Queries
+### Observable Queries
 This library provides re-implementations of LINQ operations, but instead of returning `Enumerable<T>`s and simple values, these return `IObservableCollectionQuery<T>`s, `IObservableDictionaryQuery<TKey, TValue>`s, and `IObservableScalarQuery<T>`s.
 This is because, unlike traditional LINQ operations, these implementations continuously update their results until those results are disposed.
 
