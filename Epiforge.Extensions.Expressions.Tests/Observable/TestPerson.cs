@@ -3,6 +3,27 @@ namespace Epiforge.Extensions.Expressions.Tests.Observable;
 public class TestPerson :
     PropertyChangeNotifier
 {
+    public static RangeObservableCollection<TestPerson> CreatePeopleCollection() =>
+        new(MakePeople());
+
+    public static IEnumerable<TestPerson> MakePeople() => new TestPerson[]
+    {
+        new TestPerson("John"),
+        new TestPerson("Emily"),
+        new TestPerson("Charles"),
+        new TestPerson("Erin"),
+        new TestPerson("Cliff"),
+        new TestPerson("Hunter"),
+        new TestPerson("Ben"),
+        new TestPerson("Craig"),
+        new TestPerson("Bridget"),
+        new TestPerson("Nanette"),
+        new TestPerson("George"),
+        new TestPerson("Bryan"),
+        new TestPerson("James"),
+        new TestPerson("Steve")
+    };
+
     public TestPerson()
     {
     }

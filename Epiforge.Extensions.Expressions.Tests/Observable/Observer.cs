@@ -3,22 +3,13 @@ namespace Epiforge.Extensions.Expressions.Tests.Observable;
 [TestClass]
 public class Observer
 {
-    public static ExpressionObserver Create(ExpressionObserverOptions? options = null)
-    {
-        options ??= new ExpressionObserverOptions();
-#if IS_NET_STANDARD_2_1_OR_GREATER
-        options.Optimizer = ExpressionOptimizer.tryVisit;
-#endif
-        return new(options);
-    }
-
     [TestMethod]
     public void AlreadyCancelled()
     {
         var john = TestPerson.CreateJohn();
         using var cancellationTokenSource = new CancellationTokenSource();
         cancellationTokenSource.Cancel();
-        var observer = Create();
+        var observer = ExpressionObserverHelpers.Create();
         var johnsNameIsSixCharacters = observer.ConditionAsync(() => john.Name!.Length == 6, cancellationTokenSource.Token);
         Assert.IsTrue(johnsNameIsSixCharacters.IsCompleted);
         Assert.IsTrue(johnsNameIsSixCharacters.IsCanceled);
@@ -29,7 +20,7 @@ public class Observer
     {
         var john = TestPerson.CreateJohn();
         john.Name = null;
-        var observer = Create();
+        var observer = ExpressionObserverHelpers.Create();
         var johnsNameIsSixCharacters = observer.ConditionAsync(() => john.Name!.Length == 6);
         Assert.IsTrue(johnsNameIsSixCharacters.IsCompleted);
         Assert.IsInstanceOfType(johnsNameIsSixCharacters.Exception, typeof(AggregateException));
@@ -45,7 +36,7 @@ public class Observer
     {
         var john = TestPerson.CreateJohn();
         john.Name = "Jan";
-        var observer = Create();
+        var observer = ExpressionObserverHelpers.Create();
         var johnsSexChange = observer.ConditionAsync(() => john.Name == "Jan");
 #if IS_NET_STANDARD_2_1_OR_GREATER
         Assert.IsTrue(johnsSexChange.IsCompletedSuccessfully);
@@ -61,7 +52,7 @@ public class Observer
     {
         var john = TestPerson.CreateJohn();
         using var cancellationTokenSource = new CancellationTokenSource();
-        var observer = Create();
+        var observer = ExpressionObserverHelpers.Create();
         var johnsNameIsSixCharacters = observer.ConditionAsync(() => john.Name!.Length == 6, cancellationTokenSource.Token);
         cancellationTokenSource.Cancel();
         Assert.IsTrue(johnsNameIsSixCharacters.IsCompleted);
@@ -72,7 +63,7 @@ public class Observer
     public void Fault()
     {
         var john = TestPerson.CreateJohn();
-        var observer = Create();
+        var observer = ExpressionObserverHelpers.Create();
         var johnsNameIsSixCharacters = observer.ConditionAsync(() => john.Name!.Length == 6);
         Assert.IsFalse(johnsNameIsSixCharacters.IsCompleted);
         john.Name = null;
@@ -89,7 +80,7 @@ public class Observer
     public void Success()
     {
         var john = TestPerson.CreateJohn();
-        var observer = Create();
+        var observer = ExpressionObserverHelpers.Create();
         var johnsSexChange = observer.ConditionAsync(() => john.Name == "Jan");
         Assert.IsFalse(johnsSexChange.IsCompleted);
         john.Name = "Jon";
@@ -110,7 +101,7 @@ public class Observer
         var expr = Expression.Lambda<Func<int>>(Expression.Block(Expression.Constant(3)));
         Assert.AreEqual(3, expr.Compile()());
         var notSupportedThrown = false;
-        var observer = Create();
+        var observer = ExpressionObserverHelpers.Create();
         try
         {
             using var observableExpr = observer.Observe(expr);

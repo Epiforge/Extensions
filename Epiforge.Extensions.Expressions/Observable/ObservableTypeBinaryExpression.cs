@@ -26,7 +26,7 @@ sealed class ObservableTypeBinaryExpression :
     {
         if (disposing)
         {
-            var removedFromCache = observer.Disposed(this);
+            var removedFromCache = observer.ExpressionDisposed(this);
             if (removedFromCache)
             {
                 if (expression is not null)

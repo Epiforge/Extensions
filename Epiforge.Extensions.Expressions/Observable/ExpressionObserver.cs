@@ -124,24 +124,49 @@ public class ExpressionObserver :
     public bool BlockOnAsyncDisposal { get; }
 
     /// <inheritdoc/>
-    public int CachedObservableExpressions =>
-        cachedDoubleArgumentObservableExpressions.Count +
-        cachedObservableBinaryExpressions.Count +
-        cachedObservableConditionalExpressions.Count +
-        cachedObservableConstantExpressionExpressions.Count +
-        cachedObservableConstantExpressions.Count +
-        cachedObservableExpressions.Count +
-        cachedObservableIndexExpressions.Count +
-        cachedObservableInvocationExpressions.Count +
-        cachedObservableMemberExpressions.Count +
-        cachedObservableMemberInitExpressions.Count +
-        cachedObservableMethodCallExpressions.Count +
-        cachedObservableNewArrayInitExpressions.Count +
-        cachedObservableNewExpressions.Count +
-        cachedObservableTypeBinaryExpressions.Count +
-        cachedSingleArgumentObservableExpressions.Count +
-        cachedTripleArgumentObservableExpressions.Count +
-        cachedObservableUnaryExpressions.Count;
+    public int CachedObservableExpressions
+    {
+        get
+        {
+            var count = 0;
+            lock (cachedDoubleArgumentObservableExpressionsAccess)
+                count += cachedDoubleArgumentObservableExpressions.Count;
+            lock (cachedObservableBinaryExpressionsAccess)
+                count += cachedObservableBinaryExpressions.Count;
+            lock (cachedObservableConditionalExpressionsAccess)
+                count += cachedObservableConditionalExpressions.Count;
+            lock (cachedObservableConstantExpressionsAccess)
+            {
+                count += cachedObservableConstantExpressionExpressions.Count;
+                count += cachedObservableConstantExpressions.Count;
+            }
+            lock (cachedObservableExpressionsAccess)
+                count += cachedObservableExpressions.Count;
+            lock (cachedObservableIndexExpressionsAccess)
+                count += cachedObservableIndexExpressions.Count;
+            lock (cachedObservableInvocationExpressionsAccess)
+                count += cachedObservableInvocationExpressions.Count;
+            lock (cachedObservableMemberExpressionsAccess)
+                count += cachedObservableMemberExpressions.Count;
+            lock (cachedObservableMemberInitExpressionsAccess)
+                count += cachedObservableMemberInitExpressions.Count;
+            lock (cachedObservableMethodCallExpressionsAccess)
+                count += cachedObservableMethodCallExpressions.Count;
+            lock (cachedObservableNewArrayInitExpressionsAccess)
+                count += cachedObservableNewArrayInitExpressions.Count;
+            lock (cachedObservableNewExpressionsAccess)
+                count += cachedObservableNewExpressions.Count;
+            lock (cachedObservableTypeBinaryExpressionsAccess)
+                count += cachedObservableTypeBinaryExpressions.Count;
+            lock (cachedSingleArgumentObservableExpressionsAccess)
+                count += cachedSingleArgumentObservableExpressions.Count;
+            lock (cachedTripleArgumentObservableExpressionsAccess)
+                count += cachedTripleArgumentObservableExpressions.Count;
+            lock (cachedObservableUnaryExpressionsAccess)
+                count += cachedObservableUnaryExpressions.Count;
+            return count;
+        }
+    }
 
     /// <inheritdoc/>
     public bool ConstantExpressionsListenForCollectionChanged { get; }
@@ -221,7 +246,7 @@ public class ExpressionObserver :
         return taskCompletionSource.Task;
     }
 
-    internal bool Disposed(ObservableBinaryExpression observableBinaryExpression)
+    internal bool ExpressionDisposed(ObservableBinaryExpression observableBinaryExpression)
     {
         lock (cachedObservableBinaryExpressionsAccess)
         {
@@ -234,7 +259,7 @@ public class ExpressionObserver :
         return false;
     }
 
-    internal bool Disposed(ObservableConditionalExpression observableConditionalExpression)
+    internal bool ExpressionDisposed(ObservableConditionalExpression observableConditionalExpression)
     {
         lock (cachedObservableConditionalExpressionsAccess)
         {
@@ -247,7 +272,7 @@ public class ExpressionObserver :
         return false;
     }
 
-    internal bool Disposed(ObservableConstantExpression observableConstantExpression)
+    internal bool ExpressionDisposed(ObservableConstantExpression observableConstantExpression)
     {
         var cachedExpressions = typeof(Expression).IsAssignableFrom(observableConstantExpression.ConstantExpression.Type) ? cachedObservableConstantExpressionExpressions : cachedObservableConstantExpressions;
         lock (cachedObservableConstantExpressionsAccess)
@@ -261,7 +286,7 @@ public class ExpressionObserver :
         return false;
     }
 
-    internal bool Disposed(ObservableIndexExpression observableIndexExpression)
+    internal bool ExpressionDisposed(ObservableIndexExpression observableIndexExpression)
     {
         lock (cachedObservableIndexExpressionsAccess)
         {
@@ -274,7 +299,7 @@ public class ExpressionObserver :
         return false;
     }
 
-    internal bool Disposed(ObservableInvocationExpression observableInvocationExpression)
+    internal bool ExpressionDisposed(ObservableInvocationExpression observableInvocationExpression)
     {
         lock (cachedObservableInvocationExpressionsAccess)
         {
@@ -287,7 +312,7 @@ public class ExpressionObserver :
         return false;
     }
 
-    internal bool Disposed(ObservableMemberExpression observableMemberExpression)
+    internal bool ExpressionDisposed(ObservableMemberExpression observableMemberExpression)
     {
         lock (cachedObservableMemberExpressionsAccess)
         {
@@ -300,7 +325,7 @@ public class ExpressionObserver :
         return false;
     }
 
-    internal bool Disposed(ObservableMemberInitExpression observableMemberInitExpression)
+    internal bool ExpressionDisposed(ObservableMemberInitExpression observableMemberInitExpression)
     {
         lock (cachedObservableMemberInitExpressionsAccess)
         {
@@ -313,7 +338,7 @@ public class ExpressionObserver :
         return false;
     }
 
-    internal bool Disposed(ObservableMethodCallExpression observableMethodCallExpression)
+    internal bool ExpressionDisposed(ObservableMethodCallExpression observableMethodCallExpression)
     {
         lock (cachedObservableMethodCallExpressionsAccess)
         {
@@ -326,7 +351,7 @@ public class ExpressionObserver :
         return false;
     }
 
-    internal bool Disposed(ObservableNewArrayInitExpression observableNewArrayInitExpression)
+    internal bool ExpressionDisposed(ObservableNewArrayInitExpression observableNewArrayInitExpression)
     {
         lock (cachedObservableNewArrayInitExpressionsAccess)
         {
@@ -339,7 +364,7 @@ public class ExpressionObserver :
         return false;
     }
 
-    internal bool Disposed(ObservableNewExpression observableNewExpression)
+    internal bool ExpressionDisposed(ObservableNewExpression observableNewExpression)
     {
         lock (cachedObservableNewExpressionsAccess)
         {
@@ -352,7 +377,7 @@ public class ExpressionObserver :
         return false;
     }
 
-    internal bool Disposed(ObservableTypeBinaryExpression observableTypeBinaryExpression)
+    internal bool ExpressionDisposed(ObservableTypeBinaryExpression observableTypeBinaryExpression)
     {
         lock (cachedObservableTypeBinaryExpressionsAccess)
         {
@@ -365,7 +390,7 @@ public class ExpressionObserver :
         return false;
     }
 
-    internal bool Disposed(ObservableUnaryExpression observableUnaryExpression)
+    internal bool ExpressionDisposed(ObservableUnaryExpression observableUnaryExpression)
     {
         lock (cachedObservableUnaryExpressionsAccess)
         {
@@ -378,7 +403,7 @@ public class ExpressionObserver :
         return false;
     }
 
-    internal bool Disposed<TArgument, TResult>(ObservableExpression<TArgument, TResult> observableExpression)
+    internal bool ExpressionDisposed<TArgument, TResult>(ObservableExpression<TArgument, TResult> observableExpression)
     {
         lock (cachedSingleArgumentObservableExpressionsAccess)
         {
@@ -391,7 +416,7 @@ public class ExpressionObserver :
         return false;
     }
 
-    internal bool Disposed<TArgument1, TArgument2, TResult>(ObservableExpression<TArgument1, TArgument2, TResult> observableExpression)
+    internal bool ExpressionDisposed<TArgument1, TArgument2, TResult>(ObservableExpression<TArgument1, TArgument2, TResult> observableExpression)
     {
         lock (cachedDoubleArgumentObservableExpressionsAccess)
         {
@@ -404,7 +429,7 @@ public class ExpressionObserver :
         return false;
     }
 
-    internal bool Disposed<TArgument1, TArgument2, TArgument3, TResult>(ObservableExpression<TArgument1, TArgument2, TArgument3, TResult> observableExpression)
+    internal bool ExpressionDisposed<TArgument1, TArgument2, TArgument3, TResult>(ObservableExpression<TArgument1, TArgument2, TArgument3, TResult> observableExpression)
     {
         lock (cachedTripleArgumentObservableExpressionsAccess)
         {
@@ -700,7 +725,7 @@ public class ExpressionObserver :
         if (method is null)
             throw new ArgumentNullException(nameof(method));
 #endif
-        return method.IsStatic && DisposeStaticMethodReturnValues || disposeMethodReturnValues.Contains(method) || method.IsGenericMethod && disposeMethodReturnValues.Contains(ExpressionObserverOptions.GenericMethodToGenericMethodDefinition.GetOrAdd(method, ExpressionObserverOptions.GetGenericMethodDefinitionFromGenericMethod));
+        return method.IsStatic && DisposeStaticMethodReturnValues || disposeMethodReturnValues.Contains(method) || method.IsGenericMethod && disposeMethodReturnValues.Contains(ExpressionObserverOptions.GenericMethodToGenericMethodDefinition.GetOrAdd(method, ExpressionObserverOptions.GetGenericMethodDefinitionFromGenericMethod)) || method.ReturnParameter.GetCustomAttributes(true).OfType<DisposeWhenDiscardedAttribute>().Any();
     }
 
     /// <inheritdoc/>
@@ -718,6 +743,7 @@ public class ExpressionObserver :
     }
 
     /// <inheritdoc/>
+    [return: DisposeWhenDiscarded]
     public IObservableExpression<TResult> Observe<TResult>(LambdaExpression lambdaExpression, params object?[] arguments)
     {
 #if IS_NET_6_0_OR_GREATER
@@ -759,10 +785,12 @@ public class ExpressionObserver :
     }
 
     /// <inheritdoc/>
+    [return: DisposeWhenDiscarded]
     public IObservableExpression<TResult> Observe<TResult>(Expression<Func<TResult>> expression) =>
         Observe<TResult>((LambdaExpression)expression);
 
     /// <inheritdoc/>
+    [return: DisposeWhenDiscarded]
     public IObservableExpression<TArgument, TResult> Observe<TArgument, TResult>(Expression<Func<TArgument, TResult>> expression, TArgument argument)
     {
 #if IS_NET_6_0_OR_GREATER
@@ -788,6 +816,7 @@ public class ExpressionObserver :
     }
 
     /// <inheritdoc/>
+    [return: DisposeWhenDiscarded]
     public IObservableExpression<TArgument1, TArgument2, TResult> Observe<TArgument1, TArgument2, TResult>(Expression<Func<TArgument1, TArgument2, TResult>> expression, TArgument1 argument1, TArgument2 argument2)
     {
 #if IS_NET_6_0_OR_GREATER
@@ -813,6 +842,7 @@ public class ExpressionObserver :
     }
 
     /// <inheritdoc/>
+    [return: DisposeWhenDiscarded]
     public IObservableExpression<TArgument1, TArgument2, TArgument3, TResult> Observe<TArgument1, TArgument2, TArgument3, TResult>(Expression<Func<TArgument1, TArgument2, TArgument3, TResult>> expression, TArgument1 argument1, TArgument2 argument2, TArgument3 argument3)
     {
 #if IS_NET_6_0_OR_GREATER

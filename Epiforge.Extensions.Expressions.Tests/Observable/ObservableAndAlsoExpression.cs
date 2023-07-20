@@ -8,7 +8,7 @@ public class ObservableAndAlsoExpression
     {
         var john = TestPerson.CreateJohn();
         var emily = TestPerson.CreateEmily();
-        var observer = Observer.Create();
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe((p1, p2) => p1.Name!.Length > 0 && p2.Name!.Length > 0, john, emily))
         {
             Assert.IsNull(expr.Evaluation.Fault);
@@ -28,7 +28,7 @@ public class ObservableAndAlsoExpression
     {
         var john = TestPerson.CreateJohn();
         TestPerson? noOne = null;
-        var observer = Observer.Create();
+        var observer = ExpressionObserverHelpers.Create();
 #pragma warning disable CS8602 // Dereference of a possibly null reference.
         using (var expr = observer.Observe((p1, p2) => string.IsNullOrEmpty(p1.Name) && string.IsNullOrEmpty(p2.Name), john, noOne))
 #pragma warning restore CS8602 // Dereference of a possibly null reference.
@@ -45,7 +45,7 @@ public class ObservableAndAlsoExpression
         var john = TestPerson.CreateJohn();
         var emily = TestPerson.CreateEmily();
         var values = new BlockingCollection<bool>();
-        var observer = Observer.Create();
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe((p1, p2) => p1.Name!.Length == 1 && p2.Name!.Length == 1, john, emily))
         {
             void propertyChanged(object? sender, PropertyChangedEventArgs e) => values.Add(expr.Evaluation.Result);
@@ -68,7 +68,7 @@ public class ObservableAndAlsoExpression
     {
         var john = TestPerson.CreateJohn();
         var emily = TestPerson.CreateEmily();
-        var observer = Observer.Create();
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe((p1, p2) => p1.Name!.Length == 1 && p2.Name!.Length > 3, john, emily))
             Assert.IsFalse(expr.Evaluation.Result);
         Assert.AreEqual(0, observer.CachedObservableExpressions);

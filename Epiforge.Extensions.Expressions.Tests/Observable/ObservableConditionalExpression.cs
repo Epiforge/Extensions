@@ -10,7 +10,7 @@ public class ObservableConditionalExpression
         john.Name = null;
         var emily = TestPerson.CreateEmily();
         emily.Name = null;
-        var observer = Observer.Create();
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe((p1, p2) => p1.Name != null ? p1.Name.Length : p2.Name!.Length, john, emily))
         {
             Assert.IsNotNull(expr.Evaluation.Fault);
@@ -31,7 +31,7 @@ public class ObservableConditionalExpression
         john.Name = null;
         var emily = TestPerson.CreateEmily();
         emily.Name = null;
-        var observer = Observer.Create();
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe((p1, p2) => p2.Name == null ? p1.Name!.Length : p2.Name.Length, john, emily))
         {
             Assert.IsNotNull(expr.Evaluation.Fault);
@@ -51,7 +51,7 @@ public class ObservableConditionalExpression
         var john = TestPerson.CreateJohn();
         john.Name = null;
         var emily = TestPerson.CreateEmily();
-        var observer = Observer.Create();
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe((p1, p2) => p1.Name!.Length > 0 ? p1.Name : p2.Name, john, emily))
         {
             Assert.IsNotNull(expr.Evaluation.Fault);
@@ -65,7 +65,7 @@ public class ObservableConditionalExpression
     public void FaultShortCircuiting()
     {
         var john = TestPerson.CreateJohn();
-        var observer = Observer.Create();
+        var observer = ExpressionObserverHelpers.Create();
 #pragma warning disable CS8625 // Cannot convert null literal to non-nullable reference type.
         using (var expr = observer.Observe<TestPerson, TestPerson, string>((p1, p2) => p1.Name!.Length > 0 ? p1.Name! : p2.Name!, john, null))
 #pragma warning restore CS8625 // Cannot convert null literal to non-nullable reference type.
@@ -82,7 +82,7 @@ public class ObservableConditionalExpression
         var john = TestPerson.CreateJohn();
         var emily = TestPerson.CreateEmily();
         var values = new BlockingCollection<string>();
-        var observer = Observer.Create();
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe((p1, p2) => string.IsNullOrEmpty(p1.Name) ? p2.Name : p1.Name, john, emily))
         {
             void propertyChanged(object? sender, PropertyChangedEventArgs e) =>
@@ -108,7 +108,7 @@ public class ObservableConditionalExpression
     {
         var john = TestPerson.CreateJohn();
         var emily = TestPerson.CreateEmily();
-        var observer = Observer.Create();
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe((p1, p2) => p1.Name!.Length > 0 ? p1.Name : p2.Name, john, emily))
             Assert.AreEqual(john.Name, expr.Evaluation.Result);
         Assert.AreEqual(0, observer.CachedObservableExpressions);

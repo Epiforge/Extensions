@@ -32,7 +32,7 @@ class ObservableBinaryExpression :
     {
         if (disposing)
         {
-            var removedFromCache = observer.Disposed(this);
+            var removedFromCache = observer.ExpressionDisposed(this);
             if (removedFromCache)
             {
                 DisposeValueIfNecessaryAndPossible();

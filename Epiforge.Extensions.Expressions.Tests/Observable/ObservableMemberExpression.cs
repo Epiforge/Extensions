@@ -39,7 +39,7 @@ public class ObservableMemberExpression
         var x = 3;
         var john = TestPerson.CreateJohn();
         var emily = TestPerson.CreateEmily();
-        var observer = Observer.Create();
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe(p1 => p1.Name == null ? x : emily.Name!.Length, john))
         {
             Assert.AreEqual(5, expr.Evaluation.Result);
@@ -55,7 +55,7 @@ public class ObservableMemberExpression
         var test = new TestObject { Unheard = true };
         var options = new ExpressionObserverOptions();
         options.AddIgnoredPropertyChangeNotification(typeof(TestObject).GetProperty(nameof(TestObject.Unheard))!);
-        var observer = Observer.Create(options);
+        var observer = ExpressionObserverHelpers.Create(options);
         using (var expr = observer.Observe(p1 => p1.Unheard, test))
         {
             Assert.IsTrue(expr.Evaluation.Result);
@@ -69,7 +69,7 @@ public class ObservableMemberExpression
     public void FieldValue()
     {
         var team = (developer: TestPerson.CreateJohn(), artist: TestPerson.CreateEmily());
-        var observer = Observer.Create();
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe(p1 => p1.artist.Name, team))
             Assert.AreEqual("Emily", expr.Evaluation.Result);
         Assert.AreEqual(0, observer.CachedObservableExpressions);
@@ -80,7 +80,7 @@ public class ObservableMemberExpression
     {
         var john = TestPerson.CreateJohn();
         var emily = TestPerson.CreateEmily();
-        var observer = Observer.Create();
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe((p1, p2) => (p1.Name!.Length > 0 ? p1 : p2).Name, john, emily))
         {
             Assert.IsNull(expr.Evaluation.Fault);
@@ -95,7 +95,7 @@ public class ObservableMemberExpression
     [TestMethod]
     public void StaticPropertyValue()
     {
-        var observer = Observer.Create();
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe(() => Environment.UserName))
             Assert.AreEqual(Environment.UserName, expr.Evaluation.Result);
         Assert.AreEqual(0, observer.CachedObservableExpressions);
@@ -110,7 +110,7 @@ public class ObservableMemberExpression
         var disposedTcs = new TaskCompletionSource<object?>();
         var options = new ExpressionObserverOptions();
         options.AddExpressionValueDisposal(() => new TestObject().AsyncDisposable);
-        var observer = Observer.Create(options);
+        var observer = ExpressionObserverHelpers.Create(options);
         using (var expr = observer.Observe(p1 => p1.AsyncDisposable, testObject))
         {
             Assert.AreSame(john, expr.Evaluation.Result);
@@ -137,7 +137,7 @@ public class ObservableMemberExpression
         var testObject = new TestObject { SyncDisposable = john };
         var options = new ExpressionObserverOptions();
         options.AddExpressionValueDisposal(() => new TestObject().SyncDisposable);
-        var observer = Observer.Create(options);
+        var observer = ExpressionObserverHelpers.Create(options);
         using (var expr = observer.Observe(p1 => p1.SyncDisposable, testObject))
         {
             Assert.AreSame(john, expr.Evaluation.Result);

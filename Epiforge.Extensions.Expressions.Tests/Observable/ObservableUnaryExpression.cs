@@ -6,7 +6,7 @@ public class ObservableUnaryExpression
     [TestMethod]
     public void Cast()
     {
-        var observer = Observer.Create();
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe(p1 => (double)p1, 3))
         {
             Assert.IsNull(expr.Evaluation.Fault);
@@ -20,7 +20,7 @@ public class ObservableUnaryExpression
     public void EvaluationFault()
     {
         TestPerson? noOne = null;
-        var observer = Observer.Create();
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe(() => -noOne!))
             Assert.IsNotNull(expr.Evaluation.Fault);
         Assert.AreEqual(0, observer.CachedObservableExpressions);
@@ -30,7 +30,7 @@ public class ObservableUnaryExpression
     public void FaultPropagation()
     {
         var john = TestPerson.CreateJohn();
-        var observer = Observer.Create();
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe(p1 => -p1.Name!.Length, john))
         {
             Assert.IsNull(expr.Evaluation.Fault);
@@ -46,7 +46,7 @@ public class ObservableUnaryExpression
     public void NullableConversion()
     {
         var john = TestPerson.CreateJohn();
-        var observer = Observer.Create();
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe(p1 => (p1 == null || p1.Name == null ? (int?)null : p1.Name.Length) + 3, john))
         {
             Assert.IsTrue(expr.Evaluation.Result == 7);
@@ -63,7 +63,7 @@ public class ObservableUnaryExpression
     {
         var john = TestPerson.CreateJohn();
         var values = new BlockingCollection<int>();
-        var observer = Observer.Create();
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe(p1 => -p1.Name!.Length, john))
         {
             void propertyChanged(object? sender, PropertyChangedEventArgs e) =>
@@ -90,7 +90,7 @@ public class ObservableUnaryExpression
         };
         AsyncDisposableTestPerson? newPerson;
         var disposedTcs = new TaskCompletionSource<object?>();
-        var observer = Observer.Create();
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe(p => -p[0], people))
         {
             newPerson = expr.Evaluation.Result;
@@ -117,7 +117,7 @@ public class ObservableUnaryExpression
             SyncDisposableTestPerson.CreateJohn()
         };
         SyncDisposableTestPerson? newPerson;
-        var observer = Observer.Create();
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe(p => -p[0], people))
         {
             newPerson = expr.Evaluation.Result;

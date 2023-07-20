@@ -29,7 +29,7 @@ sealed class ObservableUnaryExpression :
     {
         if (disposing)
         {
-            var removedFromCache = observer.Disposed(this);
+            var removedFromCache = observer.ExpressionDisposed(this);
             if (removedFromCache)
             {
                 if (operand is not null)

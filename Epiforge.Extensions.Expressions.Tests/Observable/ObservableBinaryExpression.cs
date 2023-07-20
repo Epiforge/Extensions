@@ -8,7 +8,7 @@ public class ObservableBinaryExpression
     {
         var john = TestPerson.CreateJohn();
         TestPerson? noOne = null;
-        var observer = Observer.Create();
+        var observer = ExpressionObserverHelpers.Create();
 #pragma warning disable CS8604 // Possible null reference argument.
         using (var expr = observer.Observe(() => john + noOne))
 #pragma warning restore CS8604 // Possible null reference argument.
@@ -21,7 +21,7 @@ public class ObservableBinaryExpression
     {
         var john = TestPerson.CreateJohn();
         var emily = TestPerson.CreateEmily();
-        var observer = Observer.Create();
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe((p1, p2) => p1.Name!.Length + p2.Name!.Length, john, emily))
         {
             Assert.IsNull(expr.Evaluation.Fault);
@@ -42,7 +42,7 @@ public class ObservableBinaryExpression
         var john = TestPerson.CreateJohn();
         var emily = TestPerson.CreateEmily();
         var values = new BlockingCollection<int>();
-        var observer = Observer.Create();
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe((p1, p2) => p1.Name!.Length + p2.Name!.Length, john, emily))
         {
             void propertyChanged(object? sender, PropertyChangedEventArgs e) => values.Add(expr.Evaluation.Result);
@@ -70,7 +70,7 @@ public class ObservableBinaryExpression
         };
         var disposedTcs = new TaskCompletionSource<object?>();
         AsyncDisposableTestPerson? newPerson;
-        var observer = Observer.Create();
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe(p => p[0] + p[1], people))
         {
             newPerson = expr.Evaluation.Result;
@@ -98,7 +98,7 @@ public class ObservableBinaryExpression
             SyncDisposableTestPerson.CreateEmily()
         };
         SyncDisposableTestPerson? newPerson;
-        var observer = Observer.Create();
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe(p => p[0] + p[1], people))
         {
             newPerson = expr.Evaluation.Result;

@@ -21,7 +21,7 @@ public interface IObservableExpression<TResult> :
     /// <summary>
     /// Gets the outcome of evaluating the lambda expression
     /// </summary>
-    (Exception? Fault, TResult? Result) Evaluation { get; }
+    (Exception? Fault, TResult Result) Evaluation { get; }
 
     /// <summary>
     /// Gets the observer that is observing the lambda expression

@@ -20,7 +20,7 @@ sealed class ObservableConditionalExpression :
     {
         if (disposing)
         {
-            var removedFromCache = observer.Disposed(this);
+            var removedFromCache = observer.ExpressionDisposed(this);
             if (test is not null)
             {
                 test.PropertyChanged -= TestPropertyChanged;

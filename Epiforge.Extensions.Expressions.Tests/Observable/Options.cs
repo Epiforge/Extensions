@@ -39,7 +39,7 @@ public class Options
     public void BlockOnAsyncDisposalEnabled()
     {
         AsyncDisposableTestPerson? person;
-        var observer = Observer.Create(new ExpressionObserverOptions { BlockOnAsyncDisposal = true });
+        var observer = ExpressionObserverHelpers.Create(new ExpressionObserverOptions { BlockOnAsyncDisposal = true });
         using (var expr = observer.Observe(() => new AsyncDisposableTestPerson()))
             person = expr.Evaluation.Result;
         Assert.AreEqual(0, observer.CachedObservableExpressions);
@@ -114,7 +114,7 @@ public class Options
     public void DisposeGenericMethodReturnValue()
     {
         SyncDisposableTestPerson? person;
-        using (var expr = Observer.Create().Observe(() => new TestObject().GetPersonNamedAfterType<string>()))
+        using (var expr = ExpressionObserverHelpers.Create().Observe(() => new TestObject().GetPersonNamedAfterType<string>()))
         {
             person = expr.Evaluation.Result!;
             Assert.AreEqual(typeof(string).Name, person.Name);
@@ -123,7 +123,7 @@ public class Options
         person.Dispose();
         var options1 = new ExpressionObserverOptions();
         options1.AddExpressionValueDisposal(() => default(TestObject)!.GetPersonNamedAfterType<int>());
-        using (var expr = Observer.Create(options1).Observe(() => new TestObject().GetPersonNamedAfterType<string>()))
+        using (var expr = ExpressionObserverHelpers.Create(options1).Observe(() => new TestObject().GetPersonNamedAfterType<string>()))
         {
             person = expr.Evaluation.Result!;
             Assert.AreEqual(typeof(string).Name, person.Name);
@@ -132,7 +132,7 @@ public class Options
         person.Dispose();
         var options2 = new ExpressionObserverOptions();
         options2.AddExpressionValueDisposal(() => default(TestObject)!.GetPersonNamedAfterType<int>(), true);
-        using (var expr = Observer.Create(options2).Observe(() => new TestObject().GetPersonNamedAfterType<string>()))
+        using (var expr = ExpressionObserverHelpers.Create(options2).Observe(() => new TestObject().GetPersonNamedAfterType<string>()))
         {
             person = expr.Evaluation.Result!;
             Assert.AreEqual(typeof(string).Name, person.Name);
@@ -200,7 +200,7 @@ public class Options
     {
         var a = Expression.Parameter(typeof(bool));
         var b = Expression.Parameter(typeof(bool));
-        var observer = Observer.Create();
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe<bool>(Expression.Lambda<Func<bool, bool, bool>>(Expression.AndAlso(Expression.Not(a), Expression.Not(b)), a, b), false, false))
             Assert.AreEqual("Not((False OrElse False))", expr.ToString());
         Assert.AreEqual(0, observer.CachedObservableExpressions);
@@ -212,7 +212,7 @@ public class Options
     {
         DisposableTestPerson? person;
         var disposedTcs = new TaskCompletionSource<object?>();
-        var observer = Observer.Create(new ExpressionObserverOptions { BlockOnAsyncDisposal = true });
+        var observer = ExpressionObserverHelpers.Create(new ExpressionObserverOptions { BlockOnAsyncDisposal = true });
         using (var expr = observer.Observe(() => new DisposableTestPerson()))
         {
             person = expr.Evaluation.Result;

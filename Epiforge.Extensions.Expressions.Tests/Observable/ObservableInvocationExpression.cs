@@ -18,7 +18,7 @@ public class ObservableInvocationExpression
         var firstParameter = Expression.Parameter(typeof(TestPerson));
         var secondParameter = Expression.Parameter(typeof(TestPerson));
         var testPersonNamePropertyInfo = typeof(TestPerson).GetProperty(nameof(TestPerson.Name))!;
-        var observer = Observer.Create();
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe<int>(Expression.Lambda(Expression.Invoke((Expression<Func<string, string, int>>)((p1, p2) => p1.Length + p2.Length), Expression.MakeMemberAccess(firstParameter, testPersonNamePropertyInfo), Expression.MakeMemberAccess(secondParameter, testPersonNamePropertyInfo)), firstParameter, secondParameter), john, emily))
         {
             Assert.AreEqual(9, expr.Evaluation.Result);
@@ -37,7 +37,7 @@ public class ObservableInvocationExpression
         var secondParameter = Expression.Parameter(typeof(TestPerson));
         var testPersonNamePropertyInfo = typeof(TestPerson).GetProperty(nameof(TestPerson.Name))!;
         var stringLengthPropertyInfo = typeof(string).GetProperty(nameof(string.Length))!;
-        var observer = Observer.Create();
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe<int>(Expression.Lambda(Expression.Invoke((Expression<Func<int, int, int>>)((p1, p2) => p1 + p2), Expression.MakeMemberAccess(Expression.MakeMemberAccess(firstParameter, testPersonNamePropertyInfo), stringLengthPropertyInfo), Expression.MakeMemberAccess(Expression.MakeMemberAccess(secondParameter, testPersonNamePropertyInfo), stringLengthPropertyInfo)), firstParameter, secondParameter), john, emily))
         {
             Assert.IsNull(expr.Evaluation.Fault);
@@ -57,7 +57,7 @@ public class ObservableInvocationExpression
         var firstParameter = Expression.Parameter(typeof(TestPerson));
         var secondParameter = Expression.Parameter(typeof(TestPerson));
         var testPersonNamePropertyInfo = typeof(TestPerson).GetProperty(nameof(TestPerson.Name))!;
-        var observer = Observer.Create();
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe<int>(Expression.Lambda(Expression.Invoke((Expression<Func<string, string, int>>)((p1, p2) => p1.Length + p2.Length), Expression.MakeMemberAccess(firstParameter, testPersonNamePropertyInfo), Expression.MakeMemberAccess(secondParameter, testPersonNamePropertyInfo)), firstParameter, secondParameter), john, emily))
         {
             Assert.IsNull(expr.Evaluation.Fault);
@@ -78,7 +78,7 @@ public class ObservableInvocationExpression
         var emily = TestPerson.CreateEmily();
         var firstParameter = Expression.Parameter(typeof(TestPerson));
         var secondParameter = Expression.Parameter(typeof(TestPerson));
-        var observer = Observer.Create();
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe<TestPerson>(Expression.Lambda(Expression.Invoke(Expression.Constant(@delegate), firstParameter, secondParameter), firstParameter, secondParameter), john, emily))
 #if IS_NET_STANDARD_2_1_OR_GREATER
             Assert.AreEqual("John Emily", expr.Evaluation.Result!.Name);
@@ -95,7 +95,7 @@ public class ObservableInvocationExpression
         var emily = TestPerson.CreateEmily();
         var firstParameter = Expression.Parameter(typeof(TestPerson));
         var secondParameter = Expression.Parameter(typeof(TestPerson));
-        var observer = Observer.Create();
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe<TestPerson>(Expression.Lambda(Expression.Invoke((Expression<Func<TestPerson, TestPerson, TestPerson>>)((p1, p2) => CombinePeople(p1, p2)), firstParameter, secondParameter), firstParameter, secondParameter), john, emily))
             Assert.AreEqual("John Emily", expr.Evaluation.Result!.Name);
         Assert.AreEqual(0, observer.CachedObservableExpressions);
@@ -111,7 +111,7 @@ public class ObservableInvocationExpression
         var emily = TestPerson.CreateEmily();
         var firstParameter = Expression.Parameter(typeof(TestPerson));
         var secondParameter = Expression.Parameter(typeof(TestPerson));
-        var observer = Observer.Create();
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe<TestPerson>(Expression.Lambda(Expression.Invoke(Expression.Constant(@delegate), firstParameter, secondParameter), firstParameter, secondParameter), john, emily))
 #if IS_NET_STANDARD_2_1_OR_GREATER
             Assert.AreEqual("John Emily", expr.Evaluation.Result!.Name);
@@ -129,7 +129,7 @@ public class ObservableInvocationExpression
         var emily = TestPerson.CreateEmily();
         var firstParameter = Expression.Parameter(typeof(TestPerson));
         var secondParameter = Expression.Parameter(typeof(TestPerson));
-        var observer = Observer.Create();
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe<TestPerson>(Expression.Lambda(Expression.Invoke(Expression.Constant(@delegate), firstParameter, secondParameter), firstParameter, secondParameter), john, emily))
             Assert.AreEqual("John Emily", expr.Evaluation.Result!.Name);
         Assert.AreEqual(0, observer.CachedObservableExpressions);

@@ -46,7 +46,7 @@ sealed class ObservableInvocationExpression :
     {
         if (disposing)
         {
-            var removedFromCache = observer.Disposed(this);
+            var removedFromCache = observer.ExpressionDisposed(this);
             if (removedFromCache)
             {
                 if (observableExpression is not null)

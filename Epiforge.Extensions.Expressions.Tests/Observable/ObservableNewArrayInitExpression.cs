@@ -8,7 +8,7 @@ public class ObservableNewArrayInitExpression
     {
         var john = TestPerson.CreateJohn();
         var emily = TestPerson.CreateEmily();
-        var observer = Observer.Create();
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe(() => string.Concat(new string?[] { john.Name!.Length.ToString(), emily.Name!.Length.ToString() })))
         {
             Assert.IsNull(expr.Evaluation.Fault);

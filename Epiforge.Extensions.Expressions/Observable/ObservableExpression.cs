@@ -41,7 +41,7 @@ abstract class ObservableExpression :
     internal readonly Expression Expression;
     internal readonly object InitializationAccess = new();
     internal Exception? InitializationException;
-    internal bool IsInitialized = false;
+    internal bool IsInitialized;
     internal int Observations;
 
     public (Exception? Fault, object? Result) Evaluation
@@ -182,12 +182,12 @@ class ObservableExpression<TResult> :
 
     public IReadOnlyList<object?> Arguments { get; }
 
-    public (Exception? Fault, TResult? Result) Evaluation
+    public (Exception? Fault, TResult Result) Evaluation
     {
         get
         {
             var (fault, result) = observableExpression.Evaluation;
-            return (fault, (TResult?)result);
+            return (fault, (TResult)result!);
         }
     }
 
@@ -257,12 +257,12 @@ class ObservableExpression<TArgument, TResult> :
 
     public TArgument Argument { get; }
 
-    public (Exception? Fault, TResult? Result) Evaluation
+    public (Exception? Fault, TResult Result) Evaluation
     {
         get
         {
             var (fault, result) = observableExpression.Evaluation;
-            return (fault, (TResult?)result);
+            return (fault, (TResult)result!);
         }
     }
 
@@ -273,7 +273,7 @@ class ObservableExpression<TArgument, TResult> :
     {
         if (disposing)
         {
-            var removedFromCache = observer.Disposed(this);
+            var removedFromCache = observer.ExpressionDisposed(this);
             if (removedFromCache)
             {
                 observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
@@ -335,12 +335,12 @@ class ObservableExpression<TArgument1, TArgument2, TResult> :
 
     public TArgument2 Argument2 { get; }
 
-    public (Exception? Fault, TResult? Result) Evaluation
+    public (Exception? Fault, TResult Result) Evaluation
     {
         get
         {
             var (fault, result) = observableExpression.Evaluation;
-            return (fault, (TResult?)result);
+            return (fault, (TResult)result!);
         }
     }
 
@@ -351,7 +351,7 @@ class ObservableExpression<TArgument1, TArgument2, TResult> :
     {
         if (disposing)
         {
-            var removedFromCache = observer.Disposed(this);
+            var removedFromCache = observer.ExpressionDisposed(this);
             if (removedFromCache)
             {
                 observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
@@ -416,12 +416,12 @@ class ObservableExpression<TArgument1, TArgument2, TArgument3, TResult> :
 
     public TArgument3 Argument3 { get; }
 
-    public (Exception? Fault, TResult? Result) Evaluation
+    public (Exception? Fault, TResult Result) Evaluation
     {
         get
         {
             var (fault, result) = observableExpression.Evaluation;
-            return (fault, (TResult?)result);
+            return (fault, (TResult)result!);
         }
     }
 
@@ -432,7 +432,7 @@ class ObservableExpression<TArgument1, TArgument2, TArgument3, TResult> :
     {
         if (disposing)
         {
-            var removedFromCache = observer.Disposed(this);
+            var removedFromCache = observer.ExpressionDisposed(this);
             if (removedFromCache)
             {
                 observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;

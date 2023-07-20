@@ -41,15 +41,16 @@ public sealed class ExpressionEqualityComparer :
     /// </summary>
     /// <param name="obj">The expression tree for which a hash code is to be returned</param>
     /// <returns>A hash code for the specified expression tree</returns>
-    public int GetHashCode(Expression obj)
+    public int GetHashCode(Expression? obj)
     {
 #if IS_NET_STANDARD_2_1_OR_GREATER
         var hashCode = new System.HashCode();
 #else
         var hashCode = new Components.HashCode();
 #endif
-        foreach (var element in ExpressionDiagramGenerator.GenerateDiagram(obj))
-            hashCode.Add(element);
+        if (obj is not null)
+            foreach (var element in ExpressionDiagramGenerator.GenerateDiagram(obj))
+                hashCode.Add(element);
         return hashCode.ToHashCode();
     }
 }

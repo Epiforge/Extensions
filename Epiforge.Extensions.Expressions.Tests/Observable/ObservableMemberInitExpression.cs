@@ -57,7 +57,7 @@ public class ObservableMemberInitExpression
     public void ClassFields()
     {
         var emily = TestPerson.CreateEmily();
-        var observer = Observer.Create();
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe(() => new FieldyTestPerson { Name = emily.Name! }))
         {
             Assert.IsNull(expr.Evaluation.Fault);
@@ -75,7 +75,7 @@ public class ObservableMemberInitExpression
     public void ClassProperties()
     {
         var emily = TestPerson.CreateEmily();
-        var observer = Observer.Create();
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe(() => new TestPerson { Name = emily.Name! }))
         {
             Assert.IsNull(expr.Evaluation.Fault);
@@ -93,7 +93,7 @@ public class ObservableMemberInitExpression
     public void MemberAssignmentFaultPropagation()
     {
         var emily = TestPerson.CreateEmily();
-        var observer = Observer.Create();
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe(() => new ThrowyTestPerson("Emily") { Name = emily.Name! }))
         {
             Assert.IsNull(expr.Evaluation.Fault);
@@ -113,7 +113,7 @@ public class ObservableMemberInitExpression
     public void NewFaultPropagation()
     {
         var emily = TestPerson.CreateEmily();
-        var observer = Observer.Create();
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe(() => new ThrowyTestPerson(emily.Name!) { Name = "Emily" }))
         {
             Assert.IsNull(expr.Evaluation.Fault);
@@ -132,7 +132,7 @@ public class ObservableMemberInitExpression
     [TestMethod]
     [ExpectedException(typeof(NotSupportedException))]
     public void StructFields() =>
-        Observer.Create().Observe(() => new StructyTestPerson { Name = TestPerson.CreateEmily().Name! });
+        ExpressionObserverHelpers.Create().Observe(() => new StructyTestPerson { Name = TestPerson.CreateEmily().Name! });
 
     [TestMethod]
     public async Task ValueAsyncDisposalAsync()
@@ -141,7 +141,7 @@ public class ObservableMemberInitExpression
         var disposedTcs = new TaskCompletionSource<object?>();
         var options = new ExpressionObserverOptions();
         options.AddExpressionValueDisposal(() => new AsyncDisposableTestPerson());
-        var observer = Observer.Create(options);
+        var observer = ExpressionObserverHelpers.Create(options);
         using (var expr = observer.Observe(() => new AsyncDisposableTestPerson { Name = "Emily" }))
         {
             Assert.IsNull(expr.Evaluation.Fault);
@@ -160,7 +160,7 @@ public class ObservableMemberInitExpression
         SyncDisposableTestPerson? emily;
         var options = new ExpressionObserverOptions();
         options.AddExpressionValueDisposal(() => new SyncDisposableTestPerson());
-        var observer = Observer.Create(options);
+        var observer = ExpressionObserverHelpers.Create(options);
         using (var expr = observer.Observe(() => new SyncDisposableTestPerson { Name = "Emily" }))
         {
             Assert.IsNull(expr.Evaluation.Fault);

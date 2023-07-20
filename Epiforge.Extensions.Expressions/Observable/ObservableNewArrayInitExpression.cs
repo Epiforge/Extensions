@@ -16,7 +16,7 @@ sealed class ObservableNewArrayInitExpression :
     {
         if (disposing)
         {
-            var removedFromCache = observer.Disposed(this);
+            var removedFromCache = observer.ExpressionDisposed(this);
             if (removedFromCache)
             {
                 if (initializers is not null)

@@ -118,6 +118,7 @@ public interface IExpressionObserver
     /// <typeparam name="TResult">The type that <paramref name="lambdaExpression"/> returns</typeparam>
     /// <param name="lambdaExpression">The lambda expression</param>
     /// <param name="arguments">The arguments</param>
+    [return: DisposeWhenDiscarded]
     IObservableExpression<TResult> Observe<TResult>(LambdaExpression lambdaExpression, params object?[] arguments);
 
     /// <summary>
@@ -125,6 +126,7 @@ public interface IExpressionObserver
     /// </summary>
     /// <typeparam name="TResult">The type that <paramref name="expression"/> returns</typeparam>
     /// <param name="expression">The strongly-typed lambda expression</param>
+    [return: DisposeWhenDiscarded]
     IObservableExpression<TResult> Observe<TResult>(Expression<Func<TResult>> expression);
 
     /// <summary>
@@ -134,6 +136,7 @@ public interface IExpressionObserver
     /// <typeparam name="TResult">The type that <paramref name="expression"/> returns</typeparam>
     /// <param name="argument1">The argument</param>
     /// <param name="expression">The strongly-typed lambda expression</param>
+    [return: DisposeWhenDiscarded]
     IObservableExpression<TArgument1, TResult> Observe<TArgument1, TResult>(Expression<Func<TArgument1, TResult>> expression, TArgument1 argument1);
 
     /// <summary>
@@ -145,6 +148,7 @@ public interface IExpressionObserver
     /// <param name="argument1">The first argument</param>
     /// <param name="argument2">The second argument</param>
     /// <param name="expression">The strongly-typed lambda expression</param>
+    [return: DisposeWhenDiscarded]
     IObservableExpression<TArgument1, TArgument2, TResult> Observe<TArgument1, TArgument2, TResult>(Expression<Func<TArgument1, TArgument2, TResult>> expression, TArgument1 argument1, TArgument2 argument2);
 
     /// <summary>
@@ -158,5 +162,6 @@ public interface IExpressionObserver
     /// <param name="argument2">The second argument</param>
     /// <param name="argument3">The third argument</param>
     /// <param name="expression">The strongly-typed lambda expression</param>
+    [return: DisposeWhenDiscarded]
     IObservableExpression<TArgument1, TArgument2, TArgument3, TResult> Observe<TArgument1, TArgument2, TArgument3, TResult>(Expression<Func<TArgument1, TArgument2, TArgument3, TResult>> expression, TArgument1 argument1, TArgument2 argument2, TArgument3 argument3);
 }

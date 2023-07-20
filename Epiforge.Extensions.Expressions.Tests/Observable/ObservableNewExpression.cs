@@ -7,7 +7,7 @@ public class ObservableNewExpression
     public void ArgumentFaultPropagation()
     {
         var john = TestPerson.CreateJohn();
-        var observer = Observer.Create();
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe(() => new TestPerson(john.Name!.Length.ToString())))
         {
             Assert.IsNull(expr.Evaluation.Fault);
@@ -22,7 +22,7 @@ public class ObservableNewExpression
     [TestMethod]
     public void EvaluationFault()
     {
-        var observer = Observer.Create();
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe(() => new EquatableList<string>(null!)))
             Assert.IsNotNull(expr.Evaluation.Fault);
         Assert.AreEqual(0, observer.CachedObservableExpressions);
@@ -36,7 +36,7 @@ public class ObservableNewExpression
         var disposedTcs = new TaskCompletionSource<object?>();
         var options = new ExpressionObserverOptions();
         options.AddConstructedTypeDisposal(typeof(AsyncDisposableTestPerson));
-        var observer = Observer.Create(options);
+        var observer = ExpressionObserverHelpers.Create(options);
         using (var expr = observer.Observe(() => new AsyncDisposableTestPerson(john.Name!.Length.ToString())))
         {
             Assert.IsNull(expr.Evaluation.Fault);
@@ -64,7 +64,7 @@ public class ObservableNewExpression
         SyncDisposableTestPerson? first, second;
         var options = new ExpressionObserverOptions();
         options.AddConstructedTypeDisposal(typeof(SyncDisposableTestPerson));
-        var observer = Observer.Create(options);
+        var observer = ExpressionObserverHelpers.Create(options);
         using (var expr = observer.Observe(() => new SyncDisposableTestPerson(john.Name!.Length.ToString())))
         {
             Assert.IsNull(expr.Evaluation.Fault);
