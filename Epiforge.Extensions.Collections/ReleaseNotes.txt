@@ -1,0 +1,1 @@
+We added the ReversedComparer type. This type is a comparer that reverses the result of another comparer. This is useful when you want to sort a list in the opposite order of the default sort order.
