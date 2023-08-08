@@ -41,5 +41,5 @@ public class ReversedComparer<T> :
     /// Greater than zero – <paramref name="x"/> is less than <paramref name="y"/>.
     /// </returns>
     public int Compare(T? x, T? y) =>
-        comparer.Compare(y, x);
+        comparer.Compare(y!, x!);
 }
