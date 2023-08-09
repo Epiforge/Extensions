@@ -1,0 +1,60 @@
+namespace Epiforge.Extensions.Expressions.Tests.Observable.Query;
+
+[TestClass]
+public class DictionaryMax
+{
+    [TestMethod]
+    public void ExpressionlessSourceManipulation()
+    {
+        var source = new ObservableDictionary<int, int>();
+        var collectionObserver = CollectionObserverHelpers.Create();
+        using (var sourceQuery = collectionObserver.ObserveReadOnlyDictionary(source))
+        {
+            using (var maxQuery = sourceQuery.ObserveMax())
+            {
+                Assert.IsNotNull(maxQuery.Evaluation.Fault);
+                Assert.AreEqual(0, maxQuery.Evaluation.Result);
+                source.Add(1, 1);
+                Assert.IsNull(maxQuery.Evaluation.Fault);
+                Assert.AreEqual(1, maxQuery.Evaluation.Result);
+                source.AddRange(Enumerable.Range(2, 3).Select(i => new KeyValuePair<int, int>(i, i)));
+                Assert.AreEqual(4, maxQuery.Evaluation.Result);
+                source.RemoveRange(new int[] { 1, 2 });
+                Assert.AreEqual(4, maxQuery.Evaluation.Result);
+                source.Remove(4);
+                Assert.AreEqual(3, maxQuery.Evaluation.Result);
+                source.Reset(Enumerable.Range(2, 3).ToDictionary(i => i));
+                Assert.AreEqual(4, maxQuery.Evaluation.Result);
+            }
+            Assert.AreEqual(0, sourceQuery.CachedObservableQueries);
+            Assert.AreEqual(1, collectionObserver.CachedObservableQueries);
+        }
+        Assert.AreEqual(0, collectionObserver.CachedObservableQueries);
+        Assert.AreEqual(0, collectionObserver.ExpressionObserver.CachedObservableExpressions);
+    }
+
+    [TestMethod]
+    public void SourceManipulation()
+    {
+        var source = new ObservableDictionary<string, TestPerson>(TestPerson.CreatePeopleCollection().ToDictionary(p => p.Name!));
+        var collectionObserver = CollectionObserverHelpers.Create();
+        using (var sourceQuery = collectionObserver.ObserveReadOnlyDictionary(source))
+        {
+            using (var maxQuery = sourceQuery.ObserveMax((key, value) => value.Name!.Length))
+            {
+                Assert.IsNull(maxQuery.Evaluation.Fault);
+                Assert.AreEqual(7, maxQuery.Evaluation.Result);
+                source.Add("John2", source["John"]);
+                Assert.AreEqual(7, maxQuery.Evaluation.Result);
+                source["John"].Name = "Johnathon";
+                Assert.AreEqual(9, maxQuery.Evaluation.Result);
+                source["John"].Name = "John";
+                Assert.AreEqual(7, maxQuery.Evaluation.Result);
+            }
+            Assert.AreEqual(0, sourceQuery.CachedObservableQueries);
+            Assert.AreEqual(1, collectionObserver.CachedObservableQueries);
+        }
+        Assert.AreEqual(0, collectionObserver.CachedObservableQueries);
+        Assert.AreEqual(0, collectionObserver.ExpressionObserver.CachedObservableExpressions);
+    }
+}

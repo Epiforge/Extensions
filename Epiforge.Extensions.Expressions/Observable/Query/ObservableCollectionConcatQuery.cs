@@ -84,15 +84,9 @@ sealed class ObservableCollectionConcatQuery<TElement> :
 
     void SetOperationFault()
     {
-        var faults = new List<Exception>();
-        if (first.OperationFault is AggregateException firstAggregateEx)
-            faults.AddRange(firstAggregateEx.InnerExceptions);
-        else if (first.OperationFault is { } firstEx)
-            faults.Add(firstEx);
-        if (Second.OperationFault is AggregateException secondAggregateEx)
-            faults.AddRange(secondAggregateEx.InnerExceptions);
-        else if (Second.OperationFault is { } secondEx)
-            faults.Add(secondEx);
-        OperationFault = faults.Count == 0 ? null : new AggregateException(faults);
+        var faultList = new FaultList();
+        faultList.Check(first);
+        faultList.Check(Second);
+        OperationFault = faultList.Fault;
     }
 }

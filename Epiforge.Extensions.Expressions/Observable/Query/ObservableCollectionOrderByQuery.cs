@@ -1,5 +1,3 @@
-using System;
-
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
 sealed class ObservableCollectionOrderByQuery<TElement> :
@@ -186,16 +184,10 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
     {
         lock (access)
         {
-            var exceptions = new List<Exception>();
+            var faultList = new FaultList();
             foreach (var (selection, _) in selectionsAndDirections!)
-                if (selection.OperationFault is { } ex)
-                {
-                    if (ex is AggregateException aggregateEx)
-                        exceptions.AddRange(aggregateEx.InnerExceptions);
-                    else
-                        exceptions.Add(ex);
-                }
-            OperationFault = exceptions.Count == 1 ? exceptions[0] : exceptions.Count > 0 ? new AggregateException(exceptions) : null;
+                faultList.Check(selection);
+            OperationFault = faultList.Fault;
         }
     }
 

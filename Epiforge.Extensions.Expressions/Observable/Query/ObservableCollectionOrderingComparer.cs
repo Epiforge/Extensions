@@ -1,8 +1,6 @@
-using Epiforge.Extensions.Collections;
-
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-class ObservableCollectionOrderingComparer<TElement> :
+sealed class ObservableCollectionOrderingComparer<TElement> :
     SyncDisposable,
     IComparer<TElement>
 {

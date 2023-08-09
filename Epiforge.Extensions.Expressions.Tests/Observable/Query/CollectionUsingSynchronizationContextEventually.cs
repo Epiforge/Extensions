@@ -54,6 +54,7 @@ public class CollectionUsingSynchronizationContextEventually
                 Assert.AreEqual("4,5,1,2,3", string.Join(",", usingSynchronizationContextEventuallyQuery));
                 Assert.AreEqual(5, usingSynchronizationContextEventuallyQuery.Count);
                 Assert.AreEqual(1, usingSynchronizationContextEventuallyQuery[2]);
+                usingSynchronizationContextEventuallyQuery.CollectionChanged -= collectionChanged;
             }
             Assert.AreEqual(0, sourceQuery.CachedObservableQueries);
             Assert.AreEqual(1, collectionObserver.CachedObservableQueries);

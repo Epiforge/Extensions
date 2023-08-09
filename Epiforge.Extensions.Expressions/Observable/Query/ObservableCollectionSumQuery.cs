@@ -4,7 +4,13 @@ sealed class ObservableCollectionSumQuery<TElement, TResult> :
     ObservableCollectionScalarQuery<TElement, TResult>
 {
     public ObservableCollectionSumQuery(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> observableCollectionQuery, Expression<Func<TElement, TResult>> selector) :
-        base(collectionObserver, observableCollectionQuery) => Selector = selector;
+        base(collectionObserver, observableCollectionQuery)
+    {
+        access = new();
+        Selector = selector;
+    }
+
+    readonly object access;
 
     Func<TResult, TResult, TResult>? add;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
@@ -32,8 +38,11 @@ sealed class ObservableCollectionSumQuery<TElement, TResult> :
         return true;
     }
 
-    void Evaluate() =>
-        Evaluation = select!.OperationFault is { } selectFault ? (selectFault, default)! : (null, select.Aggregate(default(TResult)!, add!));
+    void Evaluate()
+    {
+        lock (access)
+            Evaluation = select!.OperationFault is { } selectFault ? (selectFault, default)! : (null, select.Aggregate(default(TResult)!, add!));
+    }
 
     protected override void OnInitialization()
     {

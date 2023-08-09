@@ -1,5 +1,3 @@
-using System.Data;
-
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
 sealed class ObservableCollectionComparisonQuery<TResult> :
@@ -8,11 +6,13 @@ sealed class ObservableCollectionComparisonQuery<TResult> :
     public ObservableCollectionComparisonQuery(CollectionObserver collectionObserver, ObservableCollectionQuery<TResult> observableCollectionQuery, int soughtComparison) :
         base(collectionObserver)
     {
+        access = new();
         this.observableCollectionQuery = observableCollectionQuery;
         SoughtComparison = soughtComparison;
         comparer = Comparer<TResult>.Default;
     }
 
+    readonly object access;
     readonly IComparer<TResult> comparer;
     readonly ObservableCollectionQuery<TResult> observableCollectionQuery;
 
@@ -35,40 +35,43 @@ sealed class ObservableCollectionComparisonQuery<TResult> :
 
     void Evaluate()
     {
-        if (observableCollectionQuery.OperationFault is { } fault)
-            Evaluation = (fault, default!);
-        else if (observableCollectionQuery.HasIndexerPenalty)
+        lock (access)
         {
-            using var enumerator = observableCollectionQuery.GetEnumerator();
-            if (enumerator.MoveNext())
+            if (observableCollectionQuery.OperationFault is { } fault)
+                Evaluation = (fault, default!);
+            else if (observableCollectionQuery.HasIndexerPenalty)
             {
-                var value = enumerator.Current;
-                while (enumerator.MoveNext())
+                using var enumerator = observableCollectionQuery.GetEnumerator();
+                if (enumerator.MoveNext())
                 {
-                    var enumeratorValue = enumerator.Current;
-                    if (comparer.Compare(enumeratorValue, value) == SoughtComparison)
-                        value = enumeratorValue;
+                    var value = enumerator.Current;
+                    while (enumerator.MoveNext())
+                    {
+                        var enumeratorValue = enumerator.Current;
+                        if (comparer.Compare(enumeratorValue, value) == SoughtComparison)
+                            value = enumeratorValue;
+                    }
+                    Evaluation = (null, value);
                 }
-                Evaluation = (null, value);
+                else
+                    Evaluation = (ExceptionHelper.SequenceContainsNoElements, default!);
             }
             else
-                Evaluation = (ExceptionHelper.SequenceContainsNoElements, default!);
-        }
-        else
-        {
-            if (observableCollectionQuery.Count > 0)
             {
-                var value = observableCollectionQuery[0];
-                for (var i = 1; i < observableCollectionQuery.Count; i++)
+                if (observableCollectionQuery.Count > 0)
                 {
-                    var indexerValue = observableCollectionQuery[i];
-                    if (comparer.Compare(indexerValue, value) == SoughtComparison)
-                        value = indexerValue;
+                    var value = observableCollectionQuery[0];
+                    for (var i = 1; i < observableCollectionQuery.Count; i++)
+                    {
+                        var indexerValue = observableCollectionQuery[i];
+                        if (comparer.Compare(indexerValue, value) == SoughtComparison)
+                            value = indexerValue;
+                    }
+                    Evaluation = (null, value);
                 }
-                Evaluation = (null, value);
+                else
+                    Evaluation = (ExceptionHelper.SequenceContainsNoElements, default!);
             }
-            else
-                Evaluation = (ExceptionHelper.SequenceContainsNoElements, default!);
         }
     }
 

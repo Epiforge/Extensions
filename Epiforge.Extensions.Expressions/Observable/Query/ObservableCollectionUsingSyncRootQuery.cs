@@ -1,6 +1,6 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-class ObservableCollectionUsingSyncRootQuery<TElement> :
+sealed class ObservableCollectionUsingSyncRootQuery<TElement> :
     ObservableCollectionQuery<TElement>
 {
     public ObservableCollectionUsingSyncRootQuery(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> source, object syncRoot) :
@@ -18,6 +18,12 @@ class ObservableCollectionUsingSyncRootQuery<TElement> :
 
     public override int Count =>
         elements!.Count;
+
+    public override Exception? OperationFault
+    {
+        get => source.OperationFault;
+        protected set => throw new NotImplementedException();
+    }
 
     public override object SyncRoot { get; }
 

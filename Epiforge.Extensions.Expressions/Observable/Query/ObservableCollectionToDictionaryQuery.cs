@@ -209,19 +209,13 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue> :
 
     void SetOperationFault()
     {
-        var exceptions = new List<Exception>();
+        var faultList = new FaultList();
         if (nullKeys > 0)
-            exceptions.Add(ExceptionHelper.KeyNull);
+            faultList.AddRange(Enumerable.Range(0, nullKeys).Select(_ => ExceptionHelper.KeyNull));
         if (duplicateKeys.Count > 0)
-            exceptions.AddRange(Enumerable.Range(0, duplicateKeys.Count).Select(_ => ExceptionHelper.SameKeyAlreadyAdded));
-        if (select!.OperationFault is { } fault)
-        {
-            if (fault is AggregateException aggregateException)
-                exceptions.AddRange(aggregateException.InnerExceptions);
-            else
-                exceptions.Add(fault);
-        }
-        OperationFault = exceptions.Count == 0 ? null : exceptions.Count == 1 ? exceptions[0] : new AggregateException(exceptions);
+            faultList.AddRange(Enumerable.Range(0, duplicateKeys.Keys.Sum(key => duplicateKeys[key] - 1)).Select(_ => ExceptionHelper.SameKeyAlreadyAdded));
+        faultList.Check(select!);
+        OperationFault = faultList.Fault;
     }
 
     public override bool TryGetValue(TKey key, out TValue value)

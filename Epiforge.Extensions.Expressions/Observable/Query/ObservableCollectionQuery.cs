@@ -218,7 +218,7 @@ abstract class ObservableCollectionQuery<TElement> :
     public virtual bool IsSynchronized =>
         false;
 
-    public Exception? OperationFault
+    public virtual Exception? OperationFault
     {
         get => operationFault;
         protected set => SetBackedProperty(ref operationFault, in value, operationFaultPropertyChangingEventArgs, operationFaultPropertyChangedEventArgs);
@@ -250,6 +250,7 @@ abstract class ObservableCollectionQuery<TElement> :
     protected void OnCollectionChanged(NotifyCollectionChangedEventArgs e) =>
         CollectionChanged?.Invoke(this, e);
 
+    [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TResult> ObserveAggregate<TAccumulate, TResult>(Func<TAccumulate> seedFactory, Func<TAccumulate, TElement, TAccumulate> func, Func<TAccumulate, TResult> resultSelector)
     {
 #if IS_NET_6_0_OR_GREATER
@@ -281,6 +282,7 @@ abstract class ObservableCollectionQuery<TElement> :
         return aggregateQuery;
     }
 
+    [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<bool> ObserveAll(Expression<Func<TElement, bool>> predicate)
     {
 #if IS_NET_6_0_OR_GREATER
@@ -306,6 +308,7 @@ abstract class ObservableCollectionQuery<TElement> :
         return allQuery;
     }
 
+    [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<bool> ObserveAny()
     {
         ObservableCollectionAnyQuery<TElement> anyQuery;
@@ -322,6 +325,7 @@ abstract class ObservableCollectionQuery<TElement> :
         return anyQuery;
     }
 
+    [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<bool> ObserveAny(Expression<Func<TElement, bool>> predicate)
     {
 #if IS_NET_6_0_OR_GREATER
@@ -347,9 +351,11 @@ abstract class ObservableCollectionQuery<TElement> :
         return anyQuery;
     }
 
+    [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TElement> ObserveAverage() =>
         ObserveAverage(element => element);
 
+    [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TResult> ObserveAverage<TResult>(Expression<Func<TElement, TResult>> selector)
     {
 #if IS_NET_6_0_OR_GREATER
@@ -375,9 +381,11 @@ abstract class ObservableCollectionQuery<TElement> :
         return (ObservableCollectionAverageQuery<TElement, TResult>)averageQuery;
     }
 
+    [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<TResult> ObserveCast<TResult>() =>
         ObserveSelect(element => (TResult)(object)element!);
 
+    [return: DisposeWhenDiscarded]
     internal IObservableScalarQuery<TElement> ObserveComparison(int soughtComparison)
     {
         ObservableCollectionComparisonQuery<TElement> comparisonQuery;
@@ -394,6 +402,7 @@ abstract class ObservableCollectionQuery<TElement> :
         return comparisonQuery;
     }
 
+    [return: DisposeWhenDiscarded]
     IObservableScalarQuery<TResult> ObserveComparison<TResult>(Expression<Func<TElement, TResult>> selector, int soughtComparison)
     {
 #if IS_NET_6_0_OR_GREATER
@@ -408,6 +417,7 @@ abstract class ObservableCollectionQuery<TElement> :
         return comparison;
     }
 
+    [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<TElement> ObserveConcat(IObservableCollectionQuery<TElement> second)
     {
 #if IS_NET_6_0_OR_GREATER
@@ -430,9 +440,11 @@ abstract class ObservableCollectionQuery<TElement> :
         return concatQuery;
     }
 
+    [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<TElement> ObserveDistinct() =>
         ObserveDistinct(EqualityComparer<TElement>.Default);
 
+    [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<TElement> ObserveDistinct(IEqualityComparer<TElement> comparer)
     {
 #if IS_NET_6_0_OR_GREATER
@@ -447,15 +459,19 @@ abstract class ObservableCollectionQuery<TElement> :
         return select;
     }
 
+    [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TElement> ObserveElementAt(int index) =>
         ObserveIndex(new Index(Math.Abs(index), index < 0), false);
 
+    [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TElement> ObserveElementAtOrDefault(int index) =>
         ObserveIndex(new Index(Math.Abs(index), index < 0), true);
 
+    [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TElement> ObserveFirst() =>
         ObserveIndex(0, false);
 
+    [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TElement> ObserveFirst(Expression<Func<TElement, bool>> predicate)
     {
 #if IS_NET_6_0_OR_GREATER
@@ -470,9 +486,11 @@ abstract class ObservableCollectionQuery<TElement> :
         return first;
     }
 
+    [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TElement> ObserveFirstOrDefault() =>
         ObserveIndex(0, true);
 
+    [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TElement> ObserveFirstOrDefault(Expression<Func<TElement, bool>> predicate)
     {
 #if IS_NET_6_0_OR_GREATER
@@ -503,8 +521,9 @@ abstract class ObservableCollectionQuery<TElement> :
         }
         indexQuery.Initialize();
         return indexQuery;
-    }   
+    }
 
+    [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<TElement> ObserveIndividualChanges()
     {
         lock (cachedIndividualChangeQueryAccess)
@@ -516,9 +535,11 @@ abstract class ObservableCollectionQuery<TElement> :
         return cachedIndividualChangeQuery;
     }
 
+    [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<IObservableGrouping<TKey, TElement>> ObserveGroupBy<TKey>(Expression<Func<TElement, TKey>> keySelector) =>
         ObserveGroupBy(keySelector, EqualityComparer<TKey>.Default);
 
+    [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<IObservableGrouping<TKey, TElement>> ObserveGroupBy<TKey>(Expression<Func<TElement, TKey>> keySelector, IEqualityComparer<TKey> keyEqualityComparer)
     {
 #if IS_NET_6_0_OR_GREATER
@@ -548,9 +569,11 @@ abstract class ObservableCollectionQuery<TElement> :
         return (ObservableCollectionGroupByQuery<TKey, TElement>)groupByQuery;
     }
 
+    [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TElement> ObserveLast() =>
         ObserveIndex(^1, false);
 
+    [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TElement> ObserveLast(Expression<Func<TElement, bool>> predicate)
     {
 #if IS_NET_6_0_OR_GREATER
@@ -565,9 +588,11 @@ abstract class ObservableCollectionQuery<TElement> :
         return last;
     }
 
+    [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TElement> ObserveLastOrDefault() =>
         ObserveIndex(^1, true);
 
+    [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TElement> ObserveLastOrDefault(Expression<Func<TElement, bool>> predicate)
     {
 #if IS_NET_6_0_OR_GREATER
@@ -582,18 +607,23 @@ abstract class ObservableCollectionQuery<TElement> :
         return lastOrDefault;
     }
 
+    [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TElement> ObserveMax() =>
         ObserveComparison(1);
 
+    [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TResult> ObserveMax<TResult>(Expression<Func<TElement, TResult>> selector) =>
         ObserveComparison(selector, 1);
 
+    [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TElement> ObserveMin() =>
         ObserveComparison(-1);
 
+    [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TResult> ObserveMin<TResult>(Expression<Func<TElement, TResult>> selector) =>
         ObserveComparison(selector, -1);
 
+    [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<TResult> ObserveOfType<TResult>()
     {
         var where = ObserveWhere(element => element is TResult);
@@ -602,12 +632,15 @@ abstract class ObservableCollectionQuery<TElement> :
         return cast;
     }
 
+    [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<TElement> ObserveOrderBy(Expression<Func<TElement, IComparable>> selector) =>
         ObserveOrderBy(selector, false);
 
+    [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<TElement> ObserveOrderBy(Expression<Func<TElement, IComparable>> selector, bool isDescending) =>
         ObserveOrderBy((selector, isDescending));
 
+    [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<TElement> ObserveOrderBy(params (Expression<Func<TElement, IComparable>> selector, bool isDescending)[] selectorsAndDirections)
     {
 #if IS_NET_6_0_OR_GREATER
@@ -633,6 +666,7 @@ abstract class ObservableCollectionQuery<TElement> :
         return orderByQuery;
     }
 
+    [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<TResult> ObserveSelect<TResult>(Expression<Func<TElement, TResult>> selector)
     {
 #if IS_NET_6_0_OR_GREATER
@@ -658,6 +692,7 @@ abstract class ObservableCollectionQuery<TElement> :
         return (ObservableCollectionSelectQuery<TElement, TResult>)selectQuery;
     }
 
+    [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<TResult> ObserveSelectMany<TResult>(Expression<Func<TElement, IEnumerable<TResult>>> selector)
     {
 #if IS_NET_6_0_OR_GREATER
@@ -683,9 +718,11 @@ abstract class ObservableCollectionQuery<TElement> :
         return (ObservableCollectionSelectManyQuery<TElement, TResult>)selectManyQuery;
     }
 
+    [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TElement> ObserveSingle() =>
         ObserveIndex(null, false);
 
+    [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TElement> ObserveSingle(Expression<Func<TElement, bool>> predicate)
     {
 #if IS_NET_6_0_OR_GREATER
@@ -700,9 +737,11 @@ abstract class ObservableCollectionQuery<TElement> :
         return single;
     }
 
+    [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TElement> ObserveSingleOrDefault() =>
         ObserveIndex(null, true);
 
+    [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TElement> ObserveSingleOrDefault(Expression<Func<TElement, bool>> predicate)
     {
 #if IS_NET_6_0_OR_GREATER
@@ -717,9 +756,11 @@ abstract class ObservableCollectionQuery<TElement> :
         return singleOrDefault;
     }
 
+    [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TElement> ObserveSum() =>
         ObserveSum(element => element);
 
+    [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TResult> ObserveSum<TResult>(Expression<Func<TElement, TResult>> selector)
     {
 #if IS_NET_6_0_OR_GREATER
@@ -745,18 +786,22 @@ abstract class ObservableCollectionQuery<TElement> :
         return (ObservableCollectionSumQuery<TElement, TResult>)sumQuery;
     }
 
+    [return: DisposeWhenDiscarded]
     public IObservableDictionaryQuery<TKey, TElement> ObserveToDictionary<TKey>(Expression<Func<TElement, TKey>> keySelector)
         where TKey : notnull =>
         ObserveToDictionary(keySelector, EqualityComparer<TKey>.Default);
 
+    [return: DisposeWhenDiscarded]
     public IObservableDictionaryQuery<TKey, TElement> ObserveToDictionary<TKey>(Expression<Func<TElement, TKey>> keySelector, IEqualityComparer<TKey> equalityComparer)
         where TKey : notnull =>
         ObserveToDictionary(keySelector, element => element, equalityComparer);
 
+    [return: DisposeWhenDiscarded]
     public IObservableDictionaryQuery<TKey, TValue> ObserveToDictionary<TKey, TValue>(Expression<Func<TElement, TKey>> keySelector, Expression<Func<TElement, TValue>> valueSelector)
         where TKey : notnull =>
         ObserveToDictionary(keySelector, valueSelector, EqualityComparer<TKey>.Default);
 
+    [return: DisposeWhenDiscarded]
     public IObservableDictionaryQuery<TKey, TValue> ObserveToDictionary<TKey, TValue>(Expression<Func<TElement, TKey>> keySelector, Expression<Func<TElement, TValue>> valueSelector, IEqualityComparer<TKey> equalityComparer)
         where TKey : notnull
     {
@@ -789,6 +834,7 @@ abstract class ObservableCollectionQuery<TElement> :
         return (ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>)toDictionaryQuery;
     }
 
+    [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<TElement> ObserveUsingSynchronizationCallback(object context, CollectionSynchronizationCallback synchronizationCallback)
     {
 #if IS_NET_6_0_OR_GREATER
@@ -815,6 +861,7 @@ abstract class ObservableCollectionQuery<TElement> :
         return usingSynchronizationCallbackQuery;
     }
 
+    [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<TElement> ObserveUsingSynchronizationCallbackEventually(object context, CollectionSynchronizationCallback synchronizationCallback)
     {
 #if IS_NET_6_0_OR_GREATER
@@ -841,6 +888,7 @@ abstract class ObservableCollectionQuery<TElement> :
         return usingSynchronizationCallbackEventuallyQuery;
     }
 
+    [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<TElement> ObserveUsingSynchronizationContext(SynchronizationContext synchronizationContext)
     {
 #if IS_NET_6_0_OR_GREATER
@@ -863,6 +911,7 @@ abstract class ObservableCollectionQuery<TElement> :
         return usingSynchronizationContextQuery;
     }
 
+    [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<TElement> ObserveUsingSynchronizationContextEventually(SynchronizationContext synchronizationContext)
     {
 #if IS_NET_6_0_OR_GREATER
@@ -885,6 +934,7 @@ abstract class ObservableCollectionQuery<TElement> :
         return usingSynchronizationContextEventuallyQuery;
     }
 
+    [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<TElement> ObserveUsingSyncRoot(object lockObject)
     {
 #if IS_NET_6_0_OR_GREATER
@@ -907,6 +957,7 @@ abstract class ObservableCollectionQuery<TElement> :
         return usingSyncRootQuery;
     }
 
+    [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<TElement> ObserveUsingSyncRootEventually(object lockObject)
     {
 #if IS_NET_6_0_OR_GREATER
@@ -929,6 +980,7 @@ abstract class ObservableCollectionQuery<TElement> :
         return usingSyncRootEventuallyQuery;
     }
 
+    [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<TElement> ObserveWhere(Expression<Func<TElement, bool>> predicate)
     {
 #if IS_NET_6_0_OR_GREATER

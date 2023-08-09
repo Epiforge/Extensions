@@ -35,6 +35,8 @@ public class CollectionObserver :
     readonly object cachedGenericListObservableCollectionsAccess = new();
     readonly Dictionary<IEnumerable, ObservableQuery> cachedListObservableCollections = new();
     readonly object cachedListObservableCollectionsAccess = new();
+    readonly Dictionary<IEnumerable, ObservableQuery> cachedReadOnlyDictionaryObservableDictionaries = new();
+    readonly object cachedReadOnlyDictionaryObservableDictionariesAccess = new();
     readonly Dictionary<IEnumerable, ObservableQuery> cachedReadOnlyListObservableCollections = new();
     readonly object cachedReadOnlyListObservableCollectionsAccess = new();
 
@@ -52,6 +54,8 @@ public class CollectionObserver :
                 count += cachedGenericListObservableCollections.Values.Sum(query => 1 + query.CachedObservableQueries);
             lock (cachedListObservableCollectionsAccess)
                 count += cachedListObservableCollections.Values.Sum(query => 1 + query.CachedObservableQueries);
+            lock (cachedReadOnlyDictionaryObservableDictionariesAccess)
+                count += cachedReadOnlyDictionaryObservableDictionaries.Values.Sum(query => 1 + query.CachedObservableQueries);
             lock (cachedReadOnlyListObservableCollectionsAccess)
                 count += cachedReadOnlyListObservableCollections.Values.Sum(query => 1 + query.CachedObservableQueries);
             return count;
@@ -187,7 +191,30 @@ public class CollectionObserver :
     }
 
     /// <inheritdoc/>
-    public IObservableDictionaryQuery<TKey, TValue> Observe<TKey, TValue>(IReadOnlyDictionary<TKey, TValue> dictionary) => throw new NotImplementedException();
+    public IObservableDictionaryQuery<TKey, TValue> ObserveReadOnlyDictionary<TKey, TValue>(IReadOnlyDictionary<TKey, TValue> dictionary)
+        where TKey : notnull
+    {
+#if IS_NET_6_0_OR_GREATER
+        ArgumentNullException.ThrowIfNull(dictionary);
+#else
+        if (dictionary is null)
+            throw new ArgumentNullException(nameof(dictionary));
+#endif
+        ObservableDictionaryQueryReadOnlyDictionary<TKey, TValue> readOnlyDictionaryObservableDictionary;
+        lock (cachedReadOnlyDictionaryObservableDictionariesAccess)
+        {
+            if (!cachedReadOnlyDictionaryObservableDictionaries.TryGetValue(dictionary, out var cachedReadOnlyDictionaryObservableDictionary))
+            {
+                readOnlyDictionaryObservableDictionary = new ObservableDictionaryQueryReadOnlyDictionary<TKey, TValue>(this, dictionary);
+                cachedReadOnlyDictionaryObservableDictionaries.Add(dictionary, readOnlyDictionaryObservableDictionary);
+            }
+            else
+                readOnlyDictionaryObservableDictionary = (ObservableDictionaryQueryReadOnlyDictionary<TKey, TValue>)cachedReadOnlyDictionaryObservableDictionary;
+            ++readOnlyDictionaryObservableDictionary.Observations;
+        }
+        readOnlyDictionaryObservableDictionary.Initialize();
+        return readOnlyDictionaryObservableDictionary;
+    }
 
     internal bool QueryDisposed(ObservableCollectionQueryEnumerable enumerableObservableCollection)
     {
@@ -248,6 +275,20 @@ public class CollectionObserver :
             if (--readOnlyListObservableCollection.Observations == 0)
             {
                 cachedReadOnlyListObservableCollections.Remove(readOnlyListObservableCollection.ReadOnlyList);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    internal bool QueryDisposed<TKey, TValue>(ObservableDictionaryQueryReadOnlyDictionary<TKey, TValue> readOnlyDictionaryObservableDictionary)
+        where TKey : notnull
+    {
+        lock (cachedReadOnlyDictionaryObservableDictionariesAccess)
+        {
+            if (--readOnlyDictionaryObservableDictionary.Observations == 0)
+            {
+                cachedReadOnlyDictionaryObservableDictionaries.Remove(readOnlyDictionaryObservableDictionary.ReadOnlyDictionary);
                 return true;
             }
         }

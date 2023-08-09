@@ -5,6 +5,9 @@ static class ExceptionHelper
     public static ArgumentOutOfRangeException IndexArgumentWasOutOfRange =>
         new("index", "Index was out of range. Must be non-negative and less than the size of the collection.");
 
+    public static KeyNotFoundException KeyNotFound =>
+        new("The given key was not present in the dictionary.");
+
     public static ArgumentNullException KeyNull =>
         new("key");
 

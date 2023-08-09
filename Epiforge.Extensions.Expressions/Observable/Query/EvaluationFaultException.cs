@@ -4,7 +4,7 @@ namespace Epiforge.Extensions.Expressions.Observable.Query;
 /// Wraps an exception which occurred while evaluating an element
 /// </summary>
 [Serializable]
-public class EvaluationFaultException :
+public sealed class EvaluationFaultException :
     Exception
 {
     /// <summary>

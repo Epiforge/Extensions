@@ -1,6 +1,6 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-class ObservableCollectionUsingSynchronizationCallbackEventuallyQuery<TElement> :
+sealed class ObservableCollectionUsingSynchronizationCallbackEventuallyQuery<TElement> :
     ObservableCollectionQuery<TElement>
 {
     public ObservableCollectionUsingSynchronizationCallbackEventuallyQuery(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> source, object context, CollectionSynchronizationCallback synchronizationCallback) :
@@ -32,6 +32,12 @@ class ObservableCollectionUsingSynchronizationCallbackEventuallyQuery<TElement> 
 
     public override int Count =>
         elements!.Count;
+
+    public override Exception? OperationFault
+    {
+        get => source.OperationFault;
+        protected set => throw new NotImplementedException();
+    }
 
     protected override bool Dispose(bool disposing)
     {

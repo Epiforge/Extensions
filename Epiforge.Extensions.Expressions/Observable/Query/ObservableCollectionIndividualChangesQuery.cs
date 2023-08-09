@@ -1,6 +1,6 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-class ObservableCollectionIndividualChangesQuery<TElement> :
+sealed class ObservableCollectionIndividualChangesQuery<TElement> :
     ObservableCollectionQuery<TElement>
 {
     public ObservableCollectionIndividualChangesQuery(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> source) :

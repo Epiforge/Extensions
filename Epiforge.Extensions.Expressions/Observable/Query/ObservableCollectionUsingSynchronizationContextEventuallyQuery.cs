@@ -1,6 +1,6 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-class ObservableCollectionUsingSynchronizationContextEventuallyQuery<TElement> :
+sealed class ObservableCollectionUsingSynchronizationContextEventuallyQuery<TElement> :
     ObservableCollectionQuery<TElement>
 {
     public ObservableCollectionUsingSynchronizationContextEventuallyQuery(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> source, SynchronizationContext synchronizationContext) :
@@ -23,6 +23,12 @@ class ObservableCollectionUsingSynchronizationContextEventuallyQuery<TElement> :
 
     public override bool IsSynchronized =>
         true;
+
+    public override Exception? OperationFault
+    {
+        get => SynchronizationContext.Send(() => source.OperationFault);
+        protected set => throw new NotImplementedException();
+    }
 
     protected override bool Dispose(bool disposing)
     {

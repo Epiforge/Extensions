@@ -7,6 +7,7 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult> :
         base(collectionObserver)
     {
         access = new();
+        elementComparer = EqualityComparer<TElement>.Default;
         evaluationsChanging = new();
         observableExpressionCounts = new();
         observableExpressions = new();
@@ -16,6 +17,7 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult> :
     }
 
     readonly object access;
+    readonly IEqualityComparer<TElement> elementComparer;
     readonly Dictionary<IObservableExpression<TElement, TResult>, (Exception? fault, TResult result)> evaluationsChanging;
     readonly Dictionary<IObservableExpression<TElement, TResult>, int> observableExpressionCounts;
     readonly List<IObservableExpression<TElement, TResult>> observableExpressions;
@@ -80,18 +82,8 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult> :
                 var (oldFault, oldResult) = evaluationsChanging![observableExpression];
                 evaluationsChanging.Remove(observableExpression);
                 var (newFault, newResult) = observableExpression.Evaluation;
-                var addedFault = oldFault is null && newFault is not null;
-                var removedFault = oldFault is not null && newFault is null;
-                var replacedFault = oldFault is not null && newFault is not null && !ReferenceEquals(oldFault, newFault);
-                if (addedFault || removedFault || replacedFault)
-                {
-                    var elementFaults = OperationFault is AggregateException aggregateException ? aggregateException.InnerExceptions.OfType<EvaluationFaultException>().ToList() : new List<EvaluationFaultException>();
-                    if (removedFault || replacedFault)
-                        elementFaults.RemoveAll(elementFault => ReferenceEquals(elementFault.Element, observableExpression.Argument));
-                    if (addedFault || replacedFault)
-                        elementFaults.Add(new EvaluationFaultException(observableExpression.Argument, newFault!));
-                    OperationFault = elementFaults.Count == 0 ? null : new AggregateException(elementFaults);
-                }
+                if (FaultList.ExchangeElementFault(OperationFault, observableExpression.Argument, elementComparer, oldFault, newFault, out var newOperationFault))
+                    OperationFault = newOperationFault;
                 if (!resultComparer.Equals(oldResult, newResult))
                     for (int i = 0, ii = observableExpressions.Count; i < ii; ++i)
                         if (ReferenceEquals(observableExpressions[i], observableExpression))

@@ -54,5 +54,6 @@ public interface ICollectionObserver
     /// <typeparam name="TKey">The type of keys in the dictionary</typeparam>
     /// <typeparam name="TValue">The type of values in the dictionary</typeparam>
     /// <param name="dictionary">The read-only dictionary to observe</param>
-    IObservableDictionaryQuery<TKey, TValue> Observe<TKey, TValue>(IReadOnlyDictionary<TKey, TValue> dictionary);
+    IObservableDictionaryQuery<TKey, TValue> ObserveReadOnlyDictionary<TKey, TValue>(IReadOnlyDictionary<TKey, TValue> dictionary)
+        where TKey : notnull;
 }

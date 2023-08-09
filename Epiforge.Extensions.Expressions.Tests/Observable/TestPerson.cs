@@ -6,6 +6,9 @@ public class TestPerson :
     public static RangeObservableCollection<TestPerson> CreatePeopleCollection() =>
         new(MakePeople());
 
+    public static ObservableDictionary<int, TestPerson> CreatePeopleDictionary(SynchronizationContext? synchronizationContext = null) =>
+        new(MakePeople().Select((person, index) => (person, index)).ToDictionary(pi => pi.index, pi => pi.person));
+
     public static IEnumerable<TestPerson> MakePeople() => new TestPerson[]
     {
         new TestPerson("John"),

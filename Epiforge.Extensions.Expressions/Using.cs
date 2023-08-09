@@ -1,3 +1,5 @@
+global using Epiforge.Extensions.Collections;
+global using Epiforge.Extensions.Collections.Generic;
 global using Epiforge.Extensions.Collections.ObjectModel;
 global using Epiforge.Extensions.Collections.Specialized;
 global using Epiforge.Extensions.Components;

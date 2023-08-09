@@ -1,6 +1,6 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-class ObservableCollectionAllQuery<TElement> :
+sealed class ObservableCollectionAllQuery<TElement> :
     ObservableCollectionScalarQuery<TElement, bool>
 {
     public ObservableCollectionAllQuery(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> observableCollectionQuery, Expression<Func<TElement, bool>> predicate) :
