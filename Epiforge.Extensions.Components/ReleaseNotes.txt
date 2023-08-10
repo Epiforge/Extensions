@@ -1,1 +1,1 @@
-We made property change notifiers and disposal base classes log at the trace level instead of the debug level.
+We revised the format of the logging of property change notification classes to work better with structured logging.
