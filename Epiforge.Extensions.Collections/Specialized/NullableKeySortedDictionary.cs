@@ -19,6 +19,14 @@ public sealed class NullableKeySortedDictionary<TKey, TValue> :
         dict = new SortedDictionary<TKey, TValue>();
 
     /// <summary>
+    /// Initializes a new instance of the <see cref="NullableKeySortedDictionary{TKey, TValue}"/> class that is empty and uses the default <see cref="IComparer{T}"/> implementation for the key type
+    /// </summary>
+    /// <param name="logger">The logger with which to trace library logic</param>
+    public NullableKeySortedDictionary(ILogger logger) :
+        this() =>
+        this.logger = logger;
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="NullableKeySortedDictionary{TKey, TValue}"/> class that contains elements copied from the specified <see cref="IDictionary{TKey, TValue}"/> and uses the default <see cref="IComparer{T}"/> implementation for the key type
     /// </summary>
     /// <param name="dictionary">The <see cref="IDictionary{TKey, TValue}"/> whose elements are copied to the new <see cref="NullableKeySortedDictionary{TKey, TValue}"/></param>
@@ -35,11 +43,29 @@ public sealed class NullableKeySortedDictionary<TKey, TValue> :
     }
 
     /// <summary>
+    /// Initializes a new instance of the <see cref="NullableKeySortedDictionary{TKey, TValue}"/> class that contains elements copied from the specified <see cref="IDictionary{TKey, TValue}"/> and uses the default <see cref="IComparer{T}"/> implementation for the key type
+    /// </summary>
+    /// <param name="logger">The logger with which to trace library logic</param>
+    /// <param name="dictionary">The <see cref="IDictionary{TKey, TValue}"/> whose elements are copied to the new <see cref="NullableKeySortedDictionary{TKey, TValue}"/></param>
+    public NullableKeySortedDictionary(ILogger logger, IDictionary<TKey, TValue> dictionary) :
+        this(dictionary) =>
+        this.logger = logger;
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="NullableKeySortedDictionary{TKey, TValue}"/> class that is empty and uses the specified <see cref="IComparer{T}"/> implementation to compare keys
     /// </summary>
     /// <param name="comparer">The <see cref="IComparer{T}"/> implementation to use when comparing keys, or <c>null</c> to use the default <see cref="Comparer{T}"/> for the type of the key</param>
     public NullableKeySortedDictionary(IComparer<TKey> comparer) =>
         dict = new SortedDictionary<TKey, TValue>(comparer);
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="NullableKeySortedDictionary{TKey, TValue}"/> class that is empty and uses the specified <see cref="IComparer{T}"/> implementation to compare keys
+    /// </summary>
+    /// <param name="logger">The logger with which to trace library logic</param>
+    /// <param name="comparer">The <see cref="IComparer{T}"/> implementation to use when comparing keys, or <c>null</c> to use the default <see cref="Comparer{T}"/> for the type of the key</param>
+    public NullableKeySortedDictionary(ILogger logger, IComparer<TKey> comparer) :
+        this(comparer) =>
+        this.logger = logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="NullableKeySortedDictionary{TKey, TValue}"/> class that contains elements copied from the specified <see cref="IDictionary{TKey, TValue}"/> and uses the specified <see cref="IComparer{T}"/> implementation to compare keys
@@ -58,8 +84,19 @@ public sealed class NullableKeySortedDictionary<TKey, TValue> :
         AddRange(dictionary);
     }
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="NullableKeySortedDictionary{TKey, TValue}"/> class that contains elements copied from the specified <see cref="IDictionary{TKey, TValue}"/> and uses the specified <see cref="IComparer{T}"/> implementation to compare keys
+    /// </summary>
+    /// <param name="logger">The logger with which to trace library logic</param>
+    /// <param name="dictionary">The <see cref="IDictionary{TKey, TValue}"/> whose elements are copied to the new <see cref="NullableKeySortedDictionary{TKey, TValue}"/></param>
+    /// <param name="comparer">The <see cref="IComparer{T}"/> implementation to use when comparing keys, or <c>null</c> to use the default <see cref="Comparer{T}"/> for the type of the key</param>
+    public NullableKeySortedDictionary(ILogger logger, IDictionary<TKey, TValue> dictionary, IComparer<TKey> comparer) :
+        this(dictionary, comparer) =>
+        this.logger = logger;
+
     readonly SortedDictionary<TKey, TValue> dict;
     bool hasNullKeyedValue = false;
+    readonly ILogger? logger;
     TValue nullKeyedValue = default!;
 
     /// <summary>
@@ -112,6 +149,7 @@ public sealed class NullableKeySortedDictionary<TKey, TValue> :
                     throw new KeyNotFoundException();
             else
                 dict[key] = value;
+            logger?.LogTrace("NullableKeySortedDictionary changed: set [{Key}, {Value}]", key, value);
         }
     }
 
@@ -131,6 +169,7 @@ public sealed class NullableKeySortedDictionary<TKey, TValue> :
         }
         else
             dict.Add(key, value);
+        logger?.LogTrace("NullableKeySortedDictionary changed: added [{Key}, {Value}]", key, value);
     }
 
     void AddRange(IDictionary<TKey, TValue> dictionary)
@@ -150,6 +189,7 @@ public sealed class NullableKeySortedDictionary<TKey, TValue> :
         hasNullKeyedValue = false;
         nullKeyedValue = default!;
         dict.Clear();
+        logger?.LogTrace("NullableKeySortedDictionary changed: cleared");
     }
 
     bool ICollection<KeyValuePair<TKey, TValue>>.Contains(KeyValuePair<TKey, TValue> item) =>
@@ -197,11 +237,15 @@ public sealed class NullableKeySortedDictionary<TKey, TValue> :
             {
                 nullKeyedValue = default!;
                 hasNullKeyedValue = false;
+                logger?.LogTrace("NullableKeySortedDictionary changed: removed {Key}", key);
                 return true;
             }
             return false;
         }
-        return dict.Remove(key);
+        var removed = dict.Remove(key);
+        if (removed)
+            logger?.LogTrace("NullableKeySortedDictionary changed: removed {Key}", key);
+        return removed;
     }
 
     /// <summary>
@@ -220,17 +264,22 @@ public sealed class NullableKeySortedDictionary<TKey, TValue> :
                 value = nullKeyedValue;
                 nullKeyedValue = default!;
                 hasNullKeyedValue = false;
+                logger?.LogTrace("NullableKeySortedDictionary changed: removed [{Key}, {Value}]", key, value);
                 return true;
             }
             value = default!;
             return false;
         }
 #if IS_NET_STANDARD_2_1_OR_GREATER
-        return dict.Remove(key, out value!);
+        var removed = dict.Remove(key, out value!);
+        if (removed)
+            logger?.LogTrace("NullableKeySortedDictionary changed: removed [{Key}, {Value}]", key, value);
+        return removed;
 #else
         if (dict.TryGetValue(key, out value))
         {
             dict.Remove(key);
+            logger?.LogTrace("NullableKeySortedDictionary changed: removed [{Key}, {Value}]", key, value);
             return true;
         }
         return false;
@@ -245,11 +294,15 @@ public sealed class NullableKeySortedDictionary<TKey, TValue> :
             {
                 nullKeyedValue = default!;
                 hasNullKeyedValue = false;
+                logger?.LogTrace("NullableKeySortedDictionary changed: removed [{Key}, {Value}]", item.Key, item.Value);
                 return true;
             }
             return false;
         }
-        return ((IDictionary<TKey, TValue>)dict).Remove(item);
+        var removed = ((IDictionary<TKey, TValue>)dict).Remove(item);
+        if (removed)
+            logger?.LogTrace("NullableKeySortedDictionary changed: removed [{Key}, {Value}]", item.Key, item.Value);
+        return removed;
     }
 
     /// <summary>
@@ -266,16 +319,21 @@ public sealed class NullableKeySortedDictionary<TKey, TValue> :
             {
                 hasNullKeyedValue = true;
                 nullKeyedValue = value;
+                logger?.LogTrace("NullableKeySortedDictionary changed: added [{Key}, {Value}]", key, value);
                 return true;
             }
             return false;
         }
 #if IS_NET_STANDARD_2_1_OR_GREATER
-        return dict.TryAdd(key, value);
+        var added = dict.TryAdd(key, value);
+        if (added)
+            logger?.LogTrace("NullableKeySortedDictionary changed: added [{Key}, {Value}]", key, value);
+        return added;
 #else
         if (dict.ContainsKey(key))
             return false;
         dict.Add(key, value);
+        logger?.LogTrace("NullableKeySortedDictionary changed: added [{Key}, {Value}]", key, value);
         return true;
 #endif
     }

@@ -1,6 +1,7 @@
 global using Epiforge.Extensions.Collections.Generic;
 global using Epiforge.Extensions.Collections.Specialized;
 global using Epiforge.Extensions.Components;
+global using Microsoft.Extensions.Logging;
 global using System;
 global using System.Collections;
 global using System.Collections.Concurrent;

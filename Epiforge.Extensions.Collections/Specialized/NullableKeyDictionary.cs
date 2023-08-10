@@ -19,6 +19,14 @@ public sealed class NullableKeyDictionary<TKey, TValue> :
         dict = new Dictionary<TKey, TValue>();
 
     /// <summary>
+    /// Initializes a new instance of the <see cref="NullableKeyDictionary{TKey, TValue}"/> class that is empty, has the default initial capacity, and uses the default equality comparer for the key type
+    /// </summary>
+    /// <param name="logger">The logger with which to trace library logic</param>
+    public NullableKeyDictionary(ILogger logger) :
+        this() =>
+        this.logger = logger;
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="NullableKeyDictionary{TKey, TValue}"/> class that contains elements copied from the specified <see cref="IDictionary{TKey, TValue}"/> and uses the default equality comparer for the key type
     /// </summary>
     /// <param name="dictionary">The <see cref="IDictionary{TKey, TValue}"/> whose elements are copied to the new <see cref="NullableKeyDictionary{TKey, TValue}"/></param>
@@ -35,6 +43,15 @@ public sealed class NullableKeyDictionary<TKey, TValue> :
     }
 
     /// <summary>
+    /// Initializes a new instance of the <see cref="NullableKeyDictionary{TKey, TValue}"/> class that contains elements copied from the specified <see cref="IDictionary{TKey, TValue}"/> and uses the default equality comparer for the key type
+    /// </summary>
+    /// <param name="logger">The logger with which to trace library logic</param>
+    /// <param name="dictionary">The <see cref="IDictionary{TKey, TValue}"/> whose elements are copied to the new <see cref="NullableKeyDictionary{TKey, TValue}"/></param>
+    public NullableKeyDictionary(ILogger logger, IDictionary<TKey, TValue> dictionary) :
+        this(dictionary) =>
+        this.logger = logger;
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="NullableKeyDictionary{TKey, TValue}"/> class that is empty, has the default initial capacity, and uses the specified <see cref="IEqualityComparer{T}"/>
     /// </summary>
     /// <param name="comparer">The <see cref="IEqualityComparer{T}"/> implementation to use when comparing keys, or <c>null</c> to use the default <see cref="EqualityComparer{T}"/> for the type of the key</param>
@@ -42,11 +59,29 @@ public sealed class NullableKeyDictionary<TKey, TValue> :
         dict = new Dictionary<TKey, TValue>(comparer);
 
     /// <summary>
+    /// Initializes a new instance of the <see cref="NullableKeyDictionary{TKey, TValue}"/> class that is empty, has the default initial capacity, and uses the specified <see cref="IEqualityComparer{T}"/>
+    /// </summary>
+    /// <param name="logger">The logger with which to trace library logic</param>
+    /// <param name="comparer">The <see cref="IEqualityComparer{T}"/> implementation to use when comparing keys, or <c>null</c> to use the default <see cref="EqualityComparer{T}"/> for the type of the key</param>
+    public NullableKeyDictionary(ILogger logger, IEqualityComparer<TKey> comparer) :
+        this(comparer) =>
+        this.logger = logger;
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="NullableKeyDictionary{TKey, TValue}"/> class that is empty, has the specified initial capacity, and uses the default equality comparer for the key type
     /// </summary>
     /// <param name="capacity">The initial number of elements that the <see cref="NullableKeyDictionary{TKey, TValue}"/> can contain</param>
     public NullableKeyDictionary(int capacity) =>
         dict = new Dictionary<TKey, TValue>(capacity);
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="NullableKeyDictionary{TKey, TValue}"/> class that is empty, has the specified initial capacity, and uses the default equality comparer for the key type
+    /// </summary>
+    /// <param name="logger">The logger with which to trace library logic</param>
+    /// <param name="capacity">The initial number of elements that the <see cref="NullableKeyDictionary{TKey, TValue}"/> can contain</param>
+    public NullableKeyDictionary(ILogger logger, int capacity) :
+        this(capacity) =>
+        this.logger = logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="NullableKeyDictionary{TKey, TValue}"/> class that contains elements copied from the specified <see cref="IDictionary{TKey, TValue}"/> and uses the specified <see cref="IEqualityComparer{T}"/>
@@ -66,6 +101,16 @@ public sealed class NullableKeyDictionary<TKey, TValue> :
     }
 
     /// <summary>
+    /// Initializes a new instance of the <see cref="NullableKeyDictionary{TKey, TValue}"/> class that contains elements copied from the specified <see cref="IDictionary{TKey, TValue}"/> and uses the specified <see cref="IEqualityComparer{T}"/>
+    /// </summary>
+    /// <param name="logger">The logger with which to trace library logic</param>
+    /// <param name="dictionary">The <see cref="IDictionary{TKey, TValue}"/> whose elements are copied to the new <see cref="NullableKeyDictionary{TKey, TValue}"/></param>
+    /// <param name="comparer">The <see cref="IEqualityComparer{T}"/> implementation to use when comparing keys, or <c>null</c> to use the default <see cref="EqualityComparer{T}"/> for the type of the key</param>
+    public NullableKeyDictionary(ILogger logger, IDictionary<TKey, TValue> dictionary, IEqualityComparer<TKey> comparer) :
+        this(dictionary, comparer) =>
+        this.logger = logger;
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="NullableKeyDictionary{TKey, TValue}"/> class that is empty, has the specified initial capacity, and uses the specified <see cref="IEqualityComparer{T}"/>
     /// </summary>
     /// <param name="capacity">The initial number of elements that the <see cref="NullableKeyDictionary{TKey, TValue}"/> can contain</param>
@@ -73,11 +118,22 @@ public sealed class NullableKeyDictionary<TKey, TValue> :
     public NullableKeyDictionary(int capacity, IEqualityComparer<TKey> comparer) =>
         dict = new Dictionary<TKey, TValue>(capacity, comparer);
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="NullableKeyDictionary{TKey, TValue}"/> class that is empty, has the specified initial capacity, and uses the specified <see cref="IEqualityComparer{T}"/>
+    /// </summary>
+    /// <param name="logger">The logger with which to trace library logic</param>
+    /// <param name="capacity">The initial number of elements that the <see cref="NullableKeyDictionary{TKey, TValue}"/> can contain</param>
+    /// <param name="comparer">The <see cref="IEqualityComparer{T}"/> implementation to use when comparing keys, or <c>null</c> to use the default <see cref="EqualityComparer{T}"/> for the type of the key</param>
+    public NullableKeyDictionary(ILogger logger, int capacity, IEqualityComparer<TKey> comparer) :
+        this(capacity, comparer) =>
+        this.logger = logger;
+
 #if IS_NET_STANDARD_2_1_OR_GREATER
     readonly
 #endif
     Dictionary<TKey, TValue> dict;
     bool hasNullKeyedValue = false;
+    readonly ILogger? logger;
     TValue nullKeyedValue = default!;
 
     /// <summary>
@@ -130,6 +186,7 @@ public sealed class NullableKeyDictionary<TKey, TValue> :
                     throw new KeyNotFoundException();
             else
                 dict[key] = value;
+            logger?.LogTrace("NullableKeyDictionary changed: set [{Key}, {Value}]", key, value);
         }
     }
 
@@ -149,6 +206,7 @@ public sealed class NullableKeyDictionary<TKey, TValue> :
         }
         else
             dict.Add(key, value);
+        logger?.LogTrace("NullableKeyDictionary changed: added [{Key}, {Value}]", key, value);
     }
 
     void AddRange(IDictionary<TKey, TValue> dictionary)
@@ -168,6 +226,7 @@ public sealed class NullableKeyDictionary<TKey, TValue> :
         hasNullKeyedValue = false;
         nullKeyedValue = default!;
         dict.Clear();
+        logger?.LogTrace("NullableKeyDictionary changed: cleared");
     }
 
     bool ICollection<KeyValuePair<TKey, TValue>>.Contains(KeyValuePair<TKey, TValue> item) =>
@@ -207,19 +266,20 @@ public sealed class NullableKeyDictionary<TKey, TValue> :
     /// </summary>
     /// <param name="capacity">The number of entries</param>
     /// <returns>The current capacity of the <see cref="IDictionary{TKey, TValue}"/></returns>
-#if IS_NET_STANDARD_2_1_OR_GREATER
-    [SuppressMessage("Style", "IDE0022: Use expression body for method")]
-#endif
     public int EnsureCapacity(int capacity)
     {
 #if IS_NET_STANDARD_2_1_OR_GREATER
-        return dict.EnsureCapacity(capacity);
+        var ensuredCapacity = dict.EnsureCapacity(capacity);
+        logger?.LogTrace("NullableKeyDictionary ensured capacity {EnsuredCapacity} from request of {Capacity}", ensuredCapacity, capacity);
+        return ensuredCapacity;
 #else
         var newDictionary = new Dictionary<TKey, TValue>(capacity);
         foreach (var kvp in dict)
             newDictionary.Add(kvp.Key, kvp.Value);
         dict = newDictionary;
-        return dict.Count > capacity ? capacity : dict.Count;
+        var ensuredCapacity = Math.Min(capacity, dict.Count);
+        logger?.LogTrace("NullableKeyDictionary ensured capacity {EnsuredCapacity} from request of {Capacity}", ensuredCapacity, capacity);
+        return ensuredCapacity;
 #endif
     }
 
@@ -236,11 +296,15 @@ public sealed class NullableKeyDictionary<TKey, TValue> :
             {
                 nullKeyedValue = default!;
                 hasNullKeyedValue = false;
+                logger?.LogTrace("NullableKeyDictionary changed: removed {Key}", key);
                 return true;
             }
             return false;
         }
-        return dict.Remove(key);
+        var removed = dict.Remove(key);
+        if (removed)
+            logger?.LogTrace("NullableKeyDictionary changed: removed {Key}", key);
+        return removed;
     }
 
     /// <summary>
@@ -259,17 +323,22 @@ public sealed class NullableKeyDictionary<TKey, TValue> :
                 value = nullKeyedValue;
                 nullKeyedValue = default!;
                 hasNullKeyedValue = false;
+                logger?.LogTrace("NullableKeyDictionary changed: removed [{Key}, {Value}]", key, value);
                 return true;
             }
             value = default!;
             return false;
         }
 #if IS_NET_STANDARD_2_1_OR_GREATER
-        return dict.Remove(key, out value!);
+        var removed = dict.Remove(key, out value!);
+        if (removed)
+            logger?.LogTrace("NullableKeyDictionary changed: removed [{Key}, {Value}]", key, value);
+        return removed;
 #else
         if (dict.TryGetValue(key, out value))
         {
             dict.Remove(key);
+            logger?.LogTrace("NullableKeyDictionary changed: removed [{Key}, {Value}]", key, value);
             return true;
         }
         return false;
@@ -284,30 +353,34 @@ public sealed class NullableKeyDictionary<TKey, TValue> :
             {
                 nullKeyedValue = default!;
                 hasNullKeyedValue = false;
+                logger?.LogTrace("NullableKeyDictionary changed: removed [{Key}, {Value}]", item.Key, item.Value);
                 return true;
             }
             return false;
         }
-        return ((IDictionary<TKey, TValue>)dict).Remove(item);
+        var removed = ((IDictionary<TKey, TValue>)dict).Remove(item);
+        if (removed)
+            logger?.LogTrace("NullableKeyDictionary changed: removed [{Key}, {Value}]", item.Key, item.Value);
+        return removed;
     }
 
     /// <summary>
     /// Sets the capacity of this dictionary to what it would be if it had been originally initialized with all its entries
     /// </summary>
-    public void TrimExcess() =>
+    public void TrimExcess()
+    {
 #if IS_NET_STANDARD_2_1_OR_GREATER
         dict.TrimExcess();
 #else
         dict = new Dictionary<TKey, TValue>(dict);
 #endif
+        logger?.LogTrace("NullableKeyDictionary trimmed excess");
+    }
 
     /// <summary>
     /// Sets the capacity of this dictionary to hold up a specified number of entries without any further expansion of its backing storage
     /// </summary>
     /// <param name="capacity">The new capacity</param>
-#if IS_NET_STANDARD_2_1_OR_GREATER
-    [SuppressMessage("Style", "IDE0022: Use expression body for method")]
-#endif
     public void TrimExcess(int capacity)
     {
 #if IS_NET_STANDARD_2_1_OR_GREATER
@@ -318,6 +391,7 @@ public sealed class NullableKeyDictionary<TKey, TValue> :
             newDict.Add(kvp.Key, kvp.Value);
         dict = newDict;
 #endif
+        logger?.LogTrace("NullableKeyDictionary trimmed excess to {Capacity}", capacity);
     }
 
     /// <summary>
@@ -334,16 +408,21 @@ public sealed class NullableKeyDictionary<TKey, TValue> :
             {
                 hasNullKeyedValue = true;
                 nullKeyedValue = value;
+                logger?.LogTrace("NullableKeyDictionary changed: added [{Key}, {Value}]", key, value);
                 return true;
             }
             return false;
         }
 #if IS_NET_STANDARD_2_1_OR_GREATER
-        return dict.TryAdd(key, value);
+        var added = dict.TryAdd(key, value);
+        if (added)
+            logger?.LogTrace("NullableKeyDictionary changed: added [{Key}, {Value}]", key, value);
+        return added;
 #else
         if (dict.ContainsKey(key))
             return false;
         dict.Add(key, value);
+        logger?.LogTrace("NullableKeyDictionary changed: added [{Key}, {Value}]", key, value);
         return true;
 #endif
     }

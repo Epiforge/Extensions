@@ -37,6 +37,14 @@ public class ObservableDictionary<TKey, TValue> :
     }
 
     /// <summary>
+    /// Initializes a new instance of the <see cref="ObservableDictionary{TKey, TValue}"/> class that is empty, has the default initial capacity, and uses the default equality comparer for the key type
+    /// </summary>
+    /// <param name="logger">The logger with which to trace library logic</param>
+    public ObservableDictionary(ILogger logger) :
+        this() =>
+        Logger = logger;
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="ObservableDictionary{TKey, TValue}"/> class that contains elements copied from the specified <see cref="IDictionary{TKey, TValue}"/> and uses the default equality comparer for the key type
     /// </summary>
     /// <param name="dictionary">The <see cref="IDictionary{TKey, TValue}"/> whose elements are copied to the new <see cref="ObservableDictionary{TKey, TValue}"/></param>
@@ -52,6 +60,15 @@ public class ObservableDictionary<TKey, TValue> :
         grodi = gd;
         comparer = gd.Comparer;
     }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ObservableDictionary{TKey, TValue}"/> class that contains elements copied from the specified <see cref="IDictionary{TKey, TValue}"/> and uses the default equality comparer for the key type
+    /// </summary>
+    /// <param name="logger">The logger with which to trace library logic</param>
+    /// <param name="dictionary">The <see cref="IDictionary{TKey, TValue}"/> whose elements are copied to the new <see cref="ObservableDictionary{TKey, TValue}"/></param>
+    public ObservableDictionary(ILogger logger, IDictionary<TKey, TValue> dictionary) :
+        this(dictionary) =>
+        Logger = logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ObservableDictionary{TKey, TValue}"/> class that is empty, has the default initial capacity, and uses the specified <see cref="IEqualityComparer{T}"/>
@@ -71,6 +88,15 @@ public class ObservableDictionary<TKey, TValue> :
     }
 
     /// <summary>
+    /// Initializes a new instance of the <see cref="ObservableDictionary{TKey, TValue}"/> class that is empty, has the default initial capacity, and uses the specified <see cref="IEqualityComparer{T}"/>
+    /// </summary>
+    /// <param name="logger">The logger with which to trace library logic</param>
+    /// <param name="comparer">The <see cref="IEqualityComparer{T}"/> implementation to use when comparing keys, or <c>null</c> to use the default <see cref="EqualityComparer{T}"/> for the type of the key</param>
+    public ObservableDictionary(ILogger logger, IEqualityComparer<TKey> comparer) :
+        this(comparer) =>
+        Logger = logger;
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="ObservableDictionary{TKey, TValue}"/> class that is empty, has the specified initial capacity, and uses the default equality comparer for the key type
     /// </summary>
     /// <param name="capacity">The initial number of elements that the <see cref="ObservableDictionary{TKey, TValue}"/> can contain</param>
@@ -86,6 +112,15 @@ public class ObservableDictionary<TKey, TValue> :
         grodi = gd;
         comparer = gd.Comparer;
     }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ObservableDictionary{TKey, TValue}"/> class that is empty, has the specified initial capacity, and uses the default equality comparer for the key type
+    /// </summary>
+    /// <param name="logger">The logger with which to trace library logic</param>
+    /// <param name="capacity">The initial number of elements that the <see cref="ObservableDictionary{TKey, TValue}"/> can contain</param>
+    public ObservableDictionary(ILogger logger, int capacity) :
+        this(capacity) =>
+        Logger = logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ObservableDictionary{TKey, TValue}"/> class that contains elements copied from the specified <see cref="IDictionary{TKey, TValue}"/> and uses the specified <see cref="IEqualityComparer{T}"/>
@@ -106,6 +141,16 @@ public class ObservableDictionary<TKey, TValue> :
     }
 
     /// <summary>
+    /// Initializes a new instance of the <see cref="ObservableDictionary{TKey, TValue}"/> class that contains elements copied from the specified <see cref="IDictionary{TKey, TValue}"/> and uses the specified <see cref="IEqualityComparer{T}"/>
+    /// </summary>
+    /// <param name="logger">The logger with which to trace library logic</param>
+    /// <param name="dictionary">The <see cref="IDictionary{TKey, TValue}"/> whose elements are copied to the new <see cref="ObservableDictionary{TKey, TValue}"/></param>
+    /// <param name="comparer">The <see cref="IEqualityComparer{T}"/> implementation to use when comparing keys, or <c>null</c> to use the default <see cref="EqualityComparer{T}"/> for the type of the key</param>
+    public ObservableDictionary(ILogger logger, IDictionary<TKey, TValue> dictionary, IEqualityComparer<TKey> comparer) :
+        this(dictionary, comparer) =>
+        Logger = logger;
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="ObservableDictionary{TKey, TValue}"/> class that is empty, has the specified initial capacity, and uses the specified <see cref="IEqualityComparer{T}"/>
     /// </summary>
     /// <param name="capacity">The initial number of elements that the <see cref="ObservableDictionary{TKey, TValue}"/> can contain</param>
@@ -122,6 +167,16 @@ public class ObservableDictionary<TKey, TValue> :
         grodi = gd;
         this.comparer = comparer;
     }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ObservableDictionary{TKey, TValue}"/> class that is empty, has the specified initial capacity, and uses the specified <see cref="IEqualityComparer{T}"/>
+    /// </summary>
+    /// <param name="logger">The logger with which to trace library logic</param>
+    /// <param name="capacity">The initial number of elements that the <see cref="ObservableDictionary{TKey, TValue}"/> can contain</param>
+    /// <param name="comparer">The <see cref="IEqualityComparer{T}"/> implementation to use when comparing keys, or <c>null</c> to use the default <see cref="EqualityComparer{T}"/> for the type of the key</param>
+    public ObservableDictionary(ILogger logger, int capacity, IEqualityComparer<TKey> comparer) :
+        this(capacity, comparer) =>
+        Logger = logger;
 
     readonly IEqualityComparer<TKey> comparer;
     Dictionary<TKey, TValue> gd;
@@ -475,8 +530,11 @@ public class ObservableDictionary<TKey, TValue> :
     /// Raises the <see cref="INotifyDictionaryChanged{TKey, TValue}.DictionaryChanged"/> event
     /// </summary>
     /// <param name="e">The event arguments</param>
-    protected virtual void OnDictionaryChanged(NotifyDictionaryChangedEventArgs<TKey, TValue> e) =>
+    protected virtual void OnDictionaryChanged(NotifyDictionaryChangedEventArgs<TKey, TValue> e)
+    {
         DictionaryChanged?.Invoke(this, e);
+        Logger?.LogTrace("ObservableDictionary changed: {EventArgs}", e);
+    }
 
     /// <summary>
     /// Raises the <see cref="INotifyDictionaryChanged.DictionaryChanged"/> event

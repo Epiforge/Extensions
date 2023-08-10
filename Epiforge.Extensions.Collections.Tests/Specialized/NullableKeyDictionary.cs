@@ -101,7 +101,7 @@ public class NullableKeyDictionary
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
     public void ConstructionFromNullDictionaryWithComparer() =>
-        new NullableKeyDictionary<string, int>(null!, StringComparer.OrdinalIgnoreCase);
+        new NullableKeyDictionary<string, int>((IDictionary<string, int>)null!, StringComparer.OrdinalIgnoreCase);
 
     [TestMethod]
     [SuppressMessage("Performance", "CA1806: Do not ignore method results")]

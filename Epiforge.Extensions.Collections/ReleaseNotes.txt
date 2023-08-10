@@ -1,1 +1,1 @@
-We added the ReversedComparer type. This type is a comparer that reverses the result of another comparer. This is useful when you want to sort a list in the opposite order of the default sort order.
+We added support for tracing mutable collection types in this library by passing an ILogger instance to constructors.

@@ -36,6 +36,14 @@ public class ObservableSortedDictionary<TKey, TValue> :
     }
 
     /// <summary>
+    /// Initializes a new instance of the <see cref="ObservableSortedDictionary{TKey, TValue}"/> class that is empty and uses the default <see cref="IComparer{T}"/> implementation for the key type
+    /// </summary>
+    /// <param name="logger">The logger with which to trace library logic</param>
+    public ObservableSortedDictionary(ILogger logger) :
+        this() =>
+        Logger = logger;
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="ObservableSortedDictionary{TKey, TValue}"/> class that is empty and uses the specified <see cref="IComparer{T}"/> implementation to compare keys
     /// </summary>
     /// <param name="comparer">The <see cref="IComparer{T}"/> implementation to use when comparing keys, or <c>null</c> to use the default <see cref="Comparer{T}"/> for the type of the key</param>
@@ -50,6 +58,15 @@ public class ObservableSortedDictionary<TKey, TValue> :
         gei = gsd;
         grodi = gsd;
     }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ObservableSortedDictionary{TKey, TValue}"/> class that is empty and uses the specified <see cref="IComparer{T}"/> implementation to compare keys
+    /// </summary>
+    /// <param name="logger">The logger with which to trace library logic</param>
+    /// <param name="comparer">The <see cref="IComparer{T}"/> implementation to use when comparing keys, or <c>null</c> to use the default <see cref="Comparer{T}"/> for the type of the key</param>
+    public ObservableSortedDictionary(ILogger logger, IComparer<TKey> comparer) :
+        this(comparer) =>
+        Logger = logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ObservableSortedDictionary{TKey, TValue}"/> class that contains elements copied from the specified <see cref="IDictionary{TKey, TValue}"/> and uses the default <see cref="IComparer{T}"/> implementation for the key type
@@ -68,6 +85,15 @@ public class ObservableSortedDictionary<TKey, TValue> :
     }
 
     /// <summary>
+    /// Initializes a new instance of the <see cref="ObservableSortedDictionary{TKey, TValue}"/> class that contains elements copied from the specified <see cref="IDictionary{TKey, TValue}"/> and uses the default <see cref="IComparer{T}"/> implementation for the key type
+    /// </summary>
+    /// <param name="logger">The logger with which to trace library logic</param>
+    /// <param name="dictionary">The <see cref="IDictionary{TKey, TValue}"/> whose elements are copied to the new <see cref="ObservableSortedDictionary{TKey, TValue}"/></param>
+    public ObservableSortedDictionary(ILogger logger, IDictionary<TKey, TValue> dictionary) :
+        this(dictionary) =>
+        Logger = logger;
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="ObservableSortedDictionary{TKey, TValue}"/> class that contains elements copied from the specified <see cref="IDictionary{TKey, TValue}"/> and uses the specified <see cref="IComparer{T}"/> implementation to compare keys
     /// </summary>
     /// <param name="dictionary">The <see cref="IDictionary{TKey, TValue}"/> whose elements are copied to the new <see cref="ObservableSortedDictionary{TKey, TValue}"/></param>
@@ -83,6 +109,16 @@ public class ObservableSortedDictionary<TKey, TValue> :
         gei = gsd;
         grodi = gsd;
     }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ObservableSortedDictionary{TKey, TValue}"/> class that contains elements copied from the specified <see cref="IDictionary{TKey, TValue}"/> and uses the specified <see cref="IComparer{T}"/> implementation to compare keys
+    /// </summary>
+    /// <param name="logger">The logger with which to trace library logic</param>
+    /// <param name="dictionary">The <see cref="IDictionary{TKey, TValue}"/> whose elements are copied to the new <see cref="ObservableSortedDictionary{TKey, TValue}"/></param>
+    /// <param name="comparer">The <see cref="IComparer{T}"/> implementation to use when comparing keys, or <c>null</c> to use the default <see cref="Comparer{T}"/> for the type of the key</param>
+    public ObservableSortedDictionary(ILogger logger, IDictionary<TKey, TValue> dictionary, IComparer<TKey> comparer) :
+        this(dictionary, comparer) =>
+        Logger = logger;
 
     SortedDictionary<TKey, TValue> gsd;
     ICollection ci;
@@ -400,8 +436,11 @@ public class ObservableSortedDictionary<TKey, TValue> :
     /// Raises the <see cref="INotifyDictionaryChanged{TKey, TValue}.DictionaryChanged"/> event
     /// </summary>
     /// <param name="e">The event arguments</param>
-    protected virtual void OnDictionaryChanged(NotifyDictionaryChangedEventArgs<TKey, TValue> e) =>
+    protected virtual void OnDictionaryChanged(NotifyDictionaryChangedEventArgs<TKey, TValue> e)
+    {
         DictionaryChanged?.Invoke(this, e);
+        Logger?.LogTrace("ObservableSortedDictionary changed: {EventArgs}", e);
+    }
 
     /// <summary>
     /// Raises the <see cref="INotifyDictionaryChanged.DictionaryChanged"/> event

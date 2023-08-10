@@ -29,6 +29,14 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
         cd = new ConcurrentDictionary<TKey, TValue>();
 
     /// <summary>
+    /// Initializes a new instance of the <see cref="ObservableConcurrentDictionary{TKey, TValue}"/> class that is empty, has the default concurrency level, has the default initial capacity, and uses the default comparer for the key type
+    /// </summary>
+    /// <param name="logger">The logger with which to trace library logic</param>
+    public ObservableConcurrentDictionary(ILogger logger) :
+        this() =>
+        Logger = logger;
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="ObservableConcurrentDictionary{TKey, TValue}"/> class that contains elements copied from the specified <see cref="IEnumerable{KeyValuePair}"/>, has the default concurrency level, has the default initial capacity, and uses the default comparer for the key type
     /// </summary>
     /// <param name="collection">The <see cref="IEnumerable{KeyValuePair}"/> whose elements are copied to the new <see cref="ObservableConcurrentDictionary{TKey, TValue}"/></param>
@@ -36,6 +44,17 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
     /// <exception cref="ArgumentException"><paramref name="collection"/> contains one or more duplicate keys</exception>
     public ObservableConcurrentDictionary(IEnumerable<KeyValuePair<TKey, TValue>> collection) =>
         cd = new ConcurrentDictionary<TKey, TValue>(collection);
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ObservableConcurrentDictionary{TKey, TValue}"/> class that contains elements copied from the specified <see cref="IEnumerable{KeyValuePair}"/>, has the default concurrency level, has the default initial capacity, and uses the default comparer for the key type
+    /// </summary>
+    /// <param name="logger">The logger with which to trace library logic</param>
+    /// <param name="collection">The <see cref="IEnumerable{KeyValuePair}"/> whose elements are copied to the new <see cref="ObservableConcurrentDictionary{TKey, TValue}"/></param>
+    /// <exception cref="ArgumentNullException"><paramref name="collection"/> or any of its keys is <c>null</c></exception>
+    /// <exception cref="ArgumentException"><paramref name="collection"/> contains one or more duplicate keys</exception>
+    public ObservableConcurrentDictionary(ILogger logger, IEnumerable<KeyValuePair<TKey, TValue>> collection) :
+        this(collection) =>
+        Logger = logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ObservableConcurrentDictionary{TKey, TValue}"/> class that is empty, has the default concurrency level and capacity, and uses the specified <see cref="IEqualityComparer{TKey}"/>
@@ -53,6 +72,16 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
         this.comparer = comparer;
         cd = new ConcurrentDictionary<TKey, TValue>(comparer);
     }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ObservableConcurrentDictionary{TKey, TValue}"/> class that is empty, has the default concurrency level and capacity, and uses the specified <see cref="IEqualityComparer{TKey}"/>
+    /// </summary>
+    /// <param name="logger">The logger with which to trace library logic</param>
+    /// <param name="comparer">The equality comparison implementation to use when comparing keys</param>
+    /// <exception cref="ArgumentException"><paramref name="comparer"/> is <c>null</c></exception>
+    public ObservableConcurrentDictionary(ILogger logger, IEqualityComparer<TKey> comparer) :
+        this(comparer) =>
+        Logger = logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ObservableConcurrentDictionary{TKey, TValue}"/> class that contains elements copied from the specified <see cref="IEnumerable"/> has the default concurrency level, has the default initial capacity, and uses the specified <see cref="IEqualityComparer{TKey}"/>
@@ -76,6 +105,17 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
     }
 
     /// <summary>
+    /// Initializes a new instance of the <see cref="ObservableConcurrentDictionary{TKey, TValue}"/> class that contains elements copied from the specified <see cref="IEnumerable"/> has the default concurrency level, has the default initial capacity, and uses the specified <see cref="IEqualityComparer{TKey}"/>
+    /// </summary>
+    /// <param name="logger">The logger with which to trace library logic</param>
+    /// <param name="collection">The <see cref="IEnumerable{KeyValuePair}"/> whose elements are copied to the new <see cref="ObservableConcurrentDictionary{TKey, TValue}"/></param>
+    /// <param name="comparer">The <see cref="IEqualityComparer{TKey}"/> implementation to use when comparing keys</param>
+    /// <exception cref="ArgumentNullException"><paramref name="collection"/> or <paramref name="comparer"/> is null</exception>
+    public ObservableConcurrentDictionary(ILogger logger, IEnumerable<KeyValuePair<TKey, TValue>> collection, IEqualityComparer<TKey> comparer) :
+        this(collection, comparer) =>
+        Logger = logger;
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="ObservableConcurrentDictionary{TKey, TValue}"/> class that is empty, has the specified concurrency level and capacity, and uses the default comparer for the key type
     /// </summary>
     /// <param name="concurrencyLevel">The estimated number of threads that will update the <see cref="ObservableConcurrentDictionary{TKey, TValue}"/> concurrently</param>
@@ -87,6 +127,17 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
         this.capacity = capacity;
         cd = new ConcurrentDictionary<TKey, TValue>(concurrencyLevel, capacity);
     }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ObservableConcurrentDictionary{TKey, TValue}"/> class that is empty, has the specified concurrency level and capacity, and uses the default comparer for the key type
+    /// </summary>
+    /// <param name="logger">The logger with which to trace library logic</param>
+    /// <param name="concurrencyLevel">The estimated number of threads that will update the <see cref="ObservableConcurrentDictionary{TKey, TValue}"/> concurrently</param>
+    /// <param name="capacity">The initial number of elements that the <see cref="ObservableConcurrentDictionary{TKey, TValue}"/> can contain</param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="concurrencyLevel"/> is less than 1 -or- <paramref name="capacity"/> is less than 0</exception>
+    public ObservableConcurrentDictionary(ILogger logger, int concurrencyLevel, int capacity) :
+        this(concurrencyLevel, capacity) =>
+        Logger = logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ObservableConcurrentDictionary{TKey, TValue}"/> class that contains elements copied from the specified <see cref="IEnumerable"/>, and uses the specified <see cref="IEqualityComparer{TKey}"/>
@@ -114,6 +165,20 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
     }
 
     /// <summary>
+    /// Initializes a new instance of the <see cref="ObservableConcurrentDictionary{TKey, TValue}"/> class that contains elements copied from the specified <see cref="IEnumerable"/>, and uses the specified <see cref="IEqualityComparer{TKey}"/>
+    /// </summary>
+    /// <param name="logger">The logger with which to trace library logic</param>
+    /// <param name="concurrencyLevel">The estimated number of threads that will update the <see cref="ObservableConcurrentDictionary{TKey, TValue}"/> concurrently</param>
+    /// <param name="collection">The <see cref="IEnumerable{KeyValuePair}"/> whose elements are copied to the new <see cref="ObservableConcurrentDictionary{TKey, TValue}"/></param>
+    /// <param name="comparer">The <see cref="IEqualityComparer{TKey}"/> implementation to use when comparing keys</param>
+    /// <exception cref="ArgumentNullException"><paramref name="collection"/> or <paramref name="comparer"/> is <c>null</c></exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="concurrencyLevel"/> is less than 1</exception>
+    /// <exception cref="ArgumentException"><paramref name="collection"/> contains one or more duplicate keys</exception>
+    public ObservableConcurrentDictionary(ILogger logger, int concurrencyLevel, IEnumerable<KeyValuePair<TKey, TValue>> collection, IEqualityComparer<TKey> comparer) :
+        this(concurrencyLevel, collection, comparer) =>
+        Logger = logger;
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="ObservableConcurrentDictionary{TKey, TValue}"/> class that is empty, has the specified concurrency level, has the specified initial capacity, and uses the specified <see cref="IEqualityComparer{TKey}"/>
     /// </summary>
     /// <param name="concurrencyLevel">The estimated number of threads that will update the <see cref="ObservableConcurrentDictionary{TKey, TValue}"/> concurrently</param>
@@ -134,6 +199,19 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
         this.comparer = comparer;
         cd = new ConcurrentDictionary<TKey, TValue>(concurrencyLevel, capacity, comparer);
     }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ObservableConcurrentDictionary{TKey, TValue}"/> class that is empty, has the specified concurrency level, has the specified initial capacity, and uses the specified <see cref="IEqualityComparer{TKey}"/>
+    /// </summary>
+    /// <param name="logger">The logger with which to trace library logic</param>
+    /// <param name="concurrencyLevel">The estimated number of threads that will update the <see cref="ObservableConcurrentDictionary{TKey, TValue}"/> concurrently</param>
+    /// <param name="capacity">The initial number of elements that the <see cref="ObservableConcurrentDictionary{TKey, TValue}"/> can contain</param>
+    /// <param name="comparer">The <see cref="IEqualityComparer{TKey}"/> implementation to use when comparing keys</param>
+    /// <exception cref="ArgumentNullException"><paramref name="comparer"/> is <c>null</c></exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="concurrencyLevel"/> or <paramref name="capacity"/> is less than 1</exception>
+    public ObservableConcurrentDictionary(ILogger logger, int concurrencyLevel, int capacity, IEqualityComparer<TKey> comparer) :
+        this(concurrencyLevel, capacity, comparer) =>
+        Logger = logger;
 
     readonly int? capacity;
     ConcurrentDictionary<TKey, TValue> cd;
@@ -628,8 +706,11 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
     /// Raises the <see cref="INotifyDictionaryChanged{TKey, TValue}.DictionaryChanged"/> event
     /// </summary>
     /// <param name="e">The event arguments</param>
-    protected virtual void OnDictionaryChanged(NotifyDictionaryChangedEventArgs<TKey, TValue> e) =>
+    protected virtual void OnDictionaryChanged(NotifyDictionaryChangedEventArgs<TKey, TValue> e)
+    {
         DictionaryChanged?.Invoke(this, e);
+        Logger?.LogTrace("ObservableConcurrentDictionary changed: {EventArgs}", e);
+    }
 
     /// <summary>
     /// Raises the <see cref="INotifyDictionaryChanged.DictionaryChanged"/> event

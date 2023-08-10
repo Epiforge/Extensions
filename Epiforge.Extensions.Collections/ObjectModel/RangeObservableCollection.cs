@@ -18,10 +18,26 @@ public class RangeObservableCollection<T> :
     /// <summary>
     /// Initializes a new instance of the <see cref="RangeObservableCollection{T}"/>
     /// </summary>
+    /// <param name="logger">The logger with which to trace library logic</param>
+    public RangeObservableCollection(ILogger logger) :
+        this() =>
+        this.logger = logger;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="RangeObservableCollection{T}"/>
+    /// </summary>
     /// <param name="raiseCollectionChangedEventsForIndividualElements">Whether to raise individual <see cref="INotifyCollectionChanged.CollectionChanged"/> events for each element operated upon by range methods</param>
     public RangeObservableCollection(bool raiseCollectionChangedEventsForIndividualElements) :
         base() =>
         RaiseCollectionChangedEventsForIndividualElements = raiseCollectionChangedEventsForIndividualElements;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="RangeObservableCollection{T}"/>
+    /// </summary>
+    /// <param name="raiseCollectionChangedEventsForIndividualElements">Whether to raise individual <see cref="INotifyCollectionChanged.CollectionChanged"/> events for each element operated upon by range methods</param>
+    public RangeObservableCollection(ILogger logger, bool raiseCollectionChangedEventsForIndividualElements) :
+        this(raiseCollectionChangedEventsForIndividualElements) =>
+        this.logger = logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="RangeObservableCollection{T}"/> class that contains elements copied from the specified collection
@@ -35,11 +51,32 @@ public class RangeObservableCollection<T> :
     /// <summary>
     /// Initializes a new instance of the <see cref="RangeObservableCollection{T}"/> class that contains elements copied from the specified collection
     /// </summary>
+    /// <param name="logger">The logger with which to trace library logic</param>
+    /// <param name="collection">The collection from which the elements are copied</param>
+    public RangeObservableCollection(ILogger logger, IEnumerable<T> collection) :
+        this(collection) =>
+        this.logger = logger;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="RangeObservableCollection{T}"/> class that contains elements copied from the specified collection
+    /// </summary>
     /// <param name="collection">The collection from which the elements are copied</param>
     /// <param name="raiseCollectionChangedEventsForIndividualElements">Whether to raise individual <see cref="INotifyCollectionChanged.CollectionChanged"/> events for each element operated upon by range methods</param>
     public RangeObservableCollection(IEnumerable<T> collection, bool raiseCollectionChangedEventsForIndividualElements) :
         base(collection) =>
         RaiseCollectionChangedEventsForIndividualElements = raiseCollectionChangedEventsForIndividualElements;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="RangeObservableCollection{T}"/> class that contains elements copied from the specified collection
+    /// </summary>
+    /// <param name="logger">The logger with which to trace library logic</param>
+    /// <param name="collection">The collection from which the elements are copied</param>
+    /// <param name="raiseCollectionChangedEventsForIndividualElements">Whether to raise individual <see cref="INotifyCollectionChanged.CollectionChanged"/> events for each element operated upon by range methods</param>
+    public RangeObservableCollection(ILogger logger, IEnumerable<T> collection, bool raiseCollectionChangedEventsForIndividualElements) :
+        this(collection, raiseCollectionChangedEventsForIndividualElements) =>
+        this.logger = logger;
+
+    readonly ILogger? logger;
 
     /// <summary>
     /// Gets whether this <see cref="RangeObservableCollection{T}"/> will raise individual <see cref="INotifyCollectionChanged.CollectionChanged"/> events for each element operated upon by range methods
@@ -194,6 +231,37 @@ public class RangeObservableCollection<T> :
 
     void NotifyCountChanged() =>
         OnPropertyChanged(CommonPropertyChangeNotificationEventArgs.CountChanged);
+
+    /// <inheritdoc/>
+    protected override void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
+    {
+#if IS_NET_6_0_OR_GREATER
+        ArgumentNullException.ThrowIfNull(e);
+#else
+        if (e is null)
+            throw new ArgumentNullException(nameof(e));
+#endif
+        base.OnCollectionChanged(e);
+        if (logger?.IsEnabled(LogLevel.Trace) ?? false)
+            switch (e.Action)
+            {
+                case NotifyCollectionChangedAction.Add when e.NewItems is { } newItems:
+                    logger.LogTrace("RangeObservableCollection changed: added {NewItems} at index {NewStartingIndex}", string.Join(", ", newItems.Cast<object>()), e.NewStartingIndex);
+                    break;
+                case NotifyCollectionChangedAction.Move when e.OldItems is { } oldItems:
+                    logger.LogTrace("RangeObservableCollection changed: moved {OldItems} at index {OldStartingIndex} to {NewStartingIndex}", string.Join(", ", oldItems.Cast<object>()), e.OldStartingIndex, e.NewStartingIndex);
+                    break;
+                case NotifyCollectionChangedAction.Remove when e.OldItems is { } oldItems:
+                    logger.LogTrace("RangeObservableCollection changed: removed {OldItems} at index {OldStartingIndex}", string.Join(", ", oldItems.Cast<object>()), e.OldStartingIndex);
+                    break;
+                case NotifyCollectionChangedAction.Replace when e.OldItems is { } oldItems && e.NewItems is { } newItems && e.OldStartingIndex == e.NewStartingIndex:
+                    logger.LogTrace("RangeObservableCollection changed: replaced {OldItems} at index {OldStartingIndex} with {NewItems}", string.Join(", ", oldItems.Cast<object>()), e.OldStartingIndex, string.Join(", ", newItems.Cast<object>()));
+                    break;
+                case NotifyCollectionChangedAction.Reset:
+                    logger.LogTrace("RangeObservableCollection changed: reset");
+                    break;
+            }
+    }
 
     /// <summary>
     /// Removes all object from the <see cref="RangeObservableCollection{T}"/> that satisfy the <paramref name="predicate"/>

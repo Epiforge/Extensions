@@ -101,7 +101,7 @@ public class NullableKeySortedDictionary
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
     public void ConstructionFromNullDictionaryWithComparer() =>
-        new NullableKeySortedDictionary<string, int>(null!, StringComparer.OrdinalIgnoreCase);
+        new NullableKeySortedDictionary<string, int>((IDictionary<string, int>)null!, StringComparer.OrdinalIgnoreCase);
 
     [TestMethod]
     public void ContainsNonNullKey()

@@ -127,4 +127,17 @@ public sealed class NotifyDictionaryChangedEventArgs<TKey, TValue> :
     /// Gets the list of items affected by a <see cref="NotifyDictionaryChangedAction.Replace"/> or <see cref="NotifyDictionaryChangedAction.Remove"/> action
     /// </summary>
     public IReadOnlyList<KeyValuePair<TKey, TValue>> OldItems { get; private set; } = emptyList;
+
+    /// <summary>
+    /// Returns a string representation of the <see cref="NotifyDictionaryChangedEventArgs{TKey, TValue}"/> using the string representations of keys and values
+    /// </summary>
+    public override string ToString() =>
+        Action switch
+        {
+            NotifyDictionaryChangedAction.Add => $"added {string.Join(", ", NewItems.Select(kv => kv.ToString()))}",
+            NotifyDictionaryChangedAction.Remove => $"removed {string.Join(", ", OldItems.Select(kv => kv.ToString()))}",
+            NotifyDictionaryChangedAction.Replace => $"replaced {string.Join(", ", OldItems.Select(kv => kv.ToString()))} with {string.Join(", ", NewItems.Select(kv => kv.ToString()))}",
+            NotifyDictionaryChangedAction.Reset => $"reset",
+            _ => throw new NotSupportedException()
+        };
 }

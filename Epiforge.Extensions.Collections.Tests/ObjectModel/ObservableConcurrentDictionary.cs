@@ -107,7 +107,7 @@ public class ObservableConcurrentDictionary
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
     public void ConstructionWithComparerAndNullCollection() =>
-        new ObservableConcurrentDictionary<string, string>(null!, StringComparer.OrdinalIgnoreCase);
+        new ObservableConcurrentDictionary<string, string>((IEnumerable<KeyValuePair<string, string>>)null!, StringComparer.OrdinalIgnoreCase);
 
     [TestMethod]
     public void ConstructionWithComparer()
