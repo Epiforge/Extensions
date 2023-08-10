@@ -41,16 +41,16 @@ public class DynamicSyncDisposable
             derivation.Dispose();
             Assert.IsFalse(derivation.IsDisposed);
             logger.ReceivedLogDebug("Dispose called");
-            logger.ReceivedLogDebug($"Raising Disposing event");
-            logger.ReceivedLogDebug($"Raising DisposalOverridden event");
-            logger.DidNotReceiveLogDebug($"Raising Disposed event");
+            logger.ReceivedLogDebug("Raising Disposing event");
+            logger.ReceivedLogDebug("Raising DisposalOverridden event");
+            logger.DidNotReceiveLogDebug("Raising Disposed event");
             logger.ClearReceivedCalls();
         }
         Assert.IsTrue(derivation.IsDisposed);
         logger.ReceivedLogDebug("Dispose called");
-        logger.ReceivedLogDebug($"Raising Disposing event");
-        logger.DidNotReceiveLogDebug($"Raising DisposalOverridden event");
-        logger.ReceivedLogDebug($"Raising Disposed event");
+        logger.ReceivedLogDebug("Raising Disposing event");
+        logger.DidNotReceiveLogDebug("Raising DisposalOverridden event");
+        logger.ReceivedLogDebug("Raising Disposed event");
         logger.ClearReceivedCalls();
         Assert.AreEqual(nameof(INotifyDisposing.Disposing), disposalNotificationEvents[0].name);
         Assert.IsFalse(disposalNotificationEvents[0].args.IsFinalizer);
