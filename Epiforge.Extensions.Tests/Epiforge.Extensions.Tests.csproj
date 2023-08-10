@@ -4,7 +4,6 @@
         <CheckEolTargetFramework>false</CheckEolTargetFramework>
         <IncludeSymbols>true</IncludeSymbols>
         <IsPackable>false</IsPackable>
-        <IsTestProject>true</IsTestProject>
         <LangVersion>latest</LangVersion>
         <Nullable>enable</Nullable>
         <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
