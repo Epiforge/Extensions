@@ -34,6 +34,7 @@ public class RangeObservableCollection<T> :
     /// <summary>
     /// Initializes a new instance of the <see cref="RangeObservableCollection{T}"/>
     /// </summary>
+    /// <param name="logger">The logger with which to trace library logic</param>
     /// <param name="raiseCollectionChangedEventsForIndividualElements">Whether to raise individual <see cref="INotifyCollectionChanged.CollectionChanged"/> events for each element operated upon by range methods</param>
     public RangeObservableCollection(ILogger logger, bool raiseCollectionChangedEventsForIndividualElements) :
         this(raiseCollectionChangedEventsForIndividualElements) =>
