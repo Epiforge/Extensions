@@ -35,9 +35,9 @@ public abstract class PropertyChangeNotifier :
         if (e is null)
             throw new ArgumentNullException(nameof(e));
 #endif
-        Logger?.LogDebug("Raising PropertyChanged event for property \"{PropertyName}\"", e.PropertyName);
+        Logger?.LogTrace("Raising PropertyChanged event for property \"{PropertyName}\"", e.PropertyName);
         PropertyChanged?.Invoke(this, e);
-        Logger?.LogDebug("Raised PropertyChanged event for property \"{PropertyName}\"", e.PropertyName);
+        Logger?.LogTrace("Raised PropertyChanged event for property \"{PropertyName}\"", e.PropertyName);
     }
 
     /// <summary>
@@ -69,9 +69,9 @@ public abstract class PropertyChangeNotifier :
         if (e is null)
             throw new ArgumentNullException(nameof(e));
 #endif
-        Logger?.LogDebug("Raising PropertyChanging event for property \"{PropertyName}\"", e.PropertyName);
+        Logger?.LogTrace("Raising PropertyChanging event for property \"{PropertyName}\"", e.PropertyName);
         PropertyChanging?.Invoke(this, e);
-        Logger?.LogDebug("Raised PropertyChanging event for property \"{PropertyName}\"", e.PropertyName);
+        Logger?.LogTrace("Raised PropertyChanging event for property \"{PropertyName}\"", e.PropertyName);
     }
 
     /// <summary>
@@ -122,7 +122,7 @@ public abstract class PropertyChangeNotifier :
 #endif
         if (!equalityComparer.Equals(backingField, value))
         {
-            Logger?.LogDebug("\"{propertyName}\" property is changing from \"{backingField}\" to \"{value}\"", propertyName, backingField, value);
+            Logger?.LogTrace("\"{propertyName}\" property is changing from \"{backingField}\" to \"{value}\"", propertyName, backingField, value);
             OnPropertyChanging(propertyName);
             backingField = value;
             OnPropertyChanged(propertyName);
@@ -171,7 +171,7 @@ public abstract class PropertyChangeNotifier :
 #endif
         if (!equalityComparer.Equals(backingField, value))
         {
-            Logger?.LogDebug("\"{PropertyName}\" property is changing from \"{backingField}\" to \"{value}\"", propertyChangedEventArgs.PropertyName, backingField, value);
+            Logger?.LogTrace("\"{PropertyName}\" property is changing from \"{backingField}\" to \"{value}\"", propertyChangedEventArgs.PropertyName, backingField, value);
             OnPropertyChanging(propertyChangingEventArgs);
             backingField = value;
             OnPropertyChanged(propertyChangedEventArgs);
@@ -212,7 +212,7 @@ public abstract class PropertyChangeNotifier :
 #endif
         if (!equalityComparer.Equals(backingField, value))
         {
-            Logger?.LogDebug("\"{propertyName}\" property is changing from \"{backingField}\" to \"{value}\"", propertyName, backingField, value);
+            Logger?.LogTrace("\"{propertyName}\" property is changing from \"{backingField}\" to \"{value}\"", propertyName, backingField, value);
             OnPropertyChanging(propertyName);
             backingField = value;
             OnPropertyChanged(propertyName);
@@ -261,7 +261,7 @@ public abstract class PropertyChangeNotifier :
 #endif
         if (!equalityComparer.Equals(backingField, value))
         {
-            Logger?.LogDebug("\"{PropertyName}\" property is changing from \"{backingField}\" to \"{value}\"", propertyChangedEventArgs.PropertyName, backingField, value);
+            Logger?.LogTrace("\"{PropertyName}\" property is changing from \"{backingField}\" to \"{value}\"", propertyChangedEventArgs.PropertyName, backingField, value);
             OnPropertyChanging(propertyChangingEventArgs);
             backingField = value;
             OnPropertyChanged(propertyChangedEventArgs);

@@ -17,7 +17,7 @@ public abstract class AsyncDisposable :
     [ExcludeFromCodeCoverage]
     ~AsyncDisposable()
     {
-        Logger?.LogDebug("Finalizer called");
+        Logger?.LogTrace("Finalizer called");
         var e = DisposalNotificationEventArgs.ByFinalizer;
         OnDisposing(e);
         DisposeAsync(false).AsTask().Wait();
@@ -57,7 +57,7 @@ public abstract class AsyncDisposable :
     /// </summary>
     public virtual async ValueTask DisposeAsync()
     {
-        Logger?.LogDebug("DisposeAsync called");
+        Logger?.LogTrace("DisposeAsync called");
         using (await disposalAccess.LockAsync().ConfigureAwait(false))
             if (!IsDisposed)
             {
@@ -82,23 +82,23 @@ public abstract class AsyncDisposable :
 
     void OnDisposalOverridden(DisposalNotificationEventArgs e)
     {
-        Logger?.LogDebug("Raising DisposalOverridden event");
+        Logger?.LogTrace("Raising DisposalOverridden event");
         DisposalOverridden?.Invoke(this, e);
-        Logger?.LogDebug("Raised DisposalOverridden event");
+        Logger?.LogTrace("Raised DisposalOverridden event");
     }
 
     void OnDisposed(DisposalNotificationEventArgs e)
     {
-        Logger?.LogDebug("Raising Disposed event");
+        Logger?.LogTrace("Raising Disposed event");
         Disposed?.Invoke(this, e);
-        Logger?.LogDebug("Raised Disposed event");
+        Logger?.LogTrace("Raised Disposed event");
     }
 
     void OnDisposing(DisposalNotificationEventArgs e)
     {
-        Logger?.LogDebug("Raising Disposing event");
+        Logger?.LogTrace("Raising Disposing event");
         Disposing?.Invoke(this, e);
-        Logger?.LogDebug("Raised Disposing event");
+        Logger?.LogTrace("Raised Disposing event");
     }
 
     /// <summary>
