@@ -1,8 +1,8 @@
-global using Microsoft.Extensions.DependencyInjection;
+global using Epiforge.Extensions.Tests;
 global using Microsoft.Extensions.Logging;
 global using Microsoft.VisualStudio.TestTools.UnitTesting;
-global using Moq;
 global using Nito.AsyncEx;
+global using NSubstitute;
 global using System;
 global using System.Collections.Generic;
 global using System.Collections.ObjectModel;

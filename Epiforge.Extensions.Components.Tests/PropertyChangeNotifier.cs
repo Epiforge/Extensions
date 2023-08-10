@@ -119,7 +119,7 @@ public class PropertyChangeNotifier
     [ExpectedException(typeof(ArgumentNullException))]
     public void NullEqualityComparer()
     {
-        new Derivation(new Mock<ILogger<Derivation>>().Object, "text")
+        new Derivation(Substitute.For<ILogger<Derivation>>(), "text")
         {
             NullableTexttWithNullEqualityComparer = "bruh"
         };
@@ -129,7 +129,7 @@ public class PropertyChangeNotifier
     [ExpectedException(typeof(ArgumentNullException))]
     public void NullEqualityComparerWithoutIn()
     {
-        new Derivation(new Mock<ILogger<Derivation>>().Object, "text")
+        new Derivation(Substitute.For<ILogger<Derivation>>(), "text")
         {
             TextWithoutInAndNullComparer = "bruh"
         };
@@ -139,7 +139,7 @@ public class PropertyChangeNotifier
     [ExpectedException(typeof(ArgumentNullException))]
     public void NullPropertyChangedEventArgs()
     {
-        var derivation = new Derivation(new Mock<ILogger<Derivation>>().Object, "text");
+        var derivation = new Derivation(Substitute.For<ILogger<Derivation>>(), "text");
         derivation.NullPropertyChangedEventArgs();
     }
 
@@ -147,7 +147,7 @@ public class PropertyChangeNotifier
     [ExpectedException(typeof(ArgumentNullException))]
     public void NullPropertyChangedName()
     {
-        var derivation = new Derivation(new Mock<ILogger<Derivation>>().Object, "text");
+        var derivation = new Derivation(Substitute.For<ILogger<Derivation>>(), "text");
         derivation.NullPropertyChangedName();
     }
 
@@ -155,7 +155,7 @@ public class PropertyChangeNotifier
     [ExpectedException(typeof(ArgumentNullException))]
     public void NullPropertyChangingEventArgs()
     {
-        var derivation = new Derivation(new Mock<ILogger<Derivation>>().Object, "text");
+        var derivation = new Derivation(Substitute.For<ILogger<Derivation>>(), "text");
         derivation.NullPropertyChangingEventArgs();
     }
 
@@ -163,7 +163,7 @@ public class PropertyChangeNotifier
     [ExpectedException(typeof(ArgumentNullException))]
     public void NullPropertyChangingName()
     {
-        var derivation = new Derivation(new Mock<ILogger<Derivation>>().Object, "text");
+        var derivation = new Derivation(Substitute.For<ILogger<Derivation>>(), "text");
         derivation.NullPropertyChangingName();
     }
 
@@ -172,8 +172,8 @@ public class PropertyChangeNotifier
     {
         var propertiesChanged = new List<string>();
         var propertiesChanging = new List<string>();
-        var mockLogger = new Mock<ILogger<Derivation>>();
-        var derivation = new Derivation(mockLogger.Object, "text");
+        var logger = Substitute.For<MockLogger<Derivation>>();
+        var derivation = new Derivation(logger, "text");
 
         void propertyChanged(object? sender, PropertyChangedEventArgs e)
         {
@@ -196,28 +196,28 @@ public class PropertyChangeNotifier
         derivation.PropertyChanging += propertyChanging;
 
         derivation.Text = "text";
-        Assert.AreEqual(0, mockLogger.Invocations.Count);
+        Assert.AreEqual(0, logger.ReceivedCalls().Count());
         derivation.Text = "other text";
-        mockLogger.VerifyLogDebug("\"Text\" property is changing from \"text\" to \"other text\"");
-        mockLogger.VerifyLogDebug("Raising PropertyChanging event for property \"Text\"");
-        mockLogger.VerifyLogDebug("Raised PropertyChanging event for property \"Text\"");
-        mockLogger.VerifyLogDebug("Raising PropertyChanged event for property \"Text\"");
-        mockLogger.VerifyLogDebug("Raised PropertyChanged event for property \"Text\"");
-        mockLogger.Invocations.Clear();
+        logger.ReceivedLogDebug("\"Text\" property is changing from \"text\" to \"other text\"");
+        logger.ReceivedLogDebug("Raising PropertyChanging event for property \"Text\"");
+        logger.ReceivedLogDebug("Raised PropertyChanging event for property \"Text\"");
+        logger.ReceivedLogDebug("Raising PropertyChanged event for property \"Text\"");
+        logger.ReceivedLogDebug("Raised PropertyChanged event for property \"Text\"");
+        logger.ClearReceivedCalls();
         derivation.NullableText = "Suprise!";
-        mockLogger.VerifyLogDebug("\"NullableText\" property is changing from \"(null)\" to \"Suprise!\"");
-        mockLogger.VerifyLogDebug("Raising PropertyChanging event for property \"NullableText\"");
-        mockLogger.VerifyLogDebug("Raised PropertyChanging event for property \"NullableText\"");
-        mockLogger.VerifyLogDebug("Raising PropertyChanged event for property \"NullableText\"");
-        mockLogger.VerifyLogDebug("Raised PropertyChanged event for property \"NullableText\"");
-        mockLogger.Invocations.Clear();
+        logger.ReceivedLogDebug("\"NullableText\" property is changing from \"(null)\" to \"Suprise!\"");
+        logger.ReceivedLogDebug("Raising PropertyChanging event for property \"NullableText\"");
+        logger.ReceivedLogDebug("Raised PropertyChanging event for property \"NullableText\"");
+        logger.ReceivedLogDebug("Raising PropertyChanged event for property \"NullableText\"");
+        logger.ReceivedLogDebug("Raised PropertyChanged event for property \"NullableText\"");
+        logger.ClearReceivedCalls();
         derivation.NullableText = null;
-        mockLogger.VerifyLogDebug("\"NullableText\" property is changing from \"Suprise!\" to \"(null)\"");
-        mockLogger.VerifyLogDebug("Raising PropertyChanging event for property \"NullableText\"");
-        mockLogger.VerifyLogDebug("Raised PropertyChanging event for property \"NullableText\"");
-        mockLogger.VerifyLogDebug("Raising PropertyChanged event for property \"NullableText\"");
-        mockLogger.VerifyLogDebug("Raised PropertyChanged event for property \"NullableText\"");
-        mockLogger.Invocations.Clear();
+        logger.ReceivedLogDebug("\"NullableText\" property is changing from \"Suprise!\" to \"(null)\"");
+        logger.ReceivedLogDebug("Raising PropertyChanging event for property \"NullableText\"");
+        logger.ReceivedLogDebug("Raised PropertyChanging event for property \"NullableText\"");
+        logger.ReceivedLogDebug("Raising PropertyChanged event for property \"NullableText\"");
+        logger.ReceivedLogDebug("Raised PropertyChanged event for property \"NullableText\"");
+        logger.ClearReceivedCalls();
 
         derivation.PropertyChanged -= propertyChanged;
         derivation.PropertyChanging -= propertyChanging;
@@ -228,8 +228,8 @@ public class PropertyChangeNotifier
     {
         var propertiesChanged = new List<string>();
         var propertiesChanging = new List<string>();
-        var mockLogger = new Mock<ILogger<Derivation>>();
-        var derivation = new Derivation(mockLogger.Object, "text");
+        var logger = Substitute.For<MockLogger<Derivation>>();
+        var derivation = new Derivation(logger, "text");
 
         void propertyChanged(object? sender, PropertyChangedEventArgs e)
         {
@@ -252,13 +252,13 @@ public class PropertyChangeNotifier
         derivation.PropertyChanging += propertyChanging;
 
         derivation.TextWithCachedEventArgs = "text";
-        Assert.AreEqual(0, mockLogger.Invocations.Count);
+        Assert.AreEqual(0, logger.ReceivedCalls().Count());
         derivation.TextWithCachedEventArgs = "other text";
-        mockLogger.VerifyLogDebug("\"Text\" property is changing from \"text\" to \"other text\"");
-        mockLogger.VerifyLogDebug("Raising PropertyChanging event for property \"Text\"");
-        mockLogger.VerifyLogDebug("Raised PropertyChanging event for property \"Text\"");
-        mockLogger.VerifyLogDebug("Raising PropertyChanged event for property \"Text\"");
-        mockLogger.VerifyLogDebug("Raised PropertyChanged event for property \"Text\"");
+        logger.ReceivedLogDebug("\"Text\" property is changing from \"text\" to \"other text\"");
+        logger.ReceivedLogDebug("Raising PropertyChanging event for property \"Text\"");
+        logger.ReceivedLogDebug("Raised PropertyChanging event for property \"Text\"");
+        logger.ReceivedLogDebug("Raising PropertyChanged event for property \"Text\"");
+        logger.ReceivedLogDebug("Raised PropertyChanged event for property \"Text\"");
 
         derivation.PropertyChanged -= propertyChanged;
         derivation.PropertyChanging -= propertyChanging;
@@ -269,8 +269,8 @@ public class PropertyChangeNotifier
     {
         var propertiesChanged = new List<string>();
         var propertiesChanging = new List<string>();
-        var mockLogger = new Mock<ILogger<Derivation>>();
-        var derivation = new Derivation(mockLogger.Object, "text");
+        var logger = Substitute.For<MockLogger<Derivation>>();
+        var derivation = new Derivation(logger, "text");
 
         void propertyChanged(object? sender, PropertyChangedEventArgs e)
         {
@@ -293,13 +293,13 @@ public class PropertyChangeNotifier
         derivation.PropertyChanging += propertyChanging;
 
         derivation.TextWithoutInAndCachedEventArgs = "text";
-        Assert.AreEqual(0, mockLogger.Invocations.Count);
+        Assert.AreEqual(0, logger.ReceivedCalls().Count());
         derivation.TextWithoutInAndCachedEventArgs = "other text";
-        mockLogger.VerifyLogDebug("\"Text\" property is changing from \"text\" to \"other text\"");
-        mockLogger.VerifyLogDebug("Raising PropertyChanging event for property \"Text\"");
-        mockLogger.VerifyLogDebug("Raised PropertyChanging event for property \"Text\"");
-        mockLogger.VerifyLogDebug("Raising PropertyChanged event for property \"Text\"");
-        mockLogger.VerifyLogDebug("Raised PropertyChanged event for property \"Text\"");
+        logger.ReceivedLogDebug("\"Text\" property is changing from \"text\" to \"other text\"");
+        logger.ReceivedLogDebug("Raising PropertyChanging event for property \"Text\"");
+        logger.ReceivedLogDebug("Raised PropertyChanging event for property \"Text\"");
+        logger.ReceivedLogDebug("Raising PropertyChanged event for property \"Text\"");
+        logger.ReceivedLogDebug("Raised PropertyChanged event for property \"Text\"");
 
         derivation.PropertyChanged -= propertyChanged;
         derivation.PropertyChanging -= propertyChanging;
@@ -309,7 +309,7 @@ public class PropertyChangeNotifier
     [ExpectedException(typeof(ArgumentNullException))]
     public void PropertyChangesWithCachedChangedEventArgsOnly()
     {
-        new Derivation(new Mock<ILogger<Derivation>>().Object, "text")
+        new Derivation(Substitute.For<ILogger<Derivation>>(), "text")
         {
             TextWithCachedChangedEventArgsOnly = "text"
         };
@@ -319,7 +319,7 @@ public class PropertyChangeNotifier
     [ExpectedException(typeof(ArgumentNullException))]
     public void PropertyChangesWithCachedChangingEventArgsOnly()
     {
-        new Derivation(new Mock<ILogger<Derivation>>().Object, "text")
+        new Derivation(Substitute.For<ILogger<Derivation>>(), "text")
         {
             TextWithCachedChangingEventArgsOnly = "text"
         };
@@ -329,7 +329,7 @@ public class PropertyChangeNotifier
     [ExpectedException(typeof(ArgumentNullException))]
     public void PropertyChangesWithCachedEventArgsAndNullComparer()
     {
-        new Derivation(new Mock<ILogger<Derivation>>().Object, "text")
+        new Derivation(Substitute.For<ILogger<Derivation>>(), "text")
         {
             TextWithCachedEventArgsAndNullComparer = "text"
         };
@@ -339,7 +339,7 @@ public class PropertyChangeNotifier
     [ExpectedException(typeof(ArgumentNullException))]
     public void PropertyChangesWithoutInWithCachedChangedEventArgsOnly()
     {
-        new Derivation(new Mock<ILogger<Derivation>>().Object, "text")
+        new Derivation(Substitute.For<ILogger<Derivation>>(), "text")
         {
             TextWithoutInWithCachedChangedEventArgsOnly = "text"
         };
@@ -349,7 +349,7 @@ public class PropertyChangeNotifier
     [ExpectedException(typeof(ArgumentNullException))]
     public void PropertyChangesWithoutInWithCachedChangingEventArgsOnly()
     {
-        new Derivation(new Mock<ILogger<Derivation>>().Object, "text")
+        new Derivation(Substitute.For<ILogger<Derivation>>(), "text")
         {
             TextWithoutInWithCachedChangingEventArgsOnly = "text"
         };
@@ -359,7 +359,7 @@ public class PropertyChangeNotifier
     [ExpectedException(typeof(ArgumentNullException))]
     public void PropertyChangesWithoutInWithCachedEventArgsAndNullComparer()
     {
-        new Derivation(new Mock<ILogger<Derivation>>().Object, "text")
+        new Derivation(Substitute.For<ILogger<Derivation>>(), "text")
         {
             TextWithoutInWithCachedEventArgsAndNullComparer = "text"
         };
@@ -370,8 +370,8 @@ public class PropertyChangeNotifier
     {
         var propertiesChanged = new List<string>();
         var propertiesChanging = new List<string>();
-        var mockLogger = new Mock<ILogger<Derivation>>();
-        var derivation = new Derivation(mockLogger.Object, "text");
+        var logger = Substitute.For<MockLogger<Derivation>>();
+        var derivation = new Derivation(logger, "text");
 
         void propertyChanged(object? sender, PropertyChangedEventArgs e)
         {
@@ -394,28 +394,28 @@ public class PropertyChangeNotifier
         derivation.PropertyChanging += propertyChanging;
 
         derivation.TextWithoutIn = "text";
-        Assert.AreEqual(0, mockLogger.Invocations.Count);
+        Assert.AreEqual(0, logger.ReceivedCalls().Count());
         derivation.TextWithoutIn = "other text";
-        mockLogger.VerifyLogDebug("\"TextWithoutIn\" property is changing from \"text\" to \"other text\"");
-        mockLogger.VerifyLogDebug("Raising PropertyChanging event for property \"TextWithoutIn\"");
-        mockLogger.VerifyLogDebug("Raised PropertyChanging event for property \"TextWithoutIn\"");
-        mockLogger.VerifyLogDebug("Raising PropertyChanged event for property \"TextWithoutIn\"");
-        mockLogger.VerifyLogDebug("Raised PropertyChanged event for property \"TextWithoutIn\"");
-        mockLogger.Invocations.Clear();
+        logger.ReceivedLogDebug("\"TextWithoutIn\" property is changing from \"text\" to \"other text\"");
+        logger.ReceivedLogDebug("Raising PropertyChanging event for property \"TextWithoutIn\"");
+        logger.ReceivedLogDebug("Raised PropertyChanging event for property \"TextWithoutIn\"");
+        logger.ReceivedLogDebug("Raising PropertyChanged event for property \"TextWithoutIn\"");
+        logger.ReceivedLogDebug("Raised PropertyChanged event for property \"TextWithoutIn\"");
+        logger.ClearReceivedCalls();
         derivation.NullableTextWithoutIn = "Suprise!";
-        mockLogger.VerifyLogDebug("\"NullableTextWithoutIn\" property is changing from \"(null)\" to \"Suprise!\"");
-        mockLogger.VerifyLogDebug("Raising PropertyChanging event for property \"NullableTextWithoutIn\"");
-        mockLogger.VerifyLogDebug("Raised PropertyChanging event for property \"NullableTextWithoutIn\"");
-        mockLogger.VerifyLogDebug("Raising PropertyChanged event for property \"NullableTextWithoutIn\"");
-        mockLogger.VerifyLogDebug("Raised PropertyChanged event for property \"NullableTextWithoutIn\"");
-        mockLogger.Invocations.Clear();
+        logger.ReceivedLogDebug("\"NullableTextWithoutIn\" property is changing from \"(null)\" to \"Suprise!\"");
+        logger.ReceivedLogDebug("Raising PropertyChanging event for property \"NullableTextWithoutIn\"");
+        logger.ReceivedLogDebug("Raised PropertyChanging event for property \"NullableTextWithoutIn\"");
+        logger.ReceivedLogDebug("Raising PropertyChanged event for property \"NullableTextWithoutIn\"");
+        logger.ReceivedLogDebug("Raised PropertyChanged event for property \"NullableTextWithoutIn\"");
+        logger.ClearReceivedCalls();
         derivation.NullableTextWithoutIn = null;
-        mockLogger.VerifyLogDebug("\"NullableTextWithoutIn\" property is changing from \"Suprise!\" to \"(null)\"");
-        mockLogger.VerifyLogDebug("Raising PropertyChanging event for property \"NullableTextWithoutIn\"");
-        mockLogger.VerifyLogDebug("Raised PropertyChanging event for property \"NullableTextWithoutIn\"");
-        mockLogger.VerifyLogDebug("Raising PropertyChanged event for property \"NullableTextWithoutIn\"");
-        mockLogger.VerifyLogDebug("Raised PropertyChanged event for property \"NullableTextWithoutIn\"");
-        mockLogger.Invocations.Clear();
+        logger.ReceivedLogDebug("\"NullableTextWithoutIn\" property is changing from \"Suprise!\" to \"(null)\"");
+        logger.ReceivedLogDebug("Raising PropertyChanging event for property \"NullableTextWithoutIn\"");
+        logger.ReceivedLogDebug("Raised PropertyChanging event for property \"NullableTextWithoutIn\"");
+        logger.ReceivedLogDebug("Raising PropertyChanged event for property \"NullableTextWithoutIn\"");
+        logger.ReceivedLogDebug("Raised PropertyChanged event for property \"NullableTextWithoutIn\"");
+        logger.ClearReceivedCalls();
 
         derivation.PropertyChanged -= propertyChanged;
         derivation.PropertyChanging -= propertyChanging;

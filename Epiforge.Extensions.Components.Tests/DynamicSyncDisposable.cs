@@ -29,9 +29,9 @@ public class DynamicSyncDisposable
     public void Dispose()
     {
         var disposalNotificationEvents = new List<(string name, DisposalNotificationEventArgs args)>();
-        var mockLogger = new Mock<ILogger<Derivation>>();
+        var logger = Substitute.For<MockLogger<Derivation>>();
         Derivation derivation;
-        using (derivation = new Derivation(mockLogger.Object))
+        using (derivation = new Derivation(logger))
         {
             Assert.IsFalse(derivation.IsDisposed);
             derivation.Disposing += (_, e) => disposalNotificationEvents.Add((nameof(INotifyDisposing.Disposing), e));
@@ -40,18 +40,18 @@ public class DynamicSyncDisposable
             derivation.AddReference();
             derivation.Dispose();
             Assert.IsFalse(derivation.IsDisposed);
-            mockLogger.VerifyLogDebug("Dispose called");
-            mockLogger.VerifyLogDebug($"Raising Disposing event");
-            mockLogger.VerifyLogDebug($"Raising DisposalOverridden event");
-            mockLogger.VerifyLogDebug($"Raising Disposed event", Times.Never());
-            mockLogger.Invocations.Clear();
+            logger.ReceivedLogDebug("Dispose called");
+            logger.ReceivedLogDebug($"Raising Disposing event");
+            logger.ReceivedLogDebug($"Raising DisposalOverridden event");
+            logger.DidNotReceiveLogDebug($"Raising Disposed event");
+            logger.ClearReceivedCalls();
         }
         Assert.IsTrue(derivation.IsDisposed);
-        mockLogger.VerifyLogDebug("Dispose called");
-        mockLogger.VerifyLogDebug($"Raising Disposing event");
-        mockLogger.VerifyLogDebug($"Raising DisposalOverridden event", Times.Never());
-        mockLogger.VerifyLogDebug($"Raising Disposed event");
-        mockLogger.Invocations.Clear();
+        logger.ReceivedLogDebug("Dispose called");
+        logger.ReceivedLogDebug($"Raising Disposing event");
+        logger.DidNotReceiveLogDebug($"Raising DisposalOverridden event");
+        logger.ReceivedLogDebug($"Raising Disposed event");
+        logger.ClearReceivedCalls();
         Assert.AreEqual(nameof(INotifyDisposing.Disposing), disposalNotificationEvents[0].name);
         Assert.IsFalse(disposalNotificationEvents[0].args.IsFinalizer);
         Assert.AreEqual(nameof(INotifyDisposalOverridden.DisposalOverridden), disposalNotificationEvents[1].name);
@@ -66,9 +66,9 @@ public class DynamicSyncDisposable
     [ExpectedException(typeof(ObjectDisposedException))]
     public void ThrowIfDisposed()
     {
-        var mockLogger = new Mock<ILogger<Derivation>>();
+        var logger = Substitute.For<ILogger<Derivation>>();
         Derivation derivation;
-        using (derivation = new Derivation(mockLogger.Object))
+        using (derivation = new Derivation(logger))
         {
         }
         derivation.AddReference();
