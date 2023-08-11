@@ -26,5 +26,5 @@ public sealed class DisposalNotificationEventArgs :
     /// <summary>
     /// Gets a reusable instance of arguments for when disposal is ocurring because the object is being garbage collected
     /// </summary>
-    public static DisposalNotificationEventArgs ByFinalizer { get; } = new DisposalNotificationEventArgs(true);
+    public static DisposalNotificationEventArgs ByCallingFinalizer { get; } = new DisposalNotificationEventArgs(true);
 }

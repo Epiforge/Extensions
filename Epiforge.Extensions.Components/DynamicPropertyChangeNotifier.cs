@@ -8,10 +8,20 @@ public class DynamicPropertyChangeNotifier :
     INotifyPropertyChanged,
     INotifyPropertyChanging
 {
+    ILogger? logger;
+
     /// <summary>
     /// Gets/sets the <see cref="ILogger"/> which will be used
     /// </summary>
-    protected ILogger? Logger { get; set; }
+    protected ILogger? Logger
+    {
+        get => logger;
+        set
+        {
+            logger = value;
+            LoggerSet();
+        }
+    }
 
     /// <summary>
     /// Occurs when a property value changes
@@ -24,6 +34,13 @@ public class DynamicPropertyChangeNotifier :
     public event PropertyChangingEventHandler? PropertyChanging;
 
     /// <summary>
+    /// Called when the <see cref="Logger"/> property is set
+    /// </summary>
+    protected virtual void LoggerSet()
+    {
+    }
+
+    /// <summary>
     /// Raises the <see cref="PropertyChanged"/> event
     /// </summary>
 	/// <param name="e">The arguments of the event</param>
@@ -32,9 +49,9 @@ public class DynamicPropertyChangeNotifier :
     {
         if (e is null)
             throw new ArgumentNullException(nameof(e));
-        Logger?.LogTrace("Raising PropertyChanged event for {PropertyName} property", e.PropertyName);
+        Logger?.LogTrace(EventIds.Epiforge_Extensions_Components_RaisingPropertyChanged, "Raising PropertyChanged event for {PropertyName} property", e.PropertyName);
         PropertyChanged?.Invoke(this, e);
-        Logger?.LogTrace("Raised PropertyChanged event for {PropertyName} property", e.PropertyName);
+        Logger?.LogTrace(EventIds.Epiforge_Extensions_Components_RaisedPropertyChanged, "Raised PropertyChanged event for {PropertyName} property", e.PropertyName);
     }
 
     /// <summary>
@@ -58,9 +75,9 @@ public class DynamicPropertyChangeNotifier :
     {
         if (e is null)
             throw new ArgumentNullException(nameof(e));
-        Logger?.LogTrace("Raising PropertyChanging event for {PropertyName} property", e.PropertyName);
+        Logger?.LogTrace(EventIds.Epiforge_Extensions_Components_RaisingPropertyChanging, "Raising PropertyChanging event for {PropertyName} property", e.PropertyName);
         PropertyChanging?.Invoke(this, e);
-        Logger?.LogTrace("Raised PropertyChanging event for {PropertyName} property", e.PropertyName);
+        Logger?.LogTrace(EventIds.Epiforge_Extensions_Components_RaisedPropertyChanging, "Raised PropertyChanging event for {PropertyName} property", e.PropertyName);
     }
 
     /// <summary>
@@ -107,7 +124,7 @@ public class DynamicPropertyChangeNotifier :
 #endif
         if (!equalityComparer.Equals(backingField, value))
         {
-            Logger?.LogTrace("{PropertyName} property is changing from {OldValue} to {NewValue}", propertyName, backingField, value);
+            Logger?.LogTrace(EventIds.Epiforge_Extensions_Components_SetBackingFieldTriggered, "{PropertyName} property is changing from {OldValue} to {NewValue}", propertyName, backingField, value);
             OnPropertyChanging(propertyName);
             backingField = value;
             OnPropertyChanged(propertyName);
@@ -156,7 +173,7 @@ public class DynamicPropertyChangeNotifier :
 #endif
         if (!equalityComparer.Equals(backingField, value))
         {
-            Logger?.LogTrace("{PropertyName} property is changing from {OldValue} to {NewValue}", propertyChangedEventArgs.PropertyName, backingField, value);
+            Logger?.LogTrace(EventIds.Epiforge_Extensions_Components_SetBackingFieldTriggered, "{PropertyName} property is changing from {OldValue} to {NewValue}", propertyChangedEventArgs.PropertyName, backingField, value);
             OnPropertyChanging(propertyChangingEventArgs);
             backingField = value;
             OnPropertyChanged(propertyChangedEventArgs);
@@ -197,7 +214,7 @@ public class DynamicPropertyChangeNotifier :
 #endif
         if (!equalityComparer.Equals(backingField, value))
         {
-            Logger?.LogTrace("{PropertyName} property is changing from {OldValue} to {NewValue}", propertyName, backingField, value);
+            Logger?.LogTrace(EventIds.Epiforge_Extensions_Components_SetBackingFieldTriggered, "{PropertyName} property is changing from {OldValue} to {NewValue}", propertyName, backingField, value);
             OnPropertyChanging(propertyName);
             backingField = value;
             OnPropertyChanged(propertyName);
@@ -246,7 +263,7 @@ public class DynamicPropertyChangeNotifier :
 #endif
         if (!equalityComparer.Equals(backingField, value))
         {
-            Logger?.LogTrace("{PropertyName} property is changing from {OldValue} to {NewValue}", propertyChangedEventArgs.PropertyName, backingField, value);
+            Logger?.LogTrace(EventIds.Epiforge_Extensions_Components_SetBackingFieldTriggered, "{PropertyName} property is changing from {OldValue} to {NewValue}", propertyChangedEventArgs.PropertyName, backingField, value);
             OnPropertyChanging(propertyChangingEventArgs);
             backingField = value;
             OnPropertyChanged(propertyChangedEventArgs);
