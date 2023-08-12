@@ -1,1 +1,1 @@
-We added support for tracing mutable collection types in this library by passing an ILogger instance to constructors.
+We added event IDs to trace log messages produced by this library.
