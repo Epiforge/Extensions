@@ -9,8 +9,15 @@ public static class LoggingExtensions
     /// Gets a string representation of <see cref="NotifyCollectionChangedEventArgs"/> for logging
     /// </summary>
     /// <param name="e">The <see cref="NotifyCollectionChangedEventArgs"/> instance</param>
-    public static string ToStringForLogging(this NotifyCollectionChangedEventArgs e) =>
-        e.Action switch
+    public static string ToStringForLogging(this NotifyCollectionChangedEventArgs e)
+    {
+#if IS_NET_6_0_OR_GREATER
+        ArgumentNullException.ThrowIfNull(e);
+#else
+        if (e is null)
+            throw new ArgumentNullException(nameof(e));
+#endif
+        return e.Action switch
         {
             NotifyCollectionChangedAction.Add when e.NewItems is { } newItems => $"added {string.Join(", ", newItems.Cast<object>())} at index {e.NewStartingIndex}",
             NotifyCollectionChangedAction.Move when e.OldItems is { } oldItems => $"moved {string.Join(", ", oldItems.Cast<object>())} from index {e.OldStartingIndex} to index {e.NewStartingIndex}",
@@ -19,4 +26,5 @@ public static class LoggingExtensions
             NotifyCollectionChangedAction.Reset => "reset",
             _ => throw new NotSupportedException()
         };
+    }
 }
