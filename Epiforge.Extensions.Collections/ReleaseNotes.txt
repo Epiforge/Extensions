@@ -1,1 +1,1 @@
-We added some slight performance enhancements when tracing is active and checked for null references in some virtual protected methods where we weren't before.
+We exposed an extension method that assists in logging collection change events.

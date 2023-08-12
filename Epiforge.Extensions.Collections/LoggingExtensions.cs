@@ -1,7 +1,14 @@
 namespace Epiforge.Extensions.Collections;
 
-static class LoggingExtensions
+/// <summary>
+/// Extension methods to help with logging for collection operations
+/// </summary>
+public static class LoggingExtensions
 {
+    /// <summary>
+    /// Gets a string representation of <see cref="NotifyCollectionChangedEventArgs"/> for logging
+    /// </summary>
+    /// <param name="e">The <see cref="NotifyCollectionChangedEventArgs"/> instance</param>
     public static string ToStringForLogging(this NotifyCollectionChangedEventArgs e) =>
         e.Action switch
         {
