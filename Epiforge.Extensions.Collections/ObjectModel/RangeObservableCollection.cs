@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+
 namespace Epiforge.Extensions.Collections.ObjectModel;
 
 /// <summary>
@@ -242,26 +244,11 @@ public class RangeObservableCollection<T> :
         if (e is null)
             throw new ArgumentNullException(nameof(e));
 #endif
+        if (logger?.IsEnabled(LogLevel.Trace) ?? false)
+            logger.LogTrace(EventIds.Epiforge_Extensions_Collections_RaisingCollectionChanged, "Raising CollectionChanged: {EventArgs}", e.ToStringForLogging());
         base.OnCollectionChanged(e);
         if (logger?.IsEnabled(LogLevel.Trace) ?? false)
-            switch (e.Action)
-            {
-                case NotifyCollectionChangedAction.Add when e.NewItems is { } newItems:
-                    logger.LogTrace("RangeObservableCollection changed: added {NewItems} at index {NewStartingIndex}", string.Join(", ", newItems.Cast<object>()), e.NewStartingIndex);
-                    break;
-                case NotifyCollectionChangedAction.Move when e.OldItems is { } oldItems:
-                    logger.LogTrace("RangeObservableCollection changed: moved {OldItems} at index {OldStartingIndex} to {NewStartingIndex}", string.Join(", ", oldItems.Cast<object>()), e.OldStartingIndex, e.NewStartingIndex);
-                    break;
-                case NotifyCollectionChangedAction.Remove when e.OldItems is { } oldItems:
-                    logger.LogTrace("RangeObservableCollection changed: removed {OldItems} at index {OldStartingIndex}", string.Join(", ", oldItems.Cast<object>()), e.OldStartingIndex);
-                    break;
-                case NotifyCollectionChangedAction.Replace when e.OldItems is { } oldItems && e.NewItems is { } newItems && e.OldStartingIndex == e.NewStartingIndex:
-                    logger.LogTrace("RangeObservableCollection changed: replaced {OldItems} at index {OldStartingIndex} with {NewItems}", string.Join(", ", oldItems.Cast<object>()), e.OldStartingIndex, string.Join(", ", newItems.Cast<object>()));
-                    break;
-                case NotifyCollectionChangedAction.Reset:
-                    logger.LogTrace("RangeObservableCollection changed: reset");
-                    break;
-            }
+            logger.LogTrace(EventIds.Epiforge_Extensions_Collections_RaisedCollectionChanged, "Raised CollectionChanged: {EventArgs}", e.ToStringForLogging());
     }
 
     /// <summary>

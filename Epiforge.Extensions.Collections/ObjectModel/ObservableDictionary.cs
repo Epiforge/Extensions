@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+
 namespace Epiforge.Extensions.Collections.ObjectModel;
 
 /// <summary>
@@ -523,8 +525,14 @@ public class ObservableDictionary<TKey, TValue> :
     /// Raises the <see cref="INotifyCollectionChanged.CollectionChanged"/> event
     /// </summary>
     /// <param name="e">The event arguments</param>
-    protected virtual void OnCollectionChanged(NotifyCollectionChangedEventArgs e) =>
+    protected virtual void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
+    {
+        if (Logger?.IsEnabled(LogLevel.Trace) ?? false)
+            Logger.LogTrace(EventIds.Epiforge_Extensions_Collections_RaisingCollectionChanged, "Raising CollectionChanged: {EventArgs}", e.ToStringForLogging());
         CollectionChanged?.Invoke(this, e);
+        if (Logger?.IsEnabled(LogLevel.Trace) ?? false)
+            Logger.LogTrace(EventIds.Epiforge_Extensions_Collections_RaisedCollectionChanged, "Raised CollectionChanged: {EventArgs}", e.ToStringForLogging());
+    }
 
     /// <summary>
     /// Raises the <see cref="INotifyDictionaryChanged{TKey, TValue}.DictionaryChanged"/> event
@@ -532,8 +540,9 @@ public class ObservableDictionary<TKey, TValue> :
     /// <param name="e">The event arguments</param>
     protected virtual void OnDictionaryChanged(NotifyDictionaryChangedEventArgs<TKey, TValue> e)
     {
+        Logger?.LogTrace(EventIds.Epiforge_Extensions_Collections_RaisingDictionaryChanged, "Raising DictionaryChanged: {EventArgs}", e);
         DictionaryChanged?.Invoke(this, e);
-        Logger?.LogTrace("ObservableDictionary changed: {EventArgs}", e);
+        Logger?.LogTrace(EventIds.Epiforge_Extensions_Collections_RaisedDictionaryChanged, "Raised DictionaryChanged: {EventArgs}", e);
     }
 
     /// <summary>
