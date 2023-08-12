@@ -244,11 +244,10 @@ public class RangeObservableCollection<T> :
         if (e is null)
             throw new ArgumentNullException(nameof(e));
 #endif
-        if (logger?.IsEnabled(LogLevel.Trace) ?? false)
-            logger.LogTrace(EventIds.Epiforge_Extensions_Collections_RaisingCollectionChanged, "Raising CollectionChanged: {EventArgs}", e.ToStringForLogging());
+        var eventArgs = logger?.IsEnabled(LogLevel.Trace) ?? false ? e.ToStringForLogging() : null;
+        logger?.LogTrace(EventIds.Epiforge_Extensions_Collections_RaisingCollectionChanged, "Raising CollectionChanged: {EventArgs}", eventArgs);
         base.OnCollectionChanged(e);
-        if (logger?.IsEnabled(LogLevel.Trace) ?? false)
-            logger.LogTrace(EventIds.Epiforge_Extensions_Collections_RaisedCollectionChanged, "Raised CollectionChanged: {EventArgs}", e.ToStringForLogging());
+        logger?.LogTrace(EventIds.Epiforge_Extensions_Collections_RaisedCollectionChanged, "Raised CollectionChanged: {EventArgs}", eventArgs);
     }
 
     /// <summary>

@@ -527,11 +527,16 @@ public class ObservableDictionary<TKey, TValue> :
     /// <param name="e">The event arguments</param>
     protected virtual void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
     {
-        if (Logger?.IsEnabled(LogLevel.Trace) ?? false)
-            Logger.LogTrace(EventIds.Epiforge_Extensions_Collections_RaisingCollectionChanged, "Raising CollectionChanged: {EventArgs}", e.ToStringForLogging());
+#if IS_NET_6_0_OR_GREATER
+        ArgumentNullException.ThrowIfNull(e);
+#else
+        if (e is null)
+            throw new ArgumentNullException(nameof(e));
+#endif
+        var eventArgs = Logger?.IsEnabled(LogLevel.Trace) ?? false ? e.ToStringForLogging() : null;
+        Logger?.LogTrace(EventIds.Epiforge_Extensions_Collections_RaisingCollectionChanged, "Raising CollectionChanged: {EventArgs}", eventArgs);
         CollectionChanged?.Invoke(this, e);
-        if (Logger?.IsEnabled(LogLevel.Trace) ?? false)
-            Logger.LogTrace(EventIds.Epiforge_Extensions_Collections_RaisedCollectionChanged, "Raised CollectionChanged: {EventArgs}", e.ToStringForLogging());
+        Logger?.LogTrace(EventIds.Epiforge_Extensions_Collections_RaisedCollectionChanged, "Raised CollectionChanged: {EventArgs}", eventArgs);
     }
 
     /// <summary>
