@@ -40,10 +40,11 @@ sealed class ObservableIndexExpression :
                         argument.PropertyChanged -= ArgumentPropertyChanged;
                         argument.Dispose();
                     }
+                base.Dispose(disposing);
             }
             return removedFromCache;
         }
-        return true;
+        return base.Dispose(disposing);
     }
 
     protected override void Evaluate()
@@ -52,9 +53,15 @@ sealed class ObservableIndexExpression :
         {
             var (objectFault, objectResult) = @object?.Evaluation ?? (null, null);
             if (objectFault is not null)
+            {
                 Evaluation = (objectFault, defaultResult);
+                observer.Logger?.LogTrace("{IndexExpression} object expression faulted: {Fault}", IndexExpression, objectFault);
+            }
             else if (arguments?.Select(argument => argument.Evaluation.Fault).FirstOrDefault(fault => fault is not null) is { } argumentFault)
+            {
                 Evaluation = (argumentFault, defaultResult);
+                observer.Logger?.LogTrace("{IndexExpression} argument expression faulted: {Fault}", IndexExpression, argumentFault);
+            }
             else
             {
                 if (!ReferenceEquals(objectResult, this.objectResult))
@@ -63,12 +70,15 @@ sealed class ObservableIndexExpression :
                     this.objectResult = objectResult;
                     SubscribeToObjectValueNotifications();
                 }
-                Evaluation = (null, getMethod?.FastInvoke(this.objectResult, arguments?.Select(argument => argument.Evaluation.Result).ToArray() ?? Array.Empty<object?>()));
+                var value = getMethod?.FastInvoke(this.objectResult, arguments?.Select(argument => argument.Evaluation.Result).ToArray() ?? Array.Empty<object?>());
+                Evaluation = (null, value);
+                observer.Logger?.LogTrace("{IndexExpression} evaluated: {Value}", IndexExpression, value);
             }
         }
         catch (Exception ex)
         {
             Evaluation = (ex, defaultResult);
+            observer.Logger?.LogTrace("{IndexExpression} faulted: {Fault}", IndexExpression, ex);
         }
     }
 

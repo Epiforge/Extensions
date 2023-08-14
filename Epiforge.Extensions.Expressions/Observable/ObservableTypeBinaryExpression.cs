@@ -3,6 +3,12 @@ namespace Epiforge.Extensions.Expressions.Observable;
 sealed class ObservableTypeBinaryExpression :
     ObservableExpression
 {
+    #region Delegates
+
+    delegate bool TypeIsDelegate(object? obj);
+
+    #endregion Delegates
+
     static readonly ConcurrentDictionary<Type, TypeIsDelegate> delegates = new();
 
     static TypeIsDelegate CreateDelegate(Type type)
@@ -34,19 +40,27 @@ sealed class ObservableTypeBinaryExpression :
                     expression.PropertyChanged -= ExpressionPropertyChanged;
                     expression.Dispose();
                 }
+                base.Dispose(disposing);
             }
             return removedFromCache;
         }
-        return true;
+        return base.Dispose(disposing);
     }
 
     protected override void Evaluate()
     {
         var (expressionFault, expressionValue) = expression?.Evaluation ?? (null, null);
         if (expressionFault is not null)
+        {
             Evaluation = (expressionFault, defaultResult);
+            observer.Logger?.LogTrace("{TypeBinaryExpression} expression faulted: {Fault}", TypeBinaryExpression, expressionFault);
+        }
         else
+        {
+            var value = @delegate?.Invoke(expressionValue);
             Evaluation = (null, @delegate?.Invoke(expressionValue));
+            observer.Logger?.LogTrace("{TypeBinaryExpression} evaluated: {Value}", TypeBinaryExpression, value);
+        }
     }
 
     void ExpressionPropertyChanged(object? sender, PropertyChangedEventArgs e) =>

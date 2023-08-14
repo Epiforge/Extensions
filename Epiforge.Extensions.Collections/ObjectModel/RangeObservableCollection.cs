@@ -1,5 +1,3 @@
-using Microsoft.Extensions.Logging;
-
 namespace Epiforge.Extensions.Collections.ObjectModel;
 
 /// <summary>

@@ -32,6 +32,7 @@ sealed class ObservableCollectionConcatQuery<TElement> :
                 first.PropertyChanged -= FirstPropertyChanged;
                 Second.CollectionChanged -= SecondCollectionChanged;
                 Second.PropertyChanged -= SecondPropertyChanged;
+                RemovedFromCache();
             }
             return removedFromCache;
         }
@@ -89,4 +90,7 @@ sealed class ObservableCollectionConcatQuery<TElement> :
         faultList.Check(Second);
         OperationFault = faultList.Fault;
     }
+
+    public override string ToString() =>
+        $"concatenation of {first} and {Second}";
 }

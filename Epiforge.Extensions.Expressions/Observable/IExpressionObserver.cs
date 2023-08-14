@@ -36,6 +36,11 @@ public interface IExpressionObserver
     bool DisposeStaticMethodReturnValues { get; }
 
     /// <summary>
+    /// Gets the <see cref="ILogger"/> instance to which trace information will be written
+    /// </summary>
+    ILogger? Logger { get; }
+
+    /// <summary>
     /// Gets whether the expression observer will subscribe to <see cref="INotifyCollectionChanged.CollectionChanged" /> events of constant expression values when present and retrieved from a field of a compiler-generated type and cause re-evaluations when they occur; the default is <c>true</c>
     /// </summary>
     bool MemberExpressionsListenToGeneratedTypesFieldValuesForCollectionChanged { get; }
@@ -122,6 +127,15 @@ public interface IExpressionObserver
     IObservableExpression<TResult> Observe<TResult>(LambdaExpression lambdaExpression, params object?[] arguments);
 
     /// <summary>
+    /// Creates an observable expression using a specified lambda expression and arguments, skipping optimizations
+    /// </summary>
+    /// <typeparam name="TResult">The type that <paramref name="lambdaExpression"/> returns</typeparam>
+    /// <param name="lambdaExpression">The lambda expression</param>
+    /// <param name="arguments">The arguments</param>
+    [return: DisposeWhenDiscarded]
+    IObservableExpression<TResult> ObserveWithoutOptimization<TResult>(LambdaExpression lambdaExpression, params object?[] arguments);
+
+    /// <summary>
     /// Creates an observable expression using a specified strongly-typed lambda expression with no arguments
     /// </summary>
     /// <typeparam name="TResult">The type that <paramref name="expression"/> returns</typeparam>
@@ -130,14 +144,32 @@ public interface IExpressionObserver
     IObservableExpression<TResult> Observe<TResult>(Expression<Func<TResult>> expression);
 
     /// <summary>
-    /// Creates an observable expression using a specified strongly-typed lambda expression and one argument
+    /// Creates an observable expression using a specified strongly-typed lambda expression with no arguments, skipping optimizations
     /// </summary>
-    /// <typeparam name="TArgument1">The type of the argument</typeparam>
     /// <typeparam name="TResult">The type that <paramref name="expression"/> returns</typeparam>
-    /// <param name="argument1">The argument</param>
     /// <param name="expression">The strongly-typed lambda expression</param>
     [return: DisposeWhenDiscarded]
-    IObservableExpression<TArgument1, TResult> Observe<TArgument1, TResult>(Expression<Func<TArgument1, TResult>> expression, TArgument1 argument1);
+    IObservableExpression<TResult> ObserveWithoutOptimization<TResult>(Expression<Func<TResult>> expression);
+
+    /// <summary>
+    /// Creates an observable expression using a specified strongly-typed lambda expression and one argument
+    /// </summary>
+    /// <typeparam name="TArgument">The type of the argument</typeparam>
+    /// <typeparam name="TResult">The type that <paramref name="expression"/> returns</typeparam>
+    /// <param name="argument">The argument</param>
+    /// <param name="expression">The strongly-typed lambda expression</param>
+    [return: DisposeWhenDiscarded]
+    IObservableExpression<TArgument, TResult> Observe<TArgument, TResult>(Expression<Func<TArgument, TResult>> expression, TArgument argument);
+
+    /// <summary>
+    /// Creates an observable expression using a specified strongly-typed lambda expression and one argument, skipping optimizations
+    /// </summary>
+    /// <typeparam name="TArgument">The type of the argument</typeparam>
+    /// <typeparam name="TResult">The type that <paramref name="expression"/> returns</typeparam>
+    /// <param name="argument">The argument</param>
+    /// <param name="expression">The strongly-typed lambda expression</param>
+    [return: DisposeWhenDiscarded]
+    IObservableExpression<TArgument, TResult> ObserveWithoutOptimization<TArgument, TResult>(Expression<Func<TArgument, TResult>> expression, TArgument argument);
 
     /// <summary>
     /// Creates an observable expression using a specified strongly-typed lambda expression and two arguments
@@ -152,6 +184,18 @@ public interface IExpressionObserver
     IObservableExpression<TArgument1, TArgument2, TResult> Observe<TArgument1, TArgument2, TResult>(Expression<Func<TArgument1, TArgument2, TResult>> expression, TArgument1 argument1, TArgument2 argument2);
 
     /// <summary>
+    /// Creates an observable expression using a specified strongly-typed lambda expression and two arguments, skipping optimizations
+    /// </summary>
+    /// <typeparam name="TArgument1">The type of the first argument</typeparam>
+    /// <typeparam name="TArgument2">The type of the second argument</typeparam>
+    /// <typeparam name="TResult">The type that <paramref name="expression"/> returns</typeparam>
+    /// <param name="argument1">The first argument</param>
+    /// <param name="argument2">The second argument</param>
+    /// <param name="expression">The strongly-typed lambda expression</param>
+    [return: DisposeWhenDiscarded]
+    IObservableExpression<TArgument1, TArgument2, TResult> ObserveWithoutOptimization<TArgument1, TArgument2, TResult>(Expression<Func<TArgument1, TArgument2, TResult>> expression, TArgument1 argument1, TArgument2 argument2);
+
+    /// <summary>
     /// Creates an observable expression using a specified strongly-typed lambda expression and three arguments
     /// </summary>
     /// <typeparam name="TArgument1">The type of the first argument</typeparam>
@@ -164,4 +208,18 @@ public interface IExpressionObserver
     /// <param name="expression">The strongly-typed lambda expression</param>
     [return: DisposeWhenDiscarded]
     IObservableExpression<TArgument1, TArgument2, TArgument3, TResult> Observe<TArgument1, TArgument2, TArgument3, TResult>(Expression<Func<TArgument1, TArgument2, TArgument3, TResult>> expression, TArgument1 argument1, TArgument2 argument2, TArgument3 argument3);
+
+    /// <summary>
+    /// Creates an observable expression using a specified strongly-typed lambda expression and three arguments, skipping optimizations
+    /// </summary>
+    /// <typeparam name="TArgument1">The type of the first argument</typeparam>
+    /// <typeparam name="TArgument2">The type of the second argument</typeparam>
+    /// <typeparam name="TArgument3">The type of the third argument</typeparam>
+    /// <typeparam name="TResult">The type that <paramref name="expression"/> returns</typeparam>
+    /// <param name="argument1">The first argument</param>
+    /// <param name="argument2">The second argument</param>
+    /// <param name="argument3">The third argument</param>
+    /// <param name="expression">The strongly-typed lambda expression</param>
+    [return: DisposeWhenDiscarded]
+    IObservableExpression<TArgument1, TArgument2, TArgument3, TResult> ObserveWithoutOptimization<TArgument1, TArgument2, TArgument3, TResult>(Expression<Func<TArgument1, TArgument2, TArgument3, TResult>> expression, TArgument1 argument1, TArgument2 argument2, TArgument3 argument3);
 }

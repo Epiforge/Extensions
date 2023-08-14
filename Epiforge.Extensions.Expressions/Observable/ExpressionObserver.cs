@@ -6,6 +6,22 @@ namespace Epiforge.Extensions.Expressions.Observable;
 public class ExpressionObserver :
     IExpressionObserver
 {
+    #region Cache Comparers
+
+    class ConstantExpressionExpressionEqualityComparer :
+        IEqualityComparer<ConstantExpression>
+    {
+        public static ConstantExpressionExpressionEqualityComparer Default { get; } = new();
+
+        public bool Equals(ConstantExpression? x, ConstantExpression? y) =>
+            ExpressionEqualityComparer.Default.Equals(x?.Value as Expression, y?.Value as Expression);
+
+        public int GetHashCode(ConstantExpression obj) =>
+            obj.Value is Expression expression ? ExpressionEqualityComparer.Default.GetHashCode(expression) : 0;
+    }
+
+    #endregion Cache Comparers
+
     static readonly ConcurrentDictionary<MethodInfo, PropertyInfo?> propertyGetMethodToProperty = new();
 
     static PropertyInfo? GetPropertyFromGetMethod(MethodInfo getMethod) =>
@@ -81,6 +97,7 @@ public class ExpressionObserver :
         disposeConstructedTypes = options.DisposeConstructedTypes.Keys.ToImmutableHashSet();
         disposeMethodReturnValues = options.DisposeMethodReturnValues.Keys.ToImmutableHashSet();
         ignoredPropertyChangeNotifications = options.IgnoredPropertyChangeNotifications.Keys.ToImmutableHashSet();
+        Logger = options.Logger;
     }
 
     readonly Dictionary<Expression, IDisposable> cachedDoubleArgumentObservableExpressions = new(ExpressionEqualityComparer.Default);
@@ -181,6 +198,9 @@ public class ExpressionObserver :
     public bool DisposeStaticMethodReturnValues { get; }
 
     /// <inheritdoc/>
+    public ILogger? Logger { get; }
+
+    /// <inheritdoc/>
     public bool MemberExpressionsListenToGeneratedTypesFieldValuesForCollectionChanged { get; }
 
     /// <inheritdoc/>
@@ -197,7 +217,6 @@ public class ExpressionObserver :
         ConditionAsync(condition, CancellationToken.None);
 
     /// <inheritdoc/>
-    //[SuppressMessage("Reliability", "CA2000: Dispose objects before losing scope")]
     public Task ConditionAsync(Expression<Func<bool>> condition, CancellationToken cancellationToken)
     {
         var taskCompletionSource = new TaskCompletionSource<object?>();
@@ -206,7 +225,11 @@ public class ExpressionObserver :
         {
             observableExpression.PropertyChanged -= propertyChangedHandler;
             observableExpression.Dispose();
+#if IS_NET_6_0_OR_GREATER
+            taskCompletionSource.SetCanceled(cancellationToken);
+#else
             taskCompletionSource.SetCanceled();
+#endif
         }
         void propertyChangedHandler(object? sender, PropertyChangedEventArgs e)
         {
@@ -280,6 +303,19 @@ public class ExpressionObserver :
             if (--observableConstantExpression.Observations == 0)
             {
                 cachedExpressions.Remove(observableConstantExpression.ConstantExpression);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    internal bool ExpressionDisposed<TResult>(ObservableExpression<TResult> observableExpression)
+    {
+        lock (cachedObservableExpressionsAccess)
+        {
+            if (--observableExpression.Observations == 0)
+            {
+                cachedObservableExpressions.Remove(observableExpression.Expression);
                 return true;
             }
         }
@@ -742,20 +778,8 @@ public class ExpressionObserver :
         return IsMethodReturnValueDisposed(getMethod);
     }
 
-    /// <inheritdoc/>
-    [return: DisposeWhenDiscarded]
-    public IObservableExpression<TResult> Observe<TResult>(LambdaExpression lambdaExpression, params object?[] arguments)
+    IObservableExpression<TResult> Observe<TResult>(object?[] arguments, Expression? parameterReplacedExpression)
     {
-#if IS_NET_6_0_OR_GREATER
-        ArgumentNullException.ThrowIfNull(lambdaExpression);
-        ArgumentNullException.ThrowIfNull(arguments);
-#else
-        if (lambdaExpression is null)
-            throw new ArgumentNullException(nameof(lambdaExpression));
-        if (arguments is null)
-            throw new ArgumentNullException(nameof(arguments));
-#endif
-        var parameterReplacedExpression = ReplaceParameters(lambdaExpression, arguments);
         lock (cachedObservableExpressionsAccess)
         {
             ObservableExpression<TResult> typedInstance;
@@ -771,17 +795,38 @@ public class ExpressionObserver :
         }
     }
 
-    internal bool Disregard<TResult>(ObservableExpression<TResult> observableExpression)
+    /// <inheritdoc/>
+    [return: DisposeWhenDiscarded]
+    public IObservableExpression<TResult> Observe<TResult>(LambdaExpression lambdaExpression, params object?[] arguments)
     {
-        lock (cachedObservableExpressionsAccess)
-        {
-            if (--observableExpression.Observations == 0)
-            {
-                cachedObservableExpressions.Remove(observableExpression.Expression);
-                return true;
-            }
-        }
-        return false;
+#if IS_NET_6_0_OR_GREATER
+        ArgumentNullException.ThrowIfNull(lambdaExpression);
+        ArgumentNullException.ThrowIfNull(arguments);
+#else
+        if (lambdaExpression is null)
+            throw new ArgumentNullException(nameof(lambdaExpression));
+        if (arguments is null)
+            throw new ArgumentNullException(nameof(arguments));
+#endif
+        var parameterReplacedExpression = ReplaceParameters(lambdaExpression, arguments);
+        return Observe<TResult>(arguments, parameterReplacedExpression);
+    }
+
+    /// <inheritdoc/>
+    [return: DisposeWhenDiscarded]
+    public IObservableExpression<TResult> ObserveWithoutOptimization<TResult>(LambdaExpression lambdaExpression, params object?[] arguments)
+    {
+#if IS_NET_6_0_OR_GREATER
+        ArgumentNullException.ThrowIfNull(lambdaExpression);
+        ArgumentNullException.ThrowIfNull(arguments);
+#else
+        if (lambdaExpression is null)
+            throw new ArgumentNullException(nameof(lambdaExpression));
+        if (arguments is null)
+            throw new ArgumentNullException(nameof(arguments));
+#endif
+        var parameterReplacedExpression = ReplaceParametersWithoutOptimization(lambdaExpression, arguments);
+        return Observe<TResult>(arguments, parameterReplacedExpression);
     }
 
     /// <inheritdoc/>
@@ -791,15 +836,11 @@ public class ExpressionObserver :
 
     /// <inheritdoc/>
     [return: DisposeWhenDiscarded]
-    public IObservableExpression<TArgument, TResult> Observe<TArgument, TResult>(Expression<Func<TArgument, TResult>> expression, TArgument argument)
+    public IObservableExpression<TResult> ObserveWithoutOptimization<TResult>(Expression<Func<TResult>> expression) =>
+        ObserveWithoutOptimization<TResult>((LambdaExpression)expression);
+
+    IObservableExpression<TArgument, TResult> Observe<TArgument, TResult>(TArgument argument, Expression? parameterReplacedExpression)
     {
-#if IS_NET_6_0_OR_GREATER
-        ArgumentNullException.ThrowIfNull(expression);
-#else
-        if (expression is null)
-            throw new ArgumentNullException(nameof(expression));
-#endif
-        var parameterReplacedExpression = ReplaceParameters(expression, argument);
         lock (cachedSingleArgumentObservableExpressionsAccess)
         {
             ObservableExpression<TArgument, TResult> typedInstance;
@@ -817,7 +858,7 @@ public class ExpressionObserver :
 
     /// <inheritdoc/>
     [return: DisposeWhenDiscarded]
-    public IObservableExpression<TArgument1, TArgument2, TResult> Observe<TArgument1, TArgument2, TResult>(Expression<Func<TArgument1, TArgument2, TResult>> expression, TArgument1 argument1, TArgument2 argument2)
+    public IObservableExpression<TArgument, TResult> Observe<TArgument, TResult>(Expression<Func<TArgument, TResult>> expression, TArgument argument)
     {
 #if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(expression);
@@ -825,7 +866,26 @@ public class ExpressionObserver :
         if (expression is null)
             throw new ArgumentNullException(nameof(expression));
 #endif
-        var parameterReplacedExpression = ReplaceParameters(expression, argument1, argument2);
+        var parameterReplacedExpression = ReplaceParameters(expression, argument);
+        return Observe<TArgument, TResult>(argument, parameterReplacedExpression);
+    }
+
+    /// <inheritdoc/>
+    [return: DisposeWhenDiscarded]
+    public IObservableExpression<TArgument, TResult> ObserveWithoutOptimization<TArgument, TResult>(Expression<Func<TArgument, TResult>> expression, TArgument argument)
+    {
+#if IS_NET_6_0_OR_GREATER
+        ArgumentNullException.ThrowIfNull(expression);
+#else
+        if (expression is null)
+            throw new ArgumentNullException(nameof(expression));
+#endif
+        var parameterReplacedExpression = ReplaceParametersWithoutOptimization(expression, argument);
+        return Observe<TArgument, TResult>(argument, parameterReplacedExpression);
+    }
+
+    IObservableExpression<TArgument1, TArgument2, TResult> Observe<TArgument1, TArgument2, TResult>(TArgument1 argument1, TArgument2 argument2, Expression? parameterReplacedExpression)
+    {
         lock (cachedDoubleArgumentObservableExpressionsAccess)
         {
             ObservableExpression<TArgument1, TArgument2, TResult> typedInstance;
@@ -843,7 +903,7 @@ public class ExpressionObserver :
 
     /// <inheritdoc/>
     [return: DisposeWhenDiscarded]
-    public IObservableExpression<TArgument1, TArgument2, TArgument3, TResult> Observe<TArgument1, TArgument2, TArgument3, TResult>(Expression<Func<TArgument1, TArgument2, TArgument3, TResult>> expression, TArgument1 argument1, TArgument2 argument2, TArgument3 argument3)
+    public IObservableExpression<TArgument1, TArgument2, TResult> Observe<TArgument1, TArgument2, TResult>(Expression<Func<TArgument1, TArgument2, TResult>> expression, TArgument1 argument1, TArgument2 argument2)
     {
 #if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(expression);
@@ -851,7 +911,26 @@ public class ExpressionObserver :
         if (expression is null)
             throw new ArgumentNullException(nameof(expression));
 #endif
-        var parameterReplacedExpression = ReplaceParameters(expression, argument1, argument2, argument3);
+        var parameterReplacedExpression = ReplaceParameters(expression, argument1, argument2);
+        return Observe<TArgument1, TArgument2, TResult>(argument1, argument2, parameterReplacedExpression);
+    }
+
+    /// <inheritdoc/>
+    [return: DisposeWhenDiscarded]
+    public IObservableExpression<TArgument1, TArgument2, TResult> ObserveWithoutOptimization<TArgument1, TArgument2, TResult>(Expression<Func<TArgument1, TArgument2, TResult>> expression, TArgument1 argument1, TArgument2 argument2)
+    {
+#if IS_NET_6_0_OR_GREATER
+        ArgumentNullException.ThrowIfNull(expression);
+#else
+        if (expression is null)
+            throw new ArgumentNullException(nameof(expression));
+#endif
+        var parameterReplacedExpression = ReplaceParametersWithoutOptimization(expression, argument1, argument2);
+        return Observe<TArgument1, TArgument2, TResult>(argument1, argument2, parameterReplacedExpression);
+    }
+
+    IObservableExpression<TArgument1, TArgument2, TArgument3, TResult> Observe<TArgument1, TArgument2, TArgument3, TResult>(TArgument1 argument1, TArgument2 argument2, TArgument3 argument3, Expression? parameterReplacedExpression)
+    {
         lock (cachedTripleArgumentObservableExpressionsAccess)
         {
             ObservableExpression<TArgument1, TArgument2, TArgument3, TResult> typedInstance;
@@ -867,10 +946,43 @@ public class ExpressionObserver :
         }
     }
 
+    /// <inheritdoc/>
+    [return: DisposeWhenDiscarded]
+    public IObservableExpression<TArgument1, TArgument2, TArgument3, TResult> Observe<TArgument1, TArgument2, TArgument3, TResult>(Expression<Func<TArgument1, TArgument2, TArgument3, TResult>> expression, TArgument1 argument1, TArgument2 argument2, TArgument3 argument3)
+    {
+#if IS_NET_6_0_OR_GREATER
+        ArgumentNullException.ThrowIfNull(expression);
+#else
+        if (expression is null)
+            throw new ArgumentNullException(nameof(expression));
+#endif
+        var parameterReplacedExpression = ReplaceParameters(expression, argument1, argument2, argument3);
+        return Observe<TArgument1, TArgument2, TArgument3, TResult>(argument1, argument2, argument3, parameterReplacedExpression);
+    }
+
+    /// <inheritdoc/>
+    [return: DisposeWhenDiscarded]
+    public IObservableExpression<TArgument1, TArgument2, TArgument3, TResult> ObserveWithoutOptimization<TArgument1, TArgument2, TArgument3, TResult>(Expression<Func<TArgument1, TArgument2, TArgument3, TResult>> expression, TArgument1 argument1, TArgument2 argument2, TArgument3 argument3)
+    {
+#if IS_NET_6_0_OR_GREATER
+        ArgumentNullException.ThrowIfNull(expression);
+#else
+        if (expression is null)
+            throw new ArgumentNullException(nameof(expression));
+#endif
+        var parameterReplacedExpression = ReplaceParametersWithoutOptimization(expression, argument1, argument2, argument3);
+        return Observe<TArgument1, TArgument2, TArgument3, TResult>(argument1, argument2, argument3, parameterReplacedExpression);
+    }
+
     internal Expression? ReplaceParameters(LambdaExpression lambdaExpression, params object?[] arguments)
     {
-        var parameterTranslation = new Dictionary<ParameterExpression, ConstantExpression>();
         lambdaExpression = (LambdaExpression)(Optimizer?.Invoke(lambdaExpression) ?? lambdaExpression);
+        return ReplaceParametersWithoutOptimization(lambdaExpression, arguments);
+    }
+
+    internal Expression? ReplaceParametersWithoutOptimization(LambdaExpression lambdaExpression, params object?[] arguments)
+    {
+        var parameterTranslation = new Dictionary<ParameterExpression, ConstantExpression>();
         for (var i = 0; i < lambdaExpression.Parameters.Count; ++i)
         {
             var parameter = lambdaExpression.Parameters[i];

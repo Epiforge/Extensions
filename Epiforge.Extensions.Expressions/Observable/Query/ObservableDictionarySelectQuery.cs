@@ -144,7 +144,7 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
         var expressionObserver = collectionObserver.ExpressionObserver;
         foreach (var sourceKeyValuePair in source)
         {
-            var observableExpression = expressionObserver.Observe(KeyValuePairSelector, sourceKeyValuePair);
+            var observableExpression = expressionObserver.ObserveWithoutOptimization(KeyValuePairSelector, sourceKeyValuePair);
             if (observableExpression.Evaluation.Result is KeyValuePair<TKey, TValue> resultKeyValuePair)
             {
                 if (resultKeyValuePair.Key is null)
@@ -204,7 +204,7 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
                 var newResult = new ObservableDictionary<TKey, TValue>();
                 foreach (var sourceKeyValuePair in source)
                 {
-                    var observableExpression = expressionObserver.Observe(KeyValuePairSelector, sourceKeyValuePair);
+                    var observableExpression = expressionObserver.ObserveWithoutOptimization(KeyValuePairSelector, sourceKeyValuePair);
                     if (observableExpression.Evaluation.Result is KeyValuePair<TKey, TValue> resultKeyValuePair)
                     {
                         if (resultKeyValuePair.Key is null)
@@ -255,7 +255,7 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
                 if (e.NewItems is { } newItems)
                     foreach (var keyValuePair in newItems)
                     {
-                        var observableExpression = expressionObserver.Observe(KeyValuePairSelector, keyValuePair);
+                        var observableExpression = expressionObserver.ObserveWithoutOptimization(KeyValuePairSelector, keyValuePair);
                         if (observableExpression.Evaluation.Result is KeyValuePair<TKey, TValue> resultKeyValuePair)
                         {
                             if (resultKeyValuePair.Key is null)
@@ -277,6 +277,9 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
             }
         }
     }
+
+    public override string ToString() =>
+        $"mapping {source} with {KeyValuePairSelector} and using {EqualityComparer}";
 
     public override bool TryGetValue(TKey key, out TValue value)
     {

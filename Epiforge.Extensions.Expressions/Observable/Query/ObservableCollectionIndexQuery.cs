@@ -19,12 +19,16 @@ sealed class ObservableCollectionIndexQuery<TElement> :
         {
             var removedFromCache = observableCollectionQuery.QueryDisposed(this);
             if (removedFromCache)
+            {
                 observableCollectionQuery.CollectionChanged -= ObservableCollectionQueryCollectionChanged;
+                RemovedFromCache();
+            }
             return removedFromCache;
         }
         return true;
     }
 
+    [SuppressMessage("Performance", "CA1826: Do not use Enumerable methods on indexable collections")]
     void Evaluate()
     {
         if (observableCollectionQuery.OperationFault is { } fault)
@@ -79,4 +83,13 @@ sealed class ObservableCollectionIndexQuery<TElement> :
         observableCollectionQuery.CollectionChanged += ObservableCollectionQueryCollectionChanged;
         Evaluate();
     }
+
+    public override string ToString() =>
+        $"{Index switch
+        {
+            { Value: 0, IsFromEnd: false } => "first",
+            { IsFromEnd: true } => "last",
+            null => "single",
+            { Value: var indexOffset } => $"position {indexOffset}",
+        }} in {observableCollectionQuery} or {(OutOfRangeIsDefault ? "default" : "fault")} if out of range";
 }

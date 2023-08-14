@@ -25,6 +25,7 @@ sealed class ObservableDictionaryAggregateQuery<TKey, TValue, TAccumulate, TResu
             {
                 observableDictionaryQuery.DictionaryChanged -= ObservableDictionaryQueryDictionaryChanged;
                 observableDictionaryQuery.PropertyChanged -= ObservableDictionaryQueryPropertyChanged;
+                RemovedFromCache();
             }
             return removedFromCache;
         }
@@ -66,4 +67,7 @@ sealed class ObservableDictionaryAggregateQuery<TKey, TValue, TAccumulate, TResu
         observableDictionaryQuery.PropertyChanged += ObservableDictionaryQueryPropertyChanged;
         Evaluate();
     }
+
+    public override string ToString() =>
+        $"aggregate of {observableDictionaryQuery}";
 }

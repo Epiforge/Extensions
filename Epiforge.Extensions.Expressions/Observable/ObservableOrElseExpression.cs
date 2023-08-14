@@ -12,16 +12,29 @@ sealed class ObservableOrElseExpression :
     {
         var (leftFault, leftResult) = left?.Evaluation ?? (null, null);
         if (leftFault is not null)
+        {
             Evaluation = (leftFault, defaultResult);
+            observer.Logger?.LogTrace("{BinaryExpression} left-hand operand faulted: {Fault}", BinaryExpression, leftFault);
+        }
         else if (leftResult is bool leftBool && leftBool)
+        {
             Evaluation = (null, true);
+            observer.Logger?.LogTrace("{BinaryExpression} evaluated: {Value}", BinaryExpression, true);
+        }
         else
         {
             var (rightFault, rightResult) = right?.Evaluation ?? (null, null);
             if (rightFault is not null)
+            {
                 Evaluation = (rightFault, defaultResult);
+                observer.Logger?.LogTrace("{BinaryExpression} right-hand operand faulted: {Fault}", BinaryExpression, rightFault);
+            }
             else
-                Evaluation = (null, rightResult is bool rightBool && rightBool);
+            {
+                var value = rightResult is bool rightBool && rightBool;
+                Evaluation = (null, value);
+                observer.Logger?.LogTrace("{BinaryExpression} evaluated: {Value}", BinaryExpression, value);
+            }
         }
     }
 }

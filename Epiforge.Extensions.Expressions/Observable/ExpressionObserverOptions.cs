@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+
 namespace Epiforge.Extensions.Expressions.Observable;
 
 /// <summary>
@@ -42,6 +44,11 @@ public class ExpressionObserverOptions
     /// Gets/sets whether the expression observer will dispose of objects it has received as a result of invoking static (Shared in Visual Basic) methods when the objects are replaced or otherwise discarded; the default is <c>true</c>
     /// </summary>
     public bool DisposeStaticMethodReturnValues { get; set; } = true;
+
+    /// <summary>
+    /// Gets/sets the <see cref="ILogger"/> instance to which trace information will be written; the default is <c>null</c>
+    /// </summary>
+    public ILogger? Logger { get; set; }
 
     /// <summary>
     /// Gets/sets whether the expression observer will subscribe to <see cref="INotifyCollectionChanged.CollectionChanged" /> events of constant expression values when present and retrieved from a field of a compiler-generated type and cause re-evaluations when they occur; the default is <c>true</c>

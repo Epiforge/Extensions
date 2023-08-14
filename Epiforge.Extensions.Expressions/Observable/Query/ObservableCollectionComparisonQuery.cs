@@ -27,6 +27,7 @@ sealed class ObservableCollectionComparisonQuery<TResult> :
             {
                 observableCollectionQuery.CollectionChanged -= ObservableCollectionQueryCollectionChanged;
                 observableCollectionQuery.PropertyChanged -= ObservableCollectionQueryPropertyChanged;
+                RemovedFromCache();
             }
             return removedFromCache;
         }
@@ -37,8 +38,8 @@ sealed class ObservableCollectionComparisonQuery<TResult> :
     {
         lock (access)
         {
-            if (observableCollectionQuery.OperationFault is { } fault)
-                Evaluation = (fault, default!);
+            if (observableCollectionQuery.OperationFault is { } queryFault)
+                Evaluation = (queryFault, default!);
             else if (observableCollectionQuery.HasIndexerPenalty)
             {
                 using var enumerator = observableCollectionQuery.GetEnumerator();
@@ -130,4 +131,7 @@ sealed class ObservableCollectionComparisonQuery<TResult> :
         observableCollectionQuery.CollectionChanged += ObservableCollectionQueryCollectionChanged;
         observableCollectionQuery.PropertyChanged += ObservableCollectionQueryPropertyChanged;
     }
+
+    public override string ToString() =>
+        $"{(SoughtComparison > 0 ? "max" : "min")} of {observableCollectionQuery}";
 }

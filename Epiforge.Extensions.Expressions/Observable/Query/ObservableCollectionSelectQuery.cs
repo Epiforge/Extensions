@@ -61,6 +61,7 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult> :
                 source.CollectionChanged -= SourceCollectionChanged;
                 source.PropertyChanging -= SourcePropertyChanging;
                 source.PropertyChanged -= SourcePropertyChanged;
+                RemovedFromCache();
             }
             return removedFromCache;
         }
@@ -106,7 +107,7 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult> :
 
             void processElement(TElement element)
             {
-                var observableExpression = collectionObserver.ExpressionObserver.Observe(Selector, element);
+                var observableExpression = collectionObserver.ExpressionObserver.ObserveWithoutOptimization(Selector, element);
                 observableExpressions.Add(observableExpression);
                 if (observableExpression.Evaluation.Fault is { } fault)
                     evaluationFaultExceptions!.Add(new EvaluationFaultException(element, fault));
@@ -154,7 +155,7 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult> :
 
         void processElement(TElement element)
         {
-            var observableExpression = collectionObserver.ExpressionObserver.Observe(Selector, element);
+            var observableExpression = collectionObserver.ExpressionObserver.ObserveWithoutOptimization(Selector, element);
             observableExpressions.Add(observableExpression);
             if (observableExpression.Evaluation.Fault is { } fault)
                 evaluationFaultExceptions!.Add(new EvaluationFaultException(element, fault));
@@ -228,7 +229,7 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult> :
                         for (int i = 0, ii = e.NewItems.Count; i < ii; ++i)
                         {
                             var element = (TElement)e.NewItems[i]!;
-                            var addedObservableExpression = collectionObserver.ExpressionObserver.Observe(Selector, element);
+                            var addedObservableExpression = collectionObserver.ExpressionObserver.ObserveWithoutOptimization(Selector, element);
                             newItems.Add(addedObservableExpression.Evaluation.Result);
                             addedObservableExpressions.Add(addedObservableExpression);
                             if (observableExpressionCounts.TryGetValue(addedObservableExpression, out var observableExpressionCount))
@@ -294,4 +295,7 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult> :
         if (e.PropertyName == nameof(Count))
             OnPropertyChanging(e);
     }
+
+    public override string ToString() =>
+        $"mapping {source} with {Selector}";
 }

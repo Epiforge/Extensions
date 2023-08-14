@@ -37,6 +37,7 @@ sealed class ObservableCollectionUsingSyncRootQuery<TElement> :
                 source.CollectionChanged -= SourceCollectionChanged;
                 elements!.CollectionChanged += ElementsCollectionChanged;
                 ((INotifyPropertyChanged)elements!).PropertyChanged -= ElementsPropertyChanged;
+                RemovedFromCache();
             }
             return removedFromCache;
         }
@@ -84,4 +85,7 @@ sealed class ObservableCollectionUsingSyncRootQuery<TElement> :
             }
         }
     }
+
+    public override string ToString() =>
+        $"synchronizing {source} using {SyncRoot} eventually";
 }

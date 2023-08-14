@@ -32,6 +32,7 @@ sealed class ObservableDictionaryAnyQuery<TKey, TValue> :
                     observableDictionaryQuery.DictionaryChanged -= ObservableDictionaryQueryDictionaryChanged;
                     observableDictionaryQuery.PropertyChanged -= ObservableDictionaryQueryPropertyChanged;
                 }
+                RemovedFromCache();
             }
             return removedFromCache;
         }
@@ -69,6 +70,9 @@ sealed class ObservableDictionaryAnyQuery<TKey, TValue> :
         }
         Evaluate();
     }
+
+    public override string ToString() =>
+        Predicate is null ? $"any of {observableDictionaryQuery}" : $"any of {observableDictionaryQuery} matching {Predicate}";
 
     void WhereDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e) =>
         Evaluate();

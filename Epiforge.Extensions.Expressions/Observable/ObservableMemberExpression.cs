@@ -35,10 +35,11 @@ sealed class ObservableMemberExpression :
                     observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
                     observableExpression.Dispose();
                 }
+                base.Dispose(disposing);
             }
             return removedFromCache;
         }
-        return true;
+        return base.Dispose(disposing);
     }
 
     protected override void Evaluate()
@@ -47,7 +48,10 @@ sealed class ObservableMemberExpression :
         {
             var (observableExpressionFault, observableExpressionResult) = observableExpression?.Evaluation ?? (null, null);
             if (observableExpressionFault is not null)
+            {
                 Evaluation = (observableExpressionFault, defaultResult);
+                observer.Logger?.LogTrace("{MemberExpression} faulted: {Fault}", MemberExpression, observableExpressionFault);
+            }
             else if (getMethod is not null)
             {
                 if (observableExpressionResult != this.observableExpressionResult)
@@ -56,18 +60,23 @@ sealed class ObservableMemberExpression :
                     this.observableExpressionResult = observableExpressionResult;
                     SubscribeToExpressionValueNotifications();
                 }
-                Evaluation = (null, getMethod.FastInvoke(observableExpressionResult, Array.Empty<object?>()));
+                var value = getMethod.FastInvoke(observableExpressionResult, Array.Empty<object?>());
+                Evaluation = (null, value);
+                observer.Logger?.LogTrace("{MemberExpression} evaluated: {Value}", MemberExpression, value);
             }
             else if (field is not null)
             {
                 UnsubscribeFromValueNotifications();
-                Evaluation = (null, field.GetValue(observableExpressionResult));
+                var value = field.GetValue(observableExpressionResult);
+                Evaluation = (null, value);
+                observer.Logger?.LogTrace("{MemberExpression} evaluated: {Value}", MemberExpression, value);
                 SubscribeToValueNotifications();
             }
         }
         catch (Exception ex)
         {
             Evaluation = (ex, defaultResult);
+            observer.Logger?.LogTrace("{MemberExpression} faulted: {Fault}", MemberExpression, ex);
         }
     }
 

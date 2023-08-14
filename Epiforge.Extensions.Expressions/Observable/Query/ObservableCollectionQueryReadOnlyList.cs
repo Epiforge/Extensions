@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
 sealed class ObservableCollectionQueryReadOnlyList<TElement> :
@@ -40,6 +42,8 @@ sealed class ObservableCollectionQueryReadOnlyList<TElement> :
                     propertyChangedNotifier.PropertyChanged -= PropertyChangedNotifierPropertyChanged;
                 if (ReadOnlyList is INotifyCollectionChanged collectionChangedNotifier)
                     collectionChangedNotifier.CollectionChanged -= CollectionChangedNotifierCollectionChanged;
+                if (collectionObserver.ExpressionObserver.Logger is { } logger && logger.IsEnabled(LogLevel.Trace))
+                    logger.LogTrace("Disposed observation of read-only list of {ElementTypeFullName} elements (hash code {HashCode})", typeof(TElement).FullName, ReadOnlyList.GetHashCode());
             }
             return removedFromCache;
         }
@@ -54,6 +58,8 @@ sealed class ObservableCollectionQueryReadOnlyList<TElement> :
             propertyChangedNotifier.PropertyChanged += PropertyChangedNotifierPropertyChanged;
         if (ReadOnlyList is INotifyCollectionChanged collectionChangedNotifier)
             collectionChangedNotifier.CollectionChanged += CollectionChangedNotifierCollectionChanged;
+        if (collectionObserver.ExpressionObserver.Logger is { } logger && logger.IsEnabled(LogLevel.Trace))
+            logger.LogTrace("Initialized observation of read-only list of {ElementTypeFullName} elements (hash code {HashCode})", typeof(TElement).FullName, ReadOnlyList.GetHashCode());
     }
 
     void PropertyChangedNotifierPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -67,4 +73,7 @@ sealed class ObservableCollectionQueryReadOnlyList<TElement> :
         if (e.PropertyName == nameof(IReadOnlyList<TElement>.Count))
             OnPropertyChanging(e);
     }
+
+    public override string ToString() =>
+        $"read-only list of {typeof(TElement).FullName} elements (hash code {ReadOnlyList.GetHashCode()})";
 }

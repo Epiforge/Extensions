@@ -84,6 +84,7 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue> :
                 result.DictionaryChanged -= ResultDictionaryChanged;
                 result.PropertyChanging -= ResultPropertyChanging;
                 result.PropertyChanged -= ResultPropertyChanged;
+                RemovedFromCache();
             }
             return removedFromCache;
         }
@@ -103,7 +104,7 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue> :
         var expressionObserver = collectionObserver.ExpressionObserver;
         foreach (var keyValuePair in source)
         {
-            var observableExpression = expressionObserver.Observe(Predicate, keyValuePair);
+            var observableExpression = expressionObserver.ObserveWithoutOptimization(Predicate, keyValuePair);
             if (!faultList.Check(observableExpression) && observableExpression.Evaluation.Result)
                 result.Add(keyValuePair.Key, keyValuePair.Value);
             observableExpression.PropertyChanging += ObservableExpressionPropertyChanging;
@@ -170,7 +171,7 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue> :
                 var faultList = new FaultList();
                 foreach (var keyValuePair in source)
                 {
-                    var observableExpression = expressionObserver.Observe(Predicate, keyValuePair);
+                    var observableExpression = expressionObserver.ObserveWithoutOptimization(Predicate, keyValuePair);
                     if (!faultList.Check(observableExpression) && observableExpression.Evaluation.Result)
                         newResult.Add(keyValuePair.Key, keyValuePair.Value);
                     observableExpression.PropertyChanging += ObservableExpressionPropertyChanging;
@@ -205,7 +206,7 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue> :
                 foreach (var keyValuePair in e.NewItems)
                 {
                     var key = keyValuePair.Key;
-                    var observableExpression = expressionObserver.Observe(Predicate, keyValuePair);
+                    var observableExpression = expressionObserver.ObserveWithoutOptimization(Predicate, keyValuePair);
                     var (fault, predicateResult) = observableExpression.Evaluation;
                     if (fault is not null)
                     {
@@ -223,6 +224,9 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue> :
             }
         }
     }
+
+    public override string ToString() =>
+        $"{source} matching {Predicate}";
 
     public override bool TryGetValue(TKey key, out TValue value)
     {

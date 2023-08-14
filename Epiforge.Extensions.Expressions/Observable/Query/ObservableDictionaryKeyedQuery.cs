@@ -25,6 +25,7 @@ sealed class ObservableDictionaryKeyedQuery<TKey, TValue> :
             {
                 observableDictionaryQuery.DictionaryChanged -= ObservableDictionaryQueryDictionaryChanged;
                 observableDictionaryQuery.PropertyChanged -= ObservableDictionaryQueryPropertyChanged;
+                RemovedFromCache();
             }
             return removedFromCache;
         }
@@ -104,4 +105,7 @@ sealed class ObservableDictionaryKeyedQuery<TKey, TValue> :
         observableDictionaryQuery.PropertyChanged += ObservableDictionaryQueryPropertyChanged;
         Evaluate();
     }
+
+    public override string ToString() =>
+        $"first key/value pair in {observableDictionaryQuery}{(KeyComparer is null ? string.Empty : $" sorted by {KeyComparer}")} or {(NotFoundIsDefault ? "default" : "fault")} if not found";
 }

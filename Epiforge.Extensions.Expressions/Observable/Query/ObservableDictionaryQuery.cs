@@ -126,8 +126,12 @@ abstract class ObservableDictionaryQuery<TKey, TValue> :
     IEnumerator IEnumerable.GetEnumerator() =>
         GetEnumerator();
 
-    protected void OnDictionaryChanged(NotifyDictionaryChangedEventArgs<TKey, TValue> e) =>
+    protected void OnDictionaryChanged(NotifyDictionaryChangedEventArgs<TKey, TValue> e)
+    {
+        Logger?.LogTrace(Collections.EventIds.Epiforge_Extensions_Collections_RaisingDictionaryChanged, "Raising DictionaryChanged: {EventArgs}", e);
         DictionaryChanged?.Invoke(this, e);
+        Logger?.LogTrace(Collections.EventIds.Epiforge_Extensions_Collections_RaisedDictionaryChanged, "Raised DictionaryChanged: {EventArgs}", e);
+    }
 
     public abstract bool TryGetValue(TKey key, out TValue value);
 

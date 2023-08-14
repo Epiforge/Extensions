@@ -7,8 +7,11 @@ abstract class ObservableQuery :
     protected static readonly PropertyChangedEventArgs countPropertyChangedEventArgs = new(nameof(IReadOnlyList<object>.Count));
     protected static readonly PropertyChangingEventArgs countPropertyChangingEventArgs = new(nameof(IReadOnlyList<object>.Count));
 
-    public ObservableQuery(CollectionObserver collectionObserver) =>
+    public ObservableQuery(CollectionObserver collectionObserver)
+    {
         this.collectionObserver = collectionObserver;
+        Logger = collectionObserver.ExpressionObserver.Logger;
+    }
 
     protected readonly CollectionObserver collectionObserver;
     readonly object initializationAccess = new();
@@ -29,8 +32,16 @@ abstract class ObservableQuery :
                 return;
             OnInitialization();
             isInitialized = true;
+            if (collectionObserver.ExpressionObserver.Logger is { } logger && logger.IsEnabled(LogLevel.Trace))
+                logger.LogTrace("Initialized observation of {Query}", this);
         }
     }
 
     protected abstract void OnInitialization();
+
+    protected void RemovedFromCache()
+    {
+        if (collectionObserver.ExpressionObserver.Logger is { } logger && logger.IsEnabled(LogLevel.Trace))
+            logger.LogTrace("Disposed observation of {Query}", this);
+    }
 }

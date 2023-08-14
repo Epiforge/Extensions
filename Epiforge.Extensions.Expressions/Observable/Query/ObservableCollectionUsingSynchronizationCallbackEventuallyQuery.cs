@@ -53,6 +53,7 @@ sealed class ObservableCollectionUsingSynchronizationCallbackEventuallyQuery<TEl
                 source.CollectionChanged -= SourceCollectionChanged;
                 elements!.CollectionChanged -= ElementsCollectionChanged;
                 ((INotifyPropertyChanged)elements!).PropertyChanged -= ElementsPropertyChanged;
+                RemovedFromCache();
             }
             return removedFromCache;
         }
@@ -136,4 +137,7 @@ sealed class ObservableCollectionUsingSynchronizationCallbackEventuallyQuery<TEl
                 }
             }
     }
+
+    public override string ToString() =>
+        $"synchronizing {source} using callback eventually";
 }

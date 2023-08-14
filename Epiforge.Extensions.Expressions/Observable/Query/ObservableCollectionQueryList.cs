@@ -37,6 +37,8 @@ sealed class ObservableCollectionQueryList :
                     propertyChangedNotifier.PropertyChanged -= PropertyChangedNotifierPropertyChanged;
                 if (List is INotifyCollectionChanged collectionChangedNotifier)
                     collectionChangedNotifier.CollectionChanged -= CollectionChangedNotifierCollectionChanged;
+                if (collectionObserver.ExpressionObserver.Logger is { } logger && logger.IsEnabled(LogLevel.Trace))
+                    logger.LogTrace("Disposed observation of list of object elements (hash code {HashCode})", List.GetHashCode());
             }
             return removedFromCache;
         }
@@ -54,6 +56,8 @@ sealed class ObservableCollectionQueryList :
             propertyChangedNotifier.PropertyChanged += PropertyChangedNotifierPropertyChanged;
         if (List is INotifyCollectionChanged collectionChangedNotifier)
             collectionChangedNotifier.CollectionChanged += CollectionChangedNotifierCollectionChanged;
+        if (collectionObserver.ExpressionObserver.Logger is { } logger && logger.IsEnabled(LogLevel.Trace))
+            logger.LogTrace("Initialized observation of list of object elements (hash code {HashCode})", List.GetHashCode());
     }
 
     void PropertyChangedNotifierPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -67,4 +71,7 @@ sealed class ObservableCollectionQueryList :
         if (e.PropertyName == "Count")
             OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
     }
+
+    public override string ToString() =>
+        $"list of object elements (hash code {List.GetHashCode()})";
 }

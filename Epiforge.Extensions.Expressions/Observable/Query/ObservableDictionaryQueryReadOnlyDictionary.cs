@@ -41,6 +41,8 @@ sealed class ObservableDictionaryQueryReadOnlyDictionary<TKey, TValue> :
                     propertyChangedNotifier.PropertyChanged -= PropertyChangedNotifierPropertyChanged;
                 if (ReadOnlyDictionary is INotifyDictionaryChanged<TKey, TValue> dictionaryChangedNotifier)
                     dictionaryChangedNotifier.DictionaryChanged -= DictionaryChangedNotifierDictionaryChanged;
+                if (collectionObserver.ExpressionObserver.Logger is { } logger && logger.IsEnabled(LogLevel.Trace))
+                    logger.LogTrace("Disposed observation of read-only dictionary of {KeyTypeFullName}/{ValueTypeFullName} key/value pairs (hash code {HashCode})", typeof(TKey).FullName, typeof(TValue).FullName, ReadOnlyDictionary.GetHashCode());
             }
             return removedFromCache;
         }
@@ -58,6 +60,8 @@ sealed class ObservableDictionaryQueryReadOnlyDictionary<TKey, TValue> :
             propertyChangedNotifier.PropertyChanged += PropertyChangedNotifierPropertyChanged;
         if (ReadOnlyDictionary is INotifyDictionaryChanged<TKey, TValue> dictionaryChangedNotifier)
             dictionaryChangedNotifier.DictionaryChanged += DictionaryChangedNotifierDictionaryChanged;
+        if (collectionObserver.ExpressionObserver.Logger is { } logger && logger.IsEnabled(LogLevel.Trace))
+            logger.LogTrace("Initialized observation of read-only dictionary of {KeyTypeFullName}/{ValueTypeFullName} key/value pairs (hash code {HashCode})", typeof(TKey).FullName, typeof(TValue).FullName, ReadOnlyDictionary.GetHashCode());
     }
 
     void PropertyChangedNotifierPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -71,6 +75,9 @@ sealed class ObservableDictionaryQueryReadOnlyDictionary<TKey, TValue> :
         if (e.PropertyName == nameof(IReadOnlyDictionary<TKey, TValue>.Count))
             OnPropertyChanging(e);
     }
+
+    public override string ToString() =>
+        $"read-only dictionary of {typeof(TKey).FullName}/{typeof(TValue).FullName} key/value pairs (hash code {ReadOnlyDictionary.GetHashCode()})";
 
     public override bool TryGetValue(TKey key, out TValue value) =>
         ReadOnlyDictionary.TryGetValue(key, out value!);

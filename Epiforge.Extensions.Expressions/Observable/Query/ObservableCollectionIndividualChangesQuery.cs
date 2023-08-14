@@ -7,7 +7,7 @@ sealed class ObservableCollectionIndividualChangesQuery<TElement> :
         base(collectionObserver)
     {
         access = new();
-        elements = new();
+        elements = Logger is null ? new() : new(Logger);
         this.source = source;
     }
 
@@ -43,6 +43,7 @@ sealed class ObservableCollectionIndividualChangesQuery<TElement> :
                 elements.CollectionChanged -= ElementsCollectionChanged;
                 ((INotifyPropertyChanged)elements).PropertyChanged -= ElementsPropertyChanged;
                 source.CollectionChanged -= SourceCollectionChanged;
+                RemovedFromCache();
             }
             return removedFromCache;
         }
@@ -126,4 +127,7 @@ sealed class ObservableCollectionIndividualChangesQuery<TElement> :
             }
         }
     }
+
+    public override string ToString() =>
+        $"individual changes to {source}";
 }

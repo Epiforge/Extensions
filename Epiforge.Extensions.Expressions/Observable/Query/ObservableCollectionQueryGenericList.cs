@@ -37,6 +37,8 @@ sealed class ObservableCollectionQueryGenericList<TElement> :
                     propertyChangedNotifier.PropertyChanged -= PropertyChangedNotifierPropertyChanged;
                 if (List is INotifyCollectionChanged collectionChangedNotifier)
                     collectionChangedNotifier.CollectionChanged -= CollectionChangedNotifierCollectionChanged;
+                if (collectionObserver.ExpressionObserver.Logger is { } logger && logger.IsEnabled(LogLevel.Trace))
+                    logger.LogTrace("Disposed observation of list of {ElementTypeFullName} elements (hash code {HashCode})", typeof(TElement).FullName, List.GetHashCode());
             }
             return removedFromCache;
         }
@@ -54,6 +56,8 @@ sealed class ObservableCollectionQueryGenericList<TElement> :
             propertyChangedNotifier.PropertyChanged += PropertyChangedNotifierPropertyChanged;
         if (List is INotifyCollectionChanged collectionChangedNotifier)
             collectionChangedNotifier.CollectionChanged += CollectionChangedNotifierCollectionChanged;
+        if (collectionObserver.ExpressionObserver.Logger is { } logger && logger.IsEnabled(LogLevel.Trace))
+            logger.LogTrace("Initialized observation of list of {ElementTypeFullName} elements (hash code {HashCode})", typeof(TElement).FullName, List.GetHashCode());
     }
 
     void PropertyChangedNotifierPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -67,4 +71,7 @@ sealed class ObservableCollectionQueryGenericList<TElement> :
         if (e.PropertyName == nameof(IList<TElement>.Count))
             OnPropertyChanging(e);
     }
+
+    public override string ToString() =>
+        $"list of {typeof(TElement).FullName} elements (hash code {List.GetHashCode()})";
 }

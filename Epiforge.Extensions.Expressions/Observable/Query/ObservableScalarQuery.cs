@@ -14,6 +14,15 @@ abstract class ObservableScalarQuery<TResult> :
     public (Exception? Fault, TResult Result) Evaluation
     {
         get => evaluation;
-        protected set => SetBackedProperty(ref evaluation, in value);
+        protected set
+        {
+            if (SetBackedProperty(ref evaluation, in value) && Logger is { } logger && logger.IsEnabled(LogLevel.Trace))
+            {
+                if (value.Fault is { } fault)
+                    logger.LogTrace("{ScalarQuery} faulted: {Fault}", this, fault);
+                else
+                    logger.LogTrace("{ScalarQuery} evaluated: {Result}", this, value.Result);
+            }
+        }
     }
 }

@@ -21,33 +21,48 @@ sealed class ObservableConditionalExpression :
         if (disposing)
         {
             var removedFromCache = observer.ExpressionDisposed(this);
-            if (test is not null)
+            if (removedFromCache)
             {
-                test.PropertyChanged -= TestPropertyChanged;
-                test.Dispose();
-            }
-            if (ifTrue is not null)
-            {
-                ifTrue.PropertyChanged -= IfTruePropertyChanged;
-                ifTrue.Dispose();
-            }
-            if (ifFalse is not null)
-            {
-                ifFalse.PropertyChanged -= IfFalsePropertyChanged;
-                ifFalse.Dispose();
+                if (test is not null)
+                {
+                    test.PropertyChanged -= TestPropertyChanged;
+                    test.Dispose();
+                }
+                if (ifTrue is not null)
+                {
+                    ifTrue.PropertyChanged -= IfTruePropertyChanged;
+                    ifTrue.Dispose();
+                }
+                if (ifFalse is not null)
+                {
+                    ifFalse.PropertyChanged -= IfFalsePropertyChanged;
+                    ifFalse.Dispose();
+                }
+                base.Dispose(disposing);
             }
             return removedFromCache;
         }
-        return true;
+        return base.Dispose(disposing);
     }
 
     protected override void Evaluate()
     {
         var (testFault, testResult) = test?.Evaluation ?? (null, null);
         if (testFault is not null)
+        {
             Evaluation = (testFault, defaultResult);
+            observer.Logger?.LogTrace("{ConditionalExpression} test faulted: {Fault}", ConditionalExpression, testFault);
+        }
+        else if (testResult is bool testBool)
+        {
+            Evaluation = testBool ? ifTrue!.Evaluation : ifFalse!.Evaluation;
+            observer.Logger?.LogTrace("{ConditionalExpression} test: {TestResult}", ConditionalExpression, testBool);
+        }
         else
-            Evaluation = testResult is bool testBool && testBool ? ifTrue!.Evaluation : ifFalse!.Evaluation;
+        {
+            Evaluation = (new InvalidCastException(), defaultResult);
+            observer.Logger?.LogWarning("{ConditionalExpression} test is of type {TestResultType} when a boolean is required", ConditionalExpression, testResult?.GetType());
+        }
     }
 
     protected override void OnInitialization()

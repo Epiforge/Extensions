@@ -33,6 +33,8 @@ sealed class ObservableCollectionQueryGenericEnumerable<TElement> :
             {
                 if (Enumerable is INotifyCollectionChanged collectionChangedNotifier)
                     collectionChangedNotifier.CollectionChanged -= CollectionChangedNotifierCollectionChanged;
+                if (collectionObserver.ExpressionObserver.Logger is { } logger && logger.IsEnabled(LogLevel.Trace))
+                    logger.LogTrace("Disposed observation of enumerable of {ElementTypeFullName} elements (hash code {HashCode})", typeof(TElement).FullName, Enumerable.GetHashCode());
             }
             return removedFromCache;
         }
@@ -46,5 +48,10 @@ sealed class ObservableCollectionQueryGenericEnumerable<TElement> :
     {
         if (Enumerable is INotifyCollectionChanged collectionChangedNotifier)
             collectionChangedNotifier.CollectionChanged += CollectionChangedNotifierCollectionChanged;
+        if (collectionObserver.ExpressionObserver.Logger is { } logger && logger.IsEnabled(LogLevel.Trace))
+            logger.LogTrace("Initialized observation of enumerable of {ElementTypeFullName} elements (hash code {HashCode})", typeof(TElement).FullName, Enumerable.GetHashCode());
     }
+
+    public override string ToString() =>
+        $"enumerable of {typeof(TElement).FullName} elements (hash code {Enumerable.GetHashCode()})";
 }

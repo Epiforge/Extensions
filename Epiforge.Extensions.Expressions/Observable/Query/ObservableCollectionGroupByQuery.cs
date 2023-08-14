@@ -55,7 +55,7 @@ sealed class ObservableCollectionGroupByQuery<TKey, TElement> :
         RangeObservableCollection<TElement> collection;
         if (!collectionAndGroupingByKey.TryGetValue(key, out var collectionAndGrouping))
         {
-            collection = new RangeObservableCollection<TElement>();
+            collection = collectionObserver.ExpressionObserver.Logger is { } logger ? new(logger) : new();
             var grouping = new ObservableGrouping<TKey, TElement>(collectionObserver, key, (ObservableCollectionQuery<TElement>)collectionObserver.ObserveReadOnlyList(collection));
             grouping.Initialize();
             collectionAndGrouping = (collection, grouping);
@@ -85,6 +85,7 @@ sealed class ObservableCollectionGroupByQuery<TKey, TElement> :
                         select.PropertyChanged -= SelectPropertyChanged;
                         select.Dispose();
                     }
+                    RemovedFromCache();
                 }
             return removedFromCache;
         }
@@ -161,4 +162,7 @@ sealed class ObservableCollectionGroupByQuery<TKey, TElement> :
         if (e.PropertyName == nameof(IObservableCollectionQuery<Tuple<TElement, TKey>>.OperationFault))
             OperationFault = select!.OperationFault;
     }
+
+    public override string ToString() =>
+        $"grouping of {source} by {KeySelector}";
 }

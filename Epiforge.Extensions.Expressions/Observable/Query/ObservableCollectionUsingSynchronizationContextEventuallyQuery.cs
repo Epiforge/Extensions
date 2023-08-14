@@ -40,6 +40,7 @@ sealed class ObservableCollectionUsingSynchronizationContextEventuallyQuery<TEle
                 source.CollectionChanged -= SourceCollectionChanged;
                 elements!.CollectionChanged += ElementsCollectionChanged;
                 ((INotifyPropertyChanged)elements!).PropertyChanged -= ElementsPropertyChanged;
+                RemovedFromCache();
             }
             return removedFromCache;
         }
@@ -85,4 +86,7 @@ sealed class ObservableCollectionUsingSynchronizationContextEventuallyQuery<TEle
                     break;
             }
         }, null);
+
+    public override string ToString() =>
+        $"synchronizing {source} using {SynchronizationContext} eventually";
 }

@@ -3,6 +3,7 @@ global using Epiforge.Extensions.Collections.Generic;
 global using Epiforge.Extensions.Collections.ObjectModel;
 global using Epiforge.Extensions.Collections.Specialized;
 global using Epiforge.Extensions.Components;
+global using Microsoft.Extensions.Logging;
 global using Nito.AsyncEx;
 global using System;
 global using System.Collections;

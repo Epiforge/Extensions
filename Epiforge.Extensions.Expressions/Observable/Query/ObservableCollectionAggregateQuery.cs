@@ -24,6 +24,7 @@ sealed class ObservableCollectionAggregateQuery<TElement, TAccumulate, TResult> 
             {
                 observableCollectionQuery.CollectionChanged -= ObservableCollectionQueryCollectionChanged;
                 observableCollectionQuery.PropertyChanged -= ObservableCollectionQueryPropertyChanged;
+                RemovedFromCache();
             }
             return removedFromCache;
         }
@@ -62,4 +63,7 @@ sealed class ObservableCollectionAggregateQuery<TElement, TAccumulate, TResult> 
         observableCollectionQuery.PropertyChanged += ObservableCollectionQueryPropertyChanged;
         Evaluate();
     }
+
+    public override string ToString() =>
+        $"aggregate of {observableCollectionQuery}";
 }

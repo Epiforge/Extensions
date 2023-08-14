@@ -3,6 +3,12 @@ namespace Epiforge.Extensions.Expressions.Observable;
 class ObservableBinaryExpression :
     ObservableExpression
 {
+    #region Delegates
+
+    delegate object? BinaryOperationDelegate(object? left, object? right);
+
+    #endregion Delegates
+
     sealed record ImplementationsKey(ExpressionType NodeType, Type LeftType, Type RightType, Type ReturnValueType, bool IsLiftedToNull, MethodInfo? Method);
 
     static readonly ConcurrentDictionary<ImplementationsKey, BinaryOperationDelegate> implementations = new();
@@ -46,10 +52,11 @@ class ObservableBinaryExpression :
                     right.PropertyChanged -= RightPropertyChanged;
                     right.Dispose();
                 }
+                base.Dispose(disposing);
             }
             return removedFromCache;
         }
-        return true;
+        return base.Dispose(disposing);
     }
 
     protected override void Evaluate()
@@ -58,19 +65,30 @@ class ObservableBinaryExpression :
         {
             var (leftFault, leftResult) = left?.Evaluation ?? (null, null);
             if (leftFault is not null)
+            {
                 Evaluation = (leftFault, defaultResult);
+                observer.Logger?.LogTrace("{BinaryExpression} left-hand operand faulted: {Fault}", BinaryExpression, leftFault);
+            }
             else
             {
                 var (rightFault, rightResult) = right?.Evaluation ?? (null, null);
                 if (rightFault is not null)
+                {
                     Evaluation = (rightFault, defaultResult);
+                    observer.Logger?.LogTrace("{BinaryExpression} right-hand operand faulted: {Fault}", BinaryExpression, rightFault);
+                }
                 else
-                    Evaluation = (null, @delegate?.Invoke(leftResult, rightResult));
+                {
+                    var value = @delegate?.Invoke(leftResult, rightResult);
+                    Evaluation = (null, value);
+                    observer.Logger?.LogTrace("{BinaryExpression} evaluated: {Value}", BinaryExpression, value);
+                }
             }
         }
         catch (Exception ex)
         {
             Evaluation = (ex, defaultResult);
+            observer.Logger?.LogTrace("{BinaryExpression} faulted: {Fault}", BinaryExpression, ex);
         }
     }
 

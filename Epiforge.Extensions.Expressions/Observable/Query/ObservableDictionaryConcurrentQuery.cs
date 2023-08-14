@@ -37,6 +37,7 @@ sealed class ObservableDictionaryConcurrentQuery<TKey, TValue> :
                 source.DictionaryChanged -= SourceDictionaryChanged;
                 observableConcurrentDictionary!.DictionaryChanged -= ObservableConcurrentDictionaryDictionaryChanged;
                 observableConcurrentDictionary.PropertyChanged -= ObservableConcurrentDictionaryPropertyChanged;
+                RemovedFromCache();
             }
             return removedFromCache;
         }
@@ -78,6 +79,9 @@ sealed class ObservableDictionaryConcurrentQuery<TKey, TValue> :
                     observableConcurrentDictionary!.TryAdd(newKeyValuePair.Key, newKeyValuePair.Value);
         }
     }
+
+    public override string ToString() =>
+        $"conversion of {source} to a concurrent dictionary";
 
     public override bool TryGetValue(TKey key, out TValue value) =>
         observableConcurrentDictionary!.TryGetValue(key, out value);

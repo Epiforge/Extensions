@@ -32,10 +32,11 @@ sealed class ObservableMemberInitExpression :
                         kv.Key.PropertyChanged -= MemberAssignmentObservableExpressionPropertyChanged;
                         kv.Key.Dispose();
                     }
+                base.Dispose(disposing);
             }
             return removedFromCache;
         }
-        return true;
+        return base.Dispose(disposing);
     }
 
     protected override void Evaluate()
@@ -44,9 +45,15 @@ sealed class ObservableMemberInitExpression :
         {
             var (newObservableExpressionFault, newObservableExpressionResult) = newObservableExpression?.Evaluation ?? (null, null);
             if (newObservableExpressionFault is not null)
+            {
                 Evaluation = (newObservableExpressionFault, defaultResult);
+                observer.Logger?.LogTrace("{MemberInitExpression} new faulted: {Fault}", MemberInitExpression, newObservableExpressionFault);
+            }
             else if (memberAssignmentObservableExpressions?.Keys.Select(memberAssignmentObservableExpression => memberAssignmentObservableExpression.Evaluation.Fault).FirstOrDefault(fault => fault is not null) is { } memberAssignmentObservableExpressionFault)
+            {
                 Evaluation = (memberAssignmentObservableExpressionFault, defaultResult);
+                observer.Logger?.LogTrace("{MemberInitExpression} member assignment faulted: {Fault}", MemberInitExpression, memberAssignmentObservableExpressionFault);
+            }
             else
             {
                 if (memberAssignmentObservableExpressions is not null)
@@ -60,11 +67,13 @@ sealed class ObservableMemberInitExpression :
                             throw new NotSupportedException("Cannot handle member that is not a field or property");
                     }
                 Evaluation = (null, newObservableExpressionResult);
+                observer.Logger?.LogTrace("{MemberInitExpression} evaluated: {Value}", MemberInitExpression, newObservableExpressionResult);
             }
         }
         catch (Exception ex)
         {
             Evaluation = (ex, defaultResult);
+            observer.Logger?.LogTrace("{MemberInitExpression} faulted: {Fault}", MemberInitExpression, ex);
         }
     }
 

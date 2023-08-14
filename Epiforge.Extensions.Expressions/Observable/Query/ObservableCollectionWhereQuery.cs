@@ -63,6 +63,7 @@ sealed class ObservableCollectionWhereQuery<TElement> :
                         observableExpression.Dispose();
                 }
                 source.CollectionChanged -= SourceCollectionChanged;
+                RemovedFromCache();
             }
             return removedFromCache;
         }
@@ -132,7 +133,7 @@ sealed class ObservableCollectionWhereQuery<TElement> :
 
             void processElement(TElement element)
             {
-                var observableExpression = collectionObserver.ExpressionObserver.Observe(Predicate, element);
+                var observableExpression = collectionObserver.ExpressionObserver.ObserveWithoutOptimization(Predicate, element);
                 observableExpressions.Add(observableExpression);
                 if (observableExpression.Evaluation.Fault is { } fault)
                     evaluationFaultExceptions!.Add(new EvaluationFaultException(element, fault));
@@ -209,7 +210,7 @@ sealed class ObservableCollectionWhereQuery<TElement> :
                         for (var i = 0; i < e.NewItems.Count; ++i)
                         {
                             var element = (TElement)e.NewItems[i]!;
-                            var observableExpression = collectionObserver.ExpressionObserver.Observe(Predicate, element);
+                            var observableExpression = collectionObserver.ExpressionObserver.ObserveWithoutOptimization(Predicate, element);
                             observableExpressions.Insert(e.NewStartingIndex + i, observableExpression);
                             if (observableExpressionCounts.TryGetValue(observableExpression, out var existingCount))
                                 observableExpressionCounts[observableExpression] = existingCount + 1;
@@ -267,7 +268,7 @@ sealed class ObservableCollectionWhereQuery<TElement> :
                     observableExpressionCounts.Clear();
                     void processElement(TElement element)
                     {
-                        var observableExpression = collectionObserver.ExpressionObserver.Observe(Predicate, element);
+                        var observableExpression = collectionObserver.ExpressionObserver.ObserveWithoutOptimization(Predicate, element);
                         observableExpressions.Add(observableExpression);
                         if (observableExpression.Evaluation.Fault is { } fault)
                             evaluationFaultExceptions!.Add(new EvaluationFaultException(element, fault));
@@ -303,6 +304,9 @@ sealed class ObservableCollectionWhereQuery<TElement> :
             }
         }
     }
+
+    public override string ToString() =>
+        $"{source} matching {Predicate}";
 
     int TranslateIndex(int index) =>
         index - observableExpressions.Take(index).Count(ae => !ae.Evaluation.Result);

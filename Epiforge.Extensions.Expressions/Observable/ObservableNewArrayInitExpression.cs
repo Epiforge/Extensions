@@ -26,22 +26,27 @@ sealed class ObservableNewArrayInitExpression :
                         initializer.PropertyChanged -= InitializerPropertyChanged;
                         initializer.Dispose();
                     }
+                base.Dispose(disposing);
             }
             return removedFromCache;
         }
-        return true;
+        return base.Dispose(disposing);
     }
 
     protected override void Evaluate()
     {
         if (initializers?.Select(initializer => initializer.Evaluation.Fault).FirstOrDefault(fault => fault is not null) is { } initializerFault)
+        {
             Evaluation = (initializerFault, defaultResult);
+            observer.Logger?.LogTrace("{NewArrayExpression} initializer faulted: {Fault}", NewArrayExpression, initializerFault);
+        }
         else
         {
             var array = Array.CreateInstance(elementType!, initializers?.Count ?? 0);
             for (int i = 0, ii = initializers?.Count ?? 0; i < ii; ++i)
                 array.SetValue(initializers?[i].Evaluation.Result, i);
             Evaluation = (null, array);
+            observer.Logger?.LogTrace("{NewArrayExpression} evaluated: {Value}", NewArrayExpression, array);
         }
     }
 

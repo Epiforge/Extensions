@@ -112,7 +112,7 @@ sealed class ObservableDictionaryToCollectionQuery<TElement, TKey, TValue> :
         var expressionObserver = collectionObserver.ExpressionObserver;
         foreach (var keyValuePair in source)
         {
-            var observableExpression = expressionObserver.Observe(Selector, keyValuePair);
+            var observableExpression = expressionObserver.ObserveWithoutOptimization(Selector, keyValuePair);
             if (!faultList.Check(observableExpression))
                 elements.Add(observableExpression.Evaluation.Result);
             observableExpression.PropertyChanging += ObservableExpressionPropertyChanging;
@@ -144,7 +144,7 @@ sealed class ObservableDictionaryToCollectionQuery<TElement, TKey, TValue> :
                 var faultList = new FaultList();
                 foreach (var keyValuePair in source)
                 {
-                    var observableExpression = expressionObserver.Observe(Selector, keyValuePair);
+                    var observableExpression = expressionObserver.ObserveWithoutOptimization(Selector, keyValuePair);
                     if (!faultList.Check(observableExpression))
                         newElements.Add(observableExpression.Evaluation.Result);
                     observableExpression.PropertyChanging += ObservableExpressionPropertyChanging;
@@ -175,7 +175,7 @@ sealed class ObservableDictionaryToCollectionQuery<TElement, TKey, TValue> :
                 }
                 foreach (var keyValuePair in e.NewItems)
                 {
-                    var observableExpression = expressionObserver.Observe(Selector, keyValuePair);
+                    var observableExpression = expressionObserver.ObserveWithoutOptimization(Selector, keyValuePair);
                     var (fault, element) = observableExpression.Evaluation;
                     if (fault is not null)
                     {

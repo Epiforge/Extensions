@@ -20,7 +20,10 @@ sealed class ObservableDictionaryValueForQuery<TKey, TValue> :
         {
             var removedFromCache = observableDictionaryQuery.QueryDisposed(this);
             if (removedFromCache)
+            {
                 observableDictionaryQuery.DictionaryChanged -= ObservableDictionaryQueryDictionaryChanged;
+                RemovedFromCache();
+            }
             return removedFromCache;
         }
         return true;
@@ -40,4 +43,7 @@ sealed class ObservableDictionaryValueForQuery<TKey, TValue> :
         observableDictionaryQuery.DictionaryChanged += ObservableDictionaryQueryDictionaryChanged;
         Evaluate();
     }
+
+    public override string ToString() =>
+        $"value for {Key} in {observableDictionaryQuery} or {(NotFoundIsDefault ? "default" : "fault")} if not found";
 }

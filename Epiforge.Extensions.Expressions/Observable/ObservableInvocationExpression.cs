@@ -20,7 +20,7 @@ sealed class ObservableInvocationExpression :
         switch (InvocationExpression.Expression)
         {
             case LambdaExpression lambdaExpression when observableArguments is not null:
-                observableExpression = observer.GetObservableExpression(observer.ReplaceParameters(lambdaExpression, observableArguments.Select(observableArgument => observableArgument.Evaluation.Result).ToArray() ?? Array.Empty<object?>())!, IsDeferringEvaluation);
+                observableExpression = observer.GetObservableExpression(observer.ReplaceParametersWithoutOptimization(lambdaExpression, observableArguments.Select(observableArgument => observableArgument.Evaluation.Result).ToArray() ?? Array.Empty<object?>())!, IsDeferringEvaluation);
                 break;
             case Expression expression when typeof(Delegate).IsAssignableFrom(expression.Type):
                 var observableDelegateExpressionCreated = false;
@@ -66,8 +66,9 @@ sealed class ObservableInvocationExpression :
                         obserableArgument.PropertyChanged -= ObservableArgumentPropertyChanged;
                         obserableArgument.Dispose();
                     }
+                base.Dispose(disposing);
             }
-            return removedFromCache;
+            return base.Dispose(disposing);
         }
         return true;
     }
@@ -76,11 +77,20 @@ sealed class ObservableInvocationExpression :
     {
         var (observableExpressionFault, observableExpressionResult) = observableExpression?.Evaluation ?? (null, null);
         if (observableExpressionFault is not null)
+        {
             Evaluation = (observableExpressionFault, defaultResult);
+            observer.Logger?.LogTrace("{InvocationExpression} is faulted: {Fault}", InvocationExpression, observableExpressionFault);
+        }
         else if (observableArguments?.Select(observableArgument => observableArgument.Evaluation.Fault).FirstOrDefault(fault => fault is not null) is { } observableArgumentFault)
+        {
             Evaluation = (observableArgumentFault, defaultResult);
+            observer.Logger?.LogTrace("{InvocationExpression} argument is faulted: {Fault}", InvocationExpression, observableArgumentFault);
+        }
         else
+        {
             Evaluation = (null, observableExpressionResult);
+            observer.Logger?.LogTrace("{InvocationExpression} evaluated: {Result}", InvocationExpression, observableExpressionResult);
+        }
     }
 
     void ObservableArgumentPropertyChanged(object? sender, PropertyChangedEventArgs e)

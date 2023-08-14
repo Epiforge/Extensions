@@ -32,6 +32,7 @@ sealed class ObservableCollectionSumQuery<TElement, TResult> :
                     select.PropertyChanged -= SelectPropertyChanged;
                     select.Dispose();
                 }
+                RemovedFromCache();
             }
             return removedFromCache;
         }
@@ -86,4 +87,7 @@ sealed class ObservableCollectionSumQuery<TElement, TResult> :
         if (e.PropertyName == nameof(IObservableCollectionQuery<TResult>.OperationFault))
             Evaluate();
     }
+
+    public override string ToString() =>
+        select is null ? $"sum of {observableCollectionQuery}" : $"sum of {select}";
 }

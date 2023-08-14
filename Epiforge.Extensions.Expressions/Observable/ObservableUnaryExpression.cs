@@ -3,6 +3,12 @@ namespace Epiforge.Extensions.Expressions.Observable;
 sealed class ObservableUnaryExpression :
     ObservableExpression
 {
+    #region Delegates
+
+    delegate object? UnaryOperationDelegate(object? operand);
+
+    #endregion Delegates
+
     sealed record ImplementationsKey(ExpressionType NodeType, Type OperandType, Type ReturnValueType, MethodInfo? Method);
 
     static readonly ConcurrentDictionary<ImplementationsKey, UnaryOperationDelegate> implementations = new();
@@ -38,10 +44,11 @@ sealed class ObservableUnaryExpression :
                     operand.PropertyChanged -= OperandPropertyChanged;
                     operand.Dispose();
                 }
+                base.Dispose(disposing);
             }
             return removedFromCache;
         }
-        return true;
+        return base.Dispose(disposing);
     }
 
     protected override void Evaluate()
@@ -50,13 +57,21 @@ sealed class ObservableUnaryExpression :
         {
             var (operandFault, operandResult) = operand?.Evaluation ?? (null, null);
             if (operandFault is not null)
+            {
                 Evaluation = (operandFault, defaultResult);
+                observer.Logger?.LogTrace("{UnaryExpression} operand faulted: {Fault}", UnaryExpression, operandFault);
+            }
             else
-                Evaluation = (null, @delegate?.Invoke(operandResult));
+            {
+                var value = @delegate?.Invoke(operandResult);
+                Evaluation = (null, value);
+                observer.Logger?.LogTrace("{UnaryExpression} evaluated: {Value}", UnaryExpression, value);
+            }
         }
         catch (Exception ex)
         {
             Evaluation = (ex, defaultResult);
+            observer.Logger?.LogTrace("{UnaryExpression} faulted: {Fault}", UnaryExpression, ex);
         }
     }
 

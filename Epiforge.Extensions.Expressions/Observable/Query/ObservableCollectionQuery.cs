@@ -247,8 +247,13 @@ abstract class ObservableCollectionQuery<TElement> :
     IEnumerator IEnumerable.GetEnumerator() =>
         GetEnumerator();
 
-    protected void OnCollectionChanged(NotifyCollectionChangedEventArgs e) =>
+    protected void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
+    {
+        var eventArgs = Logger?.IsEnabled(LogLevel.Trace) ?? false ? e.ToStringForLogging() : null;
+        Logger?.LogTrace(Collections.EventIds.Epiforge_Extensions_Collections_RaisingCollectionChanged, "Raising CollectionChanged: {EventArgs}", eventArgs);
         CollectionChanged?.Invoke(this, e);
+        Logger?.LogTrace(Collections.EventIds.Epiforge_Extensions_Collections_RaisedCollectionChanged, "Raised CollectionChanged: {EventArgs}", eventArgs);
+    }
 
     [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TResult> ObserveAggregate<TAccumulate, TResult>(Func<TAccumulate> seedFactory, Func<TAccumulate, TElement, TAccumulate> func, Func<TAccumulate, TResult> resultSelector)

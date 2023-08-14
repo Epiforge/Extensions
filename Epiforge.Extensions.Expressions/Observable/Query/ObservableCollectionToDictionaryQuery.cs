@@ -92,6 +92,7 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue> :
                 dictionary.DictionaryChanged -= DictionaryDictionaryChanged;
                 dictionary.PropertyChanging -= DictionaryPropertyChanging;
                 dictionary.PropertyChanged -= DictionaryPropertyChanged;
+                RemovedFromCache();
             }
             return removedFromCache;
         }
@@ -217,6 +218,9 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue> :
         faultList.Check(select!);
         OperationFault = faultList.Fault;
     }
+
+    public override string ToString() =>
+        $"conversion of {source} to a dictionary mapping keys using {KeySelector} and values using {ValueSelector}";
 
     public override bool TryGetValue(TKey key, out TValue value)
     {

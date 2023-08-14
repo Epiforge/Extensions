@@ -98,6 +98,7 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult> :
                     select.PropertyChanged -= SelectPropertyChanged;
                     select.PropertyChanging -= SelectPropertyChanging;
                     select.Dispose();
+                    RemovedFromCache();
                 }
             }
             return removedFromCache;
@@ -285,4 +286,7 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult> :
 
     void SetCount(int value) =>
         SetBackedProperty(ref count, in value, countPropertyChangingEventArgs, countPropertyChangedEventArgs);
+
+    public override string ToString() =>
+        $"reduction of mapping {source} with {Selector}";
 }

@@ -26,6 +26,7 @@ sealed class ObservableCollectionAverageQuery<TElement, TResult> :
                     sum.Dispose();
                 }
                 observableCollectionQuery.PropertyChanged -= ObservableCollectionQueryPropertyChanged;
+                RemovedFromCache();
             }
             return removedFromCache;
         }
@@ -55,4 +56,7 @@ sealed class ObservableCollectionAverageQuery<TElement, TResult> :
         if (e.PropertyName == nameof(IObservableScalarQuery<TResult>.Evaluation))
             Evaluate();
     }
+
+    public override string ToString() =>
+        $"average of {observableCollectionQuery}";
 }

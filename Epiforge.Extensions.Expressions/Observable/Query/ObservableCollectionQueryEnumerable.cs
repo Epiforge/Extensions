@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
 sealed class ObservableCollectionQueryEnumerable :
@@ -33,10 +35,13 @@ sealed class ObservableCollectionQueryEnumerable :
             {
                 if (Enumerable is INotifyCollectionChanged collectionChangedNotifier)
                     collectionChangedNotifier.CollectionChanged -= CollectionChangedNotifierCollectionChanged;
+                if (collectionObserver.ExpressionObserver.Logger is { } logger && logger.IsEnabled(LogLevel.Trace))
+                    logger.LogTrace("Disposed observation of enumerable of object elements (hash code {HashCode})", Enumerable.GetHashCode());
             }
             return removedFromCache;
         }
         return true;
+
     }
 
     public override IEnumerator<object?> GetEnumerator() =>
@@ -46,5 +51,10 @@ sealed class ObservableCollectionQueryEnumerable :
     {
         if (Enumerable is INotifyCollectionChanged collectionChangedNotifier)
             collectionChangedNotifier.CollectionChanged += CollectionChangedNotifierCollectionChanged;
+        if (collectionObserver.ExpressionObserver.Logger is { } logger && logger.IsEnabled(LogLevel.Trace))
+            logger.LogTrace("Initialized observation of enumerable of object elements (hash code {HashCode})", Enumerable.GetHashCode());
     }
+
+    public override string ToString() =>
+        $"enumerable of object elements (hash code {Enumerable.GetHashCode()})";
 }

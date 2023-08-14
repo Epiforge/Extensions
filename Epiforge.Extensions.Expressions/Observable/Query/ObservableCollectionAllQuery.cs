@@ -24,6 +24,7 @@ sealed class ObservableCollectionAllQuery<TElement> :
                 observableCollectionQuery.PropertyChanged -= ObservableCollectionQueryPropertyChanged;
                 where!.CollectionChanged -= WhereCollectionChanged;
                 where.Dispose();
+                RemovedFromCache();
             }
             return removedFromCache;
         }
@@ -54,6 +55,9 @@ sealed class ObservableCollectionAllQuery<TElement> :
         observableCollectionQuery.PropertyChanged += ObservableCollectionQueryPropertyChanged;
         Evaluate();
     }
+
+    public override string ToString() =>
+        $"all {observableCollectionQuery} matching {Predicate}";
 
     void WhereCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
         Evaluate();

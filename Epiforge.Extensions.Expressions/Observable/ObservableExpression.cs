@@ -18,6 +18,7 @@ abstract class ObservableExpression :
             throw new ArgumentNullException(nameof(expression));
 #endif
         this.observer = observer;
+        Logger = observer.Logger;
         Expression = expression;
 #if IS_NET_STANDARD_2_1_OR_GREATER
         var type = Expression.Type;
@@ -122,8 +123,20 @@ abstract class ObservableExpression :
     protected virtual bool GetShouldValueBeDisposed() =>
         false;
 
-    internal void Initialize() =>
+    protected override bool Dispose(bool disposing)
+    {
+        if (disposing)
+            observer.Logger?.LogTrace("Disposed observation of {Expression}", Expression);
+        else
+            observer.Logger?.LogWarning("Finalized observation of {Expression}: did you forget to dispose of an observable expression somewhere?", Expression);
+        return true;
+    }
+
+    internal void Initialize()
+    {
         OnInitialization();
+        observer.Logger?.LogTrace("Initialized observation of {Expression}", Expression);
+    }
 
     protected abstract void OnInitialization();
 
@@ -198,14 +211,14 @@ class ObservableExpression<TResult> :
     {
         if (disposing)
         {
-            var disregarded = observer.Disregard(this);
-            if (disregarded)
+            var removedFromCache = observer.ExpressionDisposed(this);
+            if (removedFromCache)
             {
                 observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
                 observableExpression.PropertyChanging -= ObservableExpressionPropertyChanging;
                 observableExpression.Dispose();
             }
-            return disregarded;
+            return removedFromCache;
         }
         return true;
     }

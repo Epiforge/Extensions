@@ -56,6 +56,7 @@ sealed class ObservableDictionaryUsingSynchronizationContextEventuallyQuery<TKey
                 source.DictionaryChanged -= SourceDictionaryChanged;
                 dictionary!.DictionaryChanged -= DictionaryDictionaryChanged;
                 dictionary.PropertyChanged -= DictionaryPropertyChanged;
+                RemovedFromCache();
             }
             return removedFromCache;
         }
@@ -93,6 +94,9 @@ sealed class ObservableDictionaryUsingSynchronizationContextEventuallyQuery<TKey
                     break;
             }
         }, null);
+
+    public override string ToString() =>
+        $"synchronizing {source} using {SynchronizationContext} eventually";
 
     public override bool TryGetValue(TKey key, out TValue value)
     {

@@ -25,6 +25,7 @@ sealed class ObservableDictionaryAllQuery<TKey, TValue> :
                 observableDictionaryQuery.PropertyChanged -= ObservableDictionaryQueryPropertyChanged;
                 where!.DictionaryChanged -= WhereDictionaryChanged;
                 where.Dispose();
+                RemovedFromCache();
             }
             return removeFromCache;
         }
@@ -55,6 +56,9 @@ sealed class ObservableDictionaryAllQuery<TKey, TValue> :
         observableDictionaryQuery.PropertyChanged += ObservableDictionaryQueryPropertyChanged;
         Evaluate();
     }
+
+    public override string ToString() =>
+        $"all {observableDictionaryQuery} matching {Predicate}";
 
     void WhereDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e) =>
         Evaluate();

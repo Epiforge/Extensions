@@ -31,6 +31,7 @@ sealed class ObservableCollectionAnyQuery<TElement> :
                     observableCollectionQuery.CollectionChanged -= ObservableCollectionQueryCollectionChanged;
                     observableCollectionQuery.PropertyChanged -= ObservableCollectionQueryPropertyChanged;
                 }
+                RemovedFromCache();
             }
             return removedFromCache;
         }
@@ -38,7 +39,7 @@ sealed class ObservableCollectionAnyQuery<TElement> :
     }
 
     void Evaluate() =>
-        Evaluation = where?.OperationFault is { } whereFault ? (whereFault, default) : where is null ? (null, observableCollectionQueryCount > 0) : observableCollectionQuery.OperationFault is { } observableCollectionQueryFault ? (observableCollectionQueryFault, default) : (null, where.Count > 0);
+        Evaluation = where is null ? observableCollectionQuery.OperationFault is { } observableCollectionQueryFault ? (observableCollectionQueryFault, default) : (null, observableCollectionQueryCount > 0) : where.OperationFault is { } whereFault ? (whereFault, default) : (null, where.Count > 0);
 
     void ObservableCollectionQueryCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
@@ -68,6 +69,9 @@ sealed class ObservableCollectionAnyQuery<TElement> :
         }
         Evaluate();
     }
+
+    public override string ToString() =>
+        Predicate is null ? $"any of {observableCollectionQuery}" : $"any of {observableCollectionQuery} matching {Predicate}";
 
     void WhereCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
         Evaluate();

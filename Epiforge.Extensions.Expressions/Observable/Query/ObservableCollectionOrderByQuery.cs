@@ -17,7 +17,7 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
         access = new();
         equalityComparer = EqualityComparer<TElement>.Default;
         this.source = source;
-        results = new();
+        results = Logger is null ? new() : new(Logger);
         startingIndiciesAndCounts = new();
         SelectorsAndDirections = selectorsAndDirections;
     }
@@ -67,6 +67,7 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
                     comparer!.Dispose();
                     foreach (var (selection, _) in selectionsAndDirections)
                         selection.Dispose();
+                    RemovedFromCache();
                 }
             return removedFromCache;
         }
@@ -269,4 +270,7 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
             }
         }
     }
+
+    public override string ToString() =>
+        $"ordering of {source} by {string.Join(" then ", SelectorsAndDirections.Select(selectorAndDirection => $"{selectorAndDirection.keySelectorExpression}{(selectorAndDirection.isDescending ? " descending" : string.Empty)}"))}";
 }
