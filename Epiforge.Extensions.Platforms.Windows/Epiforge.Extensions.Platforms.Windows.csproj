@@ -62,4 +62,10 @@
         <None Include="NuGet.jpg" Pack="True" PackagePath="" />
     </ItemGroup>
 
+    <ItemGroup>
+        <None Remove="Epiforge.Extensions.Platforms.Windows.net462.v3.ncrunchproject" />
+        <None Remove="Epiforge.Extensions.Platforms.Windows.net6.0-windows.v3.ncrunchproject" />
+        <None Remove="Epiforge.Extensions.Platforms.Windows.net7.0-windows.v3.ncrunchproject" />
+    </ItemGroup>
+
 </Project>

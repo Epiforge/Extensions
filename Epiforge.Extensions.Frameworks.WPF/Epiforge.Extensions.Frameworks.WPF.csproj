@@ -71,4 +71,12 @@
         <None Include="NuGet.jpg" Pack="True" PackagePath="" />
     </ItemGroup>
 
+    <ItemGroup>
+        <None Remove="Epiforge.Extensions.Frameworks.WPF.net462.v3.ncrunchproject" />
+        <None Remove="Epiforge.Extensions.Frameworks.WPF.net5.0-windows.v3.ncrunchproject" />
+        <None Remove="Epiforge.Extensions.Frameworks.WPF.net6.0-windows.v3.ncrunchproject" />
+        <None Remove="Epiforge.Extensions.Frameworks.WPF.net7.0-windows.v3.ncrunchproject" />
+        <None Remove="Epiforge.Extensions.Frameworks.WPF.netcoreapp3.1.v3.ncrunchproject" />
+    </ItemGroup>
+
 </Project>
