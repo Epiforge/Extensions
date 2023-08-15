@@ -39,7 +39,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Epiforge.Extensions.Express
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Epiforge.Extensions.Expressions.Tests", "Epiforge.Extensions.Expressions.Tests\Epiforge.Extensions.Expressions.Tests.csproj", "{2F9337A3-60A9-4003-92DD-032FE37AE1A1}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Epiforge.Extensions.Tests", "Epiforge.Extensions.Tests\Epiforge.Extensions.Tests.csproj", "{9D45F8CA-6B73-48CC-AF34-2193C7A70866}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Epiforge.Extensions.Tests", "Epiforge.Extensions.Tests\Epiforge.Extensions.Tests.csproj", "{9D45F8CA-6B73-48CC-AF34-2193C7A70866}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Epiforge.Extensions.Platforms.Windows", "Epiforge.Extensions.Platforms.Windows\Epiforge.Extensions.Platforms.Windows.csproj", "{C1D1F6C8-596C-41D7-9198-6143A456FA2B}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -75,6 +77,10 @@ Global
 		{9D45F8CA-6B73-48CC-AF34-2193C7A70866}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9D45F8CA-6B73-48CC-AF34-2193C7A70866}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9D45F8CA-6B73-48CC-AF34-2193C7A70866}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C1D1F6C8-596C-41D7-9198-6143A456FA2B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C1D1F6C8-596C-41D7-9198-6143A456FA2B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C1D1F6C8-596C-41D7-9198-6143A456FA2B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C1D1F6C8-596C-41D7-9198-6143A456FA2B}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -1,9 +1,9 @@
 This library has useful tools for dealing with expressions:
 
-* `ExpressionEqualityComparer` - Defines methods to support the comparison of expression trees for equality.
+* `ExpressionEqualityComparer` - Defines methods to support the comparison of expression trees for equality
 * `ExpressionExtensions`, providing:
-  * `Duplicate` - Duplicates the specified expression tree.
-  * `SubstituteMethods` - Recursively scans an expression tree to replace invocations of specific methods with replacement methods.
+  * `Duplicate` - Duplicates the specified expression tree
+  * `SubstituteMethods` - Recursively scans an expression tree to replace invocations of specific methods with replacement methods
 
 # Observable
 This library accepts a `LambdaExpression` and arguments to pass to it, dissects the `LambdaExpression`'s body, and hooks into change notification events for properties (`INotifyPropertyChanged`), collections (`INotifyCollectionChanged`), and dictionaries (`Epiforge.Extensions.Collections.INotifyDictionaryChanged`).

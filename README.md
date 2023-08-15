@@ -25,6 +25,8 @@ Supports `net462`, `net6.0`, `net7.0`, and `netstandard2.1`.
   - [ Expressions](#-expressions)
     - [Observable](#observable)
     - [Observable Queries](#observable-queries)
+  - [Platforms](#platforms)
+    - [ Windows](#-windows)
 - [License](#license)
 - [Contributing](#contributing)
 - [Acknowledgements](#acknowledgements)
@@ -130,19 +132,19 @@ This library provides a number of extension methods for collections and dictiona
 * `ReadOnlyObservableRangeDictionary<TKey, TValue>` is a read-only wrapper for any classes implementing `IObservableRangeDictionary<TKey, TValue>`.
 
 ### Specialized
-* `EquatableList<T>` is an immutable list of items which may be compared with other instances of the same type and produces a hash code based on the permutation of its contents.
-* `NullableKeyDictionary<TKey, TValue>` and `NullableKeySortedDictionary<TKey, TValue>` are very slim implementations of `IDictionary<TKey, TValue>` that allow a single null key (useful for some edge cases in which a null key is simply going to happen and you need to be able to deal with it; otherwise, use other dictionary classes).
-* `OrderedHashSet<T>` is a counterpart to the BCL's `HashSet<T>` that maintains the order of the elements in the set. All operations are still *O(1)*, just like the original, but if you enumerate over it you will get elements in the exact order they were added. There are also methods for manipulating the order.
+* `EquatableList<T>` is an immutable list of items which may be compared with other instances of the same type and produces a hash code based on the permutation of its contents
+* `NullableKeyDictionary<TKey, TValue>` and `NullableKeySortedDictionary<TKey, TValue>` are very slim implementations of `IDictionary<TKey, TValue>` that allow a single null key (useful for some edge cases in which a null key is simply going to happen and you need to be able to deal with it; otherwise, use other dictionary classes)
+* `OrderedHashSet<T>` is a counterpart to the BCL's `HashSet<T>` that maintains the order of the elements in the set. All operations are still *O(1)*, just like the original, but if you enumerate over it you will get elements in the exact order they were added. There are also methods for manipulating the order
 
 ## <img src="Epiforge.Extensions.Expressions/NuGet.jpg" alt="Expressions" style="float: left !important; padding-right: 0.5em !important;"> Expressions
 [![Epiforge.Extensions.Expressions Nuget](https://img.shields.io/nuget/v/Epiforge.Extensions.Expressions.svg?logo=nuget) ![Downloads](https://img.shields.io/nuget/dt/epiforge.extensions.expressions)](https://www.nuget.org/packages/Epiforge.Extensions.Expressions)
 
 This library has useful tools for dealing with expressions:
 
-* `ExpressionEqualityComparer` - Defines methods to support the comparison of expression trees for equality.
+* `ExpressionEqualityComparer` - Defines methods to support the comparison of expression trees for equality
 * `ExpressionExtensions`, providing:
-  * `Duplicate` - Duplicates the specified expression tree.
-  * `SubstituteMethods` - Recursively scans an expression tree to replace invocations of specific methods with replacement methods.
+  * `Duplicate` - Duplicates the specified expression tree
+  * `SubstituteMethods` - Recursively scans an expression tree to replace invocations of specific methods with replacement methods
 
 ### Observable
 This library accepts a `LambdaExpression` and arguments to pass to it, dissects the `LambdaExpression`'s body, and hooks into change notification events for properties (`INotifyPropertyChanged`), collections (`INotifyCollectionChanged`), and dictionaries (`Epiforge.Extensions.Collections.INotifyDictionaryChanged`).
@@ -284,6 +286,24 @@ You may subscribe to their `PropertyChanging` and `PropertyChanged` events to be
 If there is more than one fault in play, the value of `OperationFault` will be an `AggregateException`.
 
 Since the `ExpressionObserver` has a number of options governing its behavior, you may optionally pass one you've made to the constructor of `CollectionObserver` to ensure those options are obeyed when Observable Expressions are created to enable your Observable Queries.
+
+## Platforms
+
+### <img src="Epiforge.Extensions.Platforms.Windows/NuGet.jpg" alt="Platforms.Windows" style="float: left !important; padding-right: 0.5em !important;"> Windows
+[![Epiforge.Extensions.Platforms.Windows Nuget](https://img.shields.io/nuget/v/Epiforge.Extensions.Platforms.Windows.svg?logo=nuget) ![Downloads](https://img.shields.io/nuget/dt/epiforge.extensions.platforms.windows)](https://www.nuget.org/packages/Epiforge.Extensions.Platforms.Windows)
+
+This library includes utilities for interoperation with Microsoft Windows, including:
+
+* `Activation` - provides information relating to Windows Activation
+* `ConsoleAssist` - provides methods for interacting with consoles
+* `Cursor` - wraps Win32 API methods dealing with the cursor
+* `Shell` - wraps methods of the WScript.Shell COM object (specifically useful for invoking its `CreateShortcut` function)
+* `Theme` - represents the current Windows theme
+
+Also provides extension methods for dealing with processes, including:
+
+* `CloseMainWindowAsync` - close the main window of the specified process
+* `GetParentProcess` - gets the parent process of the specified process
 
 # License
 [Apache 2.0 License](LICENSE)
