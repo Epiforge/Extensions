@@ -21,11 +21,11 @@ sealed class ObservableConstantExpression :
                     dictionaryChanged.DictionaryChanged -= ValueChanged;
                 else if (observer.ConstantExpressionsListenForCollectionChanged && value is INotifyCollectionChanged collectionChanged)
                     collectionChanged.CollectionChanged -= ValueChanged;
-                base.Dispose(disposing);
+                RemovedFromCache();
             }
             return removedFromCache;
         }
-        return base.Dispose(disposing);
+        return true;
     }
 
     protected override void OnInitialization()

@@ -66,9 +66,9 @@ sealed class ObservableInvocationExpression :
                         obserableArgument.PropertyChanged -= ObservableArgumentPropertyChanged;
                         obserableArgument.Dispose();
                     }
-                base.Dispose(disposing);
+                RemovedFromCache();
             }
-            return base.Dispose(disposing);
+            return removedFromCache;
         }
         return true;
     }
@@ -79,17 +79,17 @@ sealed class ObservableInvocationExpression :
         if (observableExpressionFault is not null)
         {
             Evaluation = (observableExpressionFault, defaultResult);
-            observer.Logger?.LogTrace("{InvocationExpression} is faulted: {Fault}", InvocationExpression, observableExpressionFault);
+            observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, observableExpressionFault, "{InvocationExpression} is faulted: {Fault}", InvocationExpression, observableExpressionFault);
         }
         else if (observableArguments?.Select(observableArgument => observableArgument.Evaluation.Fault).FirstOrDefault(fault => fault is not null) is { } observableArgumentFault)
         {
             Evaluation = (observableArgumentFault, defaultResult);
-            observer.Logger?.LogTrace("{InvocationExpression} argument is faulted: {Fault}", InvocationExpression, observableArgumentFault);
+            observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, observableArgumentFault, "{InvocationExpression} argument is faulted: {Fault}", InvocationExpression, observableArgumentFault);
         }
         else
         {
             Evaluation = (null, observableExpressionResult);
-            observer.Logger?.LogTrace("{InvocationExpression} evaluated: {Result}", InvocationExpression, observableExpressionResult);
+            observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{InvocationExpression} evaluated: {Value}", InvocationExpression, observableExpressionResult);
         }
     }
 

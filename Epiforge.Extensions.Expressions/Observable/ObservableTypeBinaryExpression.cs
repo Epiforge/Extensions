@@ -40,11 +40,11 @@ sealed class ObservableTypeBinaryExpression :
                     expression.PropertyChanged -= ExpressionPropertyChanged;
                     expression.Dispose();
                 }
-                base.Dispose(disposing);
+                RemovedFromCache();
             }
             return removedFromCache;
         }
-        return base.Dispose(disposing);
+        return true;
     }
 
     protected override void Evaluate()
@@ -53,13 +53,13 @@ sealed class ObservableTypeBinaryExpression :
         if (expressionFault is not null)
         {
             Evaluation = (expressionFault, defaultResult);
-            observer.Logger?.LogTrace("{TypeBinaryExpression} expression faulted: {Fault}", TypeBinaryExpression, expressionFault);
+            observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, expressionFault, "{TypeBinaryExpression} expression faulted: {Fault}", TypeBinaryExpression, expressionFault);
         }
         else
         {
             var value = @delegate?.Invoke(expressionValue);
             Evaluation = (null, @delegate?.Invoke(expressionValue));
-            observer.Logger?.LogTrace("{TypeBinaryExpression} evaluated: {Value}", TypeBinaryExpression, value);
+            observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{TypeBinaryExpression} evaluated: {Value}", TypeBinaryExpression, value);
         }
     }
 

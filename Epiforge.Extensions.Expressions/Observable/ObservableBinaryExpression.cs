@@ -52,11 +52,11 @@ class ObservableBinaryExpression :
                     right.PropertyChanged -= RightPropertyChanged;
                     right.Dispose();
                 }
-                base.Dispose(disposing);
+                RemovedFromCache();
             }
             return removedFromCache;
         }
-        return base.Dispose(disposing);
+        return true;
     }
 
     protected override void Evaluate()
@@ -67,7 +67,7 @@ class ObservableBinaryExpression :
             if (leftFault is not null)
             {
                 Evaluation = (leftFault, defaultResult);
-                observer.Logger?.LogTrace("{BinaryExpression} left-hand operand faulted: {Fault}", BinaryExpression, leftFault);
+                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, leftFault, "{BinaryExpression} left-hand operand faulted: {Fault}", BinaryExpression, leftFault);
             }
             else
             {
@@ -75,20 +75,20 @@ class ObservableBinaryExpression :
                 if (rightFault is not null)
                 {
                     Evaluation = (rightFault, defaultResult);
-                    observer.Logger?.LogTrace("{BinaryExpression} right-hand operand faulted: {Fault}", BinaryExpression, rightFault);
+                    observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, rightFault, "{BinaryExpression} right-hand operand faulted: {Fault}", BinaryExpression, rightFault);
                 }
                 else
                 {
                     var value = @delegate?.Invoke(leftResult, rightResult);
                     Evaluation = (null, value);
-                    observer.Logger?.LogTrace("{BinaryExpression} evaluated: {Value}", BinaryExpression, value);
+                    observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{BinaryExpression} evaluated: {Value}", BinaryExpression, value);
                 }
             }
         }
         catch (Exception ex)
         {
             Evaluation = (ex, defaultResult);
-            observer.Logger?.LogTrace("{BinaryExpression} faulted: {Fault}", BinaryExpression, ex);
+            observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, ex, "{BinaryExpression} faulted: {Fault}", BinaryExpression, ex);
         }
     }
 

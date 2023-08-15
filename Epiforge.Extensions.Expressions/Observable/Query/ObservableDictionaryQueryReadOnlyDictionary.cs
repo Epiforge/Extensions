@@ -41,8 +41,6 @@ sealed class ObservableDictionaryQueryReadOnlyDictionary<TKey, TValue> :
                     propertyChangedNotifier.PropertyChanged -= PropertyChangedNotifierPropertyChanged;
                 if (ReadOnlyDictionary is INotifyDictionaryChanged<TKey, TValue> dictionaryChangedNotifier)
                     dictionaryChangedNotifier.DictionaryChanged -= DictionaryChangedNotifierDictionaryChanged;
-                if (collectionObserver.ExpressionObserver.Logger is { } logger && logger.IsEnabled(LogLevel.Trace))
-                    logger.LogTrace("Disposed observation of read-only dictionary of {KeyTypeFullName}/{ValueTypeFullName} key/value pairs (hash code {HashCode})", typeof(TKey).FullName, typeof(TValue).FullName, ReadOnlyDictionary.GetHashCode());
             }
             return removedFromCache;
         }
@@ -60,8 +58,6 @@ sealed class ObservableDictionaryQueryReadOnlyDictionary<TKey, TValue> :
             propertyChangedNotifier.PropertyChanged += PropertyChangedNotifierPropertyChanged;
         if (ReadOnlyDictionary is INotifyDictionaryChanged<TKey, TValue> dictionaryChangedNotifier)
             dictionaryChangedNotifier.DictionaryChanged += DictionaryChangedNotifierDictionaryChanged;
-        if (collectionObserver.ExpressionObserver.Logger is { } logger && logger.IsEnabled(LogLevel.Trace))
-            logger.LogTrace("Initialized observation of read-only dictionary of {KeyTypeFullName}/{ValueTypeFullName} key/value pairs (hash code {HashCode})", typeof(TKey).FullName, typeof(TValue).FullName, ReadOnlyDictionary.GetHashCode());
     }
 
     void PropertyChangedNotifierPropertyChanged(object? sender, PropertyChangedEventArgs e)

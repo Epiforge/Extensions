@@ -19,9 +19,9 @@ abstract class ObservableScalarQuery<TResult> :
             if (SetBackedProperty(ref evaluation, in value) && Logger is { } logger && logger.IsEnabled(LogLevel.Trace))
             {
                 if (value.Fault is { } fault)
-                    logger.LogTrace("{ScalarQuery} faulted: {Fault}", this, fault);
+                    logger.LogTrace(EventIds.Epiforge_Extensions_Expressions_QueryFaulted, fault, "{ScalarQuery} faulted: {Fault}", this, fault);
                 else
-                    logger.LogTrace("{ScalarQuery} evaluated: {Result}", this, value.Result);
+                    logger.LogTrace(EventIds.Epiforge_Extensions_Expressions_QueryEvaluated, "{ScalarQuery} evaluated: {Result}", this, value.Result);
             }
         }
     }

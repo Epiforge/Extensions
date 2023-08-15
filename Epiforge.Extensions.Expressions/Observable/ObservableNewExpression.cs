@@ -31,11 +31,11 @@ sealed class ObservableNewExpression :
                         argument.PropertyChanged -= ArgumentPropertyChanged;
                         argument.Dispose();
                     }
-                base.Dispose(disposing);
+                RemovedFromCache();
             }
             return removedFromCache;
         }
-        return base.Dispose(disposing);
+        return true;
     }
 
     protected override void Evaluate()
@@ -45,19 +45,19 @@ sealed class ObservableNewExpression :
             if (arguments?.Select(argument => argument.Evaluation.Fault).FirstOrDefault(fault => fault is not null) is { } argumentFault)
             {
                 Evaluation = (argumentFault, defaultResult);
-                observer.Logger?.LogTrace("{NewExpression} argument faulted: {Fault}", NewExpression, argumentFault);
+                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, argumentFault, "{NewExpression} argument faulted: {Fault}", NewExpression, argumentFault);
             }
             else
             {
                 var value = constructor is not null ? constructor.FastInvoke(arguments?.Select(argument => argument.Evaluation.Result).ToArray() ?? Array.Empty<object?>()) : Activator.CreateInstance(NewExpression.Type, arguments?.Select(argument => argument.Evaluation.Result).ToArray() ?? Array.Empty<object?>());
                 Evaluation = (null, value);
-                observer.Logger?.LogTrace("{NewExpression} evaluated: {Value}", NewExpression, value);
+                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{NewExpression} evaluated: {Value}", NewExpression, value);
             }
         }
         catch (Exception ex)
         {
             Evaluation = (ex, defaultResult);
-            observer.Logger?.LogTrace(ex, "{NewExpression} faulted: {Fault}", NewExpression, ex);
+            observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, ex, "{NewExpression} faulted: {Fault}", NewExpression, ex);
         }
     }
 

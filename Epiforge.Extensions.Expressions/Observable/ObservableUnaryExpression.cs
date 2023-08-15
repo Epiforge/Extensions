@@ -44,11 +44,11 @@ sealed class ObservableUnaryExpression :
                     operand.PropertyChanged -= OperandPropertyChanged;
                     operand.Dispose();
                 }
-                base.Dispose(disposing);
+                RemovedFromCache();
             }
             return removedFromCache;
         }
-        return base.Dispose(disposing);
+        return true;
     }
 
     protected override void Evaluate()
@@ -59,19 +59,19 @@ sealed class ObservableUnaryExpression :
             if (operandFault is not null)
             {
                 Evaluation = (operandFault, defaultResult);
-                observer.Logger?.LogTrace("{UnaryExpression} operand faulted: {Fault}", UnaryExpression, operandFault);
+                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, operandFault, "{UnaryExpression} operand faulted: {Fault}", UnaryExpression, operandFault);
             }
             else
             {
                 var value = @delegate?.Invoke(operandResult);
                 Evaluation = (null, value);
-                observer.Logger?.LogTrace("{UnaryExpression} evaluated: {Value}", UnaryExpression, value);
+                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{UnaryExpression} evaluated: {Value}", UnaryExpression, value);
             }
         }
         catch (Exception ex)
         {
             Evaluation = (ex, defaultResult);
-            observer.Logger?.LogTrace("{UnaryExpression} faulted: {Fault}", UnaryExpression, ex);
+            observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, ex, "{UnaryExpression} faulted: {Fault}", UnaryExpression, ex);
         }
     }
 

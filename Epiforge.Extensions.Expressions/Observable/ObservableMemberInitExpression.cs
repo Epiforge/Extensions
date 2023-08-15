@@ -32,11 +32,11 @@ sealed class ObservableMemberInitExpression :
                         kv.Key.PropertyChanged -= MemberAssignmentObservableExpressionPropertyChanged;
                         kv.Key.Dispose();
                     }
-                base.Dispose(disposing);
+                RemovedFromCache();
             }
             return removedFromCache;
         }
-        return base.Dispose(disposing);
+        return true;
     }
 
     protected override void Evaluate()
@@ -47,12 +47,12 @@ sealed class ObservableMemberInitExpression :
             if (newObservableExpressionFault is not null)
             {
                 Evaluation = (newObservableExpressionFault, defaultResult);
-                observer.Logger?.LogTrace("{MemberInitExpression} new faulted: {Fault}", MemberInitExpression, newObservableExpressionFault);
+                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, newObservableExpressionFault, "{MemberInitExpression} new faulted: {Fault}", MemberInitExpression, newObservableExpressionFault);
             }
             else if (memberAssignmentObservableExpressions?.Keys.Select(memberAssignmentObservableExpression => memberAssignmentObservableExpression.Evaluation.Fault).FirstOrDefault(fault => fault is not null) is { } memberAssignmentObservableExpressionFault)
             {
                 Evaluation = (memberAssignmentObservableExpressionFault, defaultResult);
-                observer.Logger?.LogTrace("{MemberInitExpression} member assignment faulted: {Fault}", MemberInitExpression, memberAssignmentObservableExpressionFault);
+                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, memberAssignmentObservableExpressionFault, "{MemberInitExpression} member assignment faulted: {Fault}", MemberInitExpression, memberAssignmentObservableExpressionFault);
             }
             else
             {
@@ -67,13 +67,13 @@ sealed class ObservableMemberInitExpression :
                             throw new NotSupportedException("Cannot handle member that is not a field or property");
                     }
                 Evaluation = (null, newObservableExpressionResult);
-                observer.Logger?.LogTrace("{MemberInitExpression} evaluated: {Value}", MemberInitExpression, newObservableExpressionResult);
+                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{MemberInitExpression} evaluated: {Value}", MemberInitExpression, newObservableExpressionResult);
             }
         }
         catch (Exception ex)
         {
             Evaluation = (ex, defaultResult);
-            observer.Logger?.LogTrace("{MemberInitExpression} faulted: {Fault}", MemberInitExpression, ex);
+            observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, ex, "{MemberInitExpression} faulted: {Fault}", MemberInitExpression, ex);
         }
     }
 

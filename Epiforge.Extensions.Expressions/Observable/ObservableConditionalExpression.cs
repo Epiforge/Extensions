@@ -38,11 +38,11 @@ sealed class ObservableConditionalExpression :
                     ifFalse.PropertyChanged -= IfFalsePropertyChanged;
                     ifFalse.Dispose();
                 }
-                base.Dispose(disposing);
+                RemovedFromCache();
             }
             return removedFromCache;
         }
-        return base.Dispose(disposing);
+        return true;
     }
 
     protected override void Evaluate()
@@ -51,17 +51,17 @@ sealed class ObservableConditionalExpression :
         if (testFault is not null)
         {
             Evaluation = (testFault, defaultResult);
-            observer.Logger?.LogTrace("{ConditionalExpression} test faulted: {Fault}", ConditionalExpression, testFault);
+            observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, testFault, "{ConditionalExpression} test faulted: {Fault}", ConditionalExpression, testFault);
         }
         else if (testResult is bool testBool)
         {
             Evaluation = testBool ? ifTrue!.Evaluation : ifFalse!.Evaluation;
-            observer.Logger?.LogTrace("{ConditionalExpression} test: {TestResult}", ConditionalExpression, testBool);
+            observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{ConditionalExpression} test: {TestResult}", ConditionalExpression, testBool);
         }
         else
         {
             Evaluation = (new InvalidCastException(), defaultResult);
-            observer.Logger?.LogWarning("{ConditionalExpression} test is of type {TestResultType} when a boolean is required", ConditionalExpression, testResult?.GetType());
+            observer.Logger?.LogWarning(EventIds.Epiforge_Extensions_Expressions_ConditionalExpressionTestInvalidType, "{ConditionalExpression} test is of type {TestResultType} when a boolean is required", ConditionalExpression, testResult?.GetType());
         }
     }
 

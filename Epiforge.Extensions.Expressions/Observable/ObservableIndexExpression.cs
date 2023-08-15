@@ -40,11 +40,11 @@ sealed class ObservableIndexExpression :
                         argument.PropertyChanged -= ArgumentPropertyChanged;
                         argument.Dispose();
                     }
-                base.Dispose(disposing);
+                RemovedFromCache();
             }
             return removedFromCache;
         }
-        return base.Dispose(disposing);
+        return true;
     }
 
     protected override void Evaluate()
@@ -55,12 +55,12 @@ sealed class ObservableIndexExpression :
             if (objectFault is not null)
             {
                 Evaluation = (objectFault, defaultResult);
-                observer.Logger?.LogTrace("{IndexExpression} object expression faulted: {Fault}", IndexExpression, objectFault);
+                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, objectFault, "{IndexExpression} object expression faulted: {Fault}", IndexExpression, objectFault);
             }
             else if (arguments?.Select(argument => argument.Evaluation.Fault).FirstOrDefault(fault => fault is not null) is { } argumentFault)
             {
                 Evaluation = (argumentFault, defaultResult);
-                observer.Logger?.LogTrace("{IndexExpression} argument expression faulted: {Fault}", IndexExpression, argumentFault);
+                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, argumentFault, "{IndexExpression} argument expression faulted: {Fault}", IndexExpression, argumentFault);
             }
             else
             {
@@ -72,13 +72,13 @@ sealed class ObservableIndexExpression :
                 }
                 var value = getMethod?.FastInvoke(this.objectResult, arguments?.Select(argument => argument.Evaluation.Result).ToArray() ?? Array.Empty<object?>());
                 Evaluation = (null, value);
-                observer.Logger?.LogTrace("{IndexExpression} evaluated: {Value}", IndexExpression, value);
+                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{IndexExpression} evaluated: {Value}", IndexExpression, value);
             }
         }
         catch (Exception ex)
         {
             Evaluation = (ex, defaultResult);
-            observer.Logger?.LogTrace("{IndexExpression} faulted: {Fault}", IndexExpression, ex);
+            observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, ex, "{IndexExpression} faulted: {Fault}", IndexExpression, ex);
         }
     }
 

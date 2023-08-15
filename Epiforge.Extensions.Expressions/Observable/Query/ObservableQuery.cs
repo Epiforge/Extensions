@@ -32,16 +32,13 @@ abstract class ObservableQuery :
                 return;
             OnInitialization();
             isInitialized = true;
-            if (collectionObserver.ExpressionObserver.Logger is { } logger && logger.IsEnabled(LogLevel.Trace))
-                logger.LogTrace("Initialized observation of {Query}", this);
+            collectionObserver.ExpressionObserver.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_QueryInitialized, "Initialized observation of {Query}", this);
         }
     }
 
     protected abstract void OnInitialization();
 
-    protected void RemovedFromCache()
-    {
-        if (collectionObserver.ExpressionObserver.Logger is { } logger && logger.IsEnabled(LogLevel.Trace))
-            logger.LogTrace("Disposed observation of {Query}", this);
-    }
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    protected void RemovedFromCache() =>
+        collectionObserver.ExpressionObserver.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_QueryDisposed, "Disposed observation of {Query}", this);
 }

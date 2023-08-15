@@ -26,11 +26,11 @@ sealed class ObservableNewArrayInitExpression :
                         initializer.PropertyChanged -= InitializerPropertyChanged;
                         initializer.Dispose();
                     }
-                base.Dispose(disposing);
+                RemovedFromCache();
             }
             return removedFromCache;
         }
-        return base.Dispose(disposing);
+        return true;
     }
 
     protected override void Evaluate()
@@ -38,7 +38,7 @@ sealed class ObservableNewArrayInitExpression :
         if (initializers?.Select(initializer => initializer.Evaluation.Fault).FirstOrDefault(fault => fault is not null) is { } initializerFault)
         {
             Evaluation = (initializerFault, defaultResult);
-            observer.Logger?.LogTrace("{NewArrayExpression} initializer faulted: {Fault}", NewArrayExpression, initializerFault);
+            observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, initializerFault, "{NewArrayExpression} initializer faulted: {Fault}", NewArrayExpression, initializerFault);
         }
         else
         {
@@ -46,7 +46,7 @@ sealed class ObservableNewArrayInitExpression :
             for (int i = 0, ii = initializers?.Count ?? 0; i < ii; ++i)
                 array.SetValue(initializers?[i].Evaluation.Result, i);
             Evaluation = (null, array);
-            observer.Logger?.LogTrace("{NewArrayExpression} evaluated: {Value}", NewArrayExpression, array);
+            observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{NewArrayExpression} evaluated: {Value}", NewArrayExpression, array);
         }
     }
 

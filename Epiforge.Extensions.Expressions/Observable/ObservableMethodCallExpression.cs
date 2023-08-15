@@ -37,11 +37,11 @@ sealed class ObservableMethodCallExpression :
                         argument.PropertyChanged -= ArgumentPropertyChanged;
                         argument.Dispose();
                     }
-                base.Dispose(disposing);
+                RemovedFromCache();
             }
             return removedFromCache;
         }
-        return base.Dispose(disposing);
+        return true;
     }
 
     protected override void Evaluate()
@@ -52,24 +52,24 @@ sealed class ObservableMethodCallExpression :
             if (objectFault is not null)
             {
                 Evaluation = (objectFault, defaultResult);
-                observer.Logger?.LogTrace("{MethodCallExpression} object faulted: {Fault}", MethodCallExpression, objectFault);
+                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, objectFault, "{MethodCallExpression} object faulted: {Fault}", MethodCallExpression, objectFault);
             }
             else if (arguments?.Select(argument => argument.Evaluation.Fault).FirstOrDefault(fault => fault is not null) is { } argumentFault)
             {
                 Evaluation = (argumentFault, defaultResult);
-                observer.Logger?.LogTrace("{MethodCallExpression} argument faulted: {Fault}", MethodCallExpression, argumentFault);
+                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, argumentFault, "{MethodCallExpression} argument faulted: {Fault}", MethodCallExpression, argumentFault);
             }
             else
             {
                 var value = method?.FastInvoke(objectResult, arguments?.Select(argument => argument.Evaluation.Result).ToArray() ?? Array.Empty<object?>());
                 Evaluation = (null, value);
-                observer.Logger?.LogTrace("{MethodCallExpression} evaluated: {Value}", MethodCallExpression, value);
+                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{MethodCallExpression} evaluated: {Value}", MethodCallExpression, value);
             }
         }
         catch (Exception ex)
         {
             Evaluation = (ex, defaultResult);
-            observer.Logger?.LogTrace(ex, "{MethodCallExpression} faulted: {Fault}", MethodCallExpression, ex);
+            observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, ex, "{MethodCallExpression} faulted: {Fault}", MethodCallExpression, ex);
         }
     }
 

@@ -35,8 +35,6 @@ sealed class ObservableCollectionQueryEnumerable :
             {
                 if (Enumerable is INotifyCollectionChanged collectionChangedNotifier)
                     collectionChangedNotifier.CollectionChanged -= CollectionChangedNotifierCollectionChanged;
-                if (collectionObserver.ExpressionObserver.Logger is { } logger && logger.IsEnabled(LogLevel.Trace))
-                    logger.LogTrace("Disposed observation of enumerable of object elements (hash code {HashCode})", Enumerable.GetHashCode());
             }
             return removedFromCache;
         }
@@ -51,8 +49,6 @@ sealed class ObservableCollectionQueryEnumerable :
     {
         if (Enumerable is INotifyCollectionChanged collectionChangedNotifier)
             collectionChangedNotifier.CollectionChanged += CollectionChangedNotifierCollectionChanged;
-        if (collectionObserver.ExpressionObserver.Logger is { } logger && logger.IsEnabled(LogLevel.Trace))
-            logger.LogTrace("Initialized observation of enumerable of object elements (hash code {HashCode})", Enumerable.GetHashCode());
     }
 
     public override string ToString() =>

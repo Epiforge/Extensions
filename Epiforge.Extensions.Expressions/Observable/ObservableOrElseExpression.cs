@@ -14,12 +14,12 @@ sealed class ObservableOrElseExpression :
         if (leftFault is not null)
         {
             Evaluation = (leftFault, defaultResult);
-            observer.Logger?.LogTrace("{BinaryExpression} left-hand operand faulted: {Fault}", BinaryExpression, leftFault);
+            observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, leftFault, "{BinaryExpression} left-hand operand faulted: {Fault}", BinaryExpression, leftFault);
         }
         else if (leftResult is bool leftBool && leftBool)
         {
             Evaluation = (null, true);
-            observer.Logger?.LogTrace("{BinaryExpression} evaluated: {Value}", BinaryExpression, true);
+            observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{BinaryExpression} evaluated: {Value}", BinaryExpression, true);
         }
         else
         {
@@ -27,13 +27,13 @@ sealed class ObservableOrElseExpression :
             if (rightFault is not null)
             {
                 Evaluation = (rightFault, defaultResult);
-                observer.Logger?.LogTrace("{BinaryExpression} right-hand operand faulted: {Fault}", BinaryExpression, rightFault);
+                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, rightFault, "{BinaryExpression} right-hand operand faulted: {Fault}", BinaryExpression, rightFault);
             }
             else
             {
                 var value = rightResult is bool rightBool && rightBool;
                 Evaluation = (null, value);
-                observer.Logger?.LogTrace("{BinaryExpression} evaluated: {Value}", BinaryExpression, value);
+                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{BinaryExpression} evaluated: {Value}", BinaryExpression, value);
             }
         }
     }

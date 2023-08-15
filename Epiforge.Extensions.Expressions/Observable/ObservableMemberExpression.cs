@@ -35,11 +35,11 @@ sealed class ObservableMemberExpression :
                     observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
                     observableExpression.Dispose();
                 }
-                base.Dispose(disposing);
+                RemovedFromCache();
             }
             return removedFromCache;
         }
-        return base.Dispose(disposing);
+        return true;
     }
 
     protected override void Evaluate()
@@ -50,7 +50,7 @@ sealed class ObservableMemberExpression :
             if (observableExpressionFault is not null)
             {
                 Evaluation = (observableExpressionFault, defaultResult);
-                observer.Logger?.LogTrace("{MemberExpression} faulted: {Fault}", MemberExpression, observableExpressionFault);
+                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, observableExpressionFault, "{MemberExpression} faulted: {Fault}", MemberExpression, observableExpressionFault);
             }
             else if (getMethod is not null)
             {
@@ -62,21 +62,21 @@ sealed class ObservableMemberExpression :
                 }
                 var value = getMethod.FastInvoke(observableExpressionResult, Array.Empty<object?>());
                 Evaluation = (null, value);
-                observer.Logger?.LogTrace("{MemberExpression} evaluated: {Value}", MemberExpression, value);
+                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{MemberExpression} evaluated: {Value}", MemberExpression, value);
             }
             else if (field is not null)
             {
                 UnsubscribeFromValueNotifications();
                 var value = field.GetValue(observableExpressionResult);
                 Evaluation = (null, value);
-                observer.Logger?.LogTrace("{MemberExpression} evaluated: {Value}", MemberExpression, value);
+                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{MemberExpression} evaluated: {Value}", MemberExpression, value);
                 SubscribeToValueNotifications();
             }
         }
         catch (Exception ex)
         {
             Evaluation = (ex, defaultResult);
-            observer.Logger?.LogTrace("{MemberExpression} faulted: {Fault}", MemberExpression, ex);
+            observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, ex, "{MemberExpression} faulted: {Fault}", MemberExpression, ex);
         }
     }
 

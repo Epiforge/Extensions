@@ -123,22 +123,17 @@ abstract class ObservableExpression :
     protected virtual bool GetShouldValueBeDisposed() =>
         false;
 
-    protected override bool Dispose(bool disposing)
-    {
-        if (disposing)
-            observer.Logger?.LogTrace("Disposed observation of {Expression}", Expression);
-        else
-            observer.Logger?.LogWarning("Finalized observation of {Expression}: did you forget to dispose of an observable expression somewhere?", Expression);
-        return true;
-    }
-
     internal void Initialize()
     {
         OnInitialization();
-        observer.Logger?.LogTrace("Initialized observation of {Expression}", Expression);
+        observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionInitialized, "Initialized observation of {Expression}", Expression);
     }
 
     protected abstract void OnInitialization();
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    protected void RemovedFromCache() =>
+        observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionDisposed, "Disposed observation of {Expression}", Expression);
 
     public override string ToString() =>
         Expression.ToString();
