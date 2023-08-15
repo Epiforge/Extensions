@@ -2,12 +2,13 @@
 
     <PropertyGroup>
         <Product>Epiforge.Extensions.Platforms.Windows</Product>
-        <Version>1.0.0</Version>
+        <Version>1.0.1</Version>
         <Description>This package assists in Windows-platform specific operations.</Description>
     </PropertyGroup>
 
     <ItemGroup>
         <PackageReference Include="Epiforge.Extensions.Components" Version="1.4.0" />
+        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.1" PrivateAssets="all" />
         <PackageReference Include="PolySharp" Version="1.13.2">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -17,6 +18,7 @@
     </ItemGroup>
 
     <PropertyGroup>
+        <AllowUnsafeBlocks Condition="'$(TargetFramework)' == 'net7.0-windows'">true</AllowUnsafeBlocks>
         <Authors>Epiforge</Authors>
         <CodeAnalysisRuleSet>..\.ruleset</CodeAnalysisRuleSet>
         <Company>Epiforge</Company>
