@@ -1,1 +1,1 @@
-We exposed an extension method that assists in logging collection change events.
+We added SourceLink.
