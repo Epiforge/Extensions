@@ -1,1 +1,1 @@
-We added SourceLink and improved P/Invoke performance.
+We now only allow unsafe code blocks when we need them.
