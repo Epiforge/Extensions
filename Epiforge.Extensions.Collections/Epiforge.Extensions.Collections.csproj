@@ -7,12 +7,12 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="Epiforge.Extensions.Components" Version="1.4.0" />
-      <PackageReference Include="PolySharp" Version="1.13.2">
-        <PrivateAssets>all</PrivateAssets>
-        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-      </PackageReference>
-      <PackageReference Include="System.Collections.Immutable" Version="7.0.0" />
+        <PackageReference Include="Epiforge.Extensions.Components" Version="1.4.0" />
+        <PackageReference Include="PolySharp" Version="1.13.2">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="System.Collections.Immutable" Version="7.0.0" />
     </ItemGroup>
 
     <PropertyGroup>
@@ -61,10 +61,10 @@
     </ItemGroup>
 
     <ItemGroup>
-      <None Remove="Epiforge.Extensions.Collections.net462.v3.ncrunchproject" />
-      <None Remove="Epiforge.Extensions.Collections.net6.0.v3.ncrunchproject" />
-      <None Remove="Epiforge.Extensions.Collections.net7.0.v3.ncrunchproject" />
-      <None Remove="Epiforge.Extensions.Collections.netstandard2.1.v3.ncrunchproject" />
+        <None Remove="Epiforge.Extensions.Collections.net462.v3.ncrunchproject" />
+        <None Remove="Epiforge.Extensions.Collections.net6.0.v3.ncrunchproject" />
+        <None Remove="Epiforge.Extensions.Collections.net7.0.v3.ncrunchproject" />
+        <None Remove="Epiforge.Extensions.Collections.netstandard2.1.v3.ncrunchproject" />
     </ItemGroup>
 
 </Project>

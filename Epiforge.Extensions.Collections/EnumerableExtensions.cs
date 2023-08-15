@@ -215,5 +215,5 @@ public static class EnumerableExtensions
         return FindIndicies(source, element => equalityComparer.Equals(element, item));
     }
 
-#endregion Indicies
+    #endregion Indicies
 }
