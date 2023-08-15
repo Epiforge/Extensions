@@ -138,6 +138,8 @@ This library provides a number of extension methods for collections and dictiona
 * `NullableKeyDictionary<TKey, TValue>` and `NullableKeySortedDictionary<TKey, TValue>` are very slim implementations of `IDictionary<TKey, TValue>` that allow a single null key (useful for some edge cases in which a null key is simply going to happen and you need to be able to deal with it; otherwise, use other dictionary classes)
 * `OrderedHashSet<T>` is a counterpart to the BCL's `HashSet<T>` that maintains the order of the elements in the set. All operations are still *O(1)*, just like the original, but if you enumerate over it you will get elements in the exact order they were added. There are also methods for manipulating the order
 
+---
+
 ## <img src="Epiforge.Extensions.Expressions/NuGet.jpg" alt="Expressions" style="float: left !important; padding-right: 0.5em !important;"> Expressions
 [![Epiforge.Extensions.Expressions Nuget](https://img.shields.io/nuget/v/Epiforge.Extensions.Expressions.svg?logo=nuget) ![Downloads](https://img.shields.io/nuget/dt/epiforge.extensions.expressions)](https://www.nuget.org/packages/Epiforge.Extensions.Expressions)
 
@@ -289,6 +291,8 @@ If there is more than one fault in play, the value of `OperationFault` will be a
 
 Since the `ExpressionObserver` has a number of options governing its behavior, you may optionally pass one you've made to the constructor of `CollectionObserver` to ensure those options are obeyed when Observable Expressions are created to enable your Observable Queries.
 
+---
+
 ## Platforms
 
 ### <img src="Epiforge.Extensions.Platforms.Windows/NuGet.jpg" alt="Platforms.Windows" style="float: left !important; padding-right: 0.5em !important;"> Windows
@@ -306,6 +310,8 @@ Also provides extension methods for dealing with processes, including:
 
 * `CloseMainWindowAsync` - close the main window of the specified process
 * `GetParentProcess` - gets the parent process of the specified process
+
+---
 
 ## Frameworks
 
