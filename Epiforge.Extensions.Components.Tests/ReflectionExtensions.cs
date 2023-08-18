@@ -1,8 +1,36 @@
+using System.Reflection.Metadata;
+
 namespace Epiforge.Extensions.Components.Tests;
 
 [TestClass]
 public class ReflectionExtensions
 {
+    #region Test Types
+
+    interface IOnlyHaveAnEvent
+    {
+        event EventHandler? SomeEvent;
+    }
+
+    interface IOnlyHaveAMethod
+    {
+        void SomeMethod();
+    }
+
+    interface IOnlyHaveAProperty
+    {
+        int SomeProperty { get; set; }
+    }
+
+    interface IHaveThemAll :
+        IOnlyHaveAnEvent,
+        IOnlyHaveAMethod,
+        IOnlyHaveAProperty
+    {
+    }
+
+    #endregion Test Types
+
     [TestMethod]
     public void ConstructorInfoFastInvoke()
     {
@@ -29,6 +57,42 @@ public class ReflectionExtensions
     [ExpectedException(typeof(ArgumentNullException))]
     public void DefaultNullType() =>
         ((Type?)null!).FastDefault();
+
+    [TestMethod]
+    public void GetImplementationEvents()
+    {
+        Assert.IsTrue(typeof(ObservableCollection<int>).GetImplementationEvents().Select(@event => @event.Name).Contains("CollectionChanged"));
+        Assert.IsTrue(typeof(IHaveThemAll).GetImplementationEvents().Select(@event => @event.Name).Contains("SomeEvent"));
+    }
+
+    [TestMethod]
+    [ExpectedException(typeof(ArgumentNullException))]
+    public void GetImplementationEventsNullType() =>
+        ((Type?)null!).GetImplementationEvents();
+
+    [TestMethod]
+    public void GetImplementationMethods()
+    {
+        Assert.IsTrue(typeof(ObservableCollection<int>).GetImplementationMethods().Select(method => method.Name).Contains("Add"));
+        Assert.IsTrue(typeof(IHaveThemAll).GetImplementationMethods().Select(method => method.Name).Contains("SomeMethod"));
+    }
+
+    [TestMethod]
+    [ExpectedException(typeof(ArgumentNullException))]
+    public void GetImplementationMethodsNullType() =>
+        ((Type?)null!).GetImplementationMethods();
+
+    [TestMethod]
+    public void GetImplementationProperties()
+    {
+        Assert.IsTrue(typeof(ObservableCollection<int>).GetImplementationProperties().Select(property => property.Name).Contains("Count"));
+        Assert.IsTrue(typeof(IHaveThemAll).GetImplementationProperties().Select(property => property.Name).Contains("SomeProperty"));
+    }
+
+    [TestMethod]
+    [ExpectedException(typeof(ArgumentNullException))]
+    public void GetImplementationPropertiesNullType() =>
+        ((Type?)null!).GetImplementationProperties();
 
     [TestMethod]
     public void IndexerPropertyInfoFastGetValue()

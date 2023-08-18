@@ -36,6 +36,9 @@ To address this, this library offers the following extension methods which will 
 * `PropertyInfo.FastGetValue`: get the value of a property only known at runtime quickly
 * `PropertyInfo.FastSetValue`: set the value of a property only known at runtime quickly
 * `Type.FastDefault`: get the default value of a type only known at runtime quickly
+* `Type.GetImplementationEvents`: searches for the events of a type, including interfaces and interface inheritance
+* `Type.GetImplementationMethods`: searches for the methods of a type, including interfaces and interface inheritance
+* `Type.GetImplementationProperties`: searches for the properties of a type, including interfaces and interface inheritance
 
 Use of these methods in .NET 7 or later will simply call the built-in methods, as they are now optimized.
 

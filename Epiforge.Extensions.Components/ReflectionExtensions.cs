@@ -41,6 +41,16 @@ public static class ReflectionExtensions
         return escapedString.ToString();
     }
 
+    static bool IsNonPrintableAsciiCharacter(char c) =>
+        c is < ' ' or > '~';
+
+    static bool ShouldEscapeCharacter(char c) =>
+        c switch
+        {
+            '\0' or '\a' or '\b' or '\f' or '\n' or '\r' or '\t' or '\v' or '\\' or '\'' or '\"' => true,
+            _ => false
+        };
+
 #if IS_NET_STANDARD_2_1_OR_GREATER
     static T? GetDefaultValue<T>() =>
         default;
@@ -226,15 +236,116 @@ public static class ReflectionExtensions
         default;
 #endif
 
-    static bool IsNonPrintableAsciiCharacter(char c) =>
-        c is < ' ' or > '~';
-
-    static bool ShouldEscapeCharacter(char c) =>
-        c switch
+    /// <summary>
+    /// Searches for the events of the current <see cref="Type"/>, including interfaces and interface inheritance, using the specified binding constraints
+    /// </summary>
+    /// <param name="type">The <see cref="Type"/></param>
+    /// <param name="bindingAttr">A bitwise combination of the enumeration values that specify how the search is conducted</param>
+    public static EventInfo[] GetImplementationEvents(this Type type, BindingFlags bindingAttr = BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy)
+    {
+#if IS_NET_6_0_OR_GREATER
+        ArgumentNullException.ThrowIfNull(type);
+#else
+        if (type is null)
+            throw new ArgumentNullException(nameof(type));
+#endif
+        if (type.IsInterface)
         {
-            '\0' or '\a' or '\b' or '\f' or '\n' or '\r' or '\t' or '\v' or '\\' or '\'' or '\"' => true,
-            _ => false
-        };
+            var eventInfos = new List<EventInfo>();
+            var considered = new List<Type>();
+            var queue = new Queue<Type>();
+            considered.Add(type);
+            queue.Enqueue(type);
+            while (queue.Count > 0)
+            {
+                var subType = queue.Dequeue();
+                foreach (var subInterface in subType.GetInterfaces())
+                {
+                    if (considered.Contains(subInterface))
+                        continue;
+                    considered.Add(subInterface);
+                    queue.Enqueue(subInterface);
+                }
+                eventInfos.InsertRange(0, subType.GetEvents(bindingAttr).Where(x => !eventInfos.Contains(x)));
+            }
+            return eventInfos.ToArray();
+        }
+        return type.GetEvents(bindingAttr);
+    }
+
+    /// <summary>
+    /// Searches for the methods of the current <see cref="Type"/>, including interfaces and interface inheritance, using the specified binding constraints
+    /// </summary>
+    /// <param name="type">The <see cref="Type"/></param>
+    /// <param name="bindingAttr">A bitwise combination of the enumeration values that specify how the search is conducted</param>
+    public static MethodInfo[] GetImplementationMethods(this Type type, BindingFlags bindingAttr = BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy)
+    {
+#if IS_NET_6_0_OR_GREATER
+        ArgumentNullException.ThrowIfNull(type);
+#else
+        if (type is null)
+            throw new ArgumentNullException(nameof(type));
+#endif
+        if (type.IsInterface)
+        {
+            var methodInfos = new List<MethodInfo>();
+            var considered = new List<Type>();
+            var queue = new Queue<Type>();
+            considered.Add(type);
+            queue.Enqueue(type);
+            while (queue.Count > 0)
+            {
+                var subType = queue.Dequeue();
+                foreach (var subInterface in subType.GetInterfaces())
+                {
+                    if (considered.Contains(subInterface))
+                        continue;
+                    considered.Add(subInterface);
+                    queue.Enqueue(subInterface);
+                }
+                methodInfos.InsertRange(0, subType.GetMethods(bindingAttr).Where(x => !methodInfos.Contains(x)));
+            }
+            return methodInfos.ToArray();
+        }
+        return type.GetMethods(bindingAttr);
+    }
+
+    /// <summary>
+    /// Searches for the properties of the current <see cref="Type"/>, including interfaces and interface inheritance, using the specified binding constraints
+    /// </summary>
+    /// <param name="type">The <see cref="Type"/></param>
+    /// <param name="bindingAttr">A bitwise combination of the enumeration values that specify how the search is conducted</param>
+    public static PropertyInfo[] GetImplementationProperties(this Type type, BindingFlags bindingAttr = BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy)
+    {
+#if IS_NET_6_0_OR_GREATER
+        ArgumentNullException.ThrowIfNull(type);
+#else
+        if (type is null)
+            throw new ArgumentNullException(nameof(type));
+#endif
+        if (type.IsInterface)
+        {
+            var propertyInfos = new List<PropertyInfo>();
+            var considered = new List<Type>();
+            var queue = new Queue<Type>();
+            considered.Add(type);
+            queue.Enqueue(type);
+            while (queue.Count > 0)
+            {
+                var subType = queue.Dequeue();
+                foreach (var subInterface in subType.GetInterfaces())
+                {
+                    if (considered.Contains(subInterface))
+                        continue;
+                    considered.Add(subInterface);
+                    queue.Enqueue(subInterface);
+                }
+                propertyInfos.InsertRange(0, subType.GetProperties(bindingAttr).Where(x => !propertyInfos.Contains(x)));
+            }
+            return propertyInfos.ToArray();
+        }
+        return type.GetProperties(bindingAttr);
+    }
 
     /// <summary>
     /// Produces a string representation of the specified object that can be used as a literal in C# source code

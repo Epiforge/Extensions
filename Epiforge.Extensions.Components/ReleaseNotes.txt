@@ -1,1 +1,1 @@
-We added event IDs to the logging introduced in a previous version. When a finalizer for a disposable type is called, this is now logged with a level of Warning since it means you forgot to dispose of an object. We also caused the disposable base classes to collect the stack trace when their loggers are set if the minimum logging level is set to Trace, which will then be emitted to the log if a finalizer for a disposable type is called.
+We added extension methods for getting the events, methods, and properties of a type, including interfaces and interface inheritance.
