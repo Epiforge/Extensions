@@ -135,6 +135,7 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult> :
             source.PropertyChanging += SourcePropertyChanging;
             source.PropertyChanged += SourcePropertyChanged;
         }
+        OnCollectionChanged(new(NotifyCollectionChangedAction.Reset));
     }
 
     NotifyCollectionChangedEventArgs ResetWithAccess()

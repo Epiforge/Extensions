@@ -111,6 +111,7 @@ sealed class ObservableCollectionGroupByQuery<TKey, TElement> :
         lock (access)
             foreach (var (element, key) in select)
                 AddElement(element, key);
+        OnCollectionChanged(new(NotifyCollectionChangedAction.Reset));
     }
 
     void RemoveElement(TElement element, TKey key)

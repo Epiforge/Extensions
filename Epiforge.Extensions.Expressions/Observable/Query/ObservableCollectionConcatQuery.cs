@@ -64,6 +64,7 @@ sealed class ObservableCollectionConcatQuery<TElement> :
         first.PropertyChanged += FirstPropertyChanged;
         Second.CollectionChanged += SecondCollectionChanged;
         Second.PropertyChanged += SecondPropertyChanged;
+        OnCollectionChanged(new(NotifyCollectionChangedAction.Reset));
     }
 
     void SecondCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>

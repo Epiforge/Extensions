@@ -1,1 +1,1 @@
-We added event IDs for logging and optimized logging logic.
+We added some race condition fixes for observable collection and dictionary queries.

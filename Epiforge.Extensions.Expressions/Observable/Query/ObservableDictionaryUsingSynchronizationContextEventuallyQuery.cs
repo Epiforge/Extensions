@@ -73,6 +73,7 @@ sealed class ObservableDictionaryUsingSynchronizationContextEventuallyQuery<TKey
         source.DictionaryChanged += SourceDictionaryChanged;
         dictionary.DictionaryChanged += DictionaryDictionaryChanged;
         dictionary.PropertyChanged += DictionaryPropertyChanged;
+        OnDictionaryChanged(new(NotifyDictionaryChangedAction.Reset));
     }
 
     void SourceDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e) =>

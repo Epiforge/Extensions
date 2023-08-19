@@ -123,6 +123,7 @@ sealed class ObservableDictionaryToCollectionQuery<TElement, TKey, TValue> :
         source.DictionaryChanged += SourceDictionaryChanged;
         elements.CollectionChanged += ElementsCollectionChanged;
         ((INotifyPropertyChanged)elements).PropertyChanged += ElementsPropertyChanged;
+        OnCollectionChanged(new(NotifyCollectionChangedAction.Reset));
     }
 
     void SourceDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e)

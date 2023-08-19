@@ -155,6 +155,7 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult> :
             select.PropertyChanged += SelectPropertyChanged;
             select.PropertyChanging += SelectPropertyChanging;
         }
+        OnCollectionChanged(new(NotifyCollectionChangedAction.Reset));
     }
 
     [SuppressMessage("Maintainability", "CA1502: Avoid excessive complexity")]
