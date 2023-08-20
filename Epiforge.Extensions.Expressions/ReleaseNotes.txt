@@ -1,1 +1,1 @@
-We added some race condition fixes for observable collection and dictionary queries.
+We reverted the changes in the previous revision.

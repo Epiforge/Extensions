@@ -74,7 +74,6 @@ sealed class ObservableCollectionUsingSynchronizationCallbackEventuallyQuery<TEl
         elements.CollectionChanged += ElementsCollectionChanged;
         ((INotifyPropertyChanged)elements).PropertyChanged += ElementsPropertyChanged;
         Task.Run(SynchronizationAsync);
-        OnCollectionChanged(new(NotifyCollectionChangedAction.Reset));
     }
 
     void ElementsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>

@@ -166,7 +166,6 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
         SetOperationFault();
         source.DictionaryChanged += SourceDictionaryChanged;
         result.DictionaryChanged += ResultDictionaryChanged;
-        OnDictionaryChanged(new(NotifyDictionaryChangedAction.Reset));
     }
 
     void ResultDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e) =>

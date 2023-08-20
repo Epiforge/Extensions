@@ -101,7 +101,6 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
             }
             SetOperationFault();
         }
-        OnCollectionChanged(new(NotifyCollectionChangedAction.Reset));
     }
 
     void RebuildStartingIndiciesAndCounts(IReadOnlyList<TElement> fromSort)

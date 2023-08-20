@@ -161,7 +161,6 @@ sealed class ObservableCollectionWhereQuery<TElement> :
 
             source.CollectionChanged += SourceCollectionChanged;
         }
-        OnCollectionChanged(new(NotifyCollectionChangedAction.Reset));
     }
 
     void SetCount(int value) =>

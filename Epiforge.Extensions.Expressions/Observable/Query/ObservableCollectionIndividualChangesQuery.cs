@@ -63,7 +63,6 @@ sealed class ObservableCollectionIndividualChangesQuery<TElement> :
         elements.CollectionChanged += ElementsCollectionChanged;
         ((INotifyPropertyChanged)elements).PropertyChanged += ElementsPropertyChanged;
         source.CollectionChanged += SourceCollectionChanged;
-        OnCollectionChanged(new(NotifyCollectionChangedAction.Reset));
     }
 
     void ElementsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>

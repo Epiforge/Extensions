@@ -63,7 +63,6 @@ sealed class ObservableDictionaryConcurrentQuery<TKey, TValue> :
         source.DictionaryChanged += SourceDictionaryChanged;
         observableConcurrentDictionary.DictionaryChanged += ObservableConcurrentDictionaryDictionaryChanged;
         observableConcurrentDictionary.PropertyChanged += ObservableConcurrentDictionaryPropertyChanged;
-        OnDictionaryChanged(new(NotifyDictionaryChangedAction.Reset));
     }
 
     void SourceDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e)

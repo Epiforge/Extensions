@@ -116,7 +116,6 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue> :
         result.DictionaryChanged += ResultDictionaryChanged;
         result.PropertyChanging += ResultPropertyChanging;
         result.PropertyChanged += ResultPropertyChanged;
-        OnDictionaryChanged(new(NotifyDictionaryChangedAction.Reset));
     }
 
     void ResultDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e) =>

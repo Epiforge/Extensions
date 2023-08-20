@@ -53,7 +53,6 @@ sealed class ObservableCollectionUsingSyncRootQuery<TElement> :
         source.CollectionChanged += SourceCollectionChanged;
         elements.CollectionChanged += ElementsCollectionChanged;
         ((INotifyPropertyChanged)elements).PropertyChanged += ElementsPropertyChanged;
-        OnCollectionChanged(new(NotifyCollectionChangedAction.Reset));
     }
 
     void ElementsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
