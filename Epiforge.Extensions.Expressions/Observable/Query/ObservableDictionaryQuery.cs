@@ -712,6 +712,19 @@ abstract class ObservableDictionaryQuery<TKey, TValue> :
         return false;
     }
 
+    internal bool QueryDisposed(ObservableDictionaryCountQuery<TKey, TValue> query)
+    {
+        lock (cachedCountQueryAccess)
+        {
+            if (--query.Observations == 0)
+            {
+                cachedCountQuery = null;
+                return true;
+            }
+        }
+        return false;
+    }
+
     internal bool QueryDisposed(ObservableDictionaryKeyedQuery<TKey, TValue> query)
     {
         lock (cachedKeyedQueriesAccess)

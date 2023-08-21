@@ -13,7 +13,7 @@ sealed class ObservableDictionaryCountQuery<TKey, TValue> :
     {
         if (disposing)
         {
-            var removedFromCache = true;
+            var removedFromCache = observableDictionaryQuery.QueryDisposed(this);
             if (removedFromCache)
                 observableDictionaryQuery.DictionaryChanged -= ObservableDictionaryQueryDictionaryChanged;
             return removedFromCache;

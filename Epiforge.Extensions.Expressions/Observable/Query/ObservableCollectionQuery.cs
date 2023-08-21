@@ -1133,6 +1133,19 @@ abstract class ObservableCollectionQuery<TElement> :
         return false;
     }
 
+    internal bool QueryDisposed(ObservableCollectionCountQuery<TElement> countQuery)
+    {
+        lock (cachedCountQueryAccess)
+        {
+            if (--countQuery.Observations == 0)
+            {
+                cachedCountQuery = null;
+                return true;
+            }
+        }
+        return false;
+    }
+
     internal bool QueryDisposed(ObservableCollectionIndexQuery<TElement> indexQuery)
     {
         lock (cachedIndexQueriesAccess)

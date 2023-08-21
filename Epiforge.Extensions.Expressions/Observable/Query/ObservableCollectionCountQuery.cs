@@ -12,7 +12,7 @@ sealed class ObservableCollectionCountQuery<TElement> :
     {
         if (disposing)
         {
-            var removedFromCache = true;
+            var removedFromCache = observableCollectionQuery.QueryDisposed(this);
             if (removedFromCache)
                 observableCollectionQuery.CollectionChanged -= ObservableCollectionQueryCollectionChanged;
             return removedFromCache;
