@@ -29,7 +29,7 @@ sealed class ObservableDictionaryCountQuery<TKey, TValue> :
             Evaluation = (null, observableDictionaryQuery.Count);
     }
 
-    void ObservableDictionaryQueryDictionaryChanged(object sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e) =>
+    void ObservableDictionaryQueryDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e) =>
         Evaluate();
 
     protected override void OnInitialization()

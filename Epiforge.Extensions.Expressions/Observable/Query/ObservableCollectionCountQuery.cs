@@ -28,7 +28,7 @@ sealed class ObservableCollectionCountQuery<TElement> :
             Evaluation = (null, observableCollectionQuery.Count);
     }
 
-    void ObservableCollectionQueryCollectionChanged(object sender, NotifyCollectionChangedEventArgs e) =>
+    void ObservableCollectionQueryCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
         Evaluate();
 
     protected override void OnInitialization()
