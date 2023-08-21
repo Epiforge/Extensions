@@ -50,6 +50,8 @@ abstract class ObservableDictionaryQuery<TKey, TValue> :
     readonly object cachedAnyQueriesAccess = new();
     ObservableDictionaryConcurrentQuery<TKey, TValue>? cachedConcurrentQuery;
     readonly object cachedConcurrentQueryAccess = new();
+    ObservableDictionaryCountQuery<TKey, TValue>? cachedCountQuery;
+    readonly object cachedCountQueryAccess = new();
     readonly Dictionary<(IComparer<TKey>? keyComparer, bool notFoundIsDefault), ObservableDictionaryKeyedQuery<TKey, TValue>> cachedKeyedQueries = new();
     readonly object cachedKeyedQueriesAccess = new();
     readonly Dictionary<(Expression keyValuePairSelector, object equalityComparer), ObservableQuery> cachedSelectQueries = new(CachedSelectQueryEqualityComparer.Default);
@@ -81,6 +83,8 @@ abstract class ObservableDictionaryQuery<TKey, TValue> :
                 count += cachedAnyQueries.Values.Sum(anyQuery => 1 + anyQuery.CachedObservableQueries);
             lock (cachedConcurrentQueryAccess)
                 count += cachedConcurrentQuery is null ? 0 : 1 + cachedConcurrentQuery.CachedObservableQueries;
+            lock (cachedCountQueryAccess)
+                count += cachedCountQuery is null ? 0 : 1 + cachedCountQuery.CachedObservableQueries;
             lock (cachedKeyedQueriesAccess)
                 count += cachedKeyedQueries.Values.Sum(keyedQuery => 1 + keyedQuery.CachedObservableQueries);
             lock (cachedSelectQueriesAccess)
@@ -263,6 +267,33 @@ abstract class ObservableDictionaryQuery<TKey, TValue> :
         }
         cachedConcurrentQuery.Initialize();
         return cachedConcurrentQuery;
+    }
+
+    [return: DisposeWhenDiscarded]
+    public IObservableScalarQuery<int> ObserveCount()
+    {
+        lock (cachedCountQueryAccess)
+        {
+            cachedCountQuery ??= new ObservableDictionaryCountQuery<TKey, TValue>(collectionObserver, this);
+            ++cachedCountQuery.Observations;
+        }
+        cachedCountQuery.Initialize();
+        return cachedCountQuery;
+    }
+
+    [return: DisposeWhenDiscarded]
+    public IObservableScalarQuery<int> ObserveCount(Expression<Func<TKey, TValue, bool>> predicate)
+    {
+#if IS_NET_6_0_OR_GREATER
+        ArgumentNullException.ThrowIfNull(predicate);
+#else
+        if (predicate is null)
+            throw new ArgumentNullException(nameof(predicate));
+#endif
+        var where = ObserveWhere(predicate);
+        var count = where.ObserveCount();
+        count.Disposed += (_, _) => where.Dispose();
+        return count;
     }
 
     [return: DisposeWhenDiscarded]

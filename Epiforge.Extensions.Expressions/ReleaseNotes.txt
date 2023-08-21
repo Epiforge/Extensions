@@ -1,1 +1,1 @@
-We reverted the changes in the previous revision.
+We added Count observations to be more in line with LINQ.

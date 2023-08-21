@@ -88,6 +88,21 @@ public interface IObservableCollectionQuery<TElement> :
     IObservableCollectionQuery<TElement> ObserveConcat(IObservableCollectionQuery<TElement> second);
 
     /// <summary>
+    /// Continuously determines the number of elements in the collection
+    /// </summary>
+    /// <returns>The number of elements in the collection</returns>
+    [return: DisposeWhenDiscarded]
+    IObservableScalarQuery<int> ObserveCount();
+
+    /// <summary>
+    /// Continuously determines the number of elements in the collection which satisfy a condition
+    /// </summary>
+    /// <param name="predicate">A function to test each element for a condition</param>
+    /// <returns>The number of elements in the collection</returns>
+    [return: DisposeWhenDiscarded]
+    IObservableScalarQuery<int> ObserveCount(Expression<Func<TElement, bool>> predicate);
+
+    /// <summary>
     /// Continuously returns distinct elements from the collection by using the default equality comparer to compare values
     /// </summary>
     /// <returns>The distinct elements from the collection</returns>

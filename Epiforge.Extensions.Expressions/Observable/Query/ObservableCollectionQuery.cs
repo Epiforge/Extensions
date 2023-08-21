@@ -116,6 +116,8 @@ abstract class ObservableCollectionQuery<TElement> :
     readonly object cachedComparisonQueriesAccess = new();
     readonly Dictionary<IObservableCollectionQuery<TElement>, ObservableCollectionConcatQuery<TElement>> cachedConcatQueries = new();
     readonly object cachedConcatQueriesAccess = new();
+    ObservableCollectionCountQuery<TElement>? cachedCountQuery;
+    readonly object cachedCountQueryAccess = new();
     readonly Dictionary<(Expression keySelector, object keyEqualityComparer), ObservableQuery> cachedGroupByQueries = new(CachedGroupByQueryEqualityComparer.Default);
     readonly object cachedGroupByQueriesAccess = new();
     readonly Dictionary<(Index? index, bool outOfRangeIsDefault), ObservableQuery> cachedIndexQueries = new();
@@ -167,12 +169,14 @@ abstract class ObservableCollectionQuery<TElement> :
                 count += cachedComparisonQueries.Values.Sum(comparerQuery => 1 + comparerQuery.CachedObservableQueries);
             lock (cachedConcatQueriesAccess)
                 count += cachedConcatQueries.Values.Sum(concatQuery => 1 + concatQuery.CachedObservableQueries);
+            lock (cachedCountQueryAccess)
+                count += cachedCountQuery is null ? 0 : 1 + cachedCountQuery.CachedObservableQueries;
             lock (cachedGroupByQueriesAccess)
                 count += cachedGroupByQueries.Values.Sum(groupByQuery => 1 + groupByQuery.CachedObservableQueries);
             lock (cachedIndexQueriesAccess)
                 count += cachedIndexQueries.Values.Sum(indexQuery => 1 + indexQuery.CachedObservableQueries);
             lock (cachedIndividualChangeQueryAccess)
-                count += cachedIndividualChangeQuery is { } nonNullIndividualChangeQuery ? 1 + nonNullIndividualChangeQuery.CachedObservableQueries : 0;
+                count += cachedIndividualChangeQuery is null ? 0 : 1 + cachedIndividualChangeQuery.CachedObservableQueries;
             lock (cachedOrderByQueriesAccess)
                 count += cachedOrderByQueries.Values.Sum(orderByQuery => 1 + orderByQuery.CachedObservableQueries);
             lock (cachedSelectQueriesAccess)
@@ -443,6 +447,33 @@ abstract class ObservableCollectionQuery<TElement> :
         }
         concatQuery.Initialize();
         return concatQuery;
+    }
+
+    [return: DisposeWhenDiscarded]
+    public IObservableScalarQuery<int> ObserveCount()
+    {
+        lock (cachedCountQueryAccess)
+        {
+            cachedCountQuery ??= new ObservableCollectionCountQuery<TElement>(collectionObserver, this);
+            ++cachedCountQuery.Observations;
+        }
+        cachedCountQuery.Initialize();
+        return cachedCountQuery;
+    }
+
+    [return: DisposeWhenDiscarded]
+    public IObservableScalarQuery<int> ObserveCount(Expression<Func<TElement, bool>> predicate)
+    {
+#if IS_NET_6_0_OR_GREATER
+        ArgumentNullException.ThrowIfNull(predicate);
+#else
+        if (predicate is null)
+            throw new ArgumentNullException(nameof(predicate));
+#endif
+        var where = ObserveWhere(predicate);
+        var count = where.ObserveCount();
+        count.Disposed += (_, _) => where.Dispose();
+        return count;
     }
 
     [return: DisposeWhenDiscarded]

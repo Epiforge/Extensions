@@ -82,6 +82,21 @@ public interface IObservableDictionaryQuery<TKey, TValue> :
     IObservableDictionaryQuery<TKey, TValue> ObserveConcurrently();
 
     /// <summary>
+    /// Continuously determines the number of key/value pairs in the dictionary
+    /// </summary>
+    /// <returns>The number of key/value pairs in the dictionary</returns>
+    [return: DisposeWhenDiscarded]
+    IObservableScalarQuery<int> ObserveCount();
+
+    /// <summary>
+    /// Continuously determines the number of key/value pairs in the dictionary which satisfy a condition
+    /// </summary>
+    /// <param name="predicate">A function to test each key/value pair for a condition</param>
+    /// <returns>The number of key/value pairs in the dictionary</returns>
+    [return: DisposeWhenDiscarded]
+    IObservableScalarQuery<int> ObserveCount(Expression<Func<TKey, TValue, bool>> predicate);
+
+    /// <summary>
     /// Continuously returns the first key/value pair of the dictionary
     /// </summary>
     /// <returns>The first key/value pair in the dictionary</returns>
@@ -92,7 +107,7 @@ public interface IObservableDictionaryQuery<TKey, TValue> :
     /// Continuously returns the first key/value pair in the dictionary that satisfies a specified condition
     /// </summary>
     /// <param name="predicate">A function to test each key/value pair for a condition</param>
-    /// <returns>The first key/value pair in the dictionary that passes the test in the spredicate function</returns>
+    /// <returns>The first key/value pair in the dictionary that passes the test in the predicate function</returns>
     [return: DisposeWhenDiscarded]
     IObservableScalarQuery<KeyValuePair<TKey, TValue>> ObserveFirst(Expression<Func<TKey, TValue, bool>> predicate);
 
@@ -109,7 +124,7 @@ public interface IObservableDictionaryQuery<TKey, TValue> :
     /// </summary>
     /// <param name="predicate">A function to test each key/value pair for a condition</param>
     /// <param name="comparer">The comparer to use when comparing keys in the dictionary</param>
-    /// <returns>The first key/value pair in the dictionary that passes the test in the spredicate function</returns>
+    /// <returns>The first key/value pair in the dictionary that passes the test in the predicate function</returns>
     [return: DisposeWhenDiscarded]
     IObservableScalarQuery<KeyValuePair<TKey, TValue>> ObserveFirst(Expression<Func<TKey, TValue, bool>> predicate, IComparer<TKey> comparer);
 
