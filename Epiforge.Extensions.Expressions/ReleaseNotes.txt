@@ -1,1 +1,1 @@
-We added Count observations to be more in line with LINQ. This revision corrects some nullability warnings and disposal defects.
+We added ObserveTransform to scalar observable queries.

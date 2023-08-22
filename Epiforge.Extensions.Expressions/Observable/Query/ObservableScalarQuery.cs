@@ -9,7 +9,20 @@ abstract class ObservableScalarQuery<TResult> :
     {
     }
 
+    readonly Dictionary<Expression, ObservableQuery> cachedTransformQueries = new(ExpressionEqualityComparer.Default);
+    readonly object cachedTransformQueriesAccess = new();
     (Exception? Fault, TResult Result) evaluation;
+
+    public override int CachedObservableQueries
+    {
+        get
+        {
+            var count = 0;
+            lock (cachedTransformQueriesAccess)
+                count += cachedTransformQueries.Values.Sum(transformQuery => 1 + transformQuery.CachedObservableQueries);
+            return count;
+        }
+    }
 
     public (Exception? Fault, TResult Result) Evaluation
     {
@@ -24,5 +37,40 @@ abstract class ObservableScalarQuery<TResult> :
                     logger.LogTrace(EventIds.Epiforge_Extensions_Expressions_QueryEvaluated, "{ScalarQuery} evaluated: {Result}", this, value.Result);
             }
         }
+    }
+
+    public IObservableScalarQuery<TTransform> ObserveTransform<TTransform>(Expression<Func<TResult, TTransform>> transform)
+    {
+#if IS_NET_6_0_OR_GREATER
+        ArgumentNullException.ThrowIfNull(transform);
+#else
+        if (transform is null)
+            throw new ArgumentNullException(nameof(transform));
+#endif
+        ObservableQuery transformQuery;
+        lock (cachedTransformQueriesAccess)
+        {
+            if (!cachedTransformQueries.TryGetValue(transform, out transformQuery!))
+            {
+                transformQuery = new ObservableScalarTransformQuery<TResult, TTransform>(collectionObserver, this, transform);
+                cachedTransformQueries.Add(transform, transformQuery);
+            }
+            ++transformQuery.Observations;
+        }
+        transformQuery.Initialize();
+        return (IObservableScalarQuery<TTransform>)transformQuery;
+    }
+
+    internal bool QueryDisposed<TTransform>(ObservableScalarTransformQuery<TResult, TTransform> query)
+    {
+        lock (cachedTransformQueriesAccess)
+        {
+            if (--query.Observations == 0)
+            {
+                cachedTransformQueries.Remove(query.Transform);
+                return true;
+            }
+        }
+        return false;
     }
 }
