@@ -1,11 +1,9 @@
 namespace Epiforge.Extensions.Collections.ObjectModel;
 
-/// <summary>
-/// Represents a dynamic data collection that supports bulk operations and provides notifications when items get added, removed, or when the whole list is refreshed
-/// </summary>
-/// <typeparam name="T">The type of elements in the collection</typeparam>
+/// <inheritdoc/>
 public class RangeObservableCollection<T> :
-    ObservableCollection<T>
+    ObservableCollection<T>,
+    IRangeObservableCollection<T>
 {
     /// <summary>
     /// Initializes a new instance of the <see cref="RangeObservableCollection{T}"/>
@@ -84,25 +82,15 @@ public class RangeObservableCollection<T> :
     /// </summary>
     public bool RaiseCollectionChangedEventsForIndividualElements { get; }
 
-    /// <summary>
-    /// Adds objects to the end of the <see cref="RangeObservableCollection{T}"/>
-    /// </summary>
-    /// <param name="items">The objects to be added to the end of the <see cref="RangeObservableCollection{T}"/></param>
+    /// <inheritdoc/>
     public void AddRange(IEnumerable<T> items) =>
         InsertRange(Items.Count, items);
 
-    /// <summary>
-    /// Adds objects to the end of the <see cref="RangeObservableCollection{T}"/>
-    /// </summary>
-    /// <param name="items">The objects to be added to the end of the <see cref="RangeObservableCollection{T}"/></param>
+    /// <inheritdoc/>
     public void AddRange(IList<T> items) =>
         AddRange((IEnumerable<T>)items);
 
-    /// <summary>
-    /// Removes all object from the <see cref="RangeObservableCollection{T}"/> that satisfy the <paramref name="predicate"/>
-    /// </summary>
-    /// <param name="predicate">A predicate used to determine whether to remove an object from the <see cref="RangeObservableCollection{T}"/></param>
-    /// <returns>The items that were removed</returns>
+    /// <inheritdoc/>
     public IReadOnlyList<T> GetAndRemoveAll(Func<T, bool> predicate)
     {
 #if IS_NET_6_0_OR_GREATER
@@ -120,11 +108,7 @@ public class RangeObservableCollection<T> :
         return removed.ToImmutableArray();
     }
 
-    /// <summary>
-    /// Gets the element at the specified index and removes it from the <see cref="RangeObservableCollection{T}"/>
-    /// </summary>
-    /// <param name="index">The zero-based index of the element</param>
-    /// <returns>The element at the specified index</returns>
+    /// <inheritdoc/>
     public virtual T GetAndRemoveAt(int index)
     {
         var item = Items[index];
@@ -132,12 +116,7 @@ public class RangeObservableCollection<T> :
         return item;
     }
 
-    /// <summary>
-    /// Gets the elements in the range starting at the specified index and of the specified length
-    /// </summary>
-    /// <param name="index">The index of the element at the start of the range</param>
-    /// <param name="count">The number of elements in the range</param>
-    /// <returns>The elements in the range</returns>
+    /// <inheritdoc/>
     public IReadOnlyList<T> GetRange(int index, int count)
     {
         var result = new List<T>();
@@ -146,11 +125,7 @@ public class RangeObservableCollection<T> :
         return result.ToImmutableArray();
     }
 
-    /// <summary>
-    /// Inserts elements into the <see cref="RangeObservableCollection{T}"/> at the specified index
-    /// </summary>
-    /// <param name="index">The zero-based index at which <paramref name="items"/> should be inserted</param>
-    /// <param name="items">The objects to insert</param>
+    /// <inheritdoc/>
     public void InsertRange(int index, IEnumerable<T> items)
     {
 #if IS_NET_6_0_OR_GREATER
@@ -180,20 +155,11 @@ public class RangeObservableCollection<T> :
         }
     }
 
-    /// <summary>
-    /// Inserts elements into the <see cref="RangeObservableCollection{T}"/> at the specified index
-    /// </summary>
-    /// <param name="index">The zero-based index at which <paramref name="items"/> should be inserted</param>
-    /// <param name="items">The objects to insert</param>
+    /// <inheritdoc/>
     public void InsertRange(int index, IList<T> items) =>
         InsertRange(index, (IEnumerable<T>)items);
 
-    /// <summary>
-    /// Moves the items at the specified index to a new location in the collection
-    /// </summary>
-    /// <param name="oldStartIndex">The zero-based index specifying the location of the items to be moved</param>
-    /// <param name="newStartIndex">The zero-based index specifying the new location of the items</param>
-    /// <param name="count">The number of items to move</param>
+    /// <inheritdoc/>
     public void MoveRange(int oldStartIndex, int newStartIndex, int count)
     {
         if (oldStartIndex != newStartIndex && count > 0)
@@ -248,19 +214,11 @@ public class RangeObservableCollection<T> :
         logger?.LogTrace(EventIds.Epiforge_Extensions_Collections_RaisedCollectionChanged, "Raised CollectionChanged: {EventArgs}", eventArgs);
     }
 
-    /// <summary>
-    /// Removes all object from the <see cref="RangeObservableCollection{T}"/> that satisfy the <paramref name="predicate"/>
-    /// </summary>
-    /// <param name="predicate">A predicate used to determine whether to remove an object from the <see cref="RangeObservableCollection{T}"/></param>
-    /// <returns>The number of items that were removed</returns>
+    /// <inheritdoc/>
     public int RemoveAll(Func<T, bool> predicate) =>
         GetAndRemoveAll(predicate).Count;
 
-    /// <summary>
-    /// Removes the specified items from the <see cref="RangeObservableCollection{T}"/>
-    /// </summary>
-    /// <param name="items">The items to be removed</param>
-    /// <returns>The number of items that were removed</returns>
+    /// <inheritdoc/>
     public void RemoveRange(IEnumerable<T> items)
     {
 #if IS_NET_6_0_OR_GREATER
@@ -281,19 +239,11 @@ public class RangeObservableCollection<T> :
         }
     }
 
-    /// <summary>
-    /// Removes the specified items from the <see cref="RangeObservableCollection{T}"/>
-    /// </summary>
-    /// <param name="items">The items to be removed</param>
-    /// <returns>The number of items that were removed</returns>
+    /// <inheritdoc/>
     public void RemoveRange(IList<T> items) =>
         RemoveRange((IEnumerable<T>)items);
 
-    /// <summary>
-    /// Removes the specified range of items from the <see cref="RangeObservableCollection{T}"/>
-    /// </summary>
-    /// <param name="index">The index of the first item in the range</param>
-    /// <param name="count">The number of items in the range</param>
+    /// <inheritdoc/>
     public void RemoveRange(int index, int count)
     {
         if (count > 0)
@@ -313,10 +263,7 @@ public class RangeObservableCollection<T> :
             }
     }
 
-    /// <summary>
-    /// Replace all items in the <see cref="RangeObservableCollection{T}"/> with the items in the specified collection
-    /// </summary>
-    /// <param name="items">The collection of replacement items</param>
+    /// <inheritdoc/>
     public void ReplaceAll(IEnumerable<T> items)
     {
 #if IS_NET_6_0_OR_GREATER
@@ -347,20 +294,11 @@ public class RangeObservableCollection<T> :
         }
     }
 
-    /// <summary>
-    /// Replace all items in the <see cref="RangeObservableCollection{T}"/> with the items in the specified collection
-    /// </summary>
-    /// <param name="items">The collection of replacement items</param>
+    /// <inheritdoc/>
     public void ReplaceAll(IList<T> items) =>
         ReplaceAll((IEnumerable<T>)items);
 
-    /// <summary>
-    /// Replaces the specified range of items from the <see cref="RangeObservableCollection{T}"/> with the items in the specified collection
-    /// </summary>
-    /// <param name="index">The index of the first item in the range</param>
-    /// <param name="count">The number of items in the range</param>
-    /// <param name="collection">The collection of replacement items</param>
-    /// <returns>The items that were replaced</returns>
+    /// <inheritdoc/>
     public IReadOnlyList<T> ReplaceRange(int index, int count, IEnumerable<T>? collection = null)
     {
         if (RaiseCollectionChangedEventsForIndividualElements)
@@ -398,20 +336,11 @@ public class RangeObservableCollection<T> :
         }
     }
 
-    /// <summary>
-    /// Replaces the specified range of items from the <see cref="RangeObservableCollection{T}"/> with the items in the specified list
-    /// </summary>
-    /// <param name="index">The index of the first item in the range</param>
-    /// <param name="count">The number of items in the range</param>
-    /// <param name="list">The list of replacement items</param>
-    /// <returns>The items that were replaced</returns>
+    /// <inheritdoc/>
     public IReadOnlyList<T> ReplaceRange(int index, int count, IList<T> list) =>
         ReplaceRange(index, count, (IEnumerable<T>)list);
 
-    /// <summary>
-    /// Resets the <see cref="RangeObservableCollection{T}"/> with the specified collection of items
-    /// </summary>
-    /// <param name="newCollection">The collection of items</param>
+    /// <inheritdoc/>
     public void Reset(IEnumerable<T> newCollection)
     {
 #if IS_NET_6_0_OR_GREATER

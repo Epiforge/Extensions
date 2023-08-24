@@ -1,1 +1,1 @@
-We added SourceLink.
+We added IRangeObservableCollection and ReadOnlyRangeObservableCollection.
