@@ -6,7 +6,7 @@ public class CollectionOfType
     [TestMethod]
     public void SourceManipulation()
     {
-        var source = new RangeObservableCollection<object>(new object[]
+        var source = new ObservableRangeCollection<object>(new object[]
         {
             0,
             false,

@@ -6,7 +6,7 @@ public class CollectionCast
     [TestMethod]
     public void SourceManipulation()
     {
-        var source = new RangeObservableCollection<int>(Enumerable.Range(1, 10));
+        var source = new ObservableRangeCollection<int>(Enumerable.Range(1, 10));
         var collectionObserver = CollectionObserverHelpers.Create();
         using (var sourceQuery = collectionObserver.ObserveReadOnlyList(source))
         {

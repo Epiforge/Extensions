@@ -6,7 +6,7 @@ public class CollectionAverage
     [TestMethod]
     public void ExpressionlessSourceManipulation()
     {
-        var source = new RangeObservableCollection<decimal>();
+        var source = new ObservableRangeCollection<decimal>();
         var collectionObserver = CollectionObserverHelpers.Create();
         using (var sourceQuery = collectionObserver.ObserveReadOnlyList(source))
         {

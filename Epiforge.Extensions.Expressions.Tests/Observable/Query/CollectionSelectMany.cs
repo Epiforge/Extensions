@@ -6,7 +6,7 @@ public class CollectionSelectMany
     [TestMethod]
     public void SourceManipulation()
     {
-        var source = new RangeObservableCollection<TestTeam>();
+        var source = new ObservableRangeCollection<TestTeam>();
         var collectionObserver = CollectionObserverHelpers.Create();
         using (var sourceQuery = collectionObserver.ObserveReadOnlyList(source))
         {
@@ -56,7 +56,7 @@ public class CollectionSelectMany
                 checkMergedNames("CharlesJohnEmilyErinCliff");
                 it.People = null;
                 checkMergedNames("CharlesJohnEmilyErinCliff");
-                it.People = new RangeObservableCollection<TestPerson>()
+                it.People = new ObservableRangeCollection<TestPerson>()
                 {
                     new TestPerson("Paul")
                 };
@@ -75,7 +75,7 @@ public class CollectionSelectMany
                 management.People.Insert(0, new TestPerson("George"));
                 checkMergedNames("GeorgeCharlesEmilyErinCliffDanielGeorgeCharles");
                 var currentManagers = management.People;
-                var otherManagers = new RangeObservableCollection<TestPerson>()
+                var otherManagers = new ObservableRangeCollection<TestPerson>()
                 {
                     new TestPerson("Josh"),
                     new TestPerson("Jessica")

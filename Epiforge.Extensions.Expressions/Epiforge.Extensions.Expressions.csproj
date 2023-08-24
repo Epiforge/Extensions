@@ -2,12 +2,12 @@
 
     <PropertyGroup>
         <Product>Epiforge.Extensions.Expressions</Product>
-        <Version>1.3.0</Version>
+        <Version>1.4.0</Version>
         <Description>This package assists in operating with expressions.</Description>
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Epiforge.Extensions.Collections" Version="1.4.0" />
+        <PackageReference Include="Epiforge.Extensions.Collections" Version="1.5.0" />
         <PackageReference Include="Epiforge.Extensions.Components" Version="1.5.0" />
         <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.1" PrivateAssets="all" />
         <PackageReference Include="PolySharp" Version="1.13.2">

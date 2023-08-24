@@ -26,7 +26,7 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     ObservableCollectionOrderingComparer<TElement>? comparer;
     readonly IEqualityComparer<TElement> equalityComparer;
-    readonly RangeObservableCollection<TElement> results;
+    readonly ObservableRangeCollection<TElement> results;
     IReadOnlyList<(IObservableCollectionQuery<Tuple<TElement, IComparable>> selection, bool isDescending)>? selectionsAndDirections;
     readonly ObservableCollectionQuery<TElement> source;
     readonly NullableKeyDictionary<TElement, (int startingIndex, int count)> startingIndiciesAndCounts;

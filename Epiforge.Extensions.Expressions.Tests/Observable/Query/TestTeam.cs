@@ -5,19 +5,19 @@ public class TestTeam :
     IComparable<TestTeam>
 {
     public TestTeam() :
-        this(new RangeObservableCollection<TestPerson>())
+        this(new ObservableRangeCollection<TestPerson>())
     {
     }
 
-    public TestTeam(RangeObservableCollection<TestPerson>? people) =>
+    public TestTeam(ObservableRangeCollection<TestPerson>? people) =>
         this.people = people;
 
-    RangeObservableCollection<TestPerson>? people;
+    ObservableRangeCollection<TestPerson>? people;
 
     public int CompareTo(TestTeam? other) =>
         GetHashCode().CompareTo(other?.GetHashCode() ?? 0);
 
-    public RangeObservableCollection<TestPerson>? People
+    public ObservableRangeCollection<TestPerson>? People
     {
         get => people;
         set => SetBackedProperty(ref people, in value);

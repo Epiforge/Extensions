@@ -6,7 +6,7 @@ public class CollectionMin
     [TestMethod]
     public void ExpressionlessSourceManipulation()
     {
-        var source = new RangeObservableCollection<int>();
+        var source = new ObservableRangeCollection<int>();
         var collectionObserver = CollectionObserverHelpers.Create();
         using (var sourceQuery = collectionObserver.ObserveReadOnlyList(source))
         {

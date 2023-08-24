@@ -3,7 +3,7 @@ namespace Epiforge.Extensions.Expressions.Tests.Observable;
 public class TestPerson :
     PropertyChangeNotifier
 {
-    public static RangeObservableCollection<TestPerson> CreatePeopleCollection() =>
+    public static ObservableRangeCollection<TestPerson> CreatePeopleCollection() =>
         new(MakePeople());
 
     public static ObservableDictionary<int, TestPerson> CreatePeopleDictionary(SynchronizationContext? synchronizationContext = null) =>

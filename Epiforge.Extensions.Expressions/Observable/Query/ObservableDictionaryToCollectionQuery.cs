@@ -19,7 +19,7 @@ sealed class ObservableDictionaryToCollectionQuery<TElement, TKey, TValue> :
 
     readonly object access;
     readonly IEqualityComparer<TElement> elementComparer;
-    readonly RangeObservableCollection<TElement> elements;
+    readonly ObservableRangeCollection<TElement> elements;
     readonly Dictionary<IObservableExpression<KeyValuePair<TKey, TValue>, TElement>, (Exception? fault, TElement result)> evaluationsChanging;
     readonly IEqualityComparer<TKey> keyComparer;
     readonly ObservableDictionary<TKey, IObservableExpression<KeyValuePair<TKey, TValue>, TElement>> observableExpressions;

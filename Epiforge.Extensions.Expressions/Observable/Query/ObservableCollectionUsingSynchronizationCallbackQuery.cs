@@ -11,7 +11,7 @@ sealed class ObservableCollectionUsingSynchronizationCallbackQuery<TElement> :
         SynchronizationCallback = synchronizationCallback;
     }
 
-    RangeObservableCollection<TElement>? elements;
+    ObservableRangeCollection<TElement>? elements;
     readonly ObservableCollectionQuery<TElement> source;
 
     internal readonly object Context;

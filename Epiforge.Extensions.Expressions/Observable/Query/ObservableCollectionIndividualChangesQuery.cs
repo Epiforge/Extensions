@@ -12,7 +12,7 @@ sealed class ObservableCollectionIndividualChangesQuery<TElement> :
     }
 
     readonly object access;
-    readonly RangeObservableCollection<TElement> elements;
+    readonly ObservableRangeCollection<TElement> elements;
     readonly ObservableCollectionQuery<TElement> source;
 
     public override TElement this[int index]

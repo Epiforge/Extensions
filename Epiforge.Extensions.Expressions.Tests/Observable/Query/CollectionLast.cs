@@ -6,7 +6,7 @@ public class CollectionLast
     [TestMethod]
     public void ExpressionlessSourceManipulation()
     {
-        var source = new RangeObservableCollection<int>(Enumerable.Range(0, 10));
+        var source = new ObservableRangeCollection<int>(Enumerable.Range(0, 10));
         var collectionObserver = CollectionObserverHelpers.Create();
         using (var sourceQuery = collectionObserver.ObserveReadOnlyList(source))
         {
@@ -33,7 +33,7 @@ public class CollectionLast
     [TestMethod]
     public void SourceManipulation()
     {
-        var source = new RangeObservableCollection<int>(Enumerable.Range(0, 10));
+        var source = new ObservableRangeCollection<int>(Enumerable.Range(0, 10));
         var collectionObserver = CollectionObserverHelpers.Create();
         using (var sourceQuery = collectionObserver.ObserveReadOnlyList(source))
         {

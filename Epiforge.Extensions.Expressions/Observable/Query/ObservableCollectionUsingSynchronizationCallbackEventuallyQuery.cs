@@ -19,7 +19,7 @@ sealed class ObservableCollectionUsingSynchronizationCallbackEventuallyQuery<TEl
     CancellationTokenSource? currentResetCancellationTokenSource;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     readonly CancellationTokenSource disposedCancellationTokenSource;
-    RangeObservableCollection<TElement>? elements;
+    ObservableRangeCollection<TElement>? elements;
     readonly ConcurrentQueue<AsyncProducerConsumerQueue<NotifyCollectionChangedEventArgs>> pendingCollectionChangedEventsQueue;
     readonly ConcurrentQueue<CancellationTokenSource> resetCancellationTokenSources;
     readonly ObservableCollectionQuery<TElement> source;

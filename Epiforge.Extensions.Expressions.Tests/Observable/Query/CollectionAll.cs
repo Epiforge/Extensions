@@ -6,7 +6,7 @@ public class CollectionAll
     [TestMethod]
     public void SourceManipulation()
     {
-        var source = new RangeObservableCollection<int>(Enumerable.Range(1, 10).Select(i => i * 3));
+        var source = new ObservableRangeCollection<int>(Enumerable.Range(1, 10).Select(i => i * 3));
         var collectionObserver = CollectionObserverHelpers.Create();
         using (var sourceQuery = collectionObserver.ObserveReadOnlyList(source))
         {

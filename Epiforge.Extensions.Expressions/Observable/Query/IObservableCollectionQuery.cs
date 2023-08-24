@@ -5,7 +5,7 @@ namespace Epiforge.Extensions.Expressions.Observable.Query;
 /// </summary>
 /// <typeparam name="TElement">The type of elements in the collection</typeparam>
 public interface IObservableCollectionQuery<TElement> :
-    IRangeObservableCollection<TElement>,
+    IObservableRangeCollection<TElement>,
     IObservableQuery
 {
     /// <summary>

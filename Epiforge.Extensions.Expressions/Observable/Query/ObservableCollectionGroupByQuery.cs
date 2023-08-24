@@ -23,8 +23,8 @@ sealed class ObservableCollectionGroupByQuery<TKey, TElement> :
     }
 
     readonly object access;
-    readonly NullableKeyDictionary<TKey, (RangeObservableCollection<TElement> collection, IObservableGrouping<TKey, TElement> grouping)> collectionAndGroupingByKey;
-    readonly RangeObservableCollection<IObservableGrouping<TKey, TElement>> groupings;
+    readonly NullableKeyDictionary<TKey, (ObservableRangeCollection<TElement> collection, IObservableGrouping<TKey, TElement> grouping)> collectionAndGroupingByKey;
+    readonly ObservableRangeCollection<IObservableGrouping<TKey, TElement>> groupings;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     IObservableCollectionQuery<Tuple<TElement, TKey>>? select;
     readonly ObservableCollectionQuery<TElement> source;
@@ -52,7 +52,7 @@ sealed class ObservableCollectionGroupByQuery<TKey, TElement> :
 
     void AddElement(TElement element, TKey key)
     {
-        RangeObservableCollection<TElement> collection;
+        ObservableRangeCollection<TElement> collection;
         if (!collectionAndGroupingByKey.TryGetValue(key, out var collectionAndGrouping))
         {
             collection = collectionObserver.ExpressionObserver.Logger is { } logger ? new(logger) : new();

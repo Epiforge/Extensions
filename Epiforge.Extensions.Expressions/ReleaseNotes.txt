@@ -1,1 +1,1 @@
-IObservableCollectionQuery now implements IRangeObservableCollection and IObservableDictionaryQuery now implements IObservableRangeDictionary.
+We made compatibility adjustments for breaking changes in other libraries.

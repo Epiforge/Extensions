@@ -6,7 +6,7 @@ public class CollectionUsingSyncRoot
     [TestMethod]
     public void SourceManipulation()
     {
-        var source = new RangeObservableCollection<int>();
+        var source = new ObservableRangeCollection<int>();
         var collectionObserver = CollectionObserverHelpers.Create();
         using (var sourceQuery = collectionObserver.ObserveReadOnlyList(source))
         {

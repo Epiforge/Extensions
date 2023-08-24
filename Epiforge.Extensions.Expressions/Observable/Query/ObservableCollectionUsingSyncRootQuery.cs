@@ -10,7 +10,7 @@ sealed class ObservableCollectionUsingSyncRootQuery<TElement> :
         SyncRoot = syncRoot;
     }
 
-    RangeObservableCollection<TElement>? elements;
+    ObservableRangeCollection<TElement>? elements;
     readonly ObservableCollectionQuery<TElement> source;
 
     public override TElement this[int index] =>

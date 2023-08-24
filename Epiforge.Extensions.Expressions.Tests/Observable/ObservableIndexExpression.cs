@@ -3,14 +3,14 @@ namespace Epiforge.Extensions.Expressions.Tests.Observable;
 [TestClass]
 public class ObservableIndexExpression
 {
-    public class TestRangeObservableCollection<T> :
-        RangeObservableCollection<T>
+    public class TestObservableRangeCollection<T> :
+        ObservableRangeCollection<T>
     {
-        public TestRangeObservableCollection() : base()
+        public TestObservableRangeCollection() : base()
         {
         }
 
-        public TestRangeObservableCollection(IEnumerable<T> collection) : base(collection)
+        public TestObservableRangeCollection(IEnumerable<T> collection) : base(collection)
         {
         }
 
@@ -65,7 +65,7 @@ public class ObservableIndexExpression
     [TestMethod]
     public void CollectionChanges()
     {
-        var numbers = new RangeObservableCollection<int>(Enumerable.Range(1, 10));
+        var numbers = new ObservableRangeCollection<int>(Enumerable.Range(1, 10));
         var values = new BlockingCollection<int>();
         var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe(p1 => p1[5], numbers))
@@ -180,7 +180,7 @@ public class ObservableIndexExpression
     [TestMethod]
     public void ObjectValueChanges()
     {
-        var numbers = new TestRangeObservableCollection<int>(Enumerable.Range(0, 10));
+        var numbers = new TestObservableRangeCollection<int>(Enumerable.Range(0, 10));
         var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe(p1 => p1[0], numbers))
         {

@@ -10,7 +10,7 @@ sealed class ObservableCollectionUsingSynchronizationContextQuery<TElement> :
         SynchronizationContext = synchronizationContext;
     }
 
-    RangeObservableCollection<TElement>? elements;
+    ObservableRangeCollection<TElement>? elements;
     readonly ObservableCollectionQuery<TElement> source;
 
     internal readonly SynchronizationContext SynchronizationContext;
