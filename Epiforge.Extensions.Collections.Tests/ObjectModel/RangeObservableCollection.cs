@@ -6,12 +6,12 @@ public class RangeObservableCollection
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
     public void GetAndRemoveAllNullPredicate() =>
-        new RangeObservableCollection<int>().GetAndRemoveAll(null!);
+        new ObservableRangeCollection<int>().GetAndRemoveAll(null!);
 
     [TestMethod]
     public void GetRange()
     {
-        var rangeObservableCollection = new RangeObservableCollection<int>(Enumerable.Range(1, 10));
+        var rangeObservableCollection = new ObservableRangeCollection<int>(Enumerable.Range(1, 10));
         var range = rangeObservableCollection.GetRange(3, 3);
         Assert.AreEqual(3, range.Count);
         Assert.AreEqual(4, range[0]);
@@ -22,12 +22,12 @@ public class RangeObservableCollection
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
     public void InsertRangeNullCollection() =>
-        new RangeObservableCollection<int>().InsertRange(0, null!);
+        new ObservableRangeCollection<int>().InsertRange(0, null!);
 
     [TestMethod]
     public void ObservedAddRange()
     {
-        var rangeObservableCollection = new RangeObservableCollection<int>();
+        var rangeObservableCollection = new ObservableRangeCollection<int>();
         var collectionChanged = false;
         void collectionChangedHandler(object? sender, NotifyCollectionChangedEventArgs e)
         {
@@ -51,7 +51,7 @@ public class RangeObservableCollection
     [TestMethod]
     public void ObservedGetAndRemoveAll()
     {
-        var rangeObservableCollection = new RangeObservableCollection<int>(Enumerable.Range(1, 10));
+        var rangeObservableCollection = new ObservableRangeCollection<int>(Enumerable.Range(1, 10));
         var collectionChanged = 0;
         void collectionChangedHandler(object? sender, NotifyCollectionChangedEventArgs e)
         {
@@ -77,7 +77,7 @@ public class RangeObservableCollection
     [TestMethod]
     public void ObservedIndividualAddRange()
     {
-        var rangeObservableCollection = new RangeObservableCollection<int>(true);
+        var rangeObservableCollection = new ObservableRangeCollection<int>(true);
         var collectionChanged = 0;
         void collectionChangedHandler(object? sender, NotifyCollectionChangedEventArgs e)
         {
@@ -101,7 +101,7 @@ public class RangeObservableCollection
     [TestMethod]
     public void ObservedIndividualMoveRangeBackward()
     {
-        var rangeObservableCollection = new RangeObservableCollection<int>(Enumerable.Range(1, 10), true);
+        var rangeObservableCollection = new ObservableRangeCollection<int>(Enumerable.Range(1, 10), true);
         var collectionChanged = 0;
         void collectionChangedHandler(object? sender, NotifyCollectionChangedEventArgs e)
         {
@@ -133,7 +133,7 @@ public class RangeObservableCollection
     [TestMethod]
     public void ObservedIndividualMoveRangeForward()
     {
-        var rangeObservableCollection = new RangeObservableCollection<int>(Enumerable.Range(1, 10), true);
+        var rangeObservableCollection = new ObservableRangeCollection<int>(Enumerable.Range(1, 10), true);
         var collectionChanged = 0;
         void collectionChangedHandler(object? sender, NotifyCollectionChangedEventArgs e)
         {
@@ -165,7 +165,7 @@ public class RangeObservableCollection
     [TestMethod]
     public void ObservedIndividualRemoveRangeWithIndexAndCount()
     {
-        var rangeObservableCollection = new RangeObservableCollection<int>(Enumerable.Range(1, 10), true);
+        var rangeObservableCollection = new ObservableRangeCollection<int>(Enumerable.Range(1, 10), true);
         var collectionChanged = 0;
         void collectionChangedHandler(object? sender, NotifyCollectionChangedEventArgs e)
         {
@@ -193,7 +193,7 @@ public class RangeObservableCollection
     [TestMethod]
     public void ObservedIndividualReplaceAll()
     {
-        var rangeObservableCollection = new RangeObservableCollection<int>(Enumerable.Range(1, 10), true);
+        var rangeObservableCollection = new ObservableRangeCollection<int>(Enumerable.Range(1, 10), true);
         var collectionChanged = 0;
         void collectionChangedHandler(object? sender, NotifyCollectionChangedEventArgs e)
         {
@@ -232,7 +232,7 @@ public class RangeObservableCollection
     [TestMethod]
     public void ObservedIndividualReplaceRange()
     {
-        var rangeObservableCollection = new RangeObservableCollection<int>(Enumerable.Range(1, 10), true);
+        var rangeObservableCollection = new ObservableRangeCollection<int>(Enumerable.Range(1, 10), true);
         var collectionChanged = 0;
         void collectionChangedHandler(object? sender, NotifyCollectionChangedEventArgs e)
         {
@@ -272,7 +272,7 @@ public class RangeObservableCollection
     [TestMethod]
     public void ObservedMoveRange()
     {
-        var rangeObservableCollection = new RangeObservableCollection<int>(Enumerable.Range(1, 10));
+        var rangeObservableCollection = new ObservableRangeCollection<int>(Enumerable.Range(1, 10));
         var collectionChanged = 0;
         void collectionChangedHandler(object? sender, NotifyCollectionChangedEventArgs e)
         {
@@ -306,7 +306,7 @@ public class RangeObservableCollection
     [TestMethod]
     public void ObservedRemoveRangeWithIndexAndCount()
     {
-        var rangeObservableCollection = new RangeObservableCollection<int>(Enumerable.Range(1, 10));
+        var rangeObservableCollection = new ObservableRangeCollection<int>(Enumerable.Range(1, 10));
         var collectionChanged = 0;
         void collectionChangedHandler(object? sender, NotifyCollectionChangedEventArgs e)
         {
@@ -335,7 +335,7 @@ public class RangeObservableCollection
     [TestMethod]
     public void ObservedRemoveRangeWithItems()
     {
-        var rangeObservableCollection = new RangeObservableCollection<int>(Enumerable.Range(1, 10));
+        var rangeObservableCollection = new ObservableRangeCollection<int>(Enumerable.Range(1, 10));
         var collectionChanged = 0;
         void collectionChangedHandler(object? sender, NotifyCollectionChangedEventArgs e)
         {
@@ -364,7 +364,7 @@ public class RangeObservableCollection
     [TestMethod]
     public void ObservedReplaceAll()
     {
-        var rangeObservableCollection = new RangeObservableCollection<int>(Enumerable.Range(1, 10));
+        var rangeObservableCollection = new ObservableRangeCollection<int>(Enumerable.Range(1, 10));
         var collectionChanged = 0;
         void collectionChangedHandler(object? sender, NotifyCollectionChangedEventArgs e)
         {
@@ -397,7 +397,7 @@ public class RangeObservableCollection
     [TestMethod]
     public void ObservedReplaceRange()
     {
-        var rangeObservableCollection = new RangeObservableCollection<int>(Enumerable.Range(1, 10));
+        var rangeObservableCollection = new ObservableRangeCollection<int>(Enumerable.Range(1, 10));
         var collectionChanged = 0;
         void collectionChangedHandler(object? sender, NotifyCollectionChangedEventArgs e)
         {
@@ -430,7 +430,7 @@ public class RangeObservableCollection
     [TestMethod]
     public void ObservedReplaceRangeWithEmptyList()
     {
-        var rangeObservableCollection = new RangeObservableCollection<int>(Enumerable.Range(1, 10));
+        var rangeObservableCollection = new ObservableRangeCollection<int>(Enumerable.Range(1, 10));
         var collectionChanged = 0;
         void collectionChangedHandler(object? sender, NotifyCollectionChangedEventArgs e)
         {
@@ -458,7 +458,7 @@ public class RangeObservableCollection
     [TestMethod]
     public void ObservedReset()
     {
-        var rangeObservableCollection = new RangeObservableCollection<int>(Enumerable.Range(1, 10));
+        var rangeObservableCollection = new ObservableRangeCollection<int>(Enumerable.Range(1, 10));
         var collectionChanged = 0;
         void collectionChangedHandler(object? sender, NotifyCollectionChangedEventArgs e)
         {
@@ -487,7 +487,7 @@ public class RangeObservableCollection
     [TestMethod]
     public void RemoveAll()
     {
-        var rangeObservableCollection = new RangeObservableCollection<int>(Enumerable.Range(1, 10));
+        var rangeObservableCollection = new ObservableRangeCollection<int>(Enumerable.Range(1, 10));
         Assert.AreEqual(10, rangeObservableCollection.Count);
         rangeObservableCollection.RemoveAll(i => i % 3 == 0);
         Assert.AreEqual(7, rangeObservableCollection.Count);
@@ -496,15 +496,15 @@ public class RangeObservableCollection
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
     public void RemoveRangeWithNullItems() =>
-        new RangeObservableCollection<int>(Enumerable.Range(1, 10)).RemoveRange(null!);
+        new ObservableRangeCollection<int>(Enumerable.Range(1, 10)).RemoveRange(null!);
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
     public void ReplaceAllWithNullItems() =>
-        new RangeObservableCollection<int>(Enumerable.Range(1, 10)).ReplaceAll(null!);
+        new ObservableRangeCollection<int>(Enumerable.Range(1, 10)).ReplaceAll(null!);
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
     public void ResetWithNullCollection() =>
-        new RangeObservableCollection<int>(Enumerable.Range(1, 10)).Reset(null!);
+        new ObservableRangeCollection<int>(Enumerable.Range(1, 10)).Reset(null!);
 }

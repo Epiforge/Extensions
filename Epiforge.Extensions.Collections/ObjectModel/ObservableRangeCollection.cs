@@ -1,84 +1,84 @@
 namespace Epiforge.Extensions.Collections.ObjectModel;
 
 /// <inheritdoc/>
-public class RangeObservableCollection<T> :
+public class ObservableRangeCollection<T> :
     ObservableCollection<T>,
-    IRangeObservableCollection<T>
+    IObservableRangeCollection<T>
 {
     /// <summary>
-    /// Initializes a new instance of the <see cref="RangeObservableCollection{T}"/>
+    /// Initializes a new instance of the <see cref="ObservableRangeCollection{T}"/>
     /// </summary>
-    public RangeObservableCollection() :
+    public ObservableRangeCollection() :
         base()
     {
     }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="RangeObservableCollection{T}"/>
+    /// Initializes a new instance of the <see cref="ObservableRangeCollection{T}"/>
     /// </summary>
     /// <param name="logger">The logger with which to trace library logic</param>
-    public RangeObservableCollection(ILogger logger) :
+    public ObservableRangeCollection(ILogger logger) :
         this() =>
         this.logger = logger;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="RangeObservableCollection{T}"/>
+    /// Initializes a new instance of the <see cref="ObservableRangeCollection{T}"/>
     /// </summary>
     /// <param name="raiseCollectionChangedEventsForIndividualElements">Whether to raise individual <see cref="INotifyCollectionChanged.CollectionChanged"/> events for each element operated upon by range methods</param>
-    public RangeObservableCollection(bool raiseCollectionChangedEventsForIndividualElements) :
+    public ObservableRangeCollection(bool raiseCollectionChangedEventsForIndividualElements) :
         base() =>
         RaiseCollectionChangedEventsForIndividualElements = raiseCollectionChangedEventsForIndividualElements;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="RangeObservableCollection{T}"/>
+    /// Initializes a new instance of the <see cref="ObservableRangeCollection{T}"/>
     /// </summary>
     /// <param name="logger">The logger with which to trace library logic</param>
     /// <param name="raiseCollectionChangedEventsForIndividualElements">Whether to raise individual <see cref="INotifyCollectionChanged.CollectionChanged"/> events for each element operated upon by range methods</param>
-    public RangeObservableCollection(ILogger logger, bool raiseCollectionChangedEventsForIndividualElements) :
+    public ObservableRangeCollection(ILogger logger, bool raiseCollectionChangedEventsForIndividualElements) :
         this(raiseCollectionChangedEventsForIndividualElements) =>
         this.logger = logger;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="RangeObservableCollection{T}"/> class that contains elements copied from the specified collection
+    /// Initializes a new instance of the <see cref="ObservableRangeCollection{T}"/> class that contains elements copied from the specified collection
     /// </summary>
     /// <param name="collection">The collection from which the elements are copied</param>
-    public RangeObservableCollection(IEnumerable<T> collection) :
+    public ObservableRangeCollection(IEnumerable<T> collection) :
         base(collection)
     {
     }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="RangeObservableCollection{T}"/> class that contains elements copied from the specified collection
+    /// Initializes a new instance of the <see cref="ObservableRangeCollection{T}"/> class that contains elements copied from the specified collection
     /// </summary>
     /// <param name="logger">The logger with which to trace library logic</param>
     /// <param name="collection">The collection from which the elements are copied</param>
-    public RangeObservableCollection(ILogger logger, IEnumerable<T> collection) :
+    public ObservableRangeCollection(ILogger logger, IEnumerable<T> collection) :
         this(collection) =>
         this.logger = logger;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="RangeObservableCollection{T}"/> class that contains elements copied from the specified collection
+    /// Initializes a new instance of the <see cref="ObservableRangeCollection{T}"/> class that contains elements copied from the specified collection
     /// </summary>
     /// <param name="collection">The collection from which the elements are copied</param>
     /// <param name="raiseCollectionChangedEventsForIndividualElements">Whether to raise individual <see cref="INotifyCollectionChanged.CollectionChanged"/> events for each element operated upon by range methods</param>
-    public RangeObservableCollection(IEnumerable<T> collection, bool raiseCollectionChangedEventsForIndividualElements) :
+    public ObservableRangeCollection(IEnumerable<T> collection, bool raiseCollectionChangedEventsForIndividualElements) :
         base(collection) =>
         RaiseCollectionChangedEventsForIndividualElements = raiseCollectionChangedEventsForIndividualElements;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="RangeObservableCollection{T}"/> class that contains elements copied from the specified collection
+    /// Initializes a new instance of the <see cref="ObservableRangeCollection{T}"/> class that contains elements copied from the specified collection
     /// </summary>
     /// <param name="logger">The logger with which to trace library logic</param>
     /// <param name="collection">The collection from which the elements are copied</param>
     /// <param name="raiseCollectionChangedEventsForIndividualElements">Whether to raise individual <see cref="INotifyCollectionChanged.CollectionChanged"/> events for each element operated upon by range methods</param>
-    public RangeObservableCollection(ILogger logger, IEnumerable<T> collection, bool raiseCollectionChangedEventsForIndividualElements) :
+    public ObservableRangeCollection(ILogger logger, IEnumerable<T> collection, bool raiseCollectionChangedEventsForIndividualElements) :
         this(collection, raiseCollectionChangedEventsForIndividualElements) =>
         this.logger = logger;
 
     readonly ILogger? logger;
 
     /// <summary>
-    /// Gets whether this <see cref="RangeObservableCollection{T}"/> will raise individual <see cref="INotifyCollectionChanged.CollectionChanged"/> events for each element operated upon by range methods
+    /// Gets whether this <see cref="ObservableRangeCollection{T}"/> will raise individual <see cref="INotifyCollectionChanged.CollectionChanged"/> events for each element operated upon by range methods
     /// </summary>
     public bool RaiseCollectionChangedEventsForIndividualElements { get; }
 

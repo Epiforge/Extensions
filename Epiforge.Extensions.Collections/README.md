@@ -32,7 +32,7 @@ This library provides a number of extension methods for collections and dictiona
   * `ReplaceRange` - Replaces the specified range of items from the collection with the items in the specified collection
   * `Reset` - Resets the collection with the specified collection of items
 * `ReadOnlyObservableRangeDictionary<TKey, TValue>` is a read-only wrapper for any classes implementing `IObservableRangeDictionary<TKey, TValue>`.
-* `ReadOnlyRangeObservableCollection<T>` is a read-only wrapper for any classes implementing `IRangeObservableCollection<TKey, TValue>`.
+* `ReadOnlyObservableRangeCollection<T>` is a read-only wrapper for any classes implementing `IObservableRangeCollection<TKey, TValue>`.
 
 # Specialized
 * `EquatableList<T>` is an immutable list of items which may be compared with other instances of the same type and produces a hash code based on the permutation of its contents.

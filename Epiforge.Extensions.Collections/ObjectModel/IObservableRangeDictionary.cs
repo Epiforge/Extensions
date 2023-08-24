@@ -11,4 +11,14 @@ public interface IObservableRangeDictionary<TKey, TValue> :
     INotifyDictionaryChanged<TKey, TValue>,
     IRangeDictionary<TKey, TValue>
 {
+    /// <summary>
+    /// Gets the value for the specified key
+    /// </summary>
+    /// <param name="key">The key</param>
+    new TValue this[TKey key] { get; }
+
+    /// <summary>
+    /// Gets the number of key/value pairs contained in the <see cref="IObservableRangeDictionary{TKey, TValue}"/>
+    /// </summary>
+    new int Count { get; }
 }

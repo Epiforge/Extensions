@@ -1,1 +1,1 @@
-We added IRangeObservableCollection and ReadOnlyRangeObservableCollection.
+We made several unfortunately breaking changes for the sake of consistency in type names and overload resolution.
