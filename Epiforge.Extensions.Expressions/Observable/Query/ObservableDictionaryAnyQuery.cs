@@ -23,7 +23,7 @@ sealed class ObservableDictionaryAnyQuery<TKey, TValue> :
             {
                 if (where is not null)
                 {
-                    where.DictionaryChanged -= WhereDictionaryChanged;
+                    ((INotifyDictionaryChanged<TKey, TValue>)where!).DictionaryChanged -= WhereDictionaryChanged;
                     where.PropertyChanged -= WherePropertyChanged;
                     where.Dispose();
                 }
@@ -65,7 +65,7 @@ sealed class ObservableDictionaryAnyQuery<TKey, TValue> :
         else
         {
             where = observableDictionaryQuery.ObserveWhere(Predicate);
-            where.DictionaryChanged += WhereDictionaryChanged;
+            ((INotifyDictionaryChanged<TKey, TValue>)where).DictionaryChanged += WhereDictionaryChanged;
             where.PropertyChanged += WherePropertyChanged;
         }
         Evaluate();

@@ -23,7 +23,7 @@ sealed class ObservableDictionaryAllQuery<TKey, TValue> :
             {
                 observableDictionaryQuery.DictionaryChanged -= ObservableDictionaryQueryDictionaryChanged;
                 observableDictionaryQuery.PropertyChanged -= ObservableDictionaryQueryPropertyChanged;
-                where!.DictionaryChanged -= WhereDictionaryChanged;
+                ((INotifyDictionaryChanged<TKey, TValue>)where!).DictionaryChanged -= WhereDictionaryChanged;
                 where.Dispose();
                 RemovedFromCache();
             }
@@ -51,7 +51,7 @@ sealed class ObservableDictionaryAllQuery<TKey, TValue> :
     {
         observableDictionaryQueryCount = observableDictionaryQuery.Count;
         where = observableDictionaryQuery.ObserveWhere(Predicate);
-        where.DictionaryChanged += WhereDictionaryChanged;
+        ((INotifyDictionaryChanged<TKey, TValue>)where).DictionaryChanged += WhereDictionaryChanged;
         observableDictionaryQuery.DictionaryChanged += ObservableDictionaryQueryDictionaryChanged;
         observableDictionaryQuery.PropertyChanged += ObservableDictionaryQueryPropertyChanged;
         Evaluate();

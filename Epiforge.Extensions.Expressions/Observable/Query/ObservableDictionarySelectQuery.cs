@@ -67,10 +67,22 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
         }
     }
 
+    public override bool Contains(KeyValuePair<TKey, TValue> item)
+    {
+        lock (access)
+            return result.Contains(item);
+    }
+
     public override bool ContainsKey(TKey key)
     {
         lock (access)
             return result.ContainsKey(key);
+    }
+
+    public override void CopyTo(KeyValuePair<TKey, TValue>[] array, int arrayIndex)
+    {
+        lock (access)
+            ((ICollection<KeyValuePair<TKey, TValue>>)result).CopyTo(array, arrayIndex);
     }
 
     protected override bool Dispose(bool disposing)
@@ -87,6 +99,8 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
                     observableExpression.Dispose();
                 }
                 source.DictionaryChanged -= SourceDictionaryChanged;
+                result.CollectionChanged -= ResultCollectionChanged;
+                ((INotifyDictionaryChanged)result).DictionaryChanged -= ResultDictionaryChangedBoxed;
                 result.DictionaryChanged -= ResultDictionaryChanged;
             }
             return removedFromCache;
@@ -99,6 +113,12 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
         lock (access)
             foreach (var keyValuePair in result)
                 yield return keyValuePair;
+    }
+
+    public override IReadOnlyList<KeyValuePair<TKey, TValue>> GetRange(IEnumerable<TKey> keys)
+    {
+        lock (access)
+            return result.GetRange(keys);
     }
 
     void ObservableExpressionPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -165,11 +185,19 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
         }
         SetOperationFault();
         source.DictionaryChanged += SourceDictionaryChanged;
+        result.CollectionChanged += ResultCollectionChanged;
+        ((INotifyDictionaryChanged)result).DictionaryChanged += ResultDictionaryChangedBoxed;
         result.DictionaryChanged += ResultDictionaryChanged;
     }
 
+    void ResultCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
+        OnCollectionChanged(e);
+
     void ResultDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e) =>
         OnDictionaryChanged(e);
+
+    void ResultDictionaryChangedBoxed(object? sender, NotifyDictionaryChangedEventArgs<object?, object?> e) =>
+        OnDictionaryChangedBoxed(e);
 
     void SetOperationFault()
     {

@@ -70,6 +70,18 @@ abstract class ObservableDictionaryQuery<TKey, TValue> :
 
     public abstract TValue this[TKey key] { get; }
 
+    TValue IDictionary<TKey, TValue>.this[TKey key]
+    {
+        get => this[key];
+        set => throw new NotSupportedException();
+    }
+
+    TValue IRangeDictionary<TKey, TValue>.this[TKey key]
+    {
+        get => this[key];
+        set => throw new NotSupportedException();
+    }
+
     public override int CachedObservableQueries
     {
         get
@@ -105,10 +117,16 @@ abstract class ObservableDictionaryQuery<TKey, TValue> :
 
     public abstract int Count { get; }
 
+    public bool IsReadOnly =>
+        true;
+
     public virtual bool IsSynchronized =>
         false;
 
     public abstract IEnumerable<TKey> Keys { get; }
+
+    ICollection<TKey> IDictionary<TKey, TValue>.Keys =>
+        Keys.ToList().AsReadOnly();
 
     public virtual Exception? OperationFault
     {
@@ -121,23 +139,145 @@ abstract class ObservableDictionaryQuery<TKey, TValue> :
 
     public abstract IEnumerable<TValue> Values { get; }
 
+    ICollection<TValue> IDictionary<TKey, TValue>.Values =>
+        Values.ToList().AsReadOnly();
+
     public event EventHandler<NotifyDictionaryChangedEventArgs<TKey, TValue>>? DictionaryChanged;
+    public event EventHandler<NotifyDictionaryChangedEventArgs<object?, object?>>? DictionaryChangedBoxed;
+    public event NotifyCollectionChangedEventHandler? CollectionChanged;
+
+    event EventHandler<NotifyDictionaryChangedEventArgs<object?, object?>>? INotifyDictionaryChanged.DictionaryChanged
+    {
+        add => DictionaryChangedBoxed += value;
+        remove => DictionaryChangedBoxed -= value;
+    }
+
+    public abstract bool Contains(KeyValuePair<TKey, TValue> item);
 
     public abstract bool ContainsKey(TKey key);
+
+    public abstract void CopyTo(KeyValuePair<TKey, TValue>[] array, int arrayIndex);
 
     public abstract IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator();
 
     IEnumerator IEnumerable.GetEnumerator() =>
         GetEnumerator();
 
-    protected void OnDictionaryChanged(NotifyDictionaryChangedEventArgs<TKey, TValue> e)
+    public abstract IReadOnlyList<KeyValuePair<TKey, TValue>> GetRange(IEnumerable<TKey> keys);
+
+    protected virtual void OnChanged(NotifyDictionaryChangedEventArgs<TKey, TValue> e)
+    {
+#if IS_NET_6_0_OR_GREATER
+        ArgumentNullException.ThrowIfNull(e);
+#else
+        if (e is null)
+            throw new ArgumentNullException(nameof(e));
+#endif
+        if (CollectionChanged is not null)
+            switch (e.Action)
+            {
+                case NotifyDictionaryChangedAction.Add:
+                    OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, (IList)e.NewItems));
+                    break;
+                case NotifyDictionaryChangedAction.Remove:
+                    OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, (IList)e.OldItems));
+                    break;
+                case NotifyDictionaryChangedAction.Replace:
+                    OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, (IList)e.NewItems, (IList)e.OldItems));
+                    break;
+                case NotifyDictionaryChangedAction.Reset:
+                    OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+                    break;
+            }
+        if (DictionaryChangedBoxed is not null)
+            switch (e.Action)
+            {
+                case NotifyDictionaryChangedAction.Add:
+                    OnDictionaryChangedBoxed(new NotifyDictionaryChangedEventArgs<object?, object?>(NotifyDictionaryChangedAction.Add, e.NewItems.Select(kv => new KeyValuePair<object?, object?>(kv.Key, kv.Value))));
+                    break;
+                case NotifyDictionaryChangedAction.Remove:
+                    OnDictionaryChangedBoxed(new NotifyDictionaryChangedEventArgs<object?, object?>(NotifyDictionaryChangedAction.Remove, e.OldItems.Select(kv => new KeyValuePair<object?, object?>(kv.Key, kv.Value))));
+                    break;
+                case NotifyDictionaryChangedAction.Replace:
+                    OnDictionaryChangedBoxed(new NotifyDictionaryChangedEventArgs<object?, object?>(NotifyDictionaryChangedAction.Replace, e.NewItems.Select(kv => new KeyValuePair<object?, object?>(kv.Key, kv.Value)), e.OldItems.Select(kv => new KeyValuePair<object?, object?>(kv.Key, kv.Value))));
+                    break;
+                case NotifyDictionaryChangedAction.Reset:
+                    OnDictionaryChangedBoxed(new NotifyDictionaryChangedEventArgs<object?, object?>(NotifyDictionaryChangedAction.Reset));
+                    break;
+            }
+        OnDictionaryChanged(e);
+    }
+
+    protected virtual void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
+    {
+#if IS_NET_6_0_OR_GREATER
+        ArgumentNullException.ThrowIfNull(e);
+#else
+        if (e is null)
+            throw new ArgumentNullException(nameof(e));
+#endif
+        var eventArgs = Logger?.IsEnabled(LogLevel.Trace) ?? false ? e.ToStringForLogging() : null;
+        Logger?.LogTrace(Collections.EventIds.Epiforge_Extensions_Collections_RaisingCollectionChanged, "Raising CollectionChanged: {EventArgs}", eventArgs);
+        CollectionChanged?.Invoke(this, e);
+        Logger?.LogTrace(Collections.EventIds.Epiforge_Extensions_Collections_RaisedCollectionChanged, "Raised CollectionChanged: {EventArgs}", eventArgs);
+    }
+
+    protected virtual void OnDictionaryChanged(NotifyDictionaryChangedEventArgs<TKey, TValue> e)
     {
         Logger?.LogTrace(Collections.EventIds.Epiforge_Extensions_Collections_RaisingDictionaryChanged, "Raising DictionaryChanged: {EventArgs}", e);
         DictionaryChanged?.Invoke(this, e);
         Logger?.LogTrace(Collections.EventIds.Epiforge_Extensions_Collections_RaisedDictionaryChanged, "Raised DictionaryChanged: {EventArgs}", e);
     }
 
+    protected virtual void OnDictionaryChangedBoxed(NotifyDictionaryChangedEventArgs<object?, object?> e) =>
+        DictionaryChangedBoxed?.Invoke(this, e);
+
     public abstract bool TryGetValue(TKey key, out TValue value);
+
+    #region Unsupported Operations
+
+    void IDictionary<TKey, TValue>.Add(TKey key, TValue value) =>
+        throw new NotSupportedException();
+
+    void ICollection<KeyValuePair<TKey, TValue>>.Add(KeyValuePair<TKey, TValue> item) =>
+        throw new NotSupportedException();
+
+    void ICollection<KeyValuePair<TKey, TValue>>.Clear() =>
+        throw new NotSupportedException();
+
+    void IRangeDictionary<TKey, TValue>.AddRange(IEnumerable<KeyValuePair<TKey, TValue>> keyValuePairs) =>
+        throw new NotSupportedException();
+
+    void IRangeDictionary<TKey, TValue>.AddRange(IReadOnlyList<KeyValuePair<TKey, TValue>> keyValuePairs) =>
+        throw new NotSupportedException();
+
+    bool IDictionary<TKey, TValue>.Remove(TKey key) =>
+        throw new NotSupportedException();
+
+    bool ICollection<KeyValuePair<TKey, TValue>>.Remove(KeyValuePair<TKey, TValue> item) =>
+        throw new NotSupportedException();
+
+    IReadOnlyList<KeyValuePair<TKey, TValue>> IRangeDictionary<TKey, TValue>.RemoveAll(Func<TKey, TValue, bool> predicate) =>
+        throw new NotSupportedException();
+
+    IReadOnlyList<TKey> IRangeDictionary<TKey, TValue>.RemoveRange(IEnumerable<TKey> keys) =>
+        throw new NotSupportedException();
+
+    void IRangeDictionary<TKey, TValue>.ReplaceRange(IEnumerable<KeyValuePair<TKey, TValue>> keyValuePairs) =>
+        throw new NotSupportedException();
+
+    IReadOnlyList<TKey> IRangeDictionary<TKey, TValue>.ReplaceRange(IEnumerable<TKey> removeKeys, IEnumerable<KeyValuePair<TKey, TValue>> newKeyValuePairs) =>
+        throw new NotSupportedException();
+
+    void IRangeDictionary<TKey, TValue>.Reset() =>
+        throw new NotSupportedException();
+
+    void IRangeDictionary<TKey, TValue>.Reset(IDictionary<TKey, TValue> dictionary) =>
+        throw new NotSupportedException();
+
+    #endregion Unsupported Operations
+
+    #region Observation Methods
 
     [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TResult> ObserveAggregate<TAccumulate, TResult>(Func<TAccumulate> seedFactory, Func<TAccumulate, TKey, TValue, TAccumulate> func, Func<TAccumulate, TResult> resultSelector)
@@ -660,6 +800,10 @@ abstract class ObservableDictionaryQuery<TKey, TValue> :
         return (ObservableDictionaryWhereQuery<TKey, TValue>)whereQuery;
     }
 
+    #endregion Observation Methods
+
+    #region Query Disposal Methods
+
     internal bool QueryDisposed<TAccumulate, TResult>(ObservableDictionaryAggregateQuery<TKey, TValue, TAccumulate, TResult> aggregateQuery)
     {
         lock (cachedAggregateQueriesAccess)
@@ -816,4 +960,6 @@ abstract class ObservableDictionaryQuery<TKey, TValue> :
         }
         return false;
     }
+
+    #endregion Query Disposal Methods
 }

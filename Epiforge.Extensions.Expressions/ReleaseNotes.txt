@@ -1,1 +1,1 @@
-We added ObserveTransform to scalar observable queries.
+IObservableCollectionQuery now implements IRangeObservableCollection and IObservableDictionaryQuery now implements IObservableRangeDictionary.

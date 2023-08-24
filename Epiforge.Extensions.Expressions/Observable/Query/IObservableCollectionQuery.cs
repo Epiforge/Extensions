@@ -5,11 +5,15 @@ namespace Epiforge.Extensions.Expressions.Observable.Query;
 /// </summary>
 /// <typeparam name="TElement">The type of elements in the collection</typeparam>
 public interface IObservableCollectionQuery<TElement> :
-    ICollection,
-    INotifyCollectionChanged,
-    IObservableQuery,
-    IReadOnlyList<TElement>
+    IRangeObservableCollection<TElement>,
+    IObservableQuery
 {
+    /// <summary>
+    /// Gets the element at the specified index
+    /// </summary>
+    /// <param name="index">The index</param>
+    new TElement this[int index] { get; }
+
     /// <summary>
     /// Gets the number of elements contained in the <see cref="IObservableCollectionQuery{TElement}"/>
     /// </summary>

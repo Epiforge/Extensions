@@ -24,8 +24,14 @@ sealed class ObservableDictionaryConcurrentQuery<TKey, TValue> :
     public override IEnumerable<TValue> Values =>
         observableConcurrentDictionary!.Values;
 
+    public override bool Contains(KeyValuePair<TKey, TValue> item) =>
+        observableConcurrentDictionary!.Contains(item);
+
     public override bool ContainsKey(TKey key) =>
         observableConcurrentDictionary!.ContainsKey(key);
+
+    public override void CopyTo(KeyValuePair<TKey, TValue>[] array, int arrayIndex) =>
+        source.CopyTo(array, arrayIndex);
 
     protected override bool Dispose(bool disposing)
     {
@@ -35,7 +41,9 @@ sealed class ObservableDictionaryConcurrentQuery<TKey, TValue> :
             if (removedFromCache)
             {
                 source.DictionaryChanged -= SourceDictionaryChanged;
-                observableConcurrentDictionary!.DictionaryChanged -= ObservableConcurrentDictionaryDictionaryChanged;
+                observableConcurrentDictionary!.CollectionChanged -= ObservableConcurrentDictionaryCollectionChanged;
+                observableConcurrentDictionary.DictionaryChanged -= ObservableConcurrentDictionaryDictionaryChanged;
+                ((INotifyDictionaryChanged)observableConcurrentDictionary).DictionaryChanged -= ObservableDictionaryConcurrentQueryDictionaryChangedBoxed;
                 observableConcurrentDictionary.PropertyChanged -= ObservableConcurrentDictionaryPropertyChanged;
                 RemovedFromCache();
             }
@@ -47,8 +55,17 @@ sealed class ObservableDictionaryConcurrentQuery<TKey, TValue> :
     public override IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator() =>
         observableConcurrentDictionary!.GetEnumerator();
 
+    public override IReadOnlyList<KeyValuePair<TKey, TValue>> GetRange(IEnumerable<TKey> keys) =>
+        keys.Select(key => new KeyValuePair<TKey, TValue>(key, observableConcurrentDictionary![key])).ToImmutableArray();
+
+    void ObservableConcurrentDictionaryCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
+        OnCollectionChanged(e);
+
     void ObservableConcurrentDictionaryDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e) =>
         OnDictionaryChanged(e);
+
+    void ObservableDictionaryConcurrentQueryDictionaryChangedBoxed(object? sender, NotifyDictionaryChangedEventArgs<object?, object?> e) =>
+        OnDictionaryChangedBoxed(e);
 
     void ObservableConcurrentDictionaryPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -61,6 +78,8 @@ sealed class ObservableDictionaryConcurrentQuery<TKey, TValue> :
         observableConcurrentDictionary = new ObservableConcurrentDictionary<TKey, TValue>(source);
         OperationFault = source.OperationFault;
         source.DictionaryChanged += SourceDictionaryChanged;
+        observableConcurrentDictionary.CollectionChanged += ObservableConcurrentDictionaryCollectionChanged;
+        ((INotifyDictionaryChanged)observableConcurrentDictionary).DictionaryChanged += ObservableDictionaryConcurrentQueryDictionaryChangedBoxed;
         observableConcurrentDictionary.DictionaryChanged += ObservableConcurrentDictionaryDictionaryChanged;
         observableConcurrentDictionary.PropertyChanged += ObservableConcurrentDictionaryPropertyChanged;
     }

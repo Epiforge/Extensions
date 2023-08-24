@@ -61,10 +61,22 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue> :
         }
     }
 
+    public override bool Contains(KeyValuePair<TKey, TValue> item)
+    {
+        lock (access)
+            return result.Contains(item);
+    }
+
     public override bool ContainsKey(TKey key)
     {
         lock (access)
             return result.ContainsKey(key);
+    }
+
+    public override void CopyTo(KeyValuePair<TKey, TValue>[] array, int arrayIndex)
+    {
+        lock (access)
+            ((ICollection<KeyValuePair<TKey, TValue>>)result).CopyTo(array, arrayIndex);
     }
 
     protected override bool Dispose(bool disposing)
@@ -81,6 +93,8 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue> :
                     observableExpression.Dispose();
                 }
                 source.DictionaryChanged -= SourceDictionaryChanged;
+                result.CollectionChanged -= ResultCollectionChanged;
+                ((INotifyDictionaryChanged)result).DictionaryChanged -= ResultDictionaryChangedBoxed;
                 result.DictionaryChanged -= ResultDictionaryChanged;
                 result.PropertyChanging -= ResultPropertyChanging;
                 result.PropertyChanged -= ResultPropertyChanged;
@@ -98,6 +112,12 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue> :
                 yield return keyValuePair;
     }
 
+    public override IReadOnlyList<KeyValuePair<TKey, TValue>> GetRange(IEnumerable<TKey> keys)
+    {
+        lock (access)
+            return result.GetRange(keys);
+    }
+
     protected override void OnInitialization()
     {
         var faultList = new FaultList();
@@ -113,13 +133,21 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue> :
         }
         OperationFault = faultList.Fault;
         source.DictionaryChanged += SourceDictionaryChanged;
+        result.CollectionChanged += ResultCollectionChanged;
+        ((INotifyDictionaryChanged)result).DictionaryChanged += ResultDictionaryChangedBoxed;
         result.DictionaryChanged += ResultDictionaryChanged;
         result.PropertyChanging += ResultPropertyChanging;
         result.PropertyChanged += ResultPropertyChanged;
     }
 
+    void ResultCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
+        OnCollectionChanged(e);
+
     void ResultDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e) =>
         OnDictionaryChanged(e);
+
+    void ResultDictionaryChangedBoxed(object? sender, NotifyDictionaryChangedEventArgs<object?, object?> e) =>
+        OnDictionaryChangedBoxed(e);
 
     void ResultPropertyChanged(object? sender, PropertyChangedEventArgs e) =>
         OnPropertyChanged(e);

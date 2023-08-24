@@ -22,11 +22,28 @@ sealed class ObservableDictionaryQueryReadOnlyDictionary<TKey, TValue> :
     public override IEnumerable<TValue> Values =>
         ReadOnlyDictionary.Values;
 
+    void CollectionChangedNotifierCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
+        OnCollectionChanged(e);
+
+    public override bool Contains(KeyValuePair<TKey, TValue> item) =>
+        ReadOnlyDictionary.Contains(item);
+
     public override bool ContainsKey(TKey key) =>
         ReadOnlyDictionary.ContainsKey(key);
 
+    public override void CopyTo(KeyValuePair<TKey, TValue>[] array, int arrayIndex)
+    {
+        if (ReadOnlyDictionary is ICollection<KeyValuePair<TKey, TValue>> collection)
+            collection.CopyTo(array, arrayIndex);
+        else
+            throw new NotSupportedException();
+    }
+
     void DictionaryChangedNotifierDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e) =>
         OnDictionaryChanged(e);
+
+    void DictionaryChangedNotifierDictionaryChangedBoxed(object? sender, NotifyDictionaryChangedEventArgs<object?, object?> e) =>
+        OnDictionaryChangedBoxed(e);
 
     protected override bool Dispose(bool disposing)
     {
@@ -39,6 +56,10 @@ sealed class ObservableDictionaryQueryReadOnlyDictionary<TKey, TValue> :
                     propertyChangingNotifier.PropertyChanging -= PropertyChangingNotifierPropertyChanging;
                 if (ReadOnlyDictionary is INotifyPropertyChanged propertyChangedNotifier)
                     propertyChangedNotifier.PropertyChanged -= PropertyChangedNotifierPropertyChanged;
+                if (ReadOnlyDictionary is INotifyCollectionChanged collectionChangedNotifier)
+                    collectionChangedNotifier.CollectionChanged -= CollectionChangedNotifierCollectionChanged;
+                if (ReadOnlyDictionary is INotifyDictionaryChanged dictionaryChangedNotifierBoxed)
+                    dictionaryChangedNotifierBoxed.DictionaryChanged -= DictionaryChangedNotifierDictionaryChangedBoxed;
                 if (ReadOnlyDictionary is INotifyDictionaryChanged<TKey, TValue> dictionaryChangedNotifier)
                     dictionaryChangedNotifier.DictionaryChanged -= DictionaryChangedNotifierDictionaryChanged;
             }
@@ -50,12 +71,24 @@ sealed class ObservableDictionaryQueryReadOnlyDictionary<TKey, TValue> :
     public override IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator() =>
         ReadOnlyDictionary.GetEnumerator();
 
+    public override IReadOnlyList<KeyValuePair<TKey, TValue>> GetRange(IEnumerable<TKey> keys)
+    {
+        if (ReadOnlyDictionary is IRangeDictionary<TKey, TValue> rangeDictionary)
+            return rangeDictionary.GetRange(keys);
+        else
+            throw new NotSupportedException();
+    }
+
     protected override void OnInitialization()
     {
         if (ReadOnlyDictionary is INotifyPropertyChanging propertyChangingNotifier)
             propertyChangingNotifier.PropertyChanging += PropertyChangingNotifierPropertyChanging;
         if (ReadOnlyDictionary is INotifyPropertyChanged propertyChangedNotifier)
             propertyChangedNotifier.PropertyChanged += PropertyChangedNotifierPropertyChanged;
+        if (ReadOnlyDictionary is INotifyCollectionChanged collectionChangedNotifier)
+            collectionChangedNotifier.CollectionChanged += CollectionChangedNotifierCollectionChanged;
+        if (ReadOnlyDictionary is INotifyDictionaryChanged dictionaryChangedNotifierBoxed)
+            dictionaryChangedNotifierBoxed.DictionaryChanged += DictionaryChangedNotifierDictionaryChangedBoxed;
         if (ReadOnlyDictionary is INotifyDictionaryChanged<TKey, TValue> dictionaryChangedNotifier)
             dictionaryChangedNotifier.DictionaryChanged += DictionaryChangedNotifierDictionaryChanged;
     }

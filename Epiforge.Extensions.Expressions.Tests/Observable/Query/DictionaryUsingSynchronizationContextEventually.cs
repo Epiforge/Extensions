@@ -19,7 +19,7 @@ public class DictionaryUsingSynchronizationContextEventually
                     queryChanged!.Set();
                     queryChanged.Reset();
                 }
-                usingSynchronizationContextEventuallyQuery.DictionaryChanged += dictionaryChanged;
+                ((INotifyDictionaryChanged<int, TestPerson>)usingSynchronizationContextEventuallyQuery).DictionaryChanged += dictionaryChanged;
                 Assert.AreEqual(14, usingSynchronizationContextEventuallyQuery.Count);
                 var queryChangedTask = queryChanged.WaitAsync();
                 source.Add(14, new TestPerson("Daniel"));

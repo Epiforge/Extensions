@@ -64,14 +64,32 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue> :
         }
     }
 
+    public override bool Contains(KeyValuePair<TKey, TValue> item)
+    {
+        lock (access)
+            return dictionary.Contains(item);
+    }
+
     public override bool ContainsKey(TKey key)
     {
         lock (access)
             return dictionary.ContainsKey(key);
     }
 
+    public override void CopyTo(KeyValuePair<TKey, TValue>[] array, int arrayIndex)
+    {
+        lock (access)
+            ((ICollection<KeyValuePair<TKey, TValue>>)dictionary).CopyTo(array, arrayIndex);
+    }
+
+    void DictionaryCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
+        OnCollectionChanged(e);
+
     void DictionaryDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e) =>
         OnDictionaryChanged(e);
+
+    void DictionaryDictionaryChangedBoxed(object? sender, NotifyDictionaryChangedEventArgs<object?, object?> e) =>
+        OnDictionaryChangedBoxed(e);
 
     void DictionaryPropertyChanged(object? sender, PropertyChangedEventArgs e) =>
         OnPropertyChanged(e);
@@ -89,6 +107,8 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue> :
                 select!.CollectionChanged -= SelectCollectionChanged;
                 select.PropertyChanged -= SelectPropertyChanged;
                 select.Dispose();
+                dictionary.CollectionChanged -= DictionaryCollectionChanged;
+                ((INotifyDictionaryChanged)dictionary).DictionaryChanged -= DictionaryDictionaryChangedBoxed;
                 dictionary.DictionaryChanged -= DictionaryDictionaryChanged;
                 dictionary.PropertyChanging -= DictionaryPropertyChanging;
                 dictionary.PropertyChanged -= DictionaryPropertyChanged;
@@ -104,6 +124,12 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue> :
         lock (access)
             foreach (var pair in dictionary)
                 yield return pair;
+    }
+
+    public override IReadOnlyList<KeyValuePair<TKey, TValue>> GetRange(IEnumerable<TKey> keys)
+    {
+        lock (access)
+            return dictionary.GetRange(keys);
     }
 
     protected override void OnInitialization()
@@ -124,6 +150,8 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue> :
             }
         }
         SetOperationFault();
+        dictionary.CollectionChanged += DictionaryCollectionChanged;
+        ((INotifyDictionaryChanged)dictionary).DictionaryChanged += DictionaryDictionaryChangedBoxed;
         dictionary.DictionaryChanged += DictionaryDictionaryChanged;
         dictionary.PropertyChanging += DictionaryPropertyChanging;
         dictionary.PropertyChanged += DictionaryPropertyChanged;

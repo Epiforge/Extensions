@@ -37,11 +37,23 @@ sealed class ObservableDictionaryUsingSynchronizationContextEventuallyQuery<TKey
     public override IEnumerable<TValue> Values =>
         SynchronizationContext.Send(() => dictionary!.Values.ToList().AsReadOnly());
 
+    public override bool Contains(KeyValuePair<TKey, TValue> item) =>
+        SynchronizationContext.Send(() => dictionary!.Contains(item));
+
     public override bool ContainsKey(TKey key) =>
         SynchronizationContext.Send(() => dictionary!.ContainsKey(key));
 
+    public override void CopyTo(KeyValuePair<TKey, TValue>[] array, int arrayIndex) =>
+        SynchronizationContext.Send(() => ((ICollection<KeyValuePair<TKey, TValue>>)dictionary!).CopyTo(array, arrayIndex));
+
+    void DictionaryCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
+        OnCollectionChanged(e);
+
     void DictionaryDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e) =>
         OnDictionaryChanged(e);
+
+    void DictionaryDictionaryChangedBoxed(object? sender, NotifyDictionaryChangedEventArgs<object?, object?> e) =>
+        OnDictionaryChangedBoxed(e);
 
     void DictionaryPropertyChanged(object? sender, PropertyChangedEventArgs e) =>
         OnPropertyChanged(e);
@@ -54,7 +66,9 @@ sealed class ObservableDictionaryUsingSynchronizationContextEventuallyQuery<TKey
             if (removedFromCache)
             {
                 source.DictionaryChanged -= SourceDictionaryChanged;
-                dictionary!.DictionaryChanged -= DictionaryDictionaryChanged;
+                dictionary!.CollectionChanged -= DictionaryCollectionChanged;
+                ((INotifyDictionaryChanged)dictionary).DictionaryChanged -= DictionaryDictionaryChangedBoxed;
+                dictionary.DictionaryChanged -= DictionaryDictionaryChanged;
                 dictionary.PropertyChanged -= DictionaryPropertyChanged;
                 RemovedFromCache();
             }
@@ -66,11 +80,16 @@ sealed class ObservableDictionaryUsingSynchronizationContextEventuallyQuery<TKey
     public override IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator() =>
         SynchronizationContext.Send(() => dictionary!.ToList().AsReadOnly().GetEnumerator());
 
+    public override IReadOnlyList<KeyValuePair<TKey, TValue>> GetRange(IEnumerable<TKey> keys) =>
+        SynchronizationContext.Send(() => dictionary!.GetRange(keys));
+
     protected override void OnInitialization()
     {
         dictionary = new();
         dictionary.AddRange(source);
         source.DictionaryChanged += SourceDictionaryChanged;
+        dictionary.CollectionChanged += DictionaryCollectionChanged;
+        ((INotifyDictionaryChanged)dictionary).DictionaryChanged += DictionaryDictionaryChangedBoxed;
         dictionary.DictionaryChanged += DictionaryDictionaryChanged;
         dictionary.PropertyChanged += DictionaryPropertyChanged;
     }

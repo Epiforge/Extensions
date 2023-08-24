@@ -152,6 +152,18 @@ abstract class ObservableCollectionQuery<TElement> :
 
     public abstract TElement this[int index] { get; }
 
+    object? IList.this[int index]
+    {
+        get => this[index];
+        set => throw new NotSupportedException();
+    }
+
+    TElement IList<TElement>.this[int index]
+    {
+        get => this[index];
+        set => throw new NotSupportedException();
+    }
+
     public override int CachedObservableQueries
     {
         get
@@ -231,7 +243,35 @@ abstract class ObservableCollectionQuery<TElement> :
     public virtual object SyncRoot =>
         null!;
 
+    bool IList.IsFixedSize =>
+        false;
+
+    bool IList.IsReadOnly =>
+        true;
+
+    bool ICollection<TElement>.IsReadOnly =>
+        true;
+
     public event NotifyCollectionChangedEventHandler? CollectionChanged;
+
+    public virtual bool Contains(TElement item)
+    {
+        if (!HasIndexerPenalty)
+            for (int i = 0, ii = Count; i < ii; ++i)
+            {
+                var element = this[i];
+                if (EqualityComparer<TElement>.Default.Equals(element, item))
+                    return true;
+            }
+        else
+            foreach (var element in this)
+                if (EqualityComparer<TElement>.Default.Equals(element, item))
+                    return true;
+        return false;
+    }
+
+    bool IList.Contains(object? value) =>
+        value is TElement element && Contains(element);
 
     public virtual void CopyTo(Array array, int index)
     {
@@ -246,10 +286,47 @@ abstract class ObservableCollectionQuery<TElement> :
         }
     }
 
+    public void CopyTo(TElement[] array, int arrayIndex) =>
+        CopyTo((Array)array, arrayIndex);
+
     public abstract IEnumerator<TElement> GetEnumerator();
 
     IEnumerator IEnumerable.GetEnumerator() =>
         GetEnumerator();
+
+    public IReadOnlyList<TElement> GetRange(int index, int count)
+    {
+        var list = new List<TElement>();
+        if (!HasIndexerPenalty)
+            for (int i = index, ii = Math.Min(index + count, Count); i < ii; ++i)
+                list.Add(this[i]);
+        else
+            foreach (var item in this)
+                list.Add(item);
+        return list.AsReadOnly();
+    }
+
+    public int IndexOf(TElement item)
+    {
+        if (!HasIndexerPenalty)
+            for (int i = 0, ii = Count; i < ii; ++i)
+                if (EqualityComparer<TElement>.Default.Equals(this[i], item))
+                    return i;
+        else
+        {
+            var enumerating = -1;
+            foreach (var element in this)
+            {
+                ++enumerating;
+                if (EqualityComparer<TElement>.Default.Equals(element, item))
+                    return enumerating;
+            }
+        }
+        return -1;
+    }
+
+    int IList.IndexOf(object? value) =>
+        value is TElement element ? IndexOf(element) : -1;
 
     protected void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
     {
@@ -258,6 +335,90 @@ abstract class ObservableCollectionQuery<TElement> :
         CollectionChanged?.Invoke(this, e);
         Logger?.LogTrace(Collections.EventIds.Epiforge_Extensions_Collections_RaisedCollectionChanged, "Raised CollectionChanged: {EventArgs}", eventArgs);
     }
+
+    #region Unsupported Operations
+
+    int IList.Add(object? value) =>
+        throw new NotSupportedException();
+
+    void ICollection<TElement>.Add(TElement item) =>
+        throw new NotSupportedException();
+
+    void IRangeObservableCollection<TElement>.AddRange(IEnumerable<TElement> items) =>
+        throw new NotSupportedException();
+
+    void IRangeObservableCollection<TElement>.AddRange(IList<TElement> items) =>
+        throw new NotSupportedException();
+
+    void IList.Clear() =>
+        throw new NotSupportedException();
+
+    void ICollection<TElement>.Clear() =>
+        throw new NotSupportedException();
+
+    IReadOnlyList<TElement> IRangeObservableCollection<TElement>.GetAndRemoveAll(Func<TElement, bool> predicate) =>
+        throw new NotSupportedException();
+
+    TElement IRangeObservableCollection<TElement>.GetAndRemoveAt(int index) =>
+        throw new NotSupportedException();
+
+    void IList.Insert(int index, object? value) =>
+        throw new NotSupportedException();
+
+    void IList<TElement>.Insert(int index, TElement item) =>
+        throw new NotSupportedException();
+
+    void IRangeObservableCollection<TElement>.InsertRange(int index, IEnumerable<TElement> items) =>
+        throw new NotSupportedException();
+
+    void IRangeObservableCollection<TElement>.InsertRange(int index, IList<TElement> items) =>
+        throw new NotSupportedException();
+
+    void IRangeObservableCollection<TElement>.MoveRange(int oldStartIndex, int newStartIndex, int count) =>
+        throw new NotSupportedException();
+
+    void IList.Remove(object? value) =>
+        throw new NotSupportedException();
+
+    bool ICollection<TElement>.Remove(TElement item) =>
+        throw new NotSupportedException();
+
+    int IRangeObservableCollection<TElement>.RemoveAll(Func<TElement, bool> predicate) =>
+        throw new NotSupportedException();
+
+    void IList.RemoveAt(int index) =>
+        throw new NotSupportedException();
+
+    void IList<TElement>.RemoveAt(int index) =>
+        throw new NotSupportedException();
+
+    void IRangeObservableCollection<TElement>.RemoveRange(IEnumerable<TElement> items) =>
+        throw new NotSupportedException();
+
+    void IRangeObservableCollection<TElement>.RemoveRange(IList<TElement> items) =>
+        throw new NotSupportedException();
+
+    void IRangeObservableCollection<TElement>.RemoveRange(int index, int count) =>
+        throw new NotSupportedException();
+
+    void IRangeObservableCollection<TElement>.ReplaceAll(IEnumerable<TElement> items) =>
+        throw new NotSupportedException();
+
+    void IRangeObservableCollection<TElement>.ReplaceAll(IList<TElement> items) =>
+        throw new NotSupportedException();
+
+    IReadOnlyList<TElement> IRangeObservableCollection<TElement>.ReplaceRange(int index, int count, IEnumerable<TElement>? collection) =>
+        throw new NotSupportedException();
+
+    IReadOnlyList<TElement> IRangeObservableCollection<TElement>.ReplaceRange(int index, int count, IList<TElement> list) =>
+        throw new NotSupportedException();
+
+    void IRangeObservableCollection<TElement>.Reset(IEnumerable<TElement> newCollection) =>
+        throw new NotSupportedException();
+
+    #endregion Unsupported Operations
+
+    #region Observation Methods
 
     [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TResult> ObserveAggregate<TAccumulate, TResult>(Func<TAccumulate> seedFactory, Func<TAccumulate, TElement, TAccumulate> func, Func<TAccumulate, TResult> resultSelector)
@@ -1042,6 +1203,10 @@ abstract class ObservableCollectionQuery<TElement> :
         return whereQuery;
     }
 
+    #endregion Observation Methods
+
+    #region Query Disposal Methods
+
     internal bool QueryDisposed<TAccumulate, TResult>(ObservableCollectionAggregateQuery<TElement, TAccumulate, TResult> aggregateQuery)
     {
         lock (cachedAggregateQueriesAccess)
@@ -1328,4 +1493,6 @@ abstract class ObservableCollectionQuery<TElement> :
         }
         return false;
     }
+
+    #endregion Query Disposal Methods
 }
