@@ -1,1 +1,1 @@
-We added extension methods for getting the events, methods, and properties of a type, including interfaces and interface inheritance.
+We added extension methods for disposal dependencies.
