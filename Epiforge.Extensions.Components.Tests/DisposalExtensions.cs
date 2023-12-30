@@ -14,13 +14,10 @@ public class DisposalExtensions
     }
 
     public class Dependent :
-        Components.Disposable
+        Components.SyncDisposable
     {
         protected override bool Dispose(bool disposing) =>
             true;
-
-        protected override ValueTask<bool> DisposeAsync(bool disposing) =>
-            new(true);
     }
 
     [TestMethod]
@@ -34,19 +31,13 @@ public class DisposalExtensions
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
-    public void DisposeWhenDependentDisposedNoFactoryArgumentsNullDependency()
-    {
-        Dependency? dependency = null;
-        dependency!.DisposeWhenDependentDisposed(() => new Dependent());
-    }
+    public void DisposeWhenDependentDisposedNoFactoryArgumentsNullDependency() =>
+        default(Dependency)!.DisposeWhenDependentDisposed(() => new Dependent());
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
-    public void DisposeWhenDependentDisposedNoFactoryArgumentsNullFactory()
-    {
-        var dependency = new Dependency();
-        dependency.DisposeWhenDependentDisposed((Func<Dependent>)null!);
-    }
+    public void DisposeWhenDependentDisposedNoFactoryArgumentsNullFactory() =>
+        new Dependency().DisposeWhenDependentDisposed((Func<Dependent>)null!);
 
     [TestMethod]
     public void DisposeWhenDependentDisposed()
@@ -59,19 +50,13 @@ public class DisposalExtensions
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
-    public void DisposeWhenDependentDisposedNullDependency()
-    {
-        Dependency? dependency = null;
-        dependency!.DisposeWhenDependentDisposed(_ => new Dependent());
-    }
+    public void DisposeWhenDependentDisposedNullDependency() =>
+        default(Dependency)!.DisposeWhenDependentDisposed(_ => new Dependent());
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
-    public void DisposeWhenDependentDisposedNullFactory()
-    {
-        var dependency = new Dependency();
-        dependency.DisposeWhenDependentDisposed((Func<Dependency, Dependent>)null!);
-    }
+    public void DisposeWhenDependentDisposedNullFactory() =>
+        new Dependency().DisposeWhenDependentDisposed((Func<Dependency, Dependent>)null!);
 
     [TestMethod]
     public async Task DisposeWhenDependentDisposedAsyncNoFactoryArguments()
@@ -84,19 +69,13 @@ public class DisposalExtensions
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
-    public async Task DisposeWhenDependentDisposedAsyncNoFactoryArgumentsNullDependency()
-    {
-        Dependency? dependency = null;
-        await dependency!.DisposeWhenDependentDisposedAsync(() => Task.FromResult(new Dependent()));
-    }
+    public async Task DisposeWhenDependentDisposedAsyncNoFactoryArgumentsNullDependency() =>
+        await default(Dependency)!.DisposeWhenDependentDisposedAsync(() => Task.FromResult(new Dependent()));
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
-    public async Task DisposeWhenDependentDisposedAsyncNoFactoryArgumentsNullFactory()
-    {
-        var dependency = new Dependency();
-        await dependency.DisposeWhenDependentDisposedAsync((Func<Task<Dependent>>)null!);
-    }
+    public async Task DisposeWhenDependentDisposedAsyncNoFactoryArgumentsNullFactory() =>
+        await new Dependency().DisposeWhenDependentDisposedAsync((Func<Task<Dependent>>)null!);
 
     [TestMethod]
     public async Task DisposeWhenDependentDisposedAsync()
@@ -109,19 +88,13 @@ public class DisposalExtensions
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
-    public async Task DisposeWhenDependentDisposedAsyncNullDependency()
-    {
-        Dependency? dependency = null;
-        await dependency!.DisposeWhenDependentDisposedAsync(_ => Task.FromResult(new Dependent()));
-    }
+    public async Task DisposeWhenDependentDisposedAsyncNullDependency() =>
+        await default(Dependency)!.DisposeWhenDependentDisposedAsync(_ => Task.FromResult(new Dependent()));
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
-    public async Task DisposeWhenDependentDisposedAsyncNullFactory()
-    {
-        var dependency = new Dependency();
-        await dependency.DisposeWhenDependentDisposedAsync((Func<Dependency, Task<Dependent>>)null!);
-    }
+    public async Task DisposeWhenDependentDisposedAsyncNullFactory() =>
+        await new Dependency().DisposeWhenDependentDisposedAsync((Func<Dependency, Task<Dependent>>)null!);
 
     [TestMethod]
     public void DisposeAsyncWhenDependentDisposedNoFactoryArguments()
@@ -137,19 +110,13 @@ public class DisposalExtensions
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
-    public void DisposeAsyncWhenDependentDisposedNoFactoryArgumentsNullDependency()
-    {
-        Dependency? dependency = null;
-        dependency!.DisposeAsyncWhenDependentDisposed(() => new Dependent());
-    }
+    public void DisposeAsyncWhenDependentDisposedNoFactoryArgumentsNullDependency() =>
+        default(Dependency)!.DisposeAsyncWhenDependentDisposed(() => new Dependent());
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
-    public void DisposeAsyncWhenDependentDisposedNoFactoryArgumentsNullFactory()
-    {
-        var dependency = new Dependency();
-        dependency.DisposeAsyncWhenDependentDisposed((Func<Dependent>)null!);
-    }
+    public void DisposeAsyncWhenDependentDisposedNoFactoryArgumentsNullFactory() =>
+        new Dependency().DisposeAsyncWhenDependentDisposed((Func<Dependent>)null!);
 
     [TestMethod]
     public void DisposeAsyncWhenDependentDisposed()
@@ -165,19 +132,13 @@ public class DisposalExtensions
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
-    public void DisposeAsyncWhenDependentDisposeNullDependency()
-    {
-        Dependency? dependency = null;
-        dependency!.DisposeAsyncWhenDependentDisposed(_ => new Dependent());
-    }
+    public void DisposeAsyncWhenDependentDisposeNullDependency() =>
+        default(Dependency)!.DisposeAsyncWhenDependentDisposed(_ => new Dependent());
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
-    public void DisposeAsyncWhenDependentDisposeNullFactory()
-    {
-        var dependency = new Dependency();
-        dependency.DisposeAsyncWhenDependentDisposed((Func<Dependency, Dependent>)null!);
-    }
+    public void DisposeAsyncWhenDependentDisposeNullFactory() =>
+        new Dependency().DisposeAsyncWhenDependentDisposed((Func<Dependency, Dependent>)null!);
 
     [TestMethod]
     public async Task DisposeAsyncWhenDependentDisposedNoFactoryArgumentsAsync()
@@ -193,19 +154,13 @@ public class DisposalExtensions
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
-    public async Task DisposeAsyncWhenDependentDisposedNoFactoryArgumentsNullDependencyAsync()
-    {
-        Dependency? dependency = null;
-        await dependency!.DisposeAsyncWhenDependentDisposedAsync(() => Task.FromResult(new Dependent()));
-    }
+    public async Task DisposeAsyncWhenDependentDisposedNoFactoryArgumentsNullDependencyAsync() =>
+        await default(Dependency)!.DisposeAsyncWhenDependentDisposedAsync(() => Task.FromResult(new Dependent()));
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
-    public async Task DisposeAsyncWhenDependentDisposedNoFactoryArgumentsNullFactoryAsync()
-    {
-        var dependency = new Dependency();
-        await dependency.DisposeAsyncWhenDependentDisposedAsync((Func<Task<Dependent>>)null!);
-    }
+    public async Task DisposeAsyncWhenDependentDisposedNoFactoryArgumentsNullFactoryAsync() =>
+        await new Dependency().DisposeAsyncWhenDependentDisposedAsync((Func<Task<Dependent>>)null!);
 
     [TestMethod]
     public async Task DisposeAsyncWhenDependentDisposedAsync()
@@ -221,17 +176,56 @@ public class DisposalExtensions
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
-    public async Task DisposeAsyncWhenDependentDisposeNullDependencyAsync()
+    public async Task DisposeAsyncWhenDependentDisposeNullDependencyAsync() =>
+        await default(Dependency)!.DisposeAsyncWhenDependentDisposedAsync(_ => Task.FromResult(new Dependent()));
+
+    [TestMethod]
+    [ExpectedException(typeof(ArgumentNullException))]
+    public async Task DisposeAsyncWhenDependentDisposeNullFactoryAsync() =>
+        await new Dependency().DisposeAsyncWhenDependentDisposedAsync((Func<Dependency, Task<Dependent>>)null!);
+
+    [TestMethod]
+    public void DisposeDependenciesWhenDisposed()
     {
-        Dependency? dependency = null;
-        await dependency!.DisposeAsyncWhenDependentDisposedAsync(_ => Task.FromResult(new Dependent()));
+        var dependency1 = new Dependency();
+        var dependency2 = new Dependency();
+        var dependent = new Dependent().DisposeDependenciesWhenDisposed(dependency1, dependency2);
+        dependent.Dispose();
+        Assert.IsTrue(dependency1.IsDisposed);
+        Assert.IsTrue(dependency2.IsDisposed);
     }
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
-    public async Task DisposeAsyncWhenDependentDisposeNullFactoryAsync()
+    public void DisposeDependenciesWhenDisposedNullDependent() =>
+        default(Dependent)!.DisposeDependenciesWhenDisposed(default(Dependency)!, default(Dependency)!);
+
+    [TestMethod]
+    [ExpectedException(typeof(ArgumentNullException))]
+    public void DisposeDependenciesWhenDisposeNullDependencies() =>
+        new Dependent().DisposeDependenciesWhenDisposed(null!);
+
+    [TestMethod]
+    public void DisposeAsyncDependenciesWhenDisposed()
     {
-        var dependency = new Dependency();
-        await dependency.DisposeAsyncWhenDependentDisposedAsync((Func<Dependency, Task<Dependent>>)null!);
+        var dependency1 = new Dependency();
+        var dependency2 = new Dependency();
+        var dependent = new Dependent().DisposeAsyncDependenciesWhenDisposed(dependency1, dependency2);
+        dependent.Dispose();
+        while (!dependency1.IsDisposed)
+        {
+        }
+        Assert.IsTrue(dependency1.IsDisposed);
+        Assert.IsTrue(dependency2.IsDisposed);
     }
+
+    [TestMethod]
+    [ExpectedException(typeof(ArgumentNullException))]
+    public void DisposeAsyncDependenciesWhenDisposedNullDependent() =>
+        default(Dependent)!.DisposeAsyncDependenciesWhenDisposed(default(Dependency)!, default(Dependency)!);
+
+    [TestMethod]
+    [ExpectedException(typeof(ArgumentNullException))]
+    public void DisposeAsyncDependenciesWhenDisposeNullDependencies() =>
+        new Dependent().DisposeAsyncDependenciesWhenDisposed(null!);
 }

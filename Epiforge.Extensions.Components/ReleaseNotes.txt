@@ -1,1 +1,1 @@
-We added extension methods for disposal dependencies.
+We added additional extension methods for disposal dependencies.
