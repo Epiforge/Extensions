@@ -64,12 +64,7 @@ public sealed class AsyncSynchronizationContext :
     /// <inheritdoc/>
     public override void Post(SendOrPostCallback d, object? state)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(d);
-#else
-        if (d is null)
-            throw new ArgumentNullException(nameof(d));
-#endif
         queuedCallbacks.Enqueue(new QueuedCallback(d, state, null));
     }
 
@@ -96,12 +91,7 @@ public sealed class AsyncSynchronizationContext :
     /// <inheritdoc/>
     public override void Send(SendOrPostCallback d, object? state)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(d);
-#else
-        if (d is null)
-            throw new ArgumentNullException(nameof(d));
-#endif
         using var signal = new ManualResetEventSlim(false);
         var queuedCallback = new QueuedCallback(d, state, signal);
         queuedCallbacks.Enqueue(queuedCallback);

@@ -6,28 +6,49 @@
         <Description>This package assists in operating with expressions.</Description>
     </PropertyGroup>
 
-    <ItemGroup>
-        <PackageReference Include="Epiforge.Extensions.Collections" Version="1.5.0" />
-        <PackageReference Include="Epiforge.Extensions.Components" Version="1.5.0" />
-        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.1" PrivateAssets="all" />
-        <PackageReference Include="PolySharp" Version="1.13.2">
-            <PrivateAssets>all</PrivateAssets>
-            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-        </PackageReference>
-        <PackageReference Include="System.Collections.Immutable" Version="7.0.0" />
-    </ItemGroup>
-
+    <!-- Start Standard Project -->
     <PropertyGroup>
         <Authors>Epiforge</Authors>
-        <CodeAnalysisRuleSet>..\.ruleset</CodeAnalysisRuleSet>
         <Company>Epiforge</Company>
         <EmbedUntrackedSources>true</EmbedUntrackedSources>
         <EnableNETAnalyzers>true</EnableNETAnalyzers>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
-        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <ImplicitUsings>enable</ImplicitUsings>
         <IncludeSymbols>true</IncludeSymbols>
         <LangVersion>latest</LangVersion>
+        <NoWarn>CS1591;CA1014;CA1043;CA1502;CA1506;CA1721;CA2252;IDE0032;IDE0079</NoWarn>
+        <NeutralResourcesLanguage>en</NeutralResourcesLanguage>
         <Nullable>enable</Nullable>
+        <WarningsAsErrors>CS8600;CS8602;CS8603</WarningsAsErrors>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <DefineConstants Condition="'$(TargetFramework)' == 'net7.0' or '$(TargetFramework)' == 'net8.0' or '$(TargetFramework)' == 'net9.0'">$(DefineConstants);IS_NET_7_0_OR_GREATER</DefineConstants>
+        <DefineConstants Condition="'$(TargetFramework)' == 'net8.0' or '$(TargetFramework)' == 'net9.0'">$(DefineConstants);IS_NET_8_0_OR_GREATER</DefineConstants>
+        <DefineConstants Condition="'$(TargetFramework)' == 'net9.0'">$(DefineConstants);IS_NET_9_0_OR_GREATER</DefineConstants>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="PolySharp" Version="1.15.0">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+    </ItemGroup>
+
+    <ItemGroup>
+        <Using Include="System.Runtime.InteropServices" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Compile Include="..\Common\CommonAssemblyInfo.cs" Link="CommonAssemblyInfo.cs" />
+    </ItemGroup>
+    <!-- End Standard Project -->
+
+    <!-- Start Library -->
+    <PropertyGroup>
+        <CodeAnalysisRuleSet>..\.ruleset</CodeAnalysisRuleSet>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <IncludeSymbols>true</IncludeSymbols>
         <PackageIcon>NuGet.jpg</PackageIcon>
         <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
         <PackageProjectUrl>https://github.com/Epiforge/Epiforge.Extensions</PackageProjectUrl>
@@ -37,12 +58,12 @@
         <RepositoryType>GitHub</RepositoryType>
         <RepositoryUrl>https://github.com/Epiforge/Epiforge.Extensions</RepositoryUrl>
         <SymbolPackageFormat>snupkg</SymbolPackageFormat>
-        <TargetFrameworks>net462;netstandard2.1;net6.0;net7.0</TargetFrameworks>
-        <WarningsAsErrors>CS8600;CS8602;CS8603</WarningsAsErrors>
-        <DefineConstants Condition="'$(TargetFramework)' == 'netstandard2.1' or '$(TargetFramework)' == 'net6.0' or '$(TargetFramework)' == 'net7.0'">$(DefineConstants);IS_NET_STANDARD_2_1_OR_GREATER</DefineConstants>
-        <DefineConstants Condition="'$(TargetFramework)' == 'net6.0' or '$(TargetFramework)' == 'net7.0'">$(DefineConstants);IS_NET_6_0_OR_GREATER</DefineConstants>
-        <DefineConstants Condition="'$(TargetFramework)' == 'net7.0'">$(DefineConstants);IS_NET_7_0_OR_GREATER</DefineConstants>
+        <TargetFrameworks>net6.0;net7.0;net8.0;net9.0</TargetFrameworks>
     </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="all" />
+    </ItemGroup>
 
     <Target Name="PreparePackageReleaseNotesFromFile" BeforeTargets="GenerateNuspec">
         <ReadLinesFromFile File="ReleaseNotes.txt">
@@ -54,19 +75,16 @@
     </Target>
 
     <ItemGroup>
-        <Compile Include="..\Common\AssemblyInfo.cs" Link="AssemblyInfo.cs" />
-    </ItemGroup>
-
-    <ItemGroup>
         <None Include="README.md" Pack="True" PackagePath="" />
         <None Include="NuGet.jpg" Pack="True" PackagePath="" />
+        <None Remove="*.ncrunchproject" />
     </ItemGroup>
+    <!-- End Library -->
 
     <ItemGroup>
-        <None Remove="Epiforge.Extensions.Expressions.net462.v3.ncrunchproject" />
-        <None Remove="Epiforge.Extensions.Expressions.net6.0.v3.ncrunchproject" />
-        <None Remove="Epiforge.Extensions.Expressions.net7.0.v3.ncrunchproject" />
-        <None Remove="Epiforge.Extensions.Expressions.netstandard2.1.v3.ncrunchproject" />
+        <PackageReference Include="Epiforge.Extensions.Collections" Version="1.5.0" />
+        <PackageReference Include="Epiforge.Extensions.Components" Version="1.7.0" />
+        <PackageReference Include="System.Collections.Immutable" Version="8.0.0" />
     </ItemGroup>
 
 </Project>

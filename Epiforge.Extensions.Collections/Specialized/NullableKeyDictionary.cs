@@ -33,12 +33,7 @@ public sealed class NullableKeyDictionary<TKey, TValue> :
     public NullableKeyDictionary(IDictionary<TKey, TValue> dictionary) :
         this()
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(dictionary);
-#else
-        if (dictionary is null)
-            throw new ArgumentNullException(nameof(dictionary));
-#endif
         AddRange(dictionary);
     }
 
@@ -91,12 +86,7 @@ public sealed class NullableKeyDictionary<TKey, TValue> :
     public NullableKeyDictionary(IDictionary<TKey, TValue> dictionary, IEqualityComparer<TKey> comparer) :
         this(comparer)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(dictionary);
-#else
-        if (dictionary is null)
-            throw new ArgumentNullException(nameof(dictionary));
-#endif
         AddRange(dictionary);
     }
 
@@ -128,10 +118,7 @@ public sealed class NullableKeyDictionary<TKey, TValue> :
         this(capacity, comparer) =>
         this.logger = logger;
 
-#if IS_NET_STANDARD_2_1_OR_GREATER
-    readonly
-#endif
-    Dictionary<TKey, TValue> dict;
+    readonly Dictionary<TKey, TValue> dict;
     bool hasNullKeyedValue = false;
     readonly ILogger? logger;
     TValue nullKeyedValue = default!;
@@ -268,19 +255,9 @@ public sealed class NullableKeyDictionary<TKey, TValue> :
     /// <returns>The current capacity of the <see cref="IDictionary{TKey, TValue}"/></returns>
     public int EnsureCapacity(int capacity)
     {
-#if IS_NET_STANDARD_2_1_OR_GREATER
         var ensuredCapacity = dict.EnsureCapacity(capacity);
         logger?.LogTrace("NullableKeyDictionary ensured capacity {EnsuredCapacity} from request of {Capacity}", ensuredCapacity, capacity);
         return ensuredCapacity;
-#else
-        var newDictionary = new Dictionary<TKey, TValue>(capacity);
-        foreach (var kvp in dict)
-            newDictionary.Add(kvp.Key, kvp.Value);
-        dict = newDictionary;
-        var ensuredCapacity = Math.Min(capacity, dict.Count);
-        logger?.LogTrace("NullableKeyDictionary ensured capacity {EnsuredCapacity} from request of {Capacity}", ensuredCapacity, capacity);
-        return ensuredCapacity;
-#endif
     }
 
     /// <summary>
@@ -329,20 +306,10 @@ public sealed class NullableKeyDictionary<TKey, TValue> :
             value = default!;
             return false;
         }
-#if IS_NET_STANDARD_2_1_OR_GREATER
         var removed = dict.Remove(key, out value!);
         if (removed)
             logger?.LogTrace("NullableKeyDictionary changed: removed [{Key}, {Value}]", key, value);
         return removed;
-#else
-        if (dict.TryGetValue(key, out value))
-        {
-            dict.Remove(key);
-            logger?.LogTrace("NullableKeyDictionary changed: removed [{Key}, {Value}]", key, value);
-            return true;
-        }
-        return false;
-#endif
     }
 
     bool ICollection<KeyValuePair<TKey, TValue>>.Remove(KeyValuePair<TKey, TValue> item)
@@ -369,11 +336,7 @@ public sealed class NullableKeyDictionary<TKey, TValue> :
     /// </summary>
     public void TrimExcess()
     {
-#if IS_NET_STANDARD_2_1_OR_GREATER
         dict.TrimExcess();
-#else
-        dict = new Dictionary<TKey, TValue>(dict);
-#endif
         logger?.LogTrace("NullableKeyDictionary trimmed excess");
     }
 
@@ -383,14 +346,7 @@ public sealed class NullableKeyDictionary<TKey, TValue> :
     /// <param name="capacity">The new capacity</param>
     public void TrimExcess(int capacity)
     {
-#if IS_NET_STANDARD_2_1_OR_GREATER
         dict.TrimExcess(capacity);
-#else
-        var newDict = new Dictionary<TKey, TValue>(capacity);
-        foreach (var kvp in dict)
-            newDict.Add(kvp.Key, kvp.Value);
-        dict = newDict;
-#endif
         logger?.LogTrace("NullableKeyDictionary trimmed excess to {Capacity}", capacity);
     }
 
@@ -413,18 +369,10 @@ public sealed class NullableKeyDictionary<TKey, TValue> :
             }
             return false;
         }
-#if IS_NET_STANDARD_2_1_OR_GREATER
         var added = dict.TryAdd(key, value);
         if (added)
             logger?.LogTrace("NullableKeyDictionary changed: added [{Key}, {Value}]", key, value);
         return added;
-#else
-        if (dict.ContainsKey(key))
-            return false;
-        dict.Add(key, value);
-        logger?.LogTrace("NullableKeyDictionary changed: added [{Key}, {Value}]", key, value);
-        return true;
-#endif
     }
 
     /// <summary>

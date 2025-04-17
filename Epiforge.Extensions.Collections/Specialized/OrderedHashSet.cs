@@ -194,12 +194,7 @@ public sealed class OrderedHashSet<T> :
     /// <exception cref="ArgumentNullException"><paramref name="other"/> is null</exception>
     public void ExceptWith(IEnumerable<T> other)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(other);
-#else
-        if (other is null)
-            throw new ArgumentNullException(nameof(other));
-#endif
         foreach (var item in other)
             Remove(item);
     }
@@ -228,12 +223,7 @@ public sealed class OrderedHashSet<T> :
     /// <exception cref="ArgumentNullException"><paramref name="other"/> is null</exception>
     public void IntersectWith(IEnumerable<T> other)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(other);
-#else
-        if (other is null)
-            throw new ArgumentNullException(nameof(other));
-#endif
         var itemsToRemove = new HashSet<T>(list, dict.Comparer);
         foreach (var item in other)
             itemsToRemove.Remove(item);
@@ -249,12 +239,7 @@ public sealed class OrderedHashSet<T> :
     /// <exception cref="ArgumentNullException"><paramref name="other"/> is null</exception>
     public bool IsProperSubsetOf(IEnumerable<T> other)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(other);
-#else
-        if (other is null)
-            throw new ArgumentNullException(nameof(other));
-#endif
         var otherSet = GetSet(other);
         if (dict.Count >= otherSet.Count)
             return false;
@@ -272,12 +257,7 @@ public sealed class OrderedHashSet<T> :
     /// <exception cref="ArgumentNullException"><paramref name="other"/> is null</exception>
     public bool IsProperSupersetOf(IEnumerable<T> other)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(other);
-#else
-        if (other is null)
-            throw new ArgumentNullException(nameof(other));
-#endif
         var otherSet = GetSet(other);
         if (otherSet.Count >= dict.Count)
             return false;
@@ -363,12 +343,7 @@ public sealed class OrderedHashSet<T> :
     /// <exception cref="ArgumentNullException"><paramref name="other"/> is null</exception>
     public bool Overlaps(IEnumerable<T> other)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(other);
-#else
-        if (other is null)
-            throw new ArgumentNullException(nameof(other));
-#endif
         foreach (var item in other)
             if (dict.ContainsKey(item))
                 return true;
@@ -437,12 +412,7 @@ public sealed class OrderedHashSet<T> :
     /// <exception cref="ArgumentNullException"><paramref name="match"/> is null</exception>
     public int RemoveWhere(Predicate<T> match)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(match);
-#else
-        if (match is null)
-            throw new ArgumentNullException(nameof(match));
-#endif
         var count = 0;
         foreach (var item in list.ToImmutableArray())
             if (match(item))
@@ -461,12 +431,7 @@ public sealed class OrderedHashSet<T> :
     /// <exception cref="ArgumentNullException"><paramref name="other"/> is null</exception>
     public bool SetEquals(IEnumerable<T> other)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(other);
-#else
-        if (other is null)
-            throw new ArgumentNullException(nameof(other));
-#endif
         var otherSet = GetSet(other);
         if (list.Count != otherSet.Count)
             return false;
@@ -483,12 +448,7 @@ public sealed class OrderedHashSet<T> :
     /// <exception cref="ArgumentNullException"><paramref name="other"/> is null</exception>
     public void SymmetricExceptWith(IEnumerable<T> other)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(other);
-#else
-        if (other is null)
-            throw new ArgumentNullException(nameof(other));
-#endif
         foreach (var item in GetSet(other))
             if (dict.ContainsKey(item))
                 Remove(item);
@@ -526,12 +486,7 @@ public sealed class OrderedHashSet<T> :
     /// <exception cref="ArgumentNullException"><paramref name="other"/> is null</exception>
     public void UnionWith(IEnumerable<T> other)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(other);
-#else
-        if (other is null)
-            throw new ArgumentNullException(nameof(other));
-#endif
         foreach (var item in other)
             Add(item);
     }

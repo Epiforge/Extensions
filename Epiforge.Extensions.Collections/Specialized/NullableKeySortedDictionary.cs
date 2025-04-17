@@ -33,12 +33,7 @@ public sealed class NullableKeySortedDictionary<TKey, TValue> :
     public NullableKeySortedDictionary(IDictionary<TKey, TValue> dictionary) :
         this()
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(dictionary);
-#else
-        if (dictionary is null)
-            throw new ArgumentNullException(nameof(dictionary));
-#endif
         AddRange(dictionary);
     }
 
@@ -75,12 +70,7 @@ public sealed class NullableKeySortedDictionary<TKey, TValue> :
     public NullableKeySortedDictionary(IDictionary<TKey, TValue> dictionary, IComparer<TKey> comparer) :
         this(comparer)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(dictionary);
-#else
-        if (dictionary is null)
-            throw new ArgumentNullException(nameof(dictionary));
-#endif
         AddRange(dictionary);
     }
 
@@ -270,20 +260,10 @@ public sealed class NullableKeySortedDictionary<TKey, TValue> :
             value = default!;
             return false;
         }
-#if IS_NET_STANDARD_2_1_OR_GREATER
         var removed = dict.Remove(key, out value!);
         if (removed)
             logger?.LogTrace("NullableKeySortedDictionary changed: removed [{Key}, {Value}]", key, value);
         return removed;
-#else
-        if (dict.TryGetValue(key, out value))
-        {
-            dict.Remove(key);
-            logger?.LogTrace("NullableKeySortedDictionary changed: removed [{Key}, {Value}]", key, value);
-            return true;
-        }
-        return false;
-#endif
     }
 
     bool ICollection<KeyValuePair<TKey, TValue>>.Remove(KeyValuePair<TKey, TValue> item)
@@ -324,18 +304,10 @@ public sealed class NullableKeySortedDictionary<TKey, TValue> :
             }
             return false;
         }
-#if IS_NET_STANDARD_2_1_OR_GREATER
         var added = dict.TryAdd(key, value);
         if (added)
             logger?.LogTrace("NullableKeySortedDictionary changed: added [{Key}, {Value}]", key, value);
         return added;
-#else
-        if (dict.ContainsKey(key))
-            return false;
-        dict.Add(key, value);
-        logger?.LogTrace("NullableKeySortedDictionary changed: added [{Key}, {Value}]", key, value);
-        return true;
-#endif
     }
 
     /// <summary>

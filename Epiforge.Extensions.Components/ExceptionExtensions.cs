@@ -57,12 +57,7 @@ public static class ExceptionExtensions
     /// <param name="format">The format in which to create the representation</param>
     public static string GetFullDetails(this Exception ex, ExceptionFullDetailsFormat? format = null)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(ex);
-#else
-        if (ex is null)
-            throw new ArgumentNullException(nameof(ex));
-#endif
         try
         {
             ex = ex.Demystify();
@@ -74,23 +69,12 @@ public static class ExceptionExtensions
         switch (format ?? DefaultExceptionFullDetailsFormat)
         {
             case ExceptionFullDetailsFormat.Json:
-#if IS_NET_STANDARD_2_1_OR_GREATER
                 var bufferWriter = new ArrayBufferWriter<byte>();
                 using (var json = new Utf8JsonWriter(bufferWriter, new JsonWriterOptions { Indented = true }))
                 {
                     GetFullDetailsInJson(ex, json);
                 }
                 return Encoding.UTF8.GetString(bufferWriter.WrittenSpan);
-#else
-                {
-                    using var memoryStream = new MemoryStream();
-                    using (var json = new Utf8JsonWriter(memoryStream, new JsonWriterOptions { Indented = true }))
-                    {
-                        GetFullDetailsInJson(ex, json);
-                    }
-                    return Encoding.UTF8.GetString(memoryStream.ToArray());
-                }
-#endif
             case ExceptionFullDetailsFormat.Xml:
                 using (var str = new StringWriter())
                 {
@@ -296,11 +280,7 @@ public static class ExceptionExtensions
             if (additionalProperties.Any())
                 foreach (var (name, value) in additionalProperties)
                     additionalLines.Append($"{Environment.NewLine}.{name} = {value.ToObjectLiteral()}");
-#if IS_NET_STANDARD_2_1_OR_GREATER
             exceptionDetails.Add(newLinePattern.Replace($"{indentation}{(top ? "-- " : "   ")}{ex.GetType().Name}: {ex.Message}{additionalLines}{(string.IsNullOrWhiteSpace(ex.StackTrace) ? string.Empty : $"{Environment.NewLine}{stackTraceIndentation.Replace(ex.StackTrace, string.Empty)}")}", $"{Environment.NewLine}{additionalLineIndentation}"));
-#else
-            exceptionDetails.Add(newLinePattern.Replace($"{indentation}{(top ? "-- " : "   ")}{ex.GetType().Name}: {ex.Message}{additionalLines}{(string.IsNullOrWhiteSpace(ex.StackTrace) ? string.Empty : $"{Environment.NewLine}{stackTraceIndentation.Replace(ex.StackTrace, string.Empty)}")}", $"{Environment.NewLine}{additionalLineIndentation}"));
-#endif
             if (reflectionTypeLoad?.LoaderExceptions?.Length > 0)
             {
                 foreach (var loader in reflectionTypeLoad.LoaderExceptions)

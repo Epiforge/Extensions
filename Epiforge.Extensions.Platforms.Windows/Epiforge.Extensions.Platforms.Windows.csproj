@@ -1,4 +1,6 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <Import Project="..\Common\LibraryProject.props" />
 
     <PropertyGroup>
         <Product>Epiforge.Extensions.Platforms.Windows</Product>
@@ -6,66 +8,21 @@
         <Description>This package assists in Windows-platform specific operations.</Description>
     </PropertyGroup>
 
-    <ItemGroup>
-        <PackageReference Include="Epiforge.Extensions.Components" Version="1.4.0" />
-        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.1" PrivateAssets="all" />
-        <PackageReference Include="PolySharp" Version="1.13.2">
-            <PrivateAssets>all</PrivateAssets>
-            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-        </PackageReference>
-        <PackageReference Include="System.Management" Version="7.0.2" />
-        <PackageReference Include="System.ValueTuple" Version="4.5.0" />
-    </ItemGroup>
-
     <PropertyGroup>
-        <AllowUnsafeBlocks Condition="'$(TargetFramework)' == 'net7.0-windows'">true</AllowUnsafeBlocks>
-        <Authors>Epiforge</Authors>
-        <CodeAnalysisRuleSet>..\.ruleset</CodeAnalysisRuleSet>
-        <Company>Epiforge</Company>
-        <EmbedUntrackedSources>true</EmbedUntrackedSources>
-        <EnableNETAnalyzers>true</EnableNETAnalyzers>
-        <GenerateDocumentationFile>true</GenerateDocumentationFile>
-        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-        <IncludeSymbols>true</IncludeSymbols>
-        <LangVersion>latest</LangVersion>
-        <Nullable>enable</Nullable>
-        <PackageIcon>NuGet.jpg</PackageIcon>
-        <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
-        <PackageProjectUrl>https://github.com/Epiforge/Epiforge.Extensions</PackageProjectUrl>
-        <PackageReadmeFile>README.md</PackageReadmeFile>
-        <PackageReleaseNotes>Please write the package release notes in ReleaseNotes.txt.</PackageReleaseNotes>
-        <PublishRepositoryUrl>true</PublishRepositoryUrl>
-        <RepositoryType>GitHub</RepositoryType>
-        <RepositoryUrl>https://github.com/Epiforge/Epiforge.Extensions</RepositoryUrl>
-        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
-        <TargetFrameworks>net462;net6.0-windows;net7.0-windows</TargetFrameworks>
-        <WarningsAsErrors>CS8600;CS8602;CS8603</WarningsAsErrors>
-        <DefineConstants Condition="'$(TargetFramework)' == 'net6.0-windows' or '$(TargetFramework)' == 'net7.0-windows'">$(DefineConstants);IS_NET_STANDARD_2_1_OR_GREATER;IS_NET_6_0_OR_GREATER</DefineConstants>
-        <DefineConstants Condition="'$(TargetFramework)' == 'net7.0-windows'">$(DefineConstants);IS_NET_7_0_OR_GREATER</DefineConstants>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <TargetFrameworks>net6.0-windows;net7.0-windows;net8.0-windows;net9.0-windows</TargetFrameworks>
     </PropertyGroup>
 
-    <Target Name="PreparePackageReleaseNotesFromFile" BeforeTargets="GenerateNuspec">
-        <ReadLinesFromFile File="ReleaseNotes.txt">
-            <Output TaskParameter="Lines" ItemName="ReleaseNoteLines" />
-        </ReadLinesFromFile>
-        <PropertyGroup>
-            <PackageReleaseNotes>@(ReleaseNoteLines, '%0a')</PackageReleaseNotes>
-        </PropertyGroup>
-    </Target>
+    <PropertyGroup>
+        <DefineConstants Condition="'$(TargetFramework)' == 'net7.0-windows' or '$(TargetFramework)' == 'net8.0-windows' or '$(TargetFramework)' == 'net9.0-windows'">$(DefineConstants);IS_NET_7_0_OR_GREATER</DefineConstants>
+        <DefineConstants Condition="'$(TargetFramework)' == 'net8.0-windows' or '$(TargetFramework)' == 'net9.0-windows'">$(DefineConstants);IS_NET_8_0_OR_GREATER</DefineConstants>
+        <DefineConstants Condition="'$(TargetFramework)' == 'net9.0-windows'">$(DefineConstants);IS_NET_9_0_OR_GREATER</DefineConstants>
+    </PropertyGroup>
 
     <ItemGroup>
-        <Compile Include="..\Common\AssemblyInfo.cs" Link="AssemblyInfo.cs" />
-    </ItemGroup>
-
-    <ItemGroup>
-        <None Include="README.md" Pack="True" PackagePath="" />
-        <None Include="NuGet.jpg" Pack="True" PackagePath="" />
-    </ItemGroup>
-
-    <ItemGroup>
-        <None Remove="Epiforge.Extensions.Platforms.Windows.net462.v3.ncrunchproject" />
-        <None Remove="Epiforge.Extensions.Platforms.Windows.net6.0-windows.v3.ncrunchproject" />
-        <None Remove="Epiforge.Extensions.Platforms.Windows.net7.0-windows.v3.ncrunchproject" />
+        <PackageReference Include="Epiforge.Extensions.Components" Version="1.7.0" />
+        <PackageReference Include="System.Management" Version="8.0.0" />
+        <PackageReference Include="System.ValueTuple" Version="4.6.1" />
     </ItemGroup>
 
 </Project>

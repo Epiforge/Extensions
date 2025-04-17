@@ -43,11 +43,7 @@ public sealed class ExpressionEqualityComparer :
     /// <returns>A hash code for the specified expression tree</returns>
     public int GetHashCode(Expression? obj)
     {
-#if IS_NET_STANDARD_2_1_OR_GREATER
         var hashCode = new System.HashCode();
-#else
-        var hashCode = new Components.HashCode();
-#endif
         if (obj is not null)
             foreach (var element in ExpressionDiagramGenerator.GenerateDiagram(obj))
                 hashCode.Add(element);

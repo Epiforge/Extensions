@@ -20,7 +20,7 @@ public class FastEqualityComparer
     }
 
     [TestMethod]
-    public new void GetHashCode()
+    public void GetHashCodeTest()
     {
         var fastEqualityComparer = new Components.FastEqualityComparer(typeof(string));
         Assert.AreEqual("a".GetHashCode(), fastEqualityComparer.GetHashCode("a"));

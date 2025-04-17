@@ -116,12 +116,7 @@ public class DynamicPropertyChangeNotifier :
     [SuppressMessage("Code Analysis", "CA1045: Do not pass types by reference", Justification = "To 'correct' this would defeat the purpose of the method")]
     protected bool SetBackedProperty<TValue>(ref TValue backingField, TValue value, IEqualityComparer<TValue> equalityComparer, [CallerMemberName] string? propertyName = null)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(equalityComparer);
-#else
-        if (equalityComparer is null)
-            throw new ArgumentNullException(nameof(equalityComparer));
-#endif
         if (!equalityComparer.Equals(backingField, value))
         {
             Logger?.LogTrace(EventIds.Epiforge_Extensions_Components_SetBackingFieldTriggered, "{PropertyName} property is changing from {OldValue} to {NewValue}", propertyName, backingField, value);
@@ -159,18 +154,9 @@ public class DynamicPropertyChangeNotifier :
     [SuppressMessage("Code Analysis", "CA1045: Do not pass types by reference", Justification = "To 'correct' this would defeat the purpose of the method")]
     protected bool SetBackedProperty<TValue>(ref TValue backingField, TValue value, IEqualityComparer<TValue> equalityComparer, PropertyChangingEventArgs propertyChangingEventArgs, PropertyChangedEventArgs propertyChangedEventArgs)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(equalityComparer);
         ArgumentNullException.ThrowIfNull(propertyChangingEventArgs);
         ArgumentNullException.ThrowIfNull(propertyChangedEventArgs);
-#else
-        if (equalityComparer is null)
-            throw new ArgumentNullException(nameof(equalityComparer));
-        if (propertyChangingEventArgs is null)
-            throw new ArgumentNullException(nameof(propertyChangingEventArgs));
-        if (propertyChangedEventArgs is null)
-            throw new ArgumentNullException(nameof(propertyChangedEventArgs));
-#endif
         if (!equalityComparer.Equals(backingField, value))
         {
             Logger?.LogTrace(EventIds.Epiforge_Extensions_Components_SetBackingFieldTriggered, "{PropertyName} property is changing from {OldValue} to {NewValue}", propertyChangedEventArgs.PropertyName, backingField, value);
@@ -206,12 +192,7 @@ public class DynamicPropertyChangeNotifier :
     [SuppressMessage("Code Analysis", "CA1045: Do not pass types by reference", Justification = "To 'correct' this would defeat the purpose of the method")]
     protected bool SetBackedProperty<TValue>(ref TValue backingField, in TValue value, IEqualityComparer<TValue> equalityComparer, [CallerMemberName] string? propertyName = null)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(equalityComparer);
-#else
-        if (equalityComparer is null)
-            throw new ArgumentNullException(nameof(equalityComparer));
-#endif
         if (!equalityComparer.Equals(backingField, value))
         {
             Logger?.LogTrace(EventIds.Epiforge_Extensions_Components_SetBackingFieldTriggered, "{PropertyName} property is changing from {OldValue} to {NewValue}", propertyName, backingField, value);
@@ -249,18 +230,9 @@ public class DynamicPropertyChangeNotifier :
     [SuppressMessage("Code Analysis", "CA1045: Do not pass types by reference", Justification = "To 'correct' this would defeat the purpose of the method")]
     protected bool SetBackedProperty<TValue>(ref TValue backingField, in TValue value, IEqualityComparer<TValue> equalityComparer, PropertyChangingEventArgs propertyChangingEventArgs, PropertyChangedEventArgs propertyChangedEventArgs)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(equalityComparer);
         ArgumentNullException.ThrowIfNull(propertyChangingEventArgs);
         ArgumentNullException.ThrowIfNull(propertyChangedEventArgs);
-#else
-        if (equalityComparer is null)
-            throw new ArgumentNullException(nameof(equalityComparer));
-        if (propertyChangingEventArgs is null)
-            throw new ArgumentNullException(nameof(propertyChangingEventArgs));
-        if (propertyChangedEventArgs is null)
-            throw new ArgumentNullException(nameof(propertyChangedEventArgs));
-#endif
         if (!equalityComparer.Equals(backingField, value))
         {
             Logger?.LogTrace(EventIds.Epiforge_Extensions_Components_SetBackingFieldTriggered, "{PropertyName} property is changing from {OldValue} to {NewValue}", propertyChangedEventArgs.PropertyName, backingField, value);

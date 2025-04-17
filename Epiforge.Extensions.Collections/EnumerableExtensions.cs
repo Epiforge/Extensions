@@ -16,15 +16,8 @@ public static class EnumerableExtensions
     /// <returns>The index of the first element that satisfies the predicate; or, <c>-1</c> if none did</returns>
     public static int FindIndex<TSource>(this IEnumerable<TSource> source, Predicate<TSource> predicate)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(predicate);
-#else
-        if (source is null)
-            throw new ArgumentNullException(nameof(source));
-        if (predicate is null)
-            throw new ArgumentNullException(nameof(predicate));
-#endif
         if (source is TSource[] typedArray)
             return Array.FindIndex(typedArray, predicate);
         if (source is List<TSource> genericList)
@@ -48,15 +41,8 @@ public static class EnumerableExtensions
     /// <returns>The index of the last element that satisfies the predicate; or, <c>-1</c> if none did</returns>
     public static int FindLastIndex<TSource>(this IEnumerable<TSource> source, Predicate<TSource> predicate)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(predicate);
-#else
-        if (source is null)
-            throw new ArgumentNullException(nameof(source));
-        if (predicate is null)
-            throw new ArgumentNullException(nameof(predicate));
-#endif
         if (source is TSource[] typedArray)
             return Array.FindLastIndex(typedArray, predicate);
         if (source is List<TSource> genericList)
@@ -111,15 +97,8 @@ public static class EnumerableExtensions
     /// <returns>The indicies of the elements that satisfy the predicate</returns>
     public static IEnumerable<int> FindIndicies<TSource>(this IEnumerable<TSource> source, Predicate<TSource> predicate)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(predicate);
-#else
-        if (source is null)
-            throw new ArgumentNullException(nameof(source));
-        if (predicate is null)
-            throw new ArgumentNullException(nameof(predicate));
-#endif
         if (source is TSource[] typedArray)
             return FindTypedIndicies(typedArray, predicate);
         if (source is List<TSource> genericList)
@@ -137,12 +116,7 @@ public static class EnumerableExtensions
     /// <returns>The first index of the item; or, <c>-1</c> if it was not found</returns>
     public static int IndexOf<TSource>(this IEnumerable<TSource> source, TSource item)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(source);
-#else
-        if (source is null)
-            throw new ArgumentNullException(nameof(source));
-#endif
         if (source is TSource[] typedArray)
             return Array.IndexOf(typedArray, item);
         if (source is IList<TSource> genericListInterface)
@@ -160,12 +134,7 @@ public static class EnumerableExtensions
     /// <returns>The last index of the item; or, <c>-1</c> if it was not found</returns>
     public static int LastIndexOf<TSource>(this IEnumerable<TSource> source, TSource item)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(source);
-#else
-        if (source is null)
-            throw new ArgumentNullException(nameof(source));
-#endif
         if (source is TSource[] typedArray)
             return Array.LastIndexOf(typedArray, item);
         var equalityComparer = EqualityComparer<TSource>.Default;
@@ -201,12 +170,7 @@ public static class EnumerableExtensions
     /// <returns>The indicies of the item</returns>
     public static IEnumerable<int> IndiciesOf<TSource>(this IEnumerable<TSource> source, TSource item)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(source);
-#else
-        if (source is null)
-            throw new ArgumentNullException(nameof(source));
-#endif
         if (source is TSource[] typedArray)
             return TypedIndiciesOf(typedArray, item);
         if (source is List<TSource> genericList)

@@ -44,12 +44,7 @@ sealed class ProductKeyDecoder
 
     public static string GetWindowsProductKeyFromDigitalProductId(byte[] digitalProductId, DigitalProductIdVersion digitalProductIdVersion)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(digitalProductId);
-#else
-        if (digitalProductId is null)
-            throw new ArgumentNullException(nameof(digitalProductId));
-#endif
         var productKey = digitalProductIdVersion == DigitalProductIdVersion.Windows8AndUp ? DecodeProductKeyWin8AndUp(digitalProductId) : DecodeProductKey(digitalProductId);
         return productKey;
     }

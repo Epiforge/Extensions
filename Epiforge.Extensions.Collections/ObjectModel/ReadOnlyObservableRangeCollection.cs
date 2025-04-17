@@ -13,12 +13,7 @@ public sealed class ReadOnlyObservableRangeCollection<T> :
     /// <param name="rangeObservableCollection">The <see cref="IObservableRangeCollection{T}"/> around which to wrap</param>
     public ReadOnlyObservableRangeCollection(IObservableRangeCollection<T> rangeObservableCollection)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(rangeObservableCollection);
-#else
-        if (rangeObservableCollection is null)
-            throw new ArgumentNullException(nameof(rangeObservableCollection));
-#endif
         this.rangeObservableCollection = rangeObservableCollection;
         this.rangeObservableCollection.CollectionChanged += RangeObservableCollectionCollectionChanged;
         this.rangeObservableCollection.PropertyChanged += RangeObservableCollectionPropertyChanged;

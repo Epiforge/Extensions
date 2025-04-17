@@ -1,0 +1,39 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+    <PropertyGroup>
+        <Authors>Epiforge</Authors>
+        <Company>Epiforge</Company>
+        <EmbedUntrackedSources>true</EmbedUntrackedSources>
+        <EnableNETAnalyzers>true</EnableNETAnalyzers>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <IncludeSymbols>true</IncludeSymbols>
+        <LangVersion>latest</LangVersion>
+        <NoWarn>CS1591;CA1014;CA1043;CA1502;CA1506;CA1721;CA2252;IDE0032;IDE0079</NoWarn>
+        <NeutralResourcesLanguage>en</NeutralResourcesLanguage>
+        <Nullable>enable</Nullable>
+        <WarningsAsErrors>CS8600;CS8602;CS8603</WarningsAsErrors>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <DefineConstants Condition="'$(TargetFramework)' == 'net7.0' or '$(TargetFramework)' == 'net8.0' or '$(TargetFramework)' == 'net9.0'">$(DefineConstants);IS_NET_7_0_OR_GREATER</DefineConstants>
+        <DefineConstants Condition="'$(TargetFramework)' == 'net8.0' or '$(TargetFramework)' == 'net9.0'">$(DefineConstants);IS_NET_8_0_OR_GREATER</DefineConstants>
+        <DefineConstants Condition="'$(TargetFramework)' == 'net9.0'">$(DefineConstants);IS_NET_9_0_OR_GREATER</DefineConstants>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="PolySharp" Version="1.15.0">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+    </ItemGroup>
+
+    <ItemGroup>
+        <Using Include="System.Runtime.InteropServices" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Compile Include="..\Common\CommonAssemblyInfo.cs" Link="CommonAssemblyInfo.cs" />
+    </ItemGroup>
+
+</Project>

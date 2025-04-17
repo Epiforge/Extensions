@@ -20,11 +20,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue> :
 
         public int GetHashCode([DisallowNull] (Expression keyValuePairSelector, object equalityComparer) obj)
         {
-#if IS_NET_STANDARD_2_1_OR_GREATER
             var hashCode = new System.HashCode();
-#else
-            var hashCode = new Components.HashCode();
-#endif
             var expressionEqualityComparer = ExpressionEqualityComparer.Default;
             hashCode.Add(expressionEqualityComparer.GetHashCode(obj.keyValuePairSelector));
             hashCode.Add(obj.equalityComparer);
@@ -167,12 +163,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue> :
 
     protected virtual void OnChanged(NotifyDictionaryChangedEventArgs<TKey, TValue> e)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(e);
-#else
-        if (e is null)
-            throw new ArgumentNullException(nameof(e));
-#endif
         if (CollectionChanged is not null)
             switch (e.Action)
             {
@@ -210,12 +201,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue> :
 
     protected virtual void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(e);
-#else
-        if (e is null)
-            throw new ArgumentNullException(nameof(e));
-#endif
         var eventArgs = Logger?.IsEnabled(LogLevel.Trace) ?? false ? e.ToStringForLogging() : null;
         Logger?.LogTrace(Collections.EventIds.Epiforge_Extensions_Collections_RaisingCollectionChanged, "Raising CollectionChanged: {EventArgs}", eventArgs);
         CollectionChanged?.Invoke(this, e);
@@ -282,18 +268,9 @@ abstract class ObservableDictionaryQuery<TKey, TValue> :
     [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TResult> ObserveAggregate<TAccumulate, TResult>(Func<TAccumulate> seedFactory, Func<TAccumulate, TKey, TValue, TAccumulate> func, Func<TAccumulate, TResult> resultSelector)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(seedFactory);
         ArgumentNullException.ThrowIfNull(func);
         ArgumentNullException.ThrowIfNull(resultSelector);
-#else
-        if (seedFactory is null)
-            throw new ArgumentNullException(nameof(seedFactory));
-        if (func is null)
-            throw new ArgumentNullException(nameof(func));
-        if (resultSelector is null)
-            throw new ArgumentNullException(nameof(resultSelector));
-#endif
         ObservableDictionaryAggregateQuery<TKey, TValue, TAccumulate, TResult> aggregateQuery;
         lock (cachedAggregateQueriesAccess)
         {
@@ -314,12 +291,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue> :
     [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<bool> ObserveAll(Expression<Func<TKey, TValue, bool>> predicate)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(predicate);
-#else
-        if (predicate is null)
-            throw new ArgumentNullException(nameof(predicate));
-#endif
         var key = predicate;
         if (collectionObserver.ExpressionObserver.Optimizer is { } optimizer)
             key = (Expression<Func<TKey, TValue, bool>>)optimizer(key);
@@ -357,12 +329,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue> :
     [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<bool> ObserveAny(Expression<Func<TKey, TValue, bool>> predicate)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(predicate);
-#else
-        if (predicate is null)
-            throw new ArgumentNullException(nameof(predicate));
-#endif
         var key = predicate;
         if (collectionObserver.ExpressionObserver.Optimizer is { } optimizer)
             key = (Expression<Func<TKey, TValue, bool>>)optimizer(key);
@@ -424,12 +391,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue> :
     [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<int> ObserveCount(Expression<Func<TKey, TValue, bool>> predicate)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(predicate);
-#else
-        if (predicate is null)
-            throw new ArgumentNullException(nameof(predicate));
-#endif
         var where = ObserveWhere(predicate);
         var count = where.ObserveCount();
         count.Disposed += (_, _) => where.Dispose();
@@ -582,18 +544,9 @@ abstract class ObservableDictionaryQuery<TKey, TValue> :
     public IObservableDictionaryQuery<TResultKey, TResultValue> ObserveSelect<TResultKey, TResultValue>(Expression<Func<TKey, TValue, TResultKey>> keySelector, Expression<Func<TKey, TValue, TResultValue>> valueSelector, IEqualityComparer<TResultKey> equalityComparer)
         where TResultKey : notnull
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(keySelector);
         ArgumentNullException.ThrowIfNull(valueSelector);
         ArgumentNullException.ThrowIfNull(equalityComparer);
-#else
-        if (keySelector is null)
-            throw new ArgumentNullException(nameof(keySelector));
-        if (valueSelector is null)
-            throw new ArgumentNullException(nameof(valueSelector));
-        if (equalityComparer is null)
-            throw new ArgumentNullException(nameof(equalityComparer));
-#endif
         var sourceKeyValuePairParameter = Expression.Parameter(typeof(KeyValuePair<TKey, TValue>));
         var sourceKeyExpression = Expression.Property(sourceKeyValuePairParameter, nameof(KeyValuePair<TKey, TValue>.Key));
         var sourceValueExpression = Expression.Property(sourceKeyValuePairParameter, nameof(KeyValuePair<TKey, TValue>.Value));
@@ -665,12 +618,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue> :
     [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<TElement> ObserveToCollection<TElement>(Expression<Func<TKey, TValue, TElement>> selector)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(selector);
-#else
-        if (selector is null)
-            throw new ArgumentNullException(nameof(selector));
-#endif
         var keyValuePairParameter = Expression.Parameter(typeof(KeyValuePair<TKey, TValue>));
         var keyExpression = Expression.Property(keyValuePairParameter, nameof(KeyValuePair<TKey, TValue>.Key));
         var valueExpression = Expression.Property(keyValuePairParameter, nameof(KeyValuePair<TKey, TValue>.Value));
@@ -695,12 +643,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue> :
     [return: DisposeWhenDiscarded]
     public IObservableDictionaryQuery<TKey, TValue> ObserveUsingSynchronizationContext(SynchronizationContext synchronizationContext)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(synchronizationContext);
-#else
-        if (synchronizationContext is null)
-            throw new ArgumentNullException(nameof(synchronizationContext));
-#endif
         ObservableDictionaryUsingSynchronizationContextEventuallyQuery<TKey, TValue> usingSynchronizationContextEventuallyQuery;
         lock (cachedUsingSynchronizationContextEventuallyQueriesAccess)
         {
@@ -718,12 +661,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue> :
     [return: DisposeWhenDiscarded]
     public IObservableDictionaryQuery<TKey, TValue> ObserveUsingSynchronizationContextEventually(SynchronizationContext synchronizationContext)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(synchronizationContext);
-#else
-        if (synchronizationContext is null)
-            throw new ArgumentNullException(nameof(synchronizationContext));
-#endif
         ObservableDictionaryUsingSynchronizationContextQuery<TKey, TValue> usingSynchronizationContextQuery;
         lock (cachedUsingSynchronizationContextQueriesAccess)
         {
@@ -749,12 +687,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue> :
     [return: DisposeWhenDiscarded]
     IObservableScalarQuery<TValue> ObserveValueFor(TKey key, bool notFoundIsDefault)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(key);
-#else
-        if (key is null)
-            throw new ArgumentNullException(nameof(key));
-#endif
         ObservableDictionaryValueForQuery<TKey, TValue> valueForQuery;
         var cacheKey = (key, notFoundIsDefault);
         lock (cachedValueForQueriesAccess)
@@ -773,12 +706,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue> :
     [return: DisposeWhenDiscarded]
     public IObservableDictionaryQuery<TKey, TValue> ObserveWhere(Expression<Func<TKey, TValue, bool>> predicate)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(predicate);
-#else
-        if (predicate is null)
-            throw new ArgumentNullException(nameof(predicate));
-#endif
         var keyValuePairParameter = Expression.Parameter(typeof(KeyValuePair<TKey, TValue>));
         var keyExpression = Expression.Property(keyValuePairParameter, nameof(KeyValuePair<TKey, TValue>.Key));
         var valueExpression = Expression.Property(keyValuePairParameter, nameof(KeyValuePair<TKey, TValue>.Value));

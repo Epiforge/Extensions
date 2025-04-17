@@ -38,13 +38,7 @@ public class Observer
         john.Name = "Jan";
         var observer = ExpressionObserverHelpers.Create();
         var johnsSexChange = observer.ConditionAsync(() => john.Name == "Jan");
-#if IS_NET_STANDARD_2_1_OR_GREATER
         Assert.IsTrue(johnsSexChange.IsCompletedSuccessfully);
-#else
-        Assert.IsTrue(johnsSexChange.IsCompleted);
-        Assert.IsFalse(johnsSexChange.IsFaulted);
-        Assert.IsFalse(johnsSexChange.IsCanceled);
-#endif
     }
 
     [TestMethod]
@@ -86,13 +80,7 @@ public class Observer
         john.Name = "Jon";
         Assert.IsFalse(johnsSexChange.IsCompleted);
         john.Name = "Jan";
-#if IS_NET_STANDARD_2_1_OR_GREATER
         Assert.IsTrue(johnsSexChange.IsCompletedSuccessfully);
-#else
-        Assert.IsTrue(johnsSexChange.IsCompleted);
-        Assert.IsFalse(johnsSexChange.IsFaulted);
-        Assert.IsFalse(johnsSexChange.IsCanceled);
-#endif
     }
 
     [TestMethod]

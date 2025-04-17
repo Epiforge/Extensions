@@ -93,12 +93,7 @@ public class ObservableRangeCollection<T> :
     /// <inheritdoc/>
     public IReadOnlyList<T> GetAndRemoveAll(Func<T, bool> predicate)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(predicate);
-#else
-        if (predicate is null)
-            throw new ArgumentNullException(nameof(predicate));
-#endif
         var removed = new List<T>();
         for (var i = 0; i < Items.Count;)
             if (predicate(Items[i]))
@@ -128,12 +123,7 @@ public class ObservableRangeCollection<T> :
     /// <inheritdoc/>
     public void InsertRange(int index, IEnumerable<T> items)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(items);
-#else
-        if (items is null)
-            throw new ArgumentNullException(nameof(items));
-#endif
         var originalIndex = index;
         --index;
         if (RaiseCollectionChangedEventsForIndividualElements)
@@ -202,12 +192,7 @@ public class ObservableRangeCollection<T> :
     /// <inheritdoc/>
     protected override void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(e);
-#else
-        if (e is null)
-            throw new ArgumentNullException(nameof(e));
-#endif
         var eventArgs = logger?.IsEnabled(LogLevel.Trace) ?? false ? e.ToStringForLogging() : null;
         logger?.LogTrace(EventIds.Epiforge_Extensions_Collections_RaisingCollectionChanged, "Raising CollectionChanged: {EventArgs}", eventArgs);
         base.OnCollectionChanged(e);
@@ -221,12 +206,7 @@ public class ObservableRangeCollection<T> :
     /// <inheritdoc/>
     public void RemoveRange(IEnumerable<T> items)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(items);
-#else
-        if (items is null)
-            throw new ArgumentNullException(nameof(items));
-#endif
         foreach (var item in items)
         {
             var index = Items.IndexOf(item);
@@ -266,12 +246,7 @@ public class ObservableRangeCollection<T> :
     /// <inheritdoc/>
     public void ReplaceAll(IEnumerable<T> items)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(items);
-#else
-        if (items is null)
-            throw new ArgumentNullException(nameof(items));
-#endif
         if (RaiseCollectionChangedEventsForIndividualElements)
         {
             Clear();
@@ -343,12 +318,7 @@ public class ObservableRangeCollection<T> :
     /// <inheritdoc/>
     public void Reset(IEnumerable<T> newCollection)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(newCollection);
-#else
-        if (newCollection is null)
-            throw new ArgumentNullException(nameof(newCollection));
-#endif
         var previousCount = Items.Count;
         Items.Clear();
         foreach (var element in newCollection)

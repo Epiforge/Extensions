@@ -15,15 +15,8 @@ public static class Shell
     /// <param name="startIn">The working directory in which to launch the target of the short-cut</param>
     public static void CreateShortcut(string shortcutPath, string targetPath, string? iconLocation = null, int iconIndex = 0, string? startIn = null)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(shortcutPath);
         ArgumentNullException.ThrowIfNull(targetPath);
-#else
-        if (shortcutPath is null)
-            throw new ArgumentNullException(nameof(shortcutPath));
-        if (targetPath is null)
-            throw new ArgumentNullException(nameof(targetPath));
-#endif
         if (Type.GetTypeFromProgID("WScript.Shell") is Type shellType && Activator.CreateInstance(shellType) is { } shell)
         {
             if (shellType.InvokeMember("CreateShortcut", BindingFlags.InvokeMethod, null, shell, new object[] { shortcutPath }) is { } shortcut)

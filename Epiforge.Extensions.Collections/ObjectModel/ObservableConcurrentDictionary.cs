@@ -63,12 +63,7 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
     /// <exception cref="ArgumentException"><paramref name="comparer"/> is <c>null</c></exception>
     public ObservableConcurrentDictionary(IEqualityComparer<TKey> comparer)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(comparer);
-#else
-        if (comparer is null)
-            throw new ArgumentNullException(nameof(comparer));
-#endif
         this.comparer = comparer;
         cd = new ConcurrentDictionary<TKey, TValue>(comparer);
     }
@@ -91,15 +86,8 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
     /// <exception cref="ArgumentNullException"><paramref name="collection"/> or <paramref name="comparer"/> is null</exception>
     public ObservableConcurrentDictionary(IEnumerable<KeyValuePair<TKey, TValue>> collection, IEqualityComparer<TKey> comparer)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(collection);
         ArgumentNullException.ThrowIfNull(comparer);
-#else
-        if (collection is null)
-            throw new ArgumentNullException(nameof(collection));
-        if (comparer is null)
-            throw new ArgumentNullException(nameof(comparer));
-#endif
         this.comparer = comparer;
         cd = new ConcurrentDictionary<TKey, TValue>(collection, comparer);
     }
@@ -150,15 +138,8 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
     /// <exception cref="ArgumentException"><paramref name="collection"/> contains one or more duplicate keys</exception>
     public ObservableConcurrentDictionary(int concurrencyLevel, IEnumerable<KeyValuePair<TKey, TValue>> collection, IEqualityComparer<TKey> comparer)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(collection);
         ArgumentNullException.ThrowIfNull(comparer);
-#else
-        if (collection is null)
-            throw new ArgumentNullException(nameof(collection));
-        if (comparer is null)
-            throw new ArgumentNullException(nameof(comparer));
-#endif
         this.concurrencyLevel = concurrencyLevel;
         this.comparer = comparer;
         cd = new ConcurrentDictionary<TKey, TValue>(concurrencyLevel, collection, comparer);
@@ -188,12 +169,7 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="concurrencyLevel"/> or <paramref name="capacity"/> is less than 1</exception>
     public ObservableConcurrentDictionary(int concurrencyLevel, int capacity, IEqualityComparer<TKey> comparer)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(comparer);
-#else
-        if (comparer is null)
-            throw new ArgumentNullException(nameof(comparer));
-#endif
         this.concurrencyLevel = concurrencyLevel;
         this.capacity = capacity;
         this.comparer = comparer;
@@ -247,12 +223,7 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
         get => ((IDictionary)cd)[key];
         set
         {
-#if IS_NET_6_0_OR_GREATER
             ArgumentNullException.ThrowIfNull(key);
-#else
-            if (key is null)
-                throw new ArgumentNullException(nameof(key));
-#endif
             if (key is TKey typedKey)
             {
                 TValue typedValue;
@@ -357,12 +328,7 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
 
     void IDictionary.Add(object key, object? value)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(key);
-#else
-        if (key is null)
-            throw new ArgumentNullException(nameof(key));
-#endif
         if (key is TKey typedKey)
         {
             TValue typedValue;
@@ -391,12 +357,7 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
     /// <exception cref="OverflowException">The dictionary already contains the maximum number of elements (<see cref="int.MaxValue"/>)</exception>
     public virtual TValue AddOrUpdate(TKey key, TValue addValue, Func<TKey, TValue, TValue> updateValueFactory)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(updateValueFactory);
-#else
-        if (updateValueFactory is null)
-            throw new ArgumentNullException(nameof(updateValueFactory));
-#endif
         var updated = false;
         TValue oldValue = default!; // this is only ever forwarded if it has been set
         var newValue = cd.AddOrUpdate(key, addValue, (k, v) =>
@@ -426,15 +387,8 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
     /// <exception cref="OverflowException">The dictionary already contains the maximum number of elements (<see cref="int.MaxValue"/>)</exception>
     public virtual TValue AddOrUpdate(TKey key, Func<TKey, TValue> addValueFactory, Func<TKey, TValue, TValue> updateValueFactory)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(addValueFactory);
         ArgumentNullException.ThrowIfNull(updateValueFactory);
-#else
-        if (addValueFactory is null)
-            throw new ArgumentNullException(nameof(addValueFactory));
-        if (updateValueFactory is null)
-            throw new ArgumentNullException(nameof(updateValueFactory));
-#endif
         var updated = false;
         TValue oldValue = default!; // this is only ever forwarded if it has been set
         var newValue = cd.AddOrUpdate(key, addValueFactory, (k, v) =>
@@ -466,32 +420,16 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
     /// <exception cref="OverflowException">The dictionary contains too many elements</exception>
     public virtual TValue AddOrUpdate<TArg>(TKey key, Func<TKey, TArg, TValue> addValueFactory, Func<TKey, TValue, TArg, TValue> updateValueFactory, TArg factoryArgument)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(addValueFactory);
         ArgumentNullException.ThrowIfNull(updateValueFactory);
-#else
-        if (addValueFactory is null)
-            throw new ArgumentNullException(nameof(addValueFactory));
-        if (updateValueFactory is null)
-            throw new ArgumentNullException(nameof(updateValueFactory));
-#endif
         var updated = false;
         TValue oldValue = default!; // this is only ever forwarded if it has been set
-#if IS_NET_STANDARD_2_1_OR_GREATER
         var newValue = cd.AddOrUpdate(key, addValueFactory, (k, v, a) =>
         {
             updated = true;
             oldValue = v;
             return updateValueFactory(k, v, a);
         }, factoryArgument);
-#else
-        var newValue = cd.AddOrUpdate(key, k => addValueFactory(k, factoryArgument), (k, v) =>
-        {
-            updated = true;
-            oldValue = v;
-            return updateValueFactory(k, v, factoryArgument);
-        });
-#endif
         if (updated)
             OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Replace, key, newValue, oldValue));
         else
@@ -582,12 +520,7 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
     /// <exception cref="OverflowException">The dictionary already contains the maximum number of elements (<see cref="int.MaxValue"/>)</exception>
     public virtual TValue GetOrAdd(TKey key, Func<TKey, TValue> valueFactory)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(valueFactory);
-#else
-        if (valueFactory is null)
-            throw new ArgumentNullException(nameof(valueFactory));
-#endif
         var added = false;
         var retrievedOrAddedValue = cd.GetOrAdd(key, k =>
         {
@@ -614,26 +547,13 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
     /// <exception cref="OverflowException">The dictionary contains too many elements</exception>
     public virtual TValue GetOrAdd<TArg>(TKey key, Func<TKey, TArg, TValue> valueFactory, TArg factoryArgument)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(valueFactory);
-#else
-        if (valueFactory is null)
-            throw new ArgumentNullException(nameof(valueFactory));
-#endif
         var added = false;
-#if IS_NET_STANDARD_2_1_OR_GREATER
         var retrievedOrAddedValue = cd.GetOrAdd(key, (k, a) =>
         {
             added = true;
             return valueFactory(k, a);
         }, factoryArgument);
-#else
-        var retrievedOrAddedValue = cd.GetOrAdd(key, k =>
-        {
-            added = true;
-            return valueFactory(k, factoryArgument);
-        });
-#endif
         if (added)
         {
             NotifyCountChanged();
@@ -654,12 +574,7 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
     /// <param name="e">The event arguments for <see cref="INotifyDictionaryChanged{TKey, TValue}.DictionaryChanged"/></param>
     protected virtual void OnChanged(NotifyDictionaryChangedEventArgs<TKey, TValue> e)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(e);
-#else
-        if (e is null)
-            throw new ArgumentNullException(nameof(e));
-#endif
         if (CollectionChanged is not null)
             switch (e.Action)
             {
@@ -701,12 +616,7 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
     /// <param name="e">The event arguments</param>
     protected virtual void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(e);
-#else
-        if (e is null)
-            throw new ArgumentNullException(nameof(e));
-#endif
         var eventArgs = Logger?.IsEnabled(LogLevel.Trace) ?? false ? e.ToStringForLogging() : null;
         Logger?.LogTrace(EventIds.Epiforge_Extensions_Collections_RaisingCollectionChanged, "Raising CollectionChanged: {EventArgs}", eventArgs);
         CollectionChanged?.Invoke(this, e);
@@ -736,12 +646,7 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
 
     void IDictionary.Remove(object key)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(key);
-#else
-        if (key is null)
-            throw new ArgumentNullException(nameof(key));
-#endif
         if (key is TKey typedKey)
             ((IDictionary<TKey, TValue>)this).Remove(typedKey);
         else

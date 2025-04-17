@@ -11,12 +11,7 @@ public static class ExpressionExtensions
     /// <param name="expression">The expression tree</param>
     public static Expression Duplicate(this Expression expression)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(expression);
-#else
-        if (expression is null)
-            throw new ArgumentNullException(nameof(expression));
-#endif
         return new DuplicateExpressionVisitor().Visit(expression);
     }
 
@@ -36,15 +31,8 @@ public static class ExpressionExtensions
     /// <exception cref="ArgumentNullException"><paramref name="expression"/> or <paramref name="substitutions"/> is <c>null</c></exception>
     public static Expression SubstituteMethods(this Expression expression, params (MethodInfo replace, MethodInfo substitution)[] substitutions)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(expression);
         ArgumentNullException.ThrowIfNull(substitutions);
-#else
-        if (expression is null)
-            throw new ArgumentNullException(nameof(expression));
-        if (substitutions is null)
-            throw new ArgumentNullException(nameof(substitutions));
-#endif
         if (substitutions.Length == 0)
             return expression;
         if (substitutions.Any(s => !new Type[] { s.replace.ReturnType }.Concat(s.replace.GetParameters().Select(p => p.ParameterType)).SequenceEqual(new Type[] { s.substitution.ReturnType }.Concat(s.substitution.GetParameters().Select(p => p.ParameterType)))))
@@ -283,7 +271,7 @@ public static class ExpressionExtensions
         catch (ExpressionProcessingException ex)
         {
             ExceptionDispatchInfo.Capture(ex).Throw();
-            throw ex;
+            throw;
         }
         catch (Exception ex)
         {

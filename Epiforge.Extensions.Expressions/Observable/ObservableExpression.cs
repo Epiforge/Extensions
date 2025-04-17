@@ -8,24 +8,12 @@ abstract class ObservableExpression :
 
     protected ObservableExpression(ExpressionObserver observer, Expression expression, bool deferEvaluation)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(observer);
         ArgumentNullException.ThrowIfNull(expression);
-#else
-        if (observer is null)
-            throw new ArgumentNullException(nameof(observer));
-        if (expression is null)
-            throw new ArgumentNullException(nameof(expression));
-#endif
         this.observer = observer;
         Logger = observer.Logger;
         Expression = expression;
-#if IS_NET_STANDARD_2_1_OR_GREATER
         var type = Expression.Type;
-#else
-        var expressionType = Expression.Type;
-        var type = expressionType.Name.StartsWith("<") ? typeof(object) : expressionType;
-#endif
         defaultResult = type.FastDefault();
         resultEqualityComparer = FastEqualityComparer.Get(type);
         deferringEvaluation = deferEvaluation;
@@ -159,21 +147,10 @@ class ObservableExpression<TResult> :
 {
     public ObservableExpression(ExpressionObserver observer, Expression expression, ObservableExpression observableExpression, IReadOnlyList<object?> arguments)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(observer);
         ArgumentNullException.ThrowIfNull(expression);
         ArgumentNullException.ThrowIfNull(observableExpression);
         ArgumentNullException.ThrowIfNull(arguments);
-#else
-        if (observer is null)
-            throw new ArgumentNullException(nameof(observer));
-        if (expression is null)
-            throw new ArgumentNullException(nameof(expression));
-        if (observableExpression is null)
-            throw new ArgumentNullException(nameof(observableExpression));
-        if (arguments is null)
-            throw new ArgumentNullException(nameof(arguments));
-#endif
         this.observer = observer;
         Expression = expression;
         this.observableExpression = observableExpression;
@@ -234,18 +211,9 @@ class ObservableExpression<TArgument, TResult> :
 {
     public ObservableExpression(ExpressionObserver observer, Expression expression, ObservableExpression observableExpression, TArgument argument)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(observer);
         ArgumentNullException.ThrowIfNull(expression);
         ArgumentNullException.ThrowIfNull(observableExpression);
-#else
-        if (observer is null)
-            throw new ArgumentNullException(nameof(observer));
-        if (expression is null)
-            throw new ArgumentNullException(nameof(expression));
-        if (observableExpression is null)
-            throw new ArgumentNullException(nameof(observableExpression));
-#endif
         this.observer = observer;
         Expression = expression;
         this.observableExpression = observableExpression;
@@ -309,18 +277,9 @@ class ObservableExpression<TArgument1, TArgument2, TResult> :
 {
     public ObservableExpression(ExpressionObserver observer, Expression expression, ObservableExpression observableExpression, TArgument1 argument1, TArgument2 argument2)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(observer);
         ArgumentNullException.ThrowIfNull(expression);
         ArgumentNullException.ThrowIfNull(observableExpression);
-#else
-        if (observer is null)
-            throw new ArgumentNullException(nameof(observer));
-        if (expression is null)
-            throw new ArgumentNullException(nameof(expression));
-        if (observableExpression is null)
-            throw new ArgumentNullException(nameof(observableExpression));
-#endif
         this.observer = observer;
         Expression = expression;
         this.observableExpression = observableExpression;
@@ -387,18 +346,9 @@ class ObservableExpression<TArgument1, TArgument2, TArgument3, TResult> :
 {
     public ObservableExpression(ExpressionObserver observer, Expression expression, ObservableExpression observableExpression, TArgument1 argument1, TArgument2 argument2, TArgument3 argument3)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(observer);
         ArgumentNullException.ThrowIfNull(expression);
         ArgumentNullException.ThrowIfNull(observableExpression);
-#else
-        if (observer is null)
-            throw new ArgumentNullException(nameof(observer));
-        if (expression is null)
-            throw new ArgumentNullException(nameof(expression));
-        if (observableExpression is null)
-            throw new ArgumentNullException(nameof(observableExpression));
-#endif
         this.observer = observer;
         Expression = expression;
         this.observableExpression = observableExpression;
