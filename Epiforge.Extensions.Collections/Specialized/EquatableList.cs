@@ -34,25 +34,13 @@ public readonly struct EquatableList<T> :
     /// <param name="sequence">The sequence whose elements are copied</param>
     public EquatableList(IEnumerable<T> sequence)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(sequence);
-#else
-        if (sequence is null)
-            throw new ArgumentNullException(nameof(sequence));
-#endif
         EqualityComparer = null;
         elements = sequence.ToImmutableArray();
-#if IS_NET_STANDARD_2_1_OR_GREATER
         var hashCode = new System.HashCode();
         foreach (var element in elements)
             hashCode.Add(element);
         this.hashCode = hashCode.ToHashCode();
-#else
-        var hashCode = new HashCode();
-        foreach (var element in elements)
-            hashCode.Add(element);
-        this.hashCode = hashCode.ToHashCode();
-#endif
     }
 
     /// <summary>
@@ -62,28 +50,14 @@ public readonly struct EquatableList<T> :
     /// <param name="equalityComparer">The equality comparer to use to determine whether elements are equal</param>
     public EquatableList(IEnumerable<T> sequence, IEqualityComparer<T> equalityComparer)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(sequence);
         ArgumentNullException.ThrowIfNull(equalityComparer);
-#else
-        if (sequence is null)
-            throw new ArgumentNullException(nameof(sequence));
-        if (equalityComparer is null)
-            throw new ArgumentNullException(nameof(equalityComparer));
-#endif
         EqualityComparer = equalityComparer;
         elements = sequence.ToImmutableArray();
-#if IS_NET_STANDARD_2_1_OR_GREATER
         var hashCode = new System.HashCode();
         foreach (var element in elements)
             hashCode.Add(element, EqualityComparer);
         this.hashCode = hashCode.ToHashCode();
-#else
-        var hashCode = new HashCode();
-        foreach (var element in elements)
-            hashCode.Add(element, EqualityComparer);
-        this.hashCode = hashCode.ToHashCode();
-#endif
     }
 
     readonly IReadOnlyList<T> elements;

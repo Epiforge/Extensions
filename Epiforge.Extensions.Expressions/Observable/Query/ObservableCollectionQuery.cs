@@ -16,11 +16,7 @@ abstract class ObservableCollectionQuery<TElement> :
 
         public int GetHashCode([DisallowNull] (Expression keySelector, object keyEqualityComaprer) obj)
         {
-#if IS_NET_STANDARD_2_1_OR_GREATER
             var hashCode = new System.HashCode();
-#else
-        var hashCode = new Components.HashCode();
-#endif
             hashCode.Add(ExpressionEqualityComparer.Default.GetHashCode(obj.keySelector));
             hashCode.Add(obj.keyEqualityComaprer?.GetHashCode() ?? 0);
             return hashCode.ToHashCode();
@@ -54,11 +50,7 @@ abstract class ObservableCollectionQuery<TElement> :
 
         public int GetHashCode([DisallowNull] IReadOnlyList<(Expression<Func<TElement, IComparable>> selector, bool isDescending)> obj)
         {
-#if IS_NET_STANDARD_2_1_OR_GREATER
             var hashCode = new System.HashCode();
-#else
-            var hashCode = new Components.HashCode();
-#endif
             foreach (var (selector, isDescending) in obj)
             {
                 hashCode.Add(ExpressionEqualityComparer.Default.GetHashCode(selector));
@@ -81,11 +73,7 @@ abstract class ObservableCollectionQuery<TElement> :
 
         public int GetHashCode([DisallowNull] (Expression keySelector, Expression valueSelector, object equalityComparer) obj)
         {
-#if IS_NET_STANDARD_2_1_OR_GREATER
             var hashCode = new System.HashCode();
-#else
-            var hashCode = new Components.HashCode();
-#endif
             var expressionEqualityComparer = ExpressionEqualityComparer.Default;
             hashCode.Add(expressionEqualityComparer.GetHashCode(obj.keySelector));
             hashCode.Add(expressionEqualityComparer.GetHashCode(obj.valueSelector));
@@ -423,18 +411,9 @@ abstract class ObservableCollectionQuery<TElement> :
     [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TResult> ObserveAggregate<TAccumulate, TResult>(Func<TAccumulate> seedFactory, Func<TAccumulate, TElement, TAccumulate> func, Func<TAccumulate, TResult> resultSelector)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(seedFactory);
         ArgumentNullException.ThrowIfNull(func);
         ArgumentNullException.ThrowIfNull(resultSelector);
-#else
-        if (seedFactory is null)
-            throw new ArgumentNullException(nameof(seedFactory));
-        if (func is null)
-            throw new ArgumentNullException(nameof(func));
-        if (resultSelector is null)
-            throw new ArgumentNullException(nameof(resultSelector));
-#endif
         ObservableCollectionAggregateQuery<TElement, TAccumulate, TResult> aggregateQuery;
         lock (cachedAggregateQueriesAccess)
         {
@@ -455,12 +434,7 @@ abstract class ObservableCollectionQuery<TElement> :
     [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<bool> ObserveAll(Expression<Func<TElement, bool>> predicate)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(predicate);
-#else
-        if (predicate is null)
-            throw new ArgumentNullException(nameof(predicate));
-#endif
         ObservableCollectionAllQuery<TElement> allQuery;
         var key = predicate;
         if (collectionObserver.ExpressionObserver.Optimizer is { } optimizer)
@@ -498,12 +472,7 @@ abstract class ObservableCollectionQuery<TElement> :
     [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<bool> ObserveAny(Expression<Func<TElement, bool>> predicate)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(predicate);
-#else
-        if (predicate is null)
-            throw new ArgumentNullException(nameof(predicate));
-#endif
         ObservableCollectionAnyQuery<TElement> anyQuery;
         var key = predicate;
         if (collectionObserver.ExpressionObserver.Optimizer is { } optimizer)
@@ -528,12 +497,7 @@ abstract class ObservableCollectionQuery<TElement> :
     [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TResult> ObserveAverage<TResult>(Expression<Func<TElement, TResult>> selector)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(selector);
-#else
-        if (selector is null)
-            throw new ArgumentNullException(nameof(selector));
-#endif
         ObservableQuery averageQuery;
         var key = selector;
         if (collectionObserver.ExpressionObserver.Optimizer is { } optimizer)
@@ -575,12 +539,7 @@ abstract class ObservableCollectionQuery<TElement> :
     [return: DisposeWhenDiscarded]
     IObservableScalarQuery<TResult> ObserveComparison<TResult>(Expression<Func<TElement, TResult>> selector, int soughtComparison)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(selector);
-#else
-        if (selector is null)
-            throw new ArgumentNullException(nameof(selector));
-#endif
         var select = ObserveSelect(selector);
         var comparison = ((ObservableCollectionQuery<TResult>)select).ObserveComparison(soughtComparison);
         comparison.Disposed += (_, _) => select.Dispose();
@@ -590,12 +549,7 @@ abstract class ObservableCollectionQuery<TElement> :
     [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<TElement> ObserveConcat(IObservableCollectionQuery<TElement> second)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(second);
-#else
-        if (second is null)
-            throw new ArgumentNullException(nameof(second));
-#endif
         ObservableCollectionConcatQuery<TElement> concatQuery;
         lock (cachedConcatQueriesAccess)
         {
@@ -625,12 +579,7 @@ abstract class ObservableCollectionQuery<TElement> :
     [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<int> ObserveCount(Expression<Func<TElement, bool>> predicate)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(predicate);
-#else
-        if (predicate is null)
-            throw new ArgumentNullException(nameof(predicate));
-#endif
         var where = ObserveWhere(predicate);
         var count = where.ObserveCount();
         count.Disposed += (_, _) => where.Dispose();
@@ -644,12 +593,7 @@ abstract class ObservableCollectionQuery<TElement> :
     [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<TElement> ObserveDistinct(IEqualityComparer<TElement> comparer)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(comparer);
-#else
-        if (comparer is null)
-            throw new ArgumentNullException(nameof(comparer));
-#endif
         var groupBy = ObserveGroupBy(element => element, comparer);
         var select = groupBy.ObserveSelect(group => group.Key);
         select.Disposed += (_, _) => groupBy.Dispose();
@@ -671,12 +615,7 @@ abstract class ObservableCollectionQuery<TElement> :
     [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TElement> ObserveFirst(Expression<Func<TElement, bool>> predicate)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(predicate);
-#else
-        if (predicate is null)
-            throw new ArgumentNullException(nameof(predicate));
-#endif
         var where = ObserveWhere(predicate);
         var first = where.ObserveFirst();
         first.Disposed += (_, _) => where.Dispose();
@@ -690,12 +629,7 @@ abstract class ObservableCollectionQuery<TElement> :
     [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TElement> ObserveFirstOrDefault(Expression<Func<TElement, bool>> predicate)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(predicate);
-#else
-        if (predicate is null)
-            throw new ArgumentNullException(nameof(predicate));
-#endif
         var where = ObserveWhere(predicate);
         var firstOrDefault = where.ObserveFirstOrDefault();
         firstOrDefault.Disposed += (_, _) => where.Dispose();
@@ -739,15 +673,8 @@ abstract class ObservableCollectionQuery<TElement> :
     [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<IObservableGrouping<TKey, TElement>> ObserveGroupBy<TKey>(Expression<Func<TElement, TKey>> keySelector, IEqualityComparer<TKey> keyEqualityComparer)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(keySelector);
         ArgumentNullException.ThrowIfNull(keyEqualityComparer);
-#else
-        if (keySelector is null)
-            throw new ArgumentNullException(nameof(keySelector));
-        if (keyEqualityComparer is null)
-            throw new ArgumentNullException(nameof(keyEqualityComparer));
-#endif
         ObservableQuery groupByQuery;
         var optimizedKeySelector = keySelector;
         if (collectionObserver.ExpressionObserver.Optimizer is { } optimizer)
@@ -773,12 +700,7 @@ abstract class ObservableCollectionQuery<TElement> :
     [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TElement> ObserveLast(Expression<Func<TElement, bool>> predicate)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(predicate);
-#else
-        if (predicate is null)
-            throw new ArgumentNullException(nameof(predicate));
-#endif
         var where = ObserveWhere(predicate);
         var last = where.ObserveLast();
         last.Disposed += (_, _) => where.Dispose();
@@ -792,12 +714,7 @@ abstract class ObservableCollectionQuery<TElement> :
     [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TElement> ObserveLastOrDefault(Expression<Func<TElement, bool>> predicate)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(predicate);
-#else
-        if (predicate is null)
-            throw new ArgumentNullException(nameof(predicate));
-#endif
         var where = ObserveWhere(predicate);
         var lastOrDefault = where.ObserveLastOrDefault();
         lastOrDefault.Disposed += (_, _) => where.Dispose();
@@ -840,12 +757,7 @@ abstract class ObservableCollectionQuery<TElement> :
     [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<TElement> ObserveOrderBy(params (Expression<Func<TElement, IComparable>> selector, bool isDescending)[] selectorsAndDirections)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(selectorsAndDirections);
-#else
-        if (selectorsAndDirections is null)
-            throw new ArgumentNullException(nameof(selectorsAndDirections));
-#endif
         ObservableCollectionOrderByQuery<TElement> orderByQuery;
         var key = selectorsAndDirections.ToList().AsReadOnly();
         if (collectionObserver.ExpressionObserver.Optimizer is { } optimizer)
@@ -866,12 +778,7 @@ abstract class ObservableCollectionQuery<TElement> :
     [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<TResult> ObserveSelect<TResult>(Expression<Func<TElement, TResult>> selector)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(selector);
-#else
-        if (selector is null)
-            throw new ArgumentNullException(nameof(selector));
-#endif
         ObservableQuery selectQuery;
         var key = selector;
         if (collectionObserver.ExpressionObserver.Optimizer is { } optimizer)
@@ -892,12 +799,7 @@ abstract class ObservableCollectionQuery<TElement> :
     [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<TResult> ObserveSelectMany<TResult>(Expression<Func<TElement, IEnumerable<TResult>>> selector)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(selector);
-#else
-        if (selector is null)
-            throw new ArgumentNullException(nameof(selector));
-#endif
         ObservableQuery selectManyQuery;
         var key = selector;
         if (collectionObserver.ExpressionObserver.Optimizer is { } optimizer)
@@ -922,12 +824,7 @@ abstract class ObservableCollectionQuery<TElement> :
     [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TElement> ObserveSingle(Expression<Func<TElement, bool>> predicate)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(predicate);
-#else
-        if (predicate is null)
-            throw new ArgumentNullException(nameof(predicate));
-#endif
         var where = ObserveWhere(predicate);
         var single = where.ObserveSingle();
         single.Disposed += (_, _) => where.Dispose();
@@ -941,12 +838,7 @@ abstract class ObservableCollectionQuery<TElement> :
     [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TElement> ObserveSingleOrDefault(Expression<Func<TElement, bool>> predicate)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(predicate);
-#else
-        if (predicate is null)
-            throw new ArgumentNullException(nameof(predicate));
-#endif
         var where = ObserveWhere(predicate);
         var singleOrDefault = where.ObserveSingleOrDefault();
         singleOrDefault.Disposed += (_, _) => where.Dispose();
@@ -960,12 +852,7 @@ abstract class ObservableCollectionQuery<TElement> :
     [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TResult> ObserveSum<TResult>(Expression<Func<TElement, TResult>> selector)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(selector);
-#else
-        if (selector is null)
-            throw new ArgumentNullException(nameof(selector));
-#endif
         ObservableQuery sumQuery;
         var key = selector;
         if (collectionObserver.ExpressionObserver.Optimizer is { } optimizer)
@@ -1002,18 +889,9 @@ abstract class ObservableCollectionQuery<TElement> :
     public IObservableDictionaryQuery<TKey, TValue> ObserveToDictionary<TKey, TValue>(Expression<Func<TElement, TKey>> keySelector, Expression<Func<TElement, TValue>> valueSelector, IEqualityComparer<TKey> equalityComparer)
         where TKey : notnull
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(keySelector);
         ArgumentNullException.ThrowIfNull(valueSelector);
         ArgumentNullException.ThrowIfNull(equalityComparer);
-#else
-        if (keySelector is null)
-            throw new ArgumentNullException(nameof(keySelector));
-        if (valueSelector is null)
-            throw new ArgumentNullException(nameof(valueSelector));
-        if (equalityComparer is null)
-            throw new ArgumentNullException(nameof(equalityComparer));
-#endif
         ObservableQuery toDictionaryQuery;
         var key = (keySelector, valueSelector, equalityComparer);
         if (collectionObserver.ExpressionObserver.Optimizer is { } optimizer)
@@ -1034,15 +912,8 @@ abstract class ObservableCollectionQuery<TElement> :
     [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<TElement> ObserveUsingSynchronizationCallback(object context, CollectionSynchronizationCallback synchronizationCallback)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(synchronizationCallback);
-#else
-        if (context is null)
-            throw new ArgumentNullException(nameof(context));
-        if (synchronizationCallback is null)
-            throw new ArgumentNullException(nameof(synchronizationCallback));
-#endif
         ObservableCollectionUsingSynchronizationCallbackQuery<TElement> usingSynchronizationCallbackQuery;
         var key = (context, synchronizationCallback);
         lock (cachedUsingSynchronizationCallbackQueriesAccess)
@@ -1061,15 +932,8 @@ abstract class ObservableCollectionQuery<TElement> :
     [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<TElement> ObserveUsingSynchronizationCallbackEventually(object context, CollectionSynchronizationCallback synchronizationCallback)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(synchronizationCallback);
-#else
-        if (context is null)
-            throw new ArgumentNullException(nameof(context));
-        if (synchronizationCallback is null)
-            throw new ArgumentNullException(nameof(synchronizationCallback));
-#endif
         ObservableCollectionUsingSynchronizationCallbackEventuallyQuery<TElement> usingSynchronizationCallbackEventuallyQuery;
         var key = (context, synchronizationCallback);
         lock (cachedUsingSynchronizationCallbackEventuallyQueriesAccess)
@@ -1088,12 +952,7 @@ abstract class ObservableCollectionQuery<TElement> :
     [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<TElement> ObserveUsingSynchronizationContext(SynchronizationContext synchronizationContext)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(synchronizationContext);
-#else
-        if (synchronizationContext is null)
-            throw new ArgumentNullException(nameof(synchronizationContext));
-#endif
         ObservableCollectionUsingSynchronizationContextQuery<TElement> usingSynchronizationContextQuery;
         lock (cachedUsingSynchronizationContextQueriesAccess)
         {
@@ -1111,12 +970,7 @@ abstract class ObservableCollectionQuery<TElement> :
     [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<TElement> ObserveUsingSynchronizationContextEventually(SynchronizationContext synchronizationContext)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(synchronizationContext);
-#else
-        if (synchronizationContext is null)
-            throw new ArgumentNullException(nameof(synchronizationContext));
-#endif
         ObservableCollectionUsingSynchronizationContextEventuallyQuery<TElement> usingSynchronizationContextEventuallyQuery;
         lock (cachedUsingSynchronizationContextEventuallyQueriesAccess)
         {
@@ -1134,12 +988,7 @@ abstract class ObservableCollectionQuery<TElement> :
     [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<TElement> ObserveUsingSyncRoot(object lockObject)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(lockObject);
-#else
-        if (lockObject is null)
-            throw new ArgumentNullException(nameof(lockObject));
-#endif
         ObservableCollectionUsingSyncRootQuery<TElement> usingSyncRootQuery;
         lock (cachedUsingSyncRootQueriesAccess)
         {
@@ -1157,12 +1006,7 @@ abstract class ObservableCollectionQuery<TElement> :
     [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<TElement> ObserveUsingSyncRootEventually(object lockObject)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(lockObject);
-#else
-        if (lockObject is null)
-            throw new ArgumentNullException(nameof(lockObject));
-#endif
         ObservableCollectionUsingSyncRootEventuallyQuery<TElement> usingSyncRootEventuallyQuery;
         lock (cachedUsingSyncRootEventuallyQueriesAccess)
         {
@@ -1180,12 +1024,7 @@ abstract class ObservableCollectionQuery<TElement> :
     [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<TElement> ObserveWhere(Expression<Func<TElement, bool>> predicate)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(predicate);
-#else
-        if (predicate is null)
-            throw new ArgumentNullException(nameof(predicate));
-#endif
         ObservableCollectionWhereQuery<TElement> whereQuery;
         var key = predicate;
         if (collectionObserver.ExpressionObserver.Optimizer is { } optimizer)

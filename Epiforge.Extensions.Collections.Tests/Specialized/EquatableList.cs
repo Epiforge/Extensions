@@ -50,7 +50,7 @@ public class EquatableList
     }
 
     [TestMethod]
-    public new void GetHashCode()
+    public void GetHashCodeTest()
     {
         var list1 = new EquatableList<string>(new string[] { "a", "b", "c" }, StringComparer.OrdinalIgnoreCase);
         var list2 = new EquatableList<string>(new string[] { "A", "B", "C" }, StringComparer.OrdinalIgnoreCase);

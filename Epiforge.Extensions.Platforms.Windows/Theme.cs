@@ -173,9 +173,5 @@ public sealed class Theme :
     static readonly TimeSpan pollingInterval = TimeSpan.FromSeconds(5);
 
     static string Sanitize(string value) =>
-#if IS_NET_STANDARD_2_1_OR_GREATER
         value.Replace(@"\", @"\\", StringComparison.OrdinalIgnoreCase).Replace("'", @"\'", StringComparison.OrdinalIgnoreCase);
-#else
-        value.Replace(@"\", @"\\").Replace("'", @"\'");
-#endif
 }

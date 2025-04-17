@@ -14,12 +14,7 @@ public class ReadOnlyDictionary<TKey, TValue> :
     /// <param name="readOnlyDictionary">The <see cref="IReadOnlyDictionary{TKey, TValue}"/> around which to wrap</param>
     public ReadOnlyDictionary(IReadOnlyDictionary<TKey, TValue> readOnlyDictionary)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(readOnlyDictionary);
-#else
-        if (readOnlyDictionary is null)
-            throw new ArgumentNullException(nameof(readOnlyDictionary));
-#endif
         this.readOnlyDictionary = readOnlyDictionary;
     }
 

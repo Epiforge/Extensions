@@ -78,15 +78,8 @@ public class ExpressionObserverOptions
     /// <returns><c>true</c> if this has resulted in a change in the options; otherwise, <c>false</c></returns>
     public bool AddConstructedTypeDisposal(Type type, params Type[] constuctorParameterTypes)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(type);
         ArgumentNullException.ThrowIfNull(constuctorParameterTypes);
-#else
-        if (type is null)
-            throw new ArgumentNullException(nameof(type));
-        if (constuctorParameterTypes is null)
-            throw new ArgumentNullException(nameof(constuctorParameterTypes));
-#endif
         if (constuctorParameterTypes.Any(constructorParameterType => constructorParameterType is null))
             throw new ArgumentException("One or more constructor parameter types are null", nameof(constuctorParameterTypes));
         return DisposeConstructedTypes.TryAdd((type, new EquatableList<Type>(constuctorParameterTypes)), 1);
@@ -99,12 +92,7 @@ public class ExpressionObserverOptions
     /// <returns><c>true</c> if this has resulted in a change in the options; otherwise, <c>false</c></returns>
     public bool AddConstructedTypeDisposal(ConstructorInfo constructor)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(constructor);
-#else
-        if (constructor is null)
-            throw new ArgumentNullException(nameof(constructor));
-#endif
         if (constructor.DeclaringType is not { } declaringType)
             throw new ArgumentException("The constructor does not have a declaring type", nameof(constructor));
         return DisposeConstructedTypes.TryAdd((declaringType, new EquatableList<Type>(constructor.GetParameters().Select(parameterInfo => parameterInfo.ParameterType).ToList())), 1);
@@ -128,12 +116,7 @@ public class ExpressionObserverOptions
     /// <returns><c>true</c> if this has resulted in a change in the options; otherwise, <c>false</c></returns>
     public bool AddExpressionValueDisposal<T>(Expression<Func<T>> lambda, bool useGenericDefinition)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(lambda);
-#else
-        if (lambda is null)
-            throw new ArgumentNullException(nameof(lambda));
-#endif
         return lambda.Body switch
         {
             BinaryExpression binary when binary.Method is { } method => AddMethodReturnValueDisposal(method, useGenericDefinition),
@@ -171,12 +154,7 @@ public class ExpressionObserverOptions
     /// <returns><c>true</c> if this has resulted in a change in the options; otherwise, <c>false</c></returns>
     public bool AddMethodReturnValueDisposal(MethodInfo method, bool useGenericDefinition)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(method);
-#else
-        if (method is null)
-            throw new ArgumentNullException(nameof(method));
-#endif
         if (useGenericDefinition)
         {
             if (!method.IsGenericMethod)
@@ -202,12 +180,7 @@ public class ExpressionObserverOptions
     /// <returns><c>true</c> if this has resulted in a change in the options; otherwise, <c>false</c></returns>
     public bool AddPropertyValueDisposal(PropertyInfo property, bool useGenericDefinition)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(property);
-#else
-        if (property is null)
-            throw new ArgumentNullException(nameof(property));
-#endif
         if (property.GetMethod is not { } getMethod)
             throw new ArgumentException("the property specified does not have a getter", nameof(property));
         return AddMethodReturnValueDisposal(getMethod, useGenericDefinition);
@@ -229,12 +202,7 @@ public class ExpressionObserverOptions
     /// <returns><c>true</c> if objects from this source will be disposed; otherwise, <c>false</c></returns>
     public bool IsConstructedTypeDisposed(ConstructorInfo constructor)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(constructor);
-#else
-        if (constructor is null)
-            throw new ArgumentNullException(nameof(constructor));
-#endif
         if (constructor.DeclaringType is not { } declaringType)
             throw new ArgumentException("the constructor specified does not have a declaring type", nameof(constructor));
         return DisposeConstructedTypes.ContainsKey((declaringType, new EquatableList<Type>(constructor.GetParameters().Select(parameterInfo => parameterInfo.ParameterType).ToList())));
@@ -248,12 +216,7 @@ public class ExpressionObserverOptions
     /// <returns><c>true</c> if objects from this source will be disposed; otherwise, <c>false</c></returns>
     public bool IsExpressionValueDisposed<T>(Expression<Func<T>> lambda)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(lambda);
-#else
-        if (lambda is null)
-            throw new ArgumentNullException(nameof(lambda));
-#endif
         return lambda.Body switch
         {
             BinaryExpression binary when binary.Method is { } method => IsMethodReturnValueDisposed(method),
@@ -274,12 +237,7 @@ public class ExpressionObserverOptions
     /// <returns><c>true</c> if property change notifications for this property will be ignored; otherwise, <c>false</c></returns>
     public bool IsIgnoredPropertyChangeNotification(PropertyInfo property)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(property);
-#else
-        if (property is null)
-            throw new ArgumentNullException(nameof(property));
-#endif
         return IgnoredPropertyChangeNotifications.ContainsKey(property);
     }
 
@@ -290,12 +248,7 @@ public class ExpressionObserverOptions
     /// <returns><c>true</c> if objects from this source will be disposed; otherwise, <c>false</c></returns>
     public bool IsMethodReturnValueDisposed(MethodInfo method)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(method);
-#else
-        if (method is null)
-            throw new ArgumentNullException(nameof(method));
-#endif
         return method.IsStatic && DisposeStaticMethodReturnValues || DisposeMethodReturnValues.ContainsKey(method) || method.IsGenericMethod && DisposeMethodReturnValues.ContainsKey(GenericMethodToGenericMethodDefinition.GetOrAdd(method, GetGenericMethodDefinitionFromGenericMethod));
     }
 
@@ -306,12 +259,7 @@ public class ExpressionObserverOptions
     /// <returns><c>true</c> if objects from this source will be disposed; otherwise, <c>false</c></returns>
     public bool IsPropertyValueDisposed(PropertyInfo property)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(property);
-#else
-        if (property is null)
-            throw new ArgumentNullException(nameof(property));
-#endif
         if (property.GetMethod is not { } getMethod)
             throw new ArgumentException("the property specified does not have a getter", nameof(property));
         return IsMethodReturnValueDisposed(getMethod);
@@ -333,12 +281,7 @@ public class ExpressionObserverOptions
     /// <returns><c>true</c> if this has resulted in a change in the options; otherwise, <c>false</c></returns>
     public bool RemoveConstructedTypeDisposal(ConstructorInfo constructor)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(constructor);
-#else
-        if (constructor is null)
-            throw new ArgumentNullException(nameof(constructor));
-#endif
         if (constructor.DeclaringType is not { } declaringType)
             throw new ArgumentException("the constructor specified does not have a declaring type", nameof(constructor));
         return DisposeConstructedTypes.TryRemove((declaringType, new EquatableList<Type>(constructor.GetParameters().Select(parameterInfo => parameterInfo.ParameterType).ToList())), out _);
@@ -352,12 +295,7 @@ public class ExpressionObserverOptions
     /// <returns><c>true</c> if this has resulted in a change in the options; otherwise, <c>false</c></returns>
     public bool RemoveExpressionValueDisposal<T>(Expression<Func<T>> lambda)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(lambda);
-#else
-        if (lambda is null)
-            throw new ArgumentNullException(nameof(lambda));
-#endif
         return lambda.Body switch
         {
             BinaryExpression binary when binary.Method is { } method => RemoveMethodReturnValueDisposal(method),
@@ -394,12 +332,7 @@ public class ExpressionObserverOptions
     /// <returns><c>true</c> if this has resulted in a change in the options; otherwise, <c>false</c></returns>
     public bool RemovePropertyValueDisposal(PropertyInfo property)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(property);
-#else
-        if (property is null)
-            throw new ArgumentNullException(nameof(property));
-#endif
         if (property.GetMethod is not { } getMethod)
             throw new ArgumentException("the property specified does not have a getter", nameof(property));
         return IsMethodReturnValueDisposed(getMethod);

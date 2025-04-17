@@ -15,15 +15,8 @@ public static class DisposalExtensions
     public static TDependent DisposeAsyncDependenciesWhenDisposed<TDependent>(this TDependent dependent, IEnumerable<IAsyncDisposable> dependencies)
         where TDependent : INotifyDisposed
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(dependent);
         ArgumentNullException.ThrowIfNull(dependencies);
-#else
-        if (dependent is null)
-            throw new ArgumentNullException(nameof(dependent));
-        if (dependencies is null)
-            throw new ArgumentNullException(nameof(dependencies));
-#endif
         dependent.Disposed += (_, e) => Task.Run(async () =>
         {
             if (!e.IsFinalizer)
@@ -57,15 +50,8 @@ public static class DisposalExtensions
         where TDependency : IAsyncDisposable
         where TDependent : INotifyDisposed
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(dependency);
         ArgumentNullException.ThrowIfNull(dependentFactory);
-#else
-        if (dependency is null)
-            throw new ArgumentNullException(nameof(dependency));
-        if (dependentFactory is null)
-            throw new ArgumentNullException(nameof(dependentFactory));
-#endif
         var dependent = dependentFactory();
         dependent.Disposed += (_, e) => Task.Run(async () =>
         {
@@ -88,15 +74,8 @@ public static class DisposalExtensions
         where TDependency : IAsyncDisposable
         where TDependent : INotifyDisposed
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(dependency);
         ArgumentNullException.ThrowIfNull(dependentFactory);
-#else
-        if (dependency is null)
-            throw new ArgumentNullException(nameof(dependency));
-        if (dependentFactory is null)
-            throw new ArgumentNullException(nameof(dependentFactory));
-#endif
         var dependent = dependentFactory(dependency);
         dependent.Disposed += (_, e) => Task.Run(async () =>
         {
@@ -119,15 +98,8 @@ public static class DisposalExtensions
         where TDependency : IAsyncDisposable
         where TDependent : INotifyDisposed
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(dependency);
         ArgumentNullException.ThrowIfNull(asyncDependentFactory);
-#else
-        if (dependency is null)
-            throw new ArgumentNullException(nameof(dependency));
-        if (asyncDependentFactory is null)
-            throw new ArgumentNullException(nameof(asyncDependentFactory));
-#endif
         var dependent = await asyncDependentFactory().ConfigureAwait(false);
         dependent.Disposed += (_, e) => Task.Run(async () =>
         {
@@ -150,15 +122,8 @@ public static class DisposalExtensions
         where TDependency : IAsyncDisposable
         where TDependent : INotifyDisposed
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(dependency);
         ArgumentNullException.ThrowIfNull(asyncDependentFactory);
-#else
-        if (dependency is null)
-            throw new ArgumentNullException(nameof(dependency));
-        if (asyncDependentFactory is null)
-            throw new ArgumentNullException(nameof(asyncDependentFactory));
-#endif
         var dependent = await asyncDependentFactory(dependency).ConfigureAwait(false);
         dependent.Disposed += (_, e) => Task.Run(async () =>
         {
@@ -178,15 +143,8 @@ public static class DisposalExtensions
     public static TDependent DisposeDependenciesWhenDisposed<TDependent>(this TDependent dependent, IEnumerable<IDisposable> dependencies)
         where TDependent : INotifyDisposed
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(dependent);
         ArgumentNullException.ThrowIfNull(dependencies);
-#else
-        if (dependent is null)
-            throw new ArgumentNullException(nameof(dependent));
-        if (dependencies is null)
-            throw new ArgumentNullException(nameof(dependencies));
-#endif
         dependent.Disposed += (_, e) =>
         {
             if (!e.IsFinalizer)
@@ -220,15 +178,8 @@ public static class DisposalExtensions
         where TDependency : IDisposable
         where TDependent : INotifyDisposed
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(dependency);
         ArgumentNullException.ThrowIfNull(dependentFactory);
-#else
-        if (dependency is null)
-            throw new ArgumentNullException(nameof(dependency));
-        if (dependentFactory is null)
-            throw new ArgumentNullException(nameof(dependentFactory));
-#endif
         var dependent = dependentFactory();
         dependent.Disposed += (_, e) =>
         {
@@ -251,15 +202,8 @@ public static class DisposalExtensions
         where TDependency : IDisposable
         where TDependent : INotifyDisposed
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(dependency);
         ArgumentNullException.ThrowIfNull(dependentFactory);
-#else
-        if (dependency is null)
-            throw new ArgumentNullException(nameof(dependency));
-        if (dependentFactory is null)
-            throw new ArgumentNullException(nameof(dependentFactory));
-#endif
         var dependent = dependentFactory(dependency);
         dependent.Disposed += (_, e) =>
         {
@@ -282,15 +226,8 @@ public static class DisposalExtensions
         where TDependency : IDisposable
         where TDependent : INotifyDisposed
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(dependency);
         ArgumentNullException.ThrowIfNull(asyncDependentFactory);
-#else
-        if (dependency is null)
-            throw new ArgumentNullException(nameof(dependency));
-        if (asyncDependentFactory is null)
-            throw new ArgumentNullException(nameof(asyncDependentFactory));
-#endif
         var dependent = await asyncDependentFactory().ConfigureAwait(false);
         dependent.Disposed += (_, e) =>
         {
@@ -313,15 +250,8 @@ public static class DisposalExtensions
         where TDependency : IDisposable
         where TDependent : INotifyDisposed
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(dependency);
         ArgumentNullException.ThrowIfNull(asyncDependentFactory);
-#else
-        if (dependency is null)
-            throw new ArgumentNullException(nameof(dependency));
-        if (asyncDependentFactory is null)
-            throw new ArgumentNullException(nameof(asyncDependentFactory));
-#endif
         var dependent = await asyncDependentFactory(dependency).ConfigureAwait(false);
         dependent.Disposed += (_, e) =>
         {

@@ -16,15 +16,8 @@ public static class DictionaryExtensions
     /// <exception cref="OverflowException">The dictionary already contains the maximum number of elements (<see cref="int.MaxValue"/>)</exception>
     public static object? GetOrAdd(this IDictionary dictionary, object key, Func<object, object?> valueFactory)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(dictionary);
         ArgumentNullException.ThrowIfNull(valueFactory);
-#else
-        if (dictionary is null)
-            throw new ArgumentNullException(nameof(dictionary));
-        if (valueFactory is null)
-            throw new ArgumentNullException(nameof(valueFactory));
-#endif
         if (dictionary.Contains(key))
             return dictionary[key];
         var value = valueFactory(key);
@@ -43,15 +36,8 @@ public static class DictionaryExtensions
     /// <exception cref="OverflowException">The dictionary already contains the maximum number of elements (<see cref="int.MaxValue"/>)</exception>
     public static TValue GetOrAdd<TKey, TValue>(this IDictionary<TKey, TValue> dictionary, TKey key, Func<TKey, TValue> valueFactory)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(dictionary);
         ArgumentNullException.ThrowIfNull(valueFactory);
-#else
-        if (dictionary is null)
-            throw new ArgumentNullException(nameof(dictionary));
-        if (valueFactory is null)
-            throw new ArgumentNullException(nameof(valueFactory));
-#endif
         if (dictionary.TryGetValue(key, out var value))
             return value;
         value = valueFactory(key);
@@ -69,15 +55,8 @@ public static class DictionaryExtensions
     /// <exception cref="ArgumentNullException"><paramref name="key"/> is <c>null</c></exception>
     public static bool TryRemove(this IDictionary dictionary, object key, out object? value)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(dictionary);
         ArgumentNullException.ThrowIfNull(key);
-#else
-        if (dictionary is null)
-            throw new ArgumentNullException(nameof(dictionary));
-        if (key is null)
-            throw new ArgumentNullException(nameof(key));
-#endif
         if (dictionary.Contains(key))
         {
             value = dictionary[key];
@@ -97,15 +76,8 @@ public static class DictionaryExtensions
     /// <exception cref="ArgumentNullException"><paramref name="key"/> is <c>null</c></exception>
     public static bool TryRemove<TKey, TValue>(this IDictionary<TKey, TValue> dictionary, TKey key, out TValue value)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(dictionary);
         ArgumentNullException.ThrowIfNull(key);
-#else
-        if (dictionary is null)
-            throw new ArgumentNullException(nameof(dictionary));
-        if (key is null)
-            throw new ArgumentNullException(nameof(key));
-#endif
         if (dictionary.TryGetValue(key, out value!))
         {
             dictionary.Remove(key);

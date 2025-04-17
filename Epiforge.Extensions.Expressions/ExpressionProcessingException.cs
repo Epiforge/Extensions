@@ -3,7 +3,6 @@ namespace Epiforge.Extensions.Expressions;
 /// <summary>
 /// An exception was thrown while processing an exception
 /// </summary>
-[Serializable]
 public sealed class ExpressionProcessingException :
     Exception
 {

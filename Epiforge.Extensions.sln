@@ -26,9 +26,10 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Epiforge.Extensions.Compone
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Common", "Common", "{30D1B25A-632D-4BDF-B01A-2B1D80D38E0D}"
 	ProjectSection(SolutionItems) = preProject
-		Common\AssemblyInfo.cs = Common\AssemblyInfo.cs
-		Common\LibraryProject.proj = Common\LibraryProject.proj
-		Common\LibraryTestProject.proj = Common\LibraryTestProject.proj
+		Common\CommonAssemblyInfo.cs = Common\CommonAssemblyInfo.cs
+		Common\LibraryProject.props = Common\LibraryProject.props
+		Common\Project.props = Common\Project.props
+		Common\TestProject.props = Common\TestProject.props
 	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Epiforge.Extensions.Collections", "Epiforge.Extensions.Collections\Epiforge.Extensions.Collections.csproj", "{5FB25E05-C2AD-48FF-A03D-B32DD642C3F5}"
@@ -42,8 +43,6 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Epiforge.Extensions.Tests", "Epiforge.Extensions.Tests\Epiforge.Extensions.Tests.csproj", "{9D45F8CA-6B73-48CC-AF34-2193C7A70866}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Epiforge.Extensions.Platforms.Windows", "Epiforge.Extensions.Platforms.Windows\Epiforge.Extensions.Platforms.Windows.csproj", "{C1D1F6C8-596C-41D7-9198-6143A456FA2B}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Epiforge.Extensions.Frameworks.WPF", "Epiforge.Extensions.Frameworks.WPF\Epiforge.Extensions.Frameworks.WPF.csproj", "{BB9701EA-2362-4817-A03B-199C8A5C26F0}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -83,10 +82,6 @@ Global
 		{C1D1F6C8-596C-41D7-9198-6143A456FA2B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C1D1F6C8-596C-41D7-9198-6143A456FA2B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C1D1F6C8-596C-41D7-9198-6143A456FA2B}.Release|Any CPU.Build.0 = Release|Any CPU
-		{BB9701EA-2362-4817-A03B-199C8A5C26F0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{BB9701EA-2362-4817-A03B-199C8A5C26F0}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{BB9701EA-2362-4817-A03B-199C8A5C26F0}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{BB9701EA-2362-4817-A03B-199C8A5C26F0}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -41,12 +41,7 @@ abstract class ObservableScalarQuery<TResult> :
 
     public IObservableScalarQuery<TTransform> ObserveTransform<TTransform>(Expression<Func<TResult, TTransform>> transform)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(transform);
-#else
-        if (transform is null)
-            throw new ArgumentNullException(nameof(transform));
-#endif
         ObservableQuery transformQuery;
         lock (cachedTransformQueriesAccess)
         {

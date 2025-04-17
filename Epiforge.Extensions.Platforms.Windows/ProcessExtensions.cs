@@ -12,12 +12,7 @@ public static class ProcessExtensions
     /// <returns></returns>
     public static async Task CloseMainWindowAsync(this Process process)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(process);
-#else
-        if (process is null)
-            throw new ArgumentNullException(nameof(process));
-#endif
         var taskCompletionSource = new TaskCompletionSource<object?>();
         void exited(object? sender, EventArgs e) =>
             taskCompletionSource.SetResult(null);
@@ -40,12 +35,7 @@ public static class ProcessExtensions
     /// <param name="process">The process of which to get the parent process</param>
     public static Process? GetParentProcess(this Process process)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(process);
-#else
-        if (process is null)
-            throw new ArgumentNullException(nameof(process));
-#endif
         var processBasicInformation = new ProcessBasicInformation();
         var status = NativeMethods.NtQueryInformationProcess(process.Handle, 0, ref processBasicInformation, Marshal.SizeOf(processBasicInformation), out _);
         if (status != 0)

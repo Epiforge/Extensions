@@ -194,7 +194,6 @@ public class Options
         Assert.IsTrue(options.RemoveExpressionValueDisposal(() => -SyncDisposableTestPerson.CreateEmily()));
     }
 
-#if IS_NET_STANDARD_2_1_OR_GREATER
     [TestMethod]
     public void OptimizerAppliedDeMorgan()
     {
@@ -205,7 +204,6 @@ public class Options
             Assert.AreEqual("Not((False OrElse False))", expr.ToString());
         Assert.AreEqual(0, observer.CachedObservableExpressions);
     }
-#endif
 
     [TestMethod]
     public async Task PreferAsyncDisposalDisabledAsync()

@@ -51,17 +51,11 @@ public static class ReflectionExtensions
             _ => false
         };
 
-#if IS_NET_STANDARD_2_1_OR_GREATER
     static T? GetDefaultValue<T>() =>
         default;
-#endif
 
     static MethodInfo GetDefaultValueByTypeValueFactory(Type type) =>
-#if IS_NET_STANDARD_2_1_OR_GREATER
         typeof(ReflectionExtensions).GetMethod(nameof(GetDefaultValue), BindingFlags.NonPublic | BindingFlags.Static)!.MakeGenericMethod(type);
-#else
-        typeof(ReflectionExtensions).GetMethod(nameof(GetDefaultValue), BindingFlags.Public | BindingFlags.Static)!.MakeGenericMethod(type);
-#endif
 
 #if !IS_NET_7_0_OR_GREATER
     delegate object InvokeConstructorDelegate(object?[] arguments);
@@ -129,12 +123,7 @@ public static class ReflectionExtensions
     /// <param name="type">The type</param>
     public static object? FastDefault(this Type type)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(type);
-#else
-        if (type is null)
-            throw new ArgumentNullException(nameof(type));
-#endif
         return type.IsValueType ? getDefaultValueByType.GetOrAdd(type, GetDefaultValueByTypeValueFactory).FastInvoke(null) : null;
     }
 
@@ -146,12 +135,7 @@ public static class ReflectionExtensions
     /// <param name="index">Optional index values for indexed properties</param>
     public static object? FastGetValue(this PropertyInfo property, object? instance, params object?[] index)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(property);
-#else
-        if (property is null)
-            throw new ArgumentNullException(nameof(property));
-#endif
 #if IS_NET_7_0_OR_GREATER
         return property.GetValue(instance, index);
 #else
@@ -168,12 +152,7 @@ public static class ReflectionExtensions
     /// <param name="arguments">An argument list for the invoked constructor</param>
     public static object? FastInvoke(this ConstructorInfo constructor, params object?[] arguments)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(constructor);
-#else
-        if (constructor is null)
-            throw new ArgumentNullException(nameof(constructor));
-#endif
 #if IS_NET_7_0_OR_GREATER
         return constructor.Invoke(arguments);
 #else
@@ -189,12 +168,7 @@ public static class ReflectionExtensions
     /// <param name="arguments">An argument list for the invoked method</param>
     public static object? FastInvoke(this MethodInfo method, object? instance, params object?[] arguments)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(method);
-#else
-        if (method is null)
-            throw new ArgumentNullException(nameof(method));
-#endif
 #if IS_NET_7_0_OR_GREATER
         return method.Invoke(instance, arguments);
 #else
@@ -211,12 +185,7 @@ public static class ReflectionExtensions
     /// <param name="index">Optional index values for indexed properties</param>
     public static void FastSetValue(this PropertyInfo property, object? instance, object? value, params object?[] index)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(property);
-#else
-        if (property is null)
-            throw new ArgumentNullException(nameof(property));
-#endif
 #if IS_NET_7_0_OR_GREATER
         property.SetValue(instance, value, index);
 #else
@@ -226,16 +195,6 @@ public static class ReflectionExtensions
 #endif
     }
 
-#if !IS_NET_STANDARD_2_1_OR_GREATER
-    /// <summary>
-    /// This method is used to perform silly reflection tricks and should not be used by callers (use the default keyword in your own code instead)
-    /// </summary>
-    /// <typeparam name="T">Type</typeparam>
-    [Obsolete("This method is used to perform silly reflection tricks and should not be used by callers (use the default keyword in your own code instead)", true)]
-    public static T? GetDefaultValue<T>() =>
-        default;
-#endif
-
     /// <summary>
     /// Searches for the events of the current <see cref="Type"/>, including interfaces and interface inheritance, using the specified binding constraints
     /// </summary>
@@ -243,12 +202,7 @@ public static class ReflectionExtensions
     /// <param name="bindingAttr">A bitwise combination of the enumeration values that specify how the search is conducted</param>
     public static EventInfo[] GetImplementationEvents(this Type type, BindingFlags bindingAttr = BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(type);
-#else
-        if (type is null)
-            throw new ArgumentNullException(nameof(type));
-#endif
         if (type.IsInterface)
         {
             var eventInfos = new List<EventInfo>();
@@ -280,12 +234,7 @@ public static class ReflectionExtensions
     /// <param name="bindingAttr">A bitwise combination of the enumeration values that specify how the search is conducted</param>
     public static MethodInfo[] GetImplementationMethods(this Type type, BindingFlags bindingAttr = BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(type);
-#else
-        if (type is null)
-            throw new ArgumentNullException(nameof(type));
-#endif
         if (type.IsInterface)
         {
             var methodInfos = new List<MethodInfo>();
@@ -317,12 +266,7 @@ public static class ReflectionExtensions
     /// <param name="bindingAttr">A bitwise combination of the enumeration values that specify how the search is conducted</param>
     public static PropertyInfo[] GetImplementationProperties(this Type type, BindingFlags bindingAttr = BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(type);
-#else
-        if (type is null)
-            throw new ArgumentNullException(nameof(type));
-#endif
         if (type.IsInterface)
         {
             var propertyInfos = new List<PropertyInfo>();

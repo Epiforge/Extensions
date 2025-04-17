@@ -148,12 +148,7 @@ public class ObservableSortedDictionary<TKey, TValue> :
     /// <param name="value">The value of the element to add</param>
     public virtual void Add(TKey key, TValue value)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(key);
-#else
-        if (key is null)
-            throw new ArgumentNullException(nameof(key));
-#endif
         if (!gsd.ContainsKey(key))
             NotifyCountChanging();
         gsd.Add(key, value);
@@ -174,12 +169,7 @@ public class ObservableSortedDictionary<TKey, TValue> :
     /// <param name="value">The object to use as the value of the element to add</param>
     protected virtual void Add(object key, object? value)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(key);
-#else
-        if (key is null)
-            throw new ArgumentNullException(nameof(key));
-#endif
         if (key is TKey typedKey && !gsd.ContainsKey(typedKey))
             NotifyCountChanging();
         di.Add(key, value);
@@ -384,12 +374,7 @@ public class ObservableSortedDictionary<TKey, TValue> :
     /// <param name="e">The event arguments for <see cref="INotifyDictionaryChanged{TKey, TValue}.DictionaryChanged"/></param>
     protected virtual void OnChanged(NotifyDictionaryChangedEventArgs<TKey, TValue> e)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(e);
-#else
-        if (e is null)
-            throw new ArgumentNullException(nameof(e));
-#endif
         if (CollectionChanged != null)
             switch (e.Action)
             {
@@ -431,12 +416,7 @@ public class ObservableSortedDictionary<TKey, TValue> :
     /// <param name="e">The event arguments</param>
     protected virtual void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(e);
-#else
-        if (e is null)
-            throw new ArgumentNullException(nameof(e));
-#endif
         var eventArgs = Logger?.IsEnabled(LogLevel.Trace) ?? false ? e.ToStringForLogging() : null;
         Logger?.LogTrace(EventIds.Epiforge_Extensions_Collections_RaisingCollectionChanged, "Raising CollectionChanged: {EventArgs}", eventArgs);
         CollectionChanged?.Invoke(this, e);
@@ -540,12 +520,7 @@ public class ObservableSortedDictionary<TKey, TValue> :
     /// <returns>The key-value pairs of the elements that were removed</returns>
     public virtual IReadOnlyList<KeyValuePair<TKey, TValue>> RemoveAll(Func<TKey, TValue, bool> predicate)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(predicate);
-#else
-        if (predicate is null)
-            throw new ArgumentNullException(nameof(predicate));
-#endif
         var removed = new List<KeyValuePair<TKey, TValue>>();
         foreach (var kv in gsd.ToList())
             if (predicate(kv.Key, kv.Value))
@@ -570,12 +545,7 @@ public class ObservableSortedDictionary<TKey, TValue> :
     /// <returns>The keys of the elements that were found and removed</returns>
     public virtual IReadOnlyList<TKey> RemoveRange(IEnumerable<TKey> keys)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(keys);
-#else
-        if (keys is null)
-            throw new ArgumentNullException(nameof(keys));
-#endif
         var removingKeyValuePairs = new List<KeyValuePair<TKey, TValue>>();
         foreach (var key in keys)
             if (gsd.TryGetValue(key, out var value))
@@ -601,12 +571,7 @@ public class ObservableSortedDictionary<TKey, TValue> :
     /// <param name="keyValuePairs">The replacement key-value pairs</param>
     public virtual void ReplaceRange(IEnumerable<KeyValuePair<TKey, TValue>> keyValuePairs)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(keyValuePairs);
-#else
-        if (keyValuePairs is null)
-            throw new ArgumentNullException(nameof(keyValuePairs));
-#endif
         if (keyValuePairs.Any(kvp => !gsd.ContainsKey(kvp.Key)))
             throw new ArgumentException("One of the keys was not found in the dictionary", nameof(keyValuePairs));
         var oldItems = GetRange(keyValuePairs.Select(kv => kv.Key));
@@ -623,12 +588,7 @@ public class ObservableSortedDictionary<TKey, TValue> :
     /// <returns>The keys of the elements that were found and removed</returns>
     public virtual IReadOnlyList<TKey> ReplaceRange(IEnumerable<TKey> removeKeys, IEnumerable<KeyValuePair<TKey, TValue>> newKeyValuePairs)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(newKeyValuePairs);
-#else
-        if (newKeyValuePairs is null)
-            throw new ArgumentNullException(nameof(newKeyValuePairs));
-#endif
         var removingKeys = removeKeys.ToImmutableHashSet();
         if (newKeyValuePairs.Where(kvp => !removingKeys.Contains(kvp.Key)).Any(kvp => kvp.Key is null || gsd.ContainsKey(kvp.Key)))
             throw new ArgumentException("One of the new keys was null or already found in the dictionary", nameof(newKeyValuePairs));
@@ -702,12 +662,7 @@ public class ObservableSortedDictionary<TKey, TValue> :
     /// <returns><c>true</c> if the key/value pair was added to the dictionary successfully; otherwise, <c>false</c></returns>
     public virtual bool TryAdd(TKey key, TValue value)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(key);
-#else
-        if (key is null)
-            throw new ArgumentNullException(nameof(key));
-#endif
         if (!gsd.ContainsKey(key))
         {
             NotifyCountChanging();

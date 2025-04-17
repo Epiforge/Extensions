@@ -35,3 +35,4 @@ packages/
 .axocover/
 *.ncrunchsolution
 *.ncrunchproject
+nCrunchTemp_*.*

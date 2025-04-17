@@ -17,12 +17,7 @@ public class FastEqualityComparer :
     /// <param name="type">The type</param>
     public static FastEqualityComparer Get(Type type)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(type);
-#else
-        if (type is null)
-            throw new ArgumentNullException(nameof(type));
-#endif
         return equalityComparers.GetOrAdd(type, EqualityComparersValueFactory);
     }
 
@@ -32,12 +27,7 @@ public class FastEqualityComparer :
     /// <param name="type">The type</param>
     public FastEqualityComparer(Type type)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(type);
-#else
-        if (type is null)
-            throw new ArgumentNullException(nameof(type));
-#endif
         Type = type;
         var equalityComparerType = typeof(EqualityComparer<>).MakeGenericType(type);
         equalityComparer = equalityComparerType.GetProperty(nameof(EqualityComparer<object>.Default), BindingFlags.Public | BindingFlags.Static)!.FastGetValue(null)!;

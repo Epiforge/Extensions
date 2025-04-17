@@ -207,12 +207,7 @@ public class ObservableDictionary<TKey, TValue> :
     /// <param name="value">The value of the element to add</param>
     public virtual void Add(TKey key, TValue value)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(key);
-#else
-        if (key is null)
-            throw new ArgumentNullException(nameof(key));
-#endif
         if (!gd.ContainsKey(key))
             NotifyCountChanging();
         gd.Add(key, value);
@@ -233,12 +228,7 @@ public class ObservableDictionary<TKey, TValue> :
     /// <param name="value">The object to use as the value of the element to add</param>
     protected virtual void Add(object key, object? value)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(key);
-#else
-        if (key is null)
-            throw new ArgumentNullException(nameof(key));
-#endif
         if (key is TKey typedKey && !gd.ContainsKey(typedKey))
             NotifyCountChanging();
         di.Add(key, value);
@@ -274,12 +264,7 @@ public class ObservableDictionary<TKey, TValue> :
     /// <param name="keyValuePairs">The key-value pairs to add</param>
     public virtual void AddRange(IReadOnlyList<KeyValuePair<TKey, TValue>> keyValuePairs)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(keyValuePairs);
-#else
-        if (keyValuePairs is null)
-            throw new ArgumentNullException(nameof(keyValuePairs));
-#endif
         if (keyValuePairs.Any(kvp => kvp.Key is null || gd.ContainsKey(kvp.Key)))
             throw new ArgumentException("One of the keys was null or already found in the dictionary", nameof(keyValuePairs));
         if (keyValuePairs.Count > 0)
@@ -384,28 +369,8 @@ public class ObservableDictionary<TKey, TValue> :
     /// </summary>
     /// <param name="capacity">The number of entries</param>
     /// <returns>The current capacity of the <see cref="ObservableDictionary{TKey, TValue}"/></returns>
-#if IS_NET_STANDARD_2_1_OR_GREATER
-    [SuppressMessage("Style", "IDE0022: Use expression body for method")]
-#endif
-    public virtual int EnsureCapacity(int capacity)
-    {
-#if IS_NET_STANDARD_2_1_OR_GREATER
-        return gd.EnsureCapacity(capacity);
-#else
-        var oldGd = gd;
-        gd = new Dictionary<TKey, TValue>(capacity, comparer);
-        foreach (var kvp in oldGd)
-            gd.Add(kvp.Key, kvp.Value);
-        ci = gd;
-        gci = gd;
-        di = gd;
-        gdi = gd;
-        ei = gd;
-        gei = gd;
-        grodi = gd;
-        return gd.Count > capacity ? capacity : gd.Count;
-#endif
-    }
+    public virtual int EnsureCapacity(int capacity) =>
+        gd.EnsureCapacity(capacity);
 
     /// <summary>
     /// Returns an <see cref="IDictionaryEnumerator"/> object for the <see cref="IDictionary"/> object
@@ -478,12 +443,7 @@ public class ObservableDictionary<TKey, TValue> :
     /// <param name="e">The event arguments for <see cref="INotifyDictionaryChanged{TKey, TValue}.DictionaryChanged"/></param>
     protected virtual void OnChanged(NotifyDictionaryChangedEventArgs<TKey, TValue> e)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(e);
-#else
-        if (e is null)
-            throw new ArgumentNullException(nameof(e));
-#endif
         if (CollectionChanged is not null)
             switch (e.Action)
             {
@@ -525,12 +485,7 @@ public class ObservableDictionary<TKey, TValue> :
     /// <param name="e">The event arguments</param>
     protected virtual void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(e);
-#else
-        if (e is null)
-            throw new ArgumentNullException(nameof(e));
-#endif
         var eventArgs = Logger?.IsEnabled(LogLevel.Trace) ?? false ? e.ToStringForLogging() : null;
         Logger?.LogTrace(EventIds.Epiforge_Extensions_Collections_RaisingCollectionChanged, "Raising CollectionChanged: {EventArgs}", eventArgs);
         CollectionChanged?.Invoke(this, e);
@@ -634,12 +589,7 @@ public class ObservableDictionary<TKey, TValue> :
     /// <returns>The key-value pairs of the elements that were removed</returns>
     public virtual IReadOnlyList<KeyValuePair<TKey, TValue>> RemoveAll(Func<TKey, TValue, bool> predicate)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(predicate);
-#else
-        if (predicate is null)
-            throw new ArgumentNullException(nameof(predicate));
-#endif
         var removed = new List<KeyValuePair<TKey, TValue>>();
         foreach (var kv in gd.ToList())
             if (predicate(kv.Key, kv.Value))
@@ -664,12 +614,7 @@ public class ObservableDictionary<TKey, TValue> :
     /// <returns>The keys of the elements that were found and removed</returns>
     public virtual IReadOnlyList<TKey> RemoveRange(IEnumerable<TKey> keys)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(keys);
-#else
-        if (keys is null)
-            throw new ArgumentNullException(nameof(keys));
-#endif
         var removingKeyValuePairs = new List<KeyValuePair<TKey, TValue>>();
         foreach (var key in keys)
             if (gd.TryGetValue(key, out var value))
@@ -695,12 +640,7 @@ public class ObservableDictionary<TKey, TValue> :
     /// <param name="keyValuePairs">The replacement key-value pairs</param>
     public virtual void ReplaceRange(IEnumerable<KeyValuePair<TKey, TValue>> keyValuePairs)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(keyValuePairs);
-#else
-        if (keyValuePairs is null)
-            throw new ArgumentNullException(nameof(keyValuePairs));
-#endif
         if (keyValuePairs.Any(kvp => !gd.ContainsKey(kvp.Key)))
             throw new ArgumentException("One of the keys was not found in the dictionary", nameof(keyValuePairs));
         var oldItems = GetRange(keyValuePairs.Select(kv => kv.Key));
@@ -717,15 +657,8 @@ public class ObservableDictionary<TKey, TValue> :
     /// <returns>The keys of the elements that were found and removed</returns>
     public virtual IReadOnlyList<TKey> ReplaceRange(IEnumerable<TKey> removeKeys, IEnumerable<KeyValuePair<TKey, TValue>> newKeyValuePairs)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(removeKeys);
         ArgumentNullException.ThrowIfNull(newKeyValuePairs);
-#else
-        if (removeKeys is null)
-            throw new ArgumentNullException(nameof(removeKeys));
-        if (newKeyValuePairs is null)
-            throw new ArgumentNullException(nameof(newKeyValuePairs));
-#endif
         var removingKeys = removeKeys.ToImmutableHashSet();
         if (newKeyValuePairs.Where(kvp => !removingKeys.Contains(kvp.Key)).Any(kvp => kvp.Key is null || gd.ContainsKey(kvp.Key)))
             throw new ArgumentException("One of the new keys was null or already found in the dictionary", nameof(newKeyValuePairs));
@@ -770,12 +703,7 @@ public class ObservableDictionary<TKey, TValue> :
     /// <param name="dictionary">The dictionary from which to retrieve the initial elements</param>
     public virtual void Reset(IDictionary<TKey, TValue> dictionary)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(dictionary);
-#else
-        if (dictionary is null)
-            throw new ArgumentNullException(nameof(dictionary));
-#endif
         var countChanging = gd.Count != dictionary.Count;
         if (countChanging)
             NotifyCountChanging();
@@ -800,50 +728,15 @@ public class ObservableDictionary<TKey, TValue> :
     /// <summary>
     /// Sets the capacity of this dictionary to what it would be if it had been originally initialized with all its entries
     /// </summary>
-#if IS_NET_STANDARD_2_1_OR_GREATER
-    [SuppressMessage("Style", "IDE0022: Use expression body for method")]
-#endif
-    public void TrimExcess()
-    {
-#if IS_NET_STANDARD_2_1_OR_GREATER
+    public void TrimExcess() =>
         gd.TrimExcess();
-#else
-        gd = new Dictionary<TKey, TValue>(gd, comparer);
-        ci = gd;
-        gci = gd;
-        di = gd;
-        gdi = gd;
-        ei = gd;
-        gei = gd;
-        grodi = gd;
-#endif
-    }
 
     /// <summary>
     /// Sets the capacity of this dictionary to hold up a specified number of entries without any further expansion of its backing storage
     /// </summary>
     /// <param name="capacity">The new capacity</param>
-#if IS_NET_STANDARD_2_1_OR_GREATER
-    [SuppressMessage("Style", "IDE0022: Use expression body for method")]
-#endif
-    public virtual void TrimExcess(int capacity)
-    {
-#if IS_NET_STANDARD_2_1_OR_GREATER
+    public virtual void TrimExcess(int capacity) =>
         gd.TrimExcess(capacity);
-#else
-        var oldGd = gd;
-        gd = new Dictionary<TKey, TValue>(capacity, comparer);
-        foreach (var kvp in oldGd)
-            gd.Add(kvp.Key, kvp.Value);
-        ci = gd;
-        gci = gd;
-        di = gd;
-        gdi = gd;
-        ei = gd;
-        gei = gd;
-        grodi = gd;
-#endif
-    }
 
     /// <summary>
     /// Attempts to add the specified key and value to the dictionary
@@ -853,12 +746,7 @@ public class ObservableDictionary<TKey, TValue> :
     /// <returns><c>true</c> if the key/value pair was added to the dictionary successfully; otherwise, <c>false</c></returns>
     public virtual bool TryAdd(TKey key, TValue value)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(key);
-#else
-        if (key is null)
-            throw new ArgumentNullException(nameof(key));
-#endif
         if (!gd.ContainsKey(key))
         {
             NotifyCountChanging();

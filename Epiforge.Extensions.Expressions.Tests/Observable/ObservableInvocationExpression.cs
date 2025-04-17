@@ -80,11 +80,7 @@ public class ObservableInvocationExpression
         var secondParameter = Expression.Parameter(typeof(TestPerson));
         var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe<TestPerson>(Expression.Lambda(Expression.Invoke(Expression.Constant(@delegate), firstParameter, secondParameter), firstParameter, secondParameter), john, emily))
-#if IS_NET_STANDARD_2_1_OR_GREATER
             Assert.AreEqual("John Emily", expr.Evaluation.Result!.Name);
-#else
-            Assert.IsNotNull(expr.Evaluation.Fault);
-#endif
         Assert.AreEqual(0, observer.CachedObservableExpressions);
     }
 
@@ -113,11 +109,7 @@ public class ObservableInvocationExpression
         var secondParameter = Expression.Parameter(typeof(TestPerson));
         var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe<TestPerson>(Expression.Lambda(Expression.Invoke(Expression.Constant(@delegate), firstParameter, secondParameter), firstParameter, secondParameter), john, emily))
-#if IS_NET_STANDARD_2_1_OR_GREATER
             Assert.AreEqual("John Emily", expr.Evaluation.Result!.Name);
-#else
-            Assert.IsNotNull(expr.Evaluation.Fault);
-#endif
         Assert.AreEqual(0, observer.CachedObservableExpressions);
     }
 

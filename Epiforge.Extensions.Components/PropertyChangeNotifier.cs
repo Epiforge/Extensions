@@ -46,12 +46,7 @@ public abstract class PropertyChangeNotifier :
     /// <exception cref="ArgumentNullException"><paramref name="e"/> is null</exception>
     protected virtual void OnPropertyChanged(PropertyChangedEventArgs e)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(e);
-#else
-        if (e is null)
-            throw new ArgumentNullException(nameof(e));
-#endif
         Logger?.LogTrace(EventIds.Epiforge_Extensions_Components_RaisingPropertyChanged, "Raising PropertyChanged event for {PropertyName} property", e.PropertyName);
         PropertyChanged?.Invoke(this, e);
         Logger?.LogTrace(EventIds.Epiforge_Extensions_Components_RaisedPropertyChanged, "Raised PropertyChanged event for {PropertyName} property", e.PropertyName);
@@ -64,12 +59,7 @@ public abstract class PropertyChangeNotifier :
 	/// <exception cref="ArgumentNullException"><paramref name="propertyName"/> is null</exception>
     protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(propertyName);
-#else
-        if (propertyName is null)
-            throw new ArgumentNullException(nameof(propertyName));
-#endif
         OnPropertyChanged(new PropertyChangedEventArgs(propertyName));
     }
 
@@ -80,12 +70,7 @@ public abstract class PropertyChangeNotifier :
     /// <exception cref="ArgumentNullException"><paramref name="e"/> is null</exception>
     protected virtual void OnPropertyChanging(PropertyChangingEventArgs e)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(e);
-#else
-        if (e is null)
-            throw new ArgumentNullException(nameof(e));
-#endif
         Logger?.LogTrace(EventIds.Epiforge_Extensions_Components_RaisingPropertyChanging, "Raising PropertyChanging event for {PropertyName} property", e.PropertyName);
         PropertyChanging?.Invoke(this, e);
         Logger?.LogTrace(EventIds.Epiforge_Extensions_Components_RaisedPropertyChanging, "Raised PropertyChanging event for {PropertyName} property", e.PropertyName);
@@ -98,12 +83,7 @@ public abstract class PropertyChangeNotifier :
     /// <exception cref="ArgumentNullException"><paramref name="propertyName"/> is null</exception>
     protected void OnPropertyChanging([CallerMemberName] string? propertyName = null)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(propertyName);
-#else
-        if (propertyName is null)
-            throw new ArgumentNullException(nameof(propertyName));
-#endif
         OnPropertyChanging(new PropertyChangingEventArgs(propertyName));
     }
 
@@ -131,12 +111,7 @@ public abstract class PropertyChangeNotifier :
     [SuppressMessage("Code Analysis", "CA1045: Do not pass types by reference", Justification = "To 'correct' this would defeat the purpose of the method")]
     protected bool SetBackedProperty<TValue>(ref TValue backingField, TValue value, IEqualityComparer<TValue> equalityComparer, [CallerMemberName] string? propertyName = null)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(equalityComparer);
-#else
-        if (equalityComparer is null)
-            throw new ArgumentNullException(nameof(equalityComparer));
-#endif
         if (!equalityComparer.Equals(backingField, value))
         {
             Logger?.LogTrace(EventIds.Epiforge_Extensions_Components_SetBackingFieldTriggered, "{PropertyName} property is changing from {OldValue} to {NewValue}", propertyName, backingField, value);
@@ -174,18 +149,9 @@ public abstract class PropertyChangeNotifier :
     [SuppressMessage("Code Analysis", "CA1045: Do not pass types by reference", Justification = "To 'correct' this would defeat the purpose of the method")]
     protected bool SetBackedProperty<TValue>(ref TValue backingField, TValue value, IEqualityComparer<TValue> equalityComparer, PropertyChangingEventArgs propertyChangingEventArgs, PropertyChangedEventArgs propertyChangedEventArgs)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(equalityComparer);
         ArgumentNullException.ThrowIfNull(propertyChangingEventArgs);
         ArgumentNullException.ThrowIfNull(propertyChangedEventArgs);
-#else
-        if (equalityComparer is null)
-            throw new ArgumentNullException(nameof(equalityComparer));
-        if (propertyChangingEventArgs is null)
-            throw new ArgumentNullException(nameof(propertyChangingEventArgs));
-        if (propertyChangedEventArgs is null)
-            throw new ArgumentNullException(nameof(propertyChangedEventArgs));
-#endif
         if (!equalityComparer.Equals(backingField, value))
         {
             Logger?.LogTrace(EventIds.Epiforge_Extensions_Components_SetBackingFieldTriggered, "{PropertyName} property is changing from {OldValue} to {NewValue}", propertyChangedEventArgs.PropertyName, backingField, value);
@@ -221,12 +187,7 @@ public abstract class PropertyChangeNotifier :
     [SuppressMessage("Code Analysis", "CA1045: Do not pass types by reference", Justification = "To 'correct' this would defeat the purpose of the method")]
     protected bool SetBackedProperty<TValue>(ref TValue backingField, in TValue value, IEqualityComparer<TValue> equalityComparer, [CallerMemberName] string? propertyName = null)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(equalityComparer);
-#else
-        if (equalityComparer is null)
-            throw new ArgumentNullException(nameof(equalityComparer));
-#endif
         if (!equalityComparer.Equals(backingField, value))
         {
             Logger?.LogTrace(EventIds.Epiforge_Extensions_Components_SetBackingFieldTriggered, "{PropertyName} property is changing from {OldValue} to {NewValue}", propertyName, backingField, value);
@@ -264,18 +225,9 @@ public abstract class PropertyChangeNotifier :
     [SuppressMessage("Code Analysis", "CA1045: Do not pass types by reference", Justification = "To 'correct' this would defeat the purpose of the method")]
     protected bool SetBackedProperty<TValue>(ref TValue backingField, in TValue value, IEqualityComparer<TValue> equalityComparer, PropertyChangingEventArgs propertyChangingEventArgs, PropertyChangedEventArgs propertyChangedEventArgs)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(equalityComparer);
         ArgumentNullException.ThrowIfNull(propertyChangingEventArgs);
         ArgumentNullException.ThrowIfNull(propertyChangedEventArgs);
-#else
-        if (equalityComparer is null)
-            throw new ArgumentNullException(nameof(equalityComparer));
-        if (propertyChangingEventArgs is null)
-            throw new ArgumentNullException(nameof(propertyChangingEventArgs));
-        if (propertyChangedEventArgs is null)
-            throw new ArgumentNullException(nameof(propertyChangedEventArgs));
-#endif
         if (!equalityComparer.Equals(backingField, value))
         {
             Logger?.LogTrace(EventIds.Epiforge_Extensions_Components_SetBackingFieldTriggered, "{PropertyName} property is changing from {OldValue} to {NewValue}", propertyChangedEventArgs.PropertyName, backingField, value);

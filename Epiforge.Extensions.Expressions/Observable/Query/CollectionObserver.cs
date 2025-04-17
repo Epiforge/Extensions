@@ -18,12 +18,7 @@ public class CollectionObserver :
     /// <param name="expressionObserver">The expression observer to use for predicates, selectors, and transforms</param>
     public CollectionObserver(IExpressionObserver expressionObserver)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(expressionObserver);
-#else
-        if (expressionObserver is null)
-            throw new ArgumentNullException(nameof(expressionObserver));
-#endif
         ExpressionObserver = expressionObserver;
     }
 
@@ -68,12 +63,7 @@ public class CollectionObserver :
     /// <inheritdoc/>
     public IObservableCollectionQuery<object?> ObserveEnumerable(IEnumerable enumerable)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(enumerable);
-#else
-        if (enumerable is null)
-            throw new ArgumentNullException(nameof(enumerable));
-#endif
         ObservableCollectionQueryEnumerable enumerableObservableCollection;
         lock (cachedEnumerableObservableCollectionsAccess)
         {
@@ -93,12 +83,7 @@ public class CollectionObserver :
     /// <inheritdoc/>
     public IObservableCollectionQuery<object?> ObserveList(IList list)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(list);
-#else
-        if (list is null)
-            throw new ArgumentNullException(nameof(list));
-#endif
         ObservableCollectionQueryList listObservableCollection;
         lock (cachedListObservableCollectionsAccess)
         {
@@ -118,12 +103,7 @@ public class CollectionObserver :
     /// <inheritdoc/>
     public IObservableCollectionQuery<TElement> ObserveEnumerable<TElement>(IEnumerable<TElement> enumerable)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(enumerable);
-#else
-        if (enumerable is null)
-            throw new ArgumentNullException(nameof(enumerable));
-#endif
         ObservableCollectionQueryGenericEnumerable<TElement> enumerableObservableCollection;
         lock (cachedGenericEnumerableObservableCollectionsAccess)
         {
@@ -143,12 +123,7 @@ public class CollectionObserver :
     /// <inheritdoc/>
     public IObservableCollectionQuery<TElement> ObserveList<TElement>(IList<TElement> list)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(list);
-#else
-        if (list is null)
-            throw new ArgumentNullException(nameof(list));
-#endif
         ObservableCollectionQueryGenericList<TElement> listObservableCollection;
         lock (cachedGenericListObservableCollectionsAccess)
         {
@@ -168,12 +143,7 @@ public class CollectionObserver :
     /// <inheritdoc/>
     public IObservableCollectionQuery<TElement> ObserveReadOnlyList<TElement>(IReadOnlyList<TElement> readOnlyList)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(readOnlyList);
-#else
-        if (readOnlyList is null)
-            throw new ArgumentNullException(nameof(readOnlyList));
-#endif
         ObservableCollectionQueryReadOnlyList<TElement> readOnlyListObservableCollection;
         lock (cachedReadOnlyListObservableCollectionsAccess)
         {
@@ -194,12 +164,7 @@ public class CollectionObserver :
     public IObservableDictionaryQuery<TKey, TValue> ObserveReadOnlyDictionary<TKey, TValue>(IReadOnlyDictionary<TKey, TValue> dictionary)
         where TKey : notnull
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(dictionary);
-#else
-        if (dictionary is null)
-            throw new ArgumentNullException(nameof(dictionary));
-#endif
         ObservableDictionaryQueryReadOnlyDictionary<TKey, TValue> readOnlyDictionaryObservableDictionary;
         lock (cachedReadOnlyDictionaryObservableDictionariesAccess)
         {

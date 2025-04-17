@@ -17,12 +17,7 @@ public class FastComparer :
     /// <param name="type">The type</param>
     public static FastComparer Get(Type type)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(type);
-#else
-        if (type is null)
-            throw new ArgumentNullException(nameof(type));
-#endif
         return comparers.GetOrAdd(type, ComparersValueFactory);
     }
 
@@ -32,12 +27,7 @@ public class FastComparer :
     /// <param name="type">The type</param>
     public FastComparer(Type type)
     {
-#if IS_NET_6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(type);
-#else
-        if (type is null)
-            throw new ArgumentNullException(nameof(type));
-#endif
         Type = type;
         var comparerType = typeof(Comparer<>).MakeGenericType(type);
         comparer = comparerType.GetProperty(nameof(Comparer<object>.Default), BindingFlags.Public | BindingFlags.Static)!.FastGetValue(null)!;
