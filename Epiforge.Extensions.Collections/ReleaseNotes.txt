@@ -1,1 +1,1 @@
-We made several unfortunately breaking changes for the sake of consistency in type names and overload resolution.
+We upgraded NuGet references, dropped support for .NET Framework, and added support for .NET 8 and .NET 9.

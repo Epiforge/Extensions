@@ -14,7 +14,7 @@ sealed class ObservableCoalesceExpression :
             x?.Parameters[0].Type == y?.Parameters[0].Type && x?.Body.Type == y?.Body.Type;
 
         public int GetHashCode(LambdaExpression obj) =>
-            Components.HashCode.Combine(obj.Parameters[0].Type, obj.Body.Type);
+            HashCode.Combine(obj.Parameters[0].Type, obj.Body.Type);
     }
 
     #endregion Cache Comparers

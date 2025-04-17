@@ -83,7 +83,7 @@
 
     <ItemGroup>
         <PackageReference Include="Epiforge.Extensions.Collections" Version="1.5.0" />
-        <PackageReference Include="Epiforge.Extensions.Components" Version="1.7.0" />
+        <PackageReference Include="Epiforge.Extensions.Components" Version="2.0.0" />
         <PackageReference Include="System.Collections.Immutable" Version="8.0.0" />
     </ItemGroup>
 
