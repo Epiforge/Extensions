@@ -7,8 +7,9 @@
                     <CodeCoverage>
                         <ModulePaths>
                             <Exclude>
+                                <ModulePath>ben.demystifier.*</ModulePath>
+                                <ModulePath>fsharp.core.*</ModulePath>
                                 <ModulePath>moq.*</ModulePath>
-                                <!-- Add more ModulePath nodes here. -->
                             </Exclude>
                         </ModulePaths>
                     </CodeCoverage>
