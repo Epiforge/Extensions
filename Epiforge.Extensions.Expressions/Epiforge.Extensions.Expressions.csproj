@@ -2,7 +2,7 @@
 
     <PropertyGroup>
         <Product>Epiforge.Extensions.Expressions</Product>
-        <Version>2.0.0</Version>
+        <Version>2.0.1</Version>
         <Description>This package assists in operating with expressions.</Description>
     </PropertyGroup>
 

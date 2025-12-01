@@ -3,6 +3,25 @@ namespace Epiforge.Extensions.Expressions.Observable.Query;
 sealed class ObservableCollectionUsingSynchronizationContextEventuallyQuery<TElement> :
     ObservableCollectionQuery<TElement>
 {
+    static T MarshalForFunc<T>(SynchronizationContext synchronizationContext, Func<T> func)
+    {
+        if (synchronizationContext == SynchronizationContext.Current)
+            return func();
+        var tcs = new TaskCompletionSource<T>();
+        synchronizationContext.Post(_ =>
+        {
+            try
+            {
+                tcs.SetResult(func());
+            }
+            catch (Exception ex)
+            {
+                tcs.SetException(ex);
+            }
+        }, null);
+        return tcs.Task.Result;
+    }
+
     public ObservableCollectionUsingSynchronizationContextEventuallyQuery(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> source, SynchronizationContext synchronizationContext) :
         base(collectionObserver)
     {
@@ -16,17 +35,17 @@ sealed class ObservableCollectionUsingSynchronizationContextEventuallyQuery<TEle
     internal readonly SynchronizationContext SynchronizationContext;
 
     public override TElement this[int index] =>
-        SynchronizationContext.Send(() => elements![index]);
+        MarshalForFunc(SynchronizationContext, () => elements![index]);
 
     public override int Count =>
-        SynchronizationContext.Send(() => elements!.Count);
+        MarshalForFunc(SynchronizationContext, () => elements!.Count);
 
     public override bool IsSynchronized =>
         true;
 
     public override Exception? OperationFault
     {
-        get => SynchronizationContext.Send(() => source.OperationFault);
+        get => MarshalForFunc(SynchronizationContext, () => source.OperationFault);
         protected set => throw new NotImplementedException();
     }
 
@@ -48,7 +67,7 @@ sealed class ObservableCollectionUsingSynchronizationContextEventuallyQuery<TEle
     }
 
     public override IEnumerator<TElement> GetEnumerator() =>
-        SynchronizationContext.Send(() => elements!.ToList().AsReadOnly().GetEnumerator());
+        MarshalForFunc(SynchronizationContext, () => elements!.ToList().AsReadOnly().GetEnumerator());
 
     protected override void OnInitialization()
     {
