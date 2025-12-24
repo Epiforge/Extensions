@@ -1,19 +1,11 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-sealed class ObservableCollectionAggregateQuery<TElement, TAccumulate, TResult> :
-    ObservableCollectionScalarQuery<TElement, TResult>
+sealed class ObservableCollectionAggregateQuery<TElement, TAccumulate, TResult>(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> observableCollectionQuery, Func<TAccumulate> seedFactory, Func<TAccumulate, TElement, TAccumulate> func, Func<TAccumulate, TResult> resultSelector) :
+    ObservableCollectionScalarQuery<TElement, TResult>(collectionObserver, observableCollectionQuery)
 {
-    public ObservableCollectionAggregateQuery(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> observableCollectionQuery, Func<TAccumulate> seedFactory, Func<TAccumulate, TElement, TAccumulate> func, Func<TAccumulate, TResult> resultSelector) :
-        base(collectionObserver, observableCollectionQuery)
-    {
-        SeedFactory = seedFactory;
-        Func = func;
-        ResultSelector = resultSelector;
-    }
-
-    internal readonly Func<TAccumulate, TElement, TAccumulate> Func;
-    internal readonly Func<TAccumulate, TResult> ResultSelector;
-    internal readonly Func<TAccumulate> SeedFactory;
+    internal readonly Func<TAccumulate, TElement, TAccumulate> Func = func;
+    internal readonly Func<TAccumulate, TResult> ResultSelector = resultSelector;
+    internal readonly Func<TAccumulate> SeedFactory = seedFactory;
 
     protected override bool Dispose(bool disposing)
     {
@@ -53,7 +45,7 @@ sealed class ObservableCollectionAggregateQuery<TElement, TAccumulate, TResult> 
 
     void ObservableCollectionQueryPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(ObservableCollectionQuery<TElement>.OperationFault))
+        if (e.PropertyName == nameof(ObservableCollectionQuery<>.OperationFault))
             Evaluate();
     }
 

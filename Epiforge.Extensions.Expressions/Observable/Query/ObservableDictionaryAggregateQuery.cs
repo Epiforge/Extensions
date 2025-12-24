@@ -1,20 +1,12 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-sealed class ObservableDictionaryAggregateQuery<TKey, TValue, TAccumulate, TResult> :
-    ObservableDictionaryScalarQuery<TKey, TValue, TResult>
+sealed class ObservableDictionaryAggregateQuery<TKey, TValue, TAccumulate, TResult>(CollectionObserver collectionObserver, ObservableDictionaryQuery<TKey, TValue> observableDictionaryQuery, Func<TAccumulate> seedFactory, Func<TAccumulate, TKey, TValue, TAccumulate> func, Func<TAccumulate, TResult> resultSelector) :
+    ObservableDictionaryScalarQuery<TKey, TValue, TResult>(collectionObserver, observableDictionaryQuery)
     where TKey : notnull
 {
-    public ObservableDictionaryAggregateQuery(CollectionObserver collectionObserver, ObservableDictionaryQuery<TKey, TValue> observableDictionaryQuery, Func<TAccumulate> seedFactory, Func<TAccumulate, TKey, TValue, TAccumulate> func, Func<TAccumulate, TResult> resultSelector) :
-        base(collectionObserver, observableDictionaryQuery)
-    {
-        SeedFactory = seedFactory;
-        Func = func;
-        ResultSelector = resultSelector;
-    }
-
-    internal readonly Func<TAccumulate, TKey, TValue, TAccumulate> Func;
-    internal readonly Func<TAccumulate, TResult> ResultSelector;
-    internal readonly Func<TAccumulate> SeedFactory;
+    internal readonly Func<TAccumulate, TKey, TValue, TAccumulate> Func = func;
+    internal readonly Func<TAccumulate, TResult> ResultSelector = resultSelector;
+    internal readonly Func<TAccumulate> SeedFactory = seedFactory;
 
     protected override bool Dispose(bool disposing)
     {
@@ -57,7 +49,7 @@ sealed class ObservableDictionaryAggregateQuery<TKey, TValue, TAccumulate, TResu
 
     void ObservableDictionaryQueryPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(ObservableDictionaryQuery<TKey, TValue>.OperationFault))
+        if (e.PropertyName == nameof(ObservableDictionaryQuery<,>.OperationFault))
             Evaluate();
     }
 

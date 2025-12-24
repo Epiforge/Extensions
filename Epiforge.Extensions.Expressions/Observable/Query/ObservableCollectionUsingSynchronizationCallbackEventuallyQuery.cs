@@ -1,31 +1,18 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-sealed class ObservableCollectionUsingSynchronizationCallbackEventuallyQuery<TElement> :
-    ObservableCollectionQuery<TElement>
+sealed class ObservableCollectionUsingSynchronizationCallbackEventuallyQuery<TElement>(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> source, object context, CollectionSynchronizationCallback synchronizationCallback) :
+    ObservableCollectionQuery<TElement>(collectionObserver)
 {
-    public ObservableCollectionUsingSynchronizationCallbackEventuallyQuery(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> source, object context, CollectionSynchronizationCallback synchronizationCallback) :
-        base(collectionObserver)
-    {
-        disposedCancellationTokenSource = new();
-        pendingCollectionChangedEventsQueue = new();
-        resetCancellationTokenSources = new();
-        this.source = source;
-        Context = context;
-        SynchronizationCallback = synchronizationCallback;
-    }
-
     AsyncProducerConsumerQueue<NotifyCollectionChangedEventArgs>? currentPendingCollectionChangedEvents;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     CancellationTokenSource? currentResetCancellationTokenSource;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
-    readonly CancellationTokenSource disposedCancellationTokenSource;
+    readonly CancellationTokenSource disposedCancellationTokenSource = new();
     ObservableRangeCollection<TElement>? elements;
-    readonly ConcurrentQueue<AsyncProducerConsumerQueue<NotifyCollectionChangedEventArgs>> pendingCollectionChangedEventsQueue;
-    readonly ConcurrentQueue<CancellationTokenSource> resetCancellationTokenSources;
-    readonly ObservableCollectionQuery<TElement> source;
-
-    internal readonly object Context;
-    internal readonly CollectionSynchronizationCallback SynchronizationCallback;
+    readonly ConcurrentQueue<AsyncProducerConsumerQueue<NotifyCollectionChangedEventArgs>> pendingCollectionChangedEventsQueue = new();
+    readonly ConcurrentQueue<CancellationTokenSource> resetCancellationTokenSources = new();
+    internal readonly object Context = context;
+    internal readonly CollectionSynchronizationCallback SynchronizationCallback = synchronizationCallback;
 
     public override TElement this[int index] =>
         elements![index];

@@ -1,7 +1,7 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-abstract class ObservableCollectionQuery<TElement> :
-    ObservableQuery,
+abstract class ObservableCollectionQuery<TElement>(CollectionObserver collectionObserver) :
+    ObservableQuery(collectionObserver),
     IObservableCollectionQuery<TElement>
 {
     #region Cache Comparers
@@ -86,56 +86,75 @@ abstract class ObservableCollectionQuery<TElement> :
 
     static readonly PropertyChangedEventArgs operationFaultPropertyChangedEventArgs = new(nameof(OperationFault));
     static readonly PropertyChangingEventArgs operationFaultPropertyChangingEventArgs = new(nameof(OperationFault));
-
-    public ObservableCollectionQuery(CollectionObserver collectionObserver) :
-        base(collectionObserver)
-    {
-    }
-
-    readonly Dictionary<(object seedFactory, object func, object resultSelector), ObservableQuery> cachedAggregateQueries = new();
-    readonly object cachedAggregateQueriesAccess = new();
+    readonly Dictionary<(object seedFactory, object func, object resultSelector), ObservableQuery> cachedAggregateQueries = [];
     readonly Dictionary<Expression<Func<TElement, bool>>, ObservableCollectionAllQuery<TElement>> cachedAllQueries = new(ExpressionEqualityComparer.Default);
-    readonly object cachedAllQueriesAccess = new();
     readonly NullableKeyDictionary<Expression<Func<TElement, bool>>?, ObservableCollectionAnyQuery<TElement>> cachedAnyQueries = new(ExpressionEqualityComparer.Default!);
-    readonly object cachedAnyQueriesAccess = new();
     readonly Dictionary<Expression, ObservableQuery> cachedAverageQueries = new(ExpressionEqualityComparer.Default);
-    readonly object cachedAverageQueriesAccess = new();
-    readonly Dictionary<int, ObservableCollectionComparisonQuery<TElement>> cachedComparisonQueries = new();
-    readonly object cachedComparisonQueriesAccess = new();
-    readonly Dictionary<IObservableCollectionQuery<TElement>, ObservableCollectionConcatQuery<TElement>> cachedConcatQueries = new();
-    readonly object cachedConcatQueriesAccess = new();
+    readonly Dictionary<int, ObservableCollectionComparisonQuery<TElement>> cachedComparisonQueries = [];
+    readonly Dictionary<IObservableCollectionQuery<TElement>, ObservableCollectionConcatQuery<TElement>> cachedConcatQueries = [];
     ObservableCollectionCountQuery<TElement>? cachedCountQuery;
-    readonly object cachedCountQueryAccess = new();
     readonly Dictionary<(Expression keySelector, object keyEqualityComparer), ObservableQuery> cachedGroupByQueries = new(CachedGroupByQueryEqualityComparer.Default);
-    readonly object cachedGroupByQueriesAccess = new();
-    readonly Dictionary<(Index? index, bool outOfRangeIsDefault), ObservableQuery> cachedIndexQueries = new();
-    readonly object cachedIndexQueriesAccess = new();
-    readonly Dictionary<IReadOnlyList<(Expression<Func<TElement, IComparable>> selector, bool isDescending)>, ObservableCollectionOrderByQuery<TElement>> cachedOrderByQueries = new(CachedOrderByQueryEqualityComparer.Default);
+    readonly Dictionary<(Index? index, bool outOfRangeIsDefault), ObservableQuery> cachedIndexQueries = [];
     ObservableCollectionIndividualChangesQuery<TElement>? cachedIndividualChangeQuery;
+    readonly Dictionary<IReadOnlyList<(Expression<Func<TElement, IComparable>> selector, bool isDescending)>, ObservableCollectionOrderByQuery<TElement>> cachedOrderByQueries = new(CachedOrderByQueryEqualityComparer.Default);
+    readonly Dictionary<Expression, ObservableQuery> cachedSelectQueries = new(ExpressionEqualityComparer.Default);
+    readonly Dictionary<Expression, ObservableQuery> cachedSelectManyQueries = new(ExpressionEqualityComparer.Default);
+    readonly Dictionary<Expression, ObservableQuery> cachedSumQueries = new(ExpressionEqualityComparer.Default);
+    readonly Dictionary<(Expression keySelector, Expression valueSelector, object equalityComparer), ObservableQuery> cachedToDictionaryQueries = new(CachedToDictionaryQueryEqualityComparer.Default);
+    readonly Dictionary<(object context, CollectionSynchronizationCallback synchronizationCallback), ObservableCollectionUsingSynchronizationCallbackEventuallyQuery<TElement>> cachedUsingSynchronizationCallbackEventuallyQueries = [];
+    readonly Dictionary<(object context, CollectionSynchronizationCallback synchronizationCallback), ObservableCollectionUsingSynchronizationCallbackQuery<TElement>> cachedUsingSynchronizationCallbackQueries = [];
+    readonly Dictionary<SynchronizationContext, ObservableCollectionUsingSynchronizationContextEventuallyQuery<TElement>> cachedUsingSynchronizationContextEventuallyQueries = [];
+    readonly Dictionary<SynchronizationContext, ObservableCollectionUsingSynchronizationContextQuery<TElement>> cachedUsingSynchronizationContextQueries = [];
+    readonly Dictionary<object, ObservableCollectionUsingSyncRootEventuallyQuery<TElement>> cachedUsingSyncRootEventuallyQueries = [];
+    readonly Dictionary<object, ObservableCollectionUsingSyncRootQuery<TElement>> cachedUsingSyncRootQueries = [];
+    readonly Dictionary<Expression<Func<TElement, bool>>, ObservableCollectionWhereQuery<TElement>> cachedWhereQueries = new(ExpressionEqualityComparer.Default);
+#if IS_NET_9_0_OR_GREATER
+    readonly Lock cachedAggregateQueriesAccess = new();
+    readonly Lock cachedAllQueriesAccess = new();
+    readonly Lock cachedAnyQueriesAccess = new();
+    readonly Lock cachedAverageQueriesAccess = new();
+    readonly Lock cachedComparisonQueriesAccess = new();
+    readonly Lock cachedConcatQueriesAccess = new();
+    readonly Lock cachedCountQueryAccess = new();
+    readonly Lock cachedGroupByQueriesAccess = new();
+    readonly Lock cachedIndexQueriesAccess = new();
+    readonly Lock cachedIndividualChangeQueryAccess = new();
+    readonly Lock cachedOrderByQueriesAccess = new();
+    readonly Lock cachedSelectQueriesAccess = new();
+    readonly Lock cachedSelectManyQueriesAccess = new();
+    readonly Lock cachedSumQueriesAccess = new();
+    readonly Lock cachedToDictionaryQueriesAccess = new();
+    readonly Lock cachedUsingSynchronizationCallbackEventuallyQueriesAccess = new();
+    readonly Lock cachedUsingSynchronizationCallbackQueriesAccess = new();
+    readonly Lock cachedUsingSynchronizationContextEventuallyQueriesAccess = new();
+    readonly Lock cachedUsingSynchronizationContextQueriesAccess = new();
+    readonly Lock cachedUsingSyncRootEventuallyQueriesAccess = new();
+    readonly Lock cachedUsingSyncRootQueriesAccess = new();
+    readonly Lock cachedWhereQueriesAccess = new();
+#else
+    readonly object cachedAggregateQueriesAccess = new();
+    readonly object cachedAllQueriesAccess = new();
+    readonly object cachedAnyQueriesAccess = new();
+    readonly object cachedAverageQueriesAccess = new();
+    readonly object cachedComparisonQueriesAccess = new();
+    readonly object cachedConcatQueriesAccess = new();
+    readonly object cachedCountQueryAccess = new();
+    readonly object cachedGroupByQueriesAccess = new();
+    readonly object cachedIndexQueriesAccess = new();
     readonly object cachedIndividualChangeQueryAccess = new();
     readonly object cachedOrderByQueriesAccess = new();
-    readonly Dictionary<Expression, ObservableQuery> cachedSelectQueries = new(ExpressionEqualityComparer.Default);
     readonly object cachedSelectQueriesAccess = new();
-    readonly Dictionary<Expression, ObservableQuery> cachedSelectManyQueries = new(ExpressionEqualityComparer.Default);
     readonly object cachedSelectManyQueriesAccess = new();
-    readonly Dictionary<Expression, ObservableQuery> cachedSumQueries = new(ExpressionEqualityComparer.Default);
     readonly object cachedSumQueriesAccess = new();
-    readonly Dictionary<(Expression keySelector, Expression valueSelector, object equalityComparer), ObservableQuery> cachedToDictionaryQueries = new(CachedToDictionaryQueryEqualityComparer.Default);
     readonly object cachedToDictionaryQueriesAccess = new();
-    readonly Dictionary<(object context, CollectionSynchronizationCallback synchronizationCallback), ObservableCollectionUsingSynchronizationCallbackEventuallyQuery<TElement>> cachedUsingSynchronizationCallbackEventuallyQueries = new();
     readonly object cachedUsingSynchronizationCallbackEventuallyQueriesAccess = new();
-    readonly Dictionary<(object context, CollectionSynchronizationCallback synchronizationCallback), ObservableCollectionUsingSynchronizationCallbackQuery<TElement>> cachedUsingSynchronizationCallbackQueries = new();
     readonly object cachedUsingSynchronizationCallbackQueriesAccess = new();
-    readonly Dictionary<SynchronizationContext, ObservableCollectionUsingSynchronizationContextEventuallyQuery<TElement>> cachedUsingSynchronizationContextEventuallyQueries = new();
     readonly object cachedUsingSynchronizationContextEventuallyQueriesAccess = new();
-    readonly Dictionary<SynchronizationContext, ObservableCollectionUsingSynchronizationContextQuery<TElement>> cachedUsingSynchronizationContextQueries = new();
     readonly object cachedUsingSynchronizationContextQueriesAccess = new();
-    readonly Dictionary<object, ObservableCollectionUsingSyncRootEventuallyQuery<TElement>> cachedUsingSyncRootEventuallyQueries = new();
     readonly object cachedUsingSyncRootEventuallyQueriesAccess = new();
-    readonly Dictionary<object, ObservableCollectionUsingSyncRootQuery<TElement>> cachedUsingSyncRootQueries = new();
     readonly object cachedUsingSyncRootQueriesAccess = new();
-    readonly Dictionary<Expression<Func<TElement, bool>>, ObservableCollectionWhereQuery<TElement>> cachedWhereQueries = new(ExpressionEqualityComparer.Default);
     readonly object cachedWhereQueriesAccess = new();
+#endif
     Exception? operationFault;
 
     public abstract TElement this[int index] { get; }
@@ -636,7 +655,7 @@ abstract class ObservableCollectionQuery<TElement> :
         return firstOrDefault;
     }
 
-    IObservableScalarQuery<TElement> ObserveIndex(Index? index, bool outOfRangeIsDefault)
+    ObservableCollectionIndexQuery<TElement> ObserveIndex(Index? index, bool outOfRangeIsDefault)
     {
         ObservableCollectionIndexQuery<TElement> indexQuery;
         lock (cachedIndexQueriesAccess)

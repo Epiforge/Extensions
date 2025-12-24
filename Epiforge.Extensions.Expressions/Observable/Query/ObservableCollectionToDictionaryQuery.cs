@@ -1,32 +1,18 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue> :
-    ObservableDictionaryQuery<TKey, TValue>
+sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> source, Expression<Func<TElement, TKey>> keySelector, Expression<Func<TElement, TValue>> valueSelector, IEqualityComparer<TKey> equalityComparer) :
+    ObservableDictionaryQuery<TKey, TValue>(collectionObserver)
     where TKey : notnull
 {
-    public ObservableCollectionToDictionaryQuery(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> source, Expression<Func<TElement, TKey>> keySelector, Expression<Func<TElement, TValue>> valueSelector, IEqualityComparer<TKey> equalityComparer) :
-        base(collectionObserver)
-    {
-        access = new();
-        dictionary = new(equalityComparer);
-        duplicateKeys = new();
-        this.source = source;
-        KeySelector = keySelector;
-        ValueSelector = valueSelector;
-        EqualityComparer = equalityComparer;
-    }
-
-    readonly object access;
-    readonly ObservableDictionary<TKey, TValue> dictionary;
-    readonly Dictionary<TKey, int> duplicateKeys;
+    readonly object access = new();
+    readonly ObservableDictionary<TKey, TValue> dictionary = new(equalityComparer);
+    readonly Dictionary<TKey, int> duplicateKeys = [];
     int nullKeys;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     IObservableCollectionQuery<KeyValuePair<TKey, TValue>>? select;
-    readonly ObservableCollectionQuery<TElement> source;
-
-    internal readonly IEqualityComparer<TKey> EqualityComparer;
-    internal readonly Expression<Func<TElement, TKey>> KeySelector;
-    internal readonly Expression<Func<TElement, TValue>> ValueSelector;
+    internal readonly IEqualityComparer<TKey> EqualityComparer = equalityComparer;
+    internal readonly Expression<Func<TElement, TKey>> KeySelector = keySelector;
+    internal readonly Expression<Func<TElement, TValue>> ValueSelector = valueSelector;
 
     public override TValue this[TKey key]
     {
@@ -135,7 +121,7 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue> :
     protected override void OnInitialization()
     {
         var elementParameter = Expression.Parameter(typeof(TElement));
-        select = source.ObserveSelect(Expression.Lambda<Func<TElement, KeyValuePair<TKey, TValue>>>(Expression.New(typeof(KeyValuePair<TKey, TValue>).GetConstructor(new[] { typeof(TKey), typeof(TValue) })!, Expression.Invoke(KeySelector, elementParameter), Expression.Invoke(ValueSelector, elementParameter)), elementParameter));
+        select = source.ObserveSelect(Expression.Lambda<Func<TElement, KeyValuePair<TKey, TValue>>>(Expression.New(typeof(KeyValuePair<TKey, TValue>).GetConstructor([typeof(TKey), typeof(TValue)])!, Expression.Invoke(KeySelector, elementParameter), Expression.Invoke(ValueSelector, elementParameter)), elementParameter));
         foreach (var keyValuePair in select)
         {
             var key = keyValuePair.Key;
@@ -185,7 +171,7 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue> :
             }
             else if (e.Action is not NotifyCollectionChangedAction.Move)
             {
-                var newKeyValuePairs = e.NewItems?.Cast<KeyValuePair<TKey, TValue>>().ToList() ?? new List<KeyValuePair<TKey, TValue>>();
+                var newKeyValuePairs = e.NewItems?.Cast<KeyValuePair<TKey, TValue>>().ToList() ?? [];
                 if (e.OldItems is { } oldItems && oldItems.Count > 0 && e.OldStartingIndex >= 0)
                     foreach (var oldKeyValuePair in oldItems.Cast<KeyValuePair<TKey, TValue>>())
                     {
@@ -232,7 +218,7 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue> :
 
     void SelectPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(IObservableCollectionQuery<KeyValuePair<TKey, TValue>>.OperationFault))
+        if (e.PropertyName == nameof(IObservableCollectionQuery<>.OperationFault))
             SetOperationFault();
     }
 

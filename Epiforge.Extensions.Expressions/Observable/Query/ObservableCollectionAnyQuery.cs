@@ -1,17 +1,13 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-sealed class ObservableCollectionAnyQuery<TElement> :
-    ObservableCollectionScalarQuery<TElement, bool>
+sealed class ObservableCollectionAnyQuery<TElement>(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> observableCollectionQuery, Expression<Func<TElement, bool>>? predicate = null) :
+    ObservableCollectionScalarQuery<TElement, bool>(collectionObserver, observableCollectionQuery)
 {
-    public ObservableCollectionAnyQuery(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> observableCollectionQuery, Expression<Func<TElement, bool>>? predicate = null) :
-        base(collectionObserver, observableCollectionQuery) =>
-        Predicate = predicate;
-
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     IObservableCollectionQuery<TElement>? where;
     int observableCollectionQueryCount;
 
-    internal readonly Expression<Func<TElement, bool>>? Predicate;
+    internal readonly Expression<Func<TElement, bool>>? Predicate = predicate;
 
     protected override bool Dispose(bool disposing)
     {
@@ -49,7 +45,7 @@ sealed class ObservableCollectionAnyQuery<TElement> :
 
     void ObservableCollectionQueryPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(ObservableCollectionQuery<TElement>.OperationFault))
+        if (e.PropertyName == nameof(ObservableCollectionQuery<>.OperationFault))
             Evaluate();
     }
 
@@ -78,7 +74,7 @@ sealed class ObservableCollectionAnyQuery<TElement> :
 
     void WherePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(IObservableCollectionQuery<TElement>.OperationFault))
+        if (e.PropertyName == nameof(IObservableCollectionQuery<>.OperationFault))
             Evaluate();
     }
 }

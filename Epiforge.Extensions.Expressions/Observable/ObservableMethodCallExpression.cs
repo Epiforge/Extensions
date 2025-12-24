@@ -1,18 +1,14 @@
 namespace Epiforge.Extensions.Expressions.Observable;
 
-sealed class ObservableMethodCallExpression :
-    ObservableExpression
+sealed class ObservableMethodCallExpression(ExpressionObserver observer, MethodCallExpression methodCallExpression, bool deferEvaluation) :
+    ObservableExpression(observer, methodCallExpression, deferEvaluation)
 {
-    public ObservableMethodCallExpression(ExpressionObserver observer, MethodCallExpression methodCallExpression, bool deferEvaluation) :
-        base(observer, methodCallExpression, deferEvaluation) =>
-        MethodCallExpression = methodCallExpression;
-
-    IReadOnlyList<ObservableExpression>? arguments;
+    ReadOnlyCollection<ObservableExpression>? arguments;
     MethodInfo? method;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     ObservableExpression? @object;
 
-    internal readonly MethodCallExpression MethodCallExpression;
+    internal readonly MethodCallExpression MethodCallExpression = methodCallExpression;
 
     void ArgumentPropertyChanged(object? sender, PropertyChangedEventArgs e) =>
         Evaluate();
@@ -61,7 +57,7 @@ sealed class ObservableMethodCallExpression :
             }
             else
             {
-                var value = method?.FastInvoke(objectResult, arguments?.Select(argument => argument.Evaluation.Result).ToArray() ?? Array.Empty<object?>());
+                var value = method?.FastInvoke(objectResult, arguments?.Select(argument => argument.Evaluation.Result).ToArray() ?? []);
                 Evaluation = (null, value);
                 observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{MethodCallExpression} evaluated: {Value}", MethodCallExpression, value);
             }

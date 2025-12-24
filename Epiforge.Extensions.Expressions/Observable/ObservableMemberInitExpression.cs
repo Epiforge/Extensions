@@ -1,17 +1,13 @@
 namespace Epiforge.Extensions.Expressions.Observable;
 
-sealed class ObservableMemberInitExpression :
-    ObservableExpression
+sealed class ObservableMemberInitExpression(ExpressionObserver observer, MemberInitExpression memberInitExpression, bool deferEvaluation) :
+    ObservableExpression(observer, memberInitExpression, deferEvaluation)
 {
-    public ObservableMemberInitExpression(ExpressionObserver observer, MemberInitExpression memberInitExpression, bool deferEvaluation) :
-        base(observer, memberInitExpression, deferEvaluation) =>
-        MemberInitExpression = memberInitExpression;
-
     IReadOnlyDictionary<ObservableExpression, MemberInfo>? memberAssignmentObservableExpressions;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     ObservableExpression? newObservableExpression;
 
-    internal readonly MemberInitExpression MemberInitExpression;
+    internal readonly MemberInitExpression MemberInitExpression = memberInitExpression;
 
     protected override bool Dispose(bool disposing)
     {

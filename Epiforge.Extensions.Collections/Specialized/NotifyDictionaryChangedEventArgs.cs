@@ -38,7 +38,7 @@ public sealed class NotifyDictionaryChangedEventArgs<TKey, TValue> :
     /// <param name="action">The action that caused the event (this must be set to <see cref="NotifyDictionaryChangedAction.Add"/> or <see cref="NotifyDictionaryChangedAction.Remove"/>)</param>
     /// <param name="changedItem">The item that is affected by the change</param>
     public NotifyDictionaryChangedEventArgs(NotifyDictionaryChangedAction action, KeyValuePair<TKey, TValue> changedItem) :
-        this(action, new KeyValuePair<TKey, TValue>[] { changedItem })
+        this(action, [changedItem])
     {
     }
 
@@ -81,7 +81,7 @@ public sealed class NotifyDictionaryChangedEventArgs<TKey, TValue> :
     /// <param name="newItem">The new key-value pair that is replacing the original key-value pair</param>
     /// <param name="oldItem">The original key-value pair that is replaced</param>
     public NotifyDictionaryChangedEventArgs(NotifyDictionaryChangedAction action, KeyValuePair<TKey, TValue> newItem, KeyValuePair<TKey, TValue> oldItem) :
-        this(action, new KeyValuePair<TKey, TValue>[] { newItem }, new KeyValuePair<TKey, TValue>[] { oldItem })
+        this(action, [newItem], [oldItem])
     {
     }
 
@@ -103,14 +103,14 @@ public sealed class NotifyDictionaryChangedEventArgs<TKey, TValue> :
     {
         Action = action;
         if (newItems is IEnumerable<KeyValuePair<TKey, TValue>> actualNewItems)
-            NewItems = actualNewItems.ToImmutableArray();
+            NewItems = [..actualNewItems];
     }
 
     void InitializeRemove(NotifyDictionaryChangedAction action, IEnumerable<KeyValuePair<TKey, TValue>>? oldItems)
     {
         Action = action;
         if (oldItems is IEnumerable<KeyValuePair<TKey, TValue>> actualOldItems)
-            OldItems = actualOldItems.ToImmutableArray();
+            OldItems = [..actualOldItems];
     }
 
     /// <summary>

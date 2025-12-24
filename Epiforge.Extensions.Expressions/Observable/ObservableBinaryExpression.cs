@@ -1,7 +1,7 @@
 namespace Epiforge.Extensions.Expressions.Observable;
 
-class ObservableBinaryExpression :
-    ObservableExpression
+class ObservableBinaryExpression(ExpressionObserver observer, BinaryExpression binaryExpression, bool deferEvaluation) :
+    ObservableExpression(observer, binaryExpression, deferEvaluation)
 {
     #region Delegates
 
@@ -22,17 +22,13 @@ class ObservableBinaryExpression :
         return Expression.Lambda<BinaryOperationDelegate>(Expression.Convert(key.Method is null ? Expression.MakeBinary(key.NodeType, leftConversion, rightConversion) : Expression.MakeBinary(key.NodeType, leftConversion, rightConversion, key.IsLiftedToNull, key.Method), typeof(object)), leftParameter, rightParameter).Compile();
     }
 
-    public ObservableBinaryExpression(ExpressionObserver observer, BinaryExpression binaryExpression, bool deferEvaluation) :
-        base(observer, binaryExpression, deferEvaluation) =>
-        BinaryExpression = binaryExpression;
-
     BinaryOperationDelegate? @delegate;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     protected ObservableExpression? left;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     protected ObservableExpression? right;
 
-    internal readonly BinaryExpression BinaryExpression;
+    internal readonly BinaryExpression BinaryExpression = binaryExpression;
 
     protected override bool Dispose(bool disposing)
     {

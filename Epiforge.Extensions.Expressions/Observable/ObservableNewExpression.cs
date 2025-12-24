@@ -1,17 +1,13 @@
 namespace Epiforge.Extensions.Expressions.Observable;
 
-sealed class ObservableNewExpression :
-    ObservableExpression
+sealed class ObservableNewExpression(ExpressionObserver observer, NewExpression newExpression, bool deferEvaluation) :
+    ObservableExpression(observer, newExpression, deferEvaluation)
 {
-    public ObservableNewExpression(ExpressionObserver observer, NewExpression newExpression, bool deferEvaluation) :
-        base(observer, newExpression, deferEvaluation) =>
-        NewExpression = newExpression;
-
-    IReadOnlyList<ObservableExpression>? arguments;
+    ReadOnlyCollection<ObservableExpression>? arguments;
     ConstructorInfo? constructor;
     EquatableList<Type> constructorParameterTypes;
 
-    internal readonly NewExpression NewExpression;
+    internal readonly NewExpression NewExpression = newExpression;
 
     void ArgumentPropertyChanged(object? sender, PropertyChangedEventArgs e) =>
         Evaluate();
@@ -49,7 +45,7 @@ sealed class ObservableNewExpression :
             }
             else
             {
-                var value = constructor is not null ? constructor.FastInvoke(arguments?.Select(argument => argument.Evaluation.Result).ToArray() ?? Array.Empty<object?>()) : Activator.CreateInstance(NewExpression.Type, arguments?.Select(argument => argument.Evaluation.Result).ToArray() ?? Array.Empty<object?>());
+                var value = constructor is not null ? constructor.FastInvoke(arguments?.Select(argument => argument.Evaluation.Result).ToArray() ?? []) : Activator.CreateInstance(NewExpression.Type, arguments?.Select(argument => argument.Evaluation.Result).ToArray() ?? []);
                 Evaluation = (null, value);
                 observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{NewExpression} evaluated: {Value}", NewExpression, value);
             }

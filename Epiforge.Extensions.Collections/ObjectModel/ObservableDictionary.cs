@@ -25,7 +25,7 @@ public class ObservableDictionary<TKey, TValue> :
     /// </summary>
     public ObservableDictionary()
     {
-        gd = new Dictionary<TKey, TValue>();
+        gd = [];
         ci = gd;
         gci = gd;
         di = gd;
@@ -415,7 +415,7 @@ public class ObservableDictionary<TKey, TValue> :
     /// <param name="keys">The keys of the elements to get</param>
     /// <returns>The elements with the specified keys</returns>
     public virtual IReadOnlyList<KeyValuePair<TKey, TValue>> GetRange(IEnumerable<TKey> keys) =>
-        keys.Select(key => new KeyValuePair<TKey, TValue>(key, gd[key])).ToImmutableArray();
+        [..keys.Select(key => new KeyValuePair<TKey, TValue>(key, gd[key]))];
 
     /// <summary>
     /// Gets the element with the specified key
@@ -604,7 +604,7 @@ public class ObservableDictionary<TKey, TValue> :
             OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Remove, removed));
             NotifyCountChanged();
         }
-        return removed.ToImmutableArray();
+        return [..removed];
     }
 
     /// <summary>
@@ -620,7 +620,7 @@ public class ObservableDictionary<TKey, TValue> :
             if (gd.TryGetValue(key, out var value))
                 removingKeyValuePairs.Add(new KeyValuePair<TKey, TValue>(key, value));
         var removedKeys = new List<TKey>();
-        if (removingKeyValuePairs.Any())
+        if (removingKeyValuePairs.Count is not 0)
         {
             NotifyCountChanging();
             foreach (var removingKeyValuePair in removingKeyValuePairs)
@@ -631,7 +631,7 @@ public class ObservableDictionary<TKey, TValue> :
             OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Remove, removingKeyValuePairs));
             NotifyCountChanged();
         }
-        return removedKeys.ToImmutableArray();
+        return [..removedKeys];
     }
 
     /// <summary>
@@ -680,7 +680,7 @@ public class ObservableDictionary<TKey, TValue> :
         OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Replace, newKeyValuePairs, removingKeyValuePairs));
         if (countChanging)
             NotifyCountChanged();
-        return removedKeys.ToImmutableArray();
+        return [..removedKeys];
     }
 
     /// <summary>
@@ -691,7 +691,7 @@ public class ObservableDictionary<TKey, TValue> :
         var countChanging = gd.Count > 0;
         if (countChanging)
             NotifyCountChanging();
-        gd = comparer is null ? new Dictionary<TKey, TValue>() : new Dictionary<TKey, TValue>(comparer);
+        gd = comparer is null ? [] : new Dictionary<TKey, TValue>(comparer);
         CastAndNotifyReset();
         if (countChanging)
             NotifyCountChanged();
@@ -744,6 +744,7 @@ public class ObservableDictionary<TKey, TValue> :
     /// <param name="key">The key of the element to add</param>
     /// <param name="value">The value of the element to add</param>
     /// <returns><c>true</c> if the key/value pair was added to the dictionary successfully; otherwise, <c>false</c></returns>
+    [SuppressMessage("Performance", "CA1864: Prefer the 'IDictionary.TryAdd(TKey, TValue)' method", Justification = "Must only raise property changing if a change is occurring")]
     public virtual bool TryAdd(TKey key, TValue value)
     {
         ArgumentNullException.ThrowIfNull(key);

@@ -30,9 +30,9 @@ public class FastEqualityComparer :
         ArgumentNullException.ThrowIfNull(type);
         Type = type;
         var equalityComparerType = typeof(EqualityComparer<>).MakeGenericType(type);
-        equalityComparer = equalityComparerType.GetProperty(nameof(EqualityComparer<object>.Default), BindingFlags.Public | BindingFlags.Static)!.FastGetValue(null)!;
-        equals = equalityComparerType.GetMethod(nameof(EqualityComparer<object>.Equals), new[] { type, type })!;
-        getHashCode = equalityComparerType.GetMethod(nameof(EqualityComparer<object>.GetHashCode), new[] { type })!;
+        equalityComparer = equalityComparerType.GetProperty(nameof(EqualityComparer<>.Default), BindingFlags.Public | BindingFlags.Static)!.FastGetValue(null)!;
+        equals = equalityComparerType.GetMethod(nameof(EqualityComparer<>.Equals), [type, type])!;
+        getHashCode = equalityComparerType.GetMethod(nameof(EqualityComparer<>.GetHashCode), [type])!;
     }
 
     readonly object equalityComparer;

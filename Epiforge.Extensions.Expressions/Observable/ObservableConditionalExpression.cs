@@ -1,12 +1,8 @@
 namespace Epiforge.Extensions.Expressions.Observable;
 
-sealed class ObservableConditionalExpression :
-    ObservableExpression
+sealed class ObservableConditionalExpression(ExpressionObserver observer, ConditionalExpression conditionalExpression, bool deferEvaluation) :
+    ObservableExpression(observer, conditionalExpression, deferEvaluation)
 {
-    public ObservableConditionalExpression(ExpressionObserver observer, ConditionalExpression conditionalExpression, bool deferEvaluation) :
-        base(observer, conditionalExpression, deferEvaluation) =>
-        ConditionalExpression = conditionalExpression;
-
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     ObservableExpression? ifFalse;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
@@ -14,7 +10,7 @@ sealed class ObservableConditionalExpression :
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     ObservableExpression? test;
 
-    internal readonly ConditionalExpression ConditionalExpression;
+    internal readonly ConditionalExpression ConditionalExpression = conditionalExpression;
 
     protected override bool Dispose(bool disposing)
     {

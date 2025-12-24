@@ -1,13 +1,8 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-sealed class ObservableCollectionCountQuery<TElement> :
-    ObservableCollectionScalarQuery<TElement, int>
+sealed class ObservableCollectionCountQuery<TElement>(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> observableCollectionQuery) :
+    ObservableCollectionScalarQuery<TElement, int>(collectionObserver, observableCollectionQuery)
 {
-    public ObservableCollectionCountQuery(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> observableCollectionQuery) :
-        base(collectionObserver, observableCollectionQuery)
-    {
-    }
-
     protected override bool Dispose(bool disposing)
     {
         if (disposing)

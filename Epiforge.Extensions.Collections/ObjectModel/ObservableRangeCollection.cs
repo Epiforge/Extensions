@@ -100,7 +100,7 @@ public class ObservableRangeCollection<T> :
                 removed.Add(GetAndRemoveAt(i));
             else
                 ++i;
-        return removed.ToImmutableArray();
+        return [..removed];
     }
 
     /// <inheritdoc/>
@@ -117,7 +117,7 @@ public class ObservableRangeCollection<T> :
         var result = new List<T>();
         for (int i = index, ii = index + count; i < ii; ++i)
             result.Add(this[i]);
-        return result.ToImmutableArray();
+        return [..result];
     }
 
     /// <inheritdoc/>
@@ -307,7 +307,7 @@ public class ObservableRangeCollection<T> :
                 OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, oldItems, originalIndex));
             if (oldItems.Length != list.Count)
                 NotifyCountChanged();
-            return oldItems.ToImmutableArray();
+            return [..oldItems];
         }
     }
 

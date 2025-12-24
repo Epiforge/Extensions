@@ -1,16 +1,15 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-abstract class ObservableScalarQuery<TResult> :
-    ObservableQuery,
+abstract class ObservableScalarQuery<TResult>(CollectionObserver collectionObserver) :
+    ObservableQuery(collectionObserver),
     IObservableScalarQuery<TResult>
 {
-    protected ObservableScalarQuery(CollectionObserver collectionObserver) :
-        base(collectionObserver)
-    {
-    }
-
     readonly Dictionary<Expression, ObservableQuery> cachedTransformQueries = new(ExpressionEqualityComparer.Default);
+#if IS_NET_9_0_OR_GREATER
+    readonly Lock cachedTransformQueriesAccess = new();
+#else
     readonly object cachedTransformQueriesAccess = new();
+#endif
     (Exception? Fault, TResult Result) evaluation;
 
     public override int CachedObservableQueries

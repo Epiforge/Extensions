@@ -1,17 +1,13 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-sealed class ObservableCollectionAllQuery<TElement> :
-    ObservableCollectionScalarQuery<TElement, bool>
+sealed class ObservableCollectionAllQuery<TElement>(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> observableCollectionQuery, Expression<Func<TElement, bool>> predicate) :
+    ObservableCollectionScalarQuery<TElement, bool>(collectionObserver, observableCollectionQuery)
 {
-    public ObservableCollectionAllQuery(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> observableCollectionQuery, Expression<Func<TElement, bool>> predicate) :
-        base(collectionObserver, observableCollectionQuery) =>
-        Predicate = predicate;
-
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     IObservableCollectionQuery<TElement>? where;
     int observableCollectionQueryCount;
 
-    internal readonly Expression<Func<TElement, bool>> Predicate;
+    internal readonly Expression<Func<TElement, bool>> Predicate = predicate;
 
     protected override bool Dispose(bool disposing)
     {
@@ -42,7 +38,7 @@ sealed class ObservableCollectionAllQuery<TElement> :
 
     void ObservableCollectionQueryPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(ObservableCollectionQuery<TElement>.OperationFault))
+        if (e.PropertyName == nameof(ObservableCollectionQuery<>.OperationFault))
             Evaluate();
     }
 

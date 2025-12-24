@@ -7,8 +7,8 @@ sealed class ObservableCollectionOrderingComparer<TElement> :
     public ObservableCollectionOrderingComparer(IReadOnlyList<(IObservableCollectionQuery<Tuple<TElement, IComparable>> selection, bool isDescending)> selectionsAndDirections)
     {
         access = new();
-        comparables = new();
-        counts = new();
+        comparables = [];
+        counts = [];
         this.selectionsAndDirections = selectionsAndDirections;
         lock (access)
         {
@@ -35,7 +35,11 @@ sealed class ObservableCollectionOrderingComparer<TElement> :
         }
     }
 
+#if IS_NET_9_0_OR_GREATER
+    readonly Lock access;
+#else
     readonly object access;
+#endif
     readonly NullableKeyDictionary<TElement, List<IComparable>> comparables;
     readonly NullableKeyDictionary<TElement, int> counts;
     readonly (IObservableCollectionQuery<Tuple<TElement, IComparable>> selection, bool isDescending) lastSelectionAndDirection;
@@ -137,7 +141,7 @@ sealed class ObservableCollectionOrderingComparer<TElement> :
                                 var count = elementComparables.Count();
                                 if (!comparables.TryGetValue(element, out var elementComparablesList))
                                 {
-                                    elementComparablesList = new List<IComparable>();
+                                    elementComparablesList = [];
                                     comparables.Add(element, elementComparablesList);
                                     elementComparablesList.Add(elementComparables.First());
                                     counts.Add(element, count);

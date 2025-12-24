@@ -4,7 +4,10 @@ namespace Epiforge.Extensions.Collections.Generic;
 /// Provides an implementation of the <see cref="IComparer{T}"/> generic interface which reverses the order of the comparison
 /// </summary>
 /// <typeparam name="T">The type of objects to compare</typeparam>
-public class ReversedComparer<T> :
+/// <remarks>
+/// Initializes a new instance of the <see cref="ReversedComparer{T}"/> class based on the specified implementation of the <see cref="IComparer{T}"/> generic interface
+/// </remarks>
+public class ReversedComparer<T>(IComparer<T> comparer) :
     IComparer<T>
 {
     /// <summary>
@@ -19,14 +22,6 @@ public class ReversedComparer<T> :
         this(Comparer<T>.Default)
     {
     }
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="ReversedComparer{T}"/> class based on the specified implementation of the <see cref="IComparer{T}"/> generic interface
-    /// </summary>
-    public ReversedComparer(IComparer<T> comparer) =>
-        this.comparer = comparer;
-
-    readonly IComparer<T> comparer;
 
     /// <summary>
     /// Performs a comparison of two objects of the same type and returns a value indicating whether one object is less than, equal to, or greater than the other

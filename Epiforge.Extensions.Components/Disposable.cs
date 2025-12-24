@@ -145,10 +145,17 @@ public abstract class Disposable :
     /// Ensure the object has not been disposed
     /// </summary>
     /// <exception cref="ObjectDisposedException">The object has already been disposed</exception>
+#if IS_NET_7_0_OR_GREATER
+    [SuppressMessage("Style", "IDE0022: Use expression body for method")]
+#endif
     protected void ThrowIfDisposed()
     {
+#if IS_NET_7_0_OR_GREATER
+        ObjectDisposedException.ThrowIf(isDisposed, this);
+#else
         if (isDisposed)
             throw new ObjectDisposedException(GetType().Name);
+#endif
     }
 
     internal static readonly PropertyChangedEventArgs IsDisposedPropertyChanged = new(nameof(IsDisposed));

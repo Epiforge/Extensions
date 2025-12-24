@@ -16,7 +16,7 @@ public sealed class NullableKeyDictionary<TKey, TValue> :
     /// Initializes a new instance of the <see cref="NullableKeyDictionary{TKey, TValue}"/> class that is empty, has the default initial capacity, and uses the default equality comparer for the key type
     /// </summary>
     public NullableKeyDictionary() =>
-        dict = new Dictionary<TKey, TValue>();
+        dict = [];
 
     /// <summary>
     /// Initializes a new instance of the <see cref="NullableKeyDictionary{TKey, TValue}"/> class that is empty, has the default initial capacity, and uses the default equality comparer for the key type
@@ -142,7 +142,7 @@ public sealed class NullableKeyDictionary<TKey, TValue> :
     /// Gets an <see cref="ICollection{T}"/> containing the keys of the <see cref="IDictionary{TKey, TValue}"/>
     /// </summary>
     public ICollection<TKey> Keys =>
-        (hasNullKeyedValue ? new TKey[] { default! } : Enumerable.Empty<TKey>()).Concat(((IDictionary<TKey, TValue>)dict).Keys).ToImmutableArray();
+        [..hasNullKeyedValue ? [default!] : Enumerable.Empty<TKey>(), ..((IDictionary<TKey, TValue>)dict).Keys];
 
     IEnumerable<TKey> IReadOnlyDictionary<TKey, TValue>.Keys =>
         Keys;
@@ -151,7 +151,7 @@ public sealed class NullableKeyDictionary<TKey, TValue> :
     /// Gets an <see cref="ICollection{T}"/> containing the values in the <see cref="IDictionary{TKey, TValue}"/>
     /// </summary>
     public ICollection<TValue> Values =>
-        (hasNullKeyedValue ? new TValue[] { nullKeyedValue } : Enumerable.Empty<TValue>()).Concat(((IDictionary<TKey, TValue>)dict).Values).ToImmutableArray();
+        [..hasNullKeyedValue ? [nullKeyedValue] : Enumerable.Empty<TValue>(), ..((IDictionary<TKey, TValue>)dict).Values];
 
     IEnumerable<TValue> IReadOnlyDictionary<TKey, TValue>.Values =>
         Values;
@@ -243,7 +243,7 @@ public sealed class NullableKeyDictionary<TKey, TValue> :
     }
 
     IEnumerator<KeyValuePair<TKey, TValue>> IEnumerable<KeyValuePair<TKey, TValue>>.GetEnumerator() =>
-        (hasNullKeyedValue ? new KeyValuePair<TKey, TValue>[] { new KeyValuePair<TKey, TValue>(default!, nullKeyedValue) } : Enumerable.Empty<KeyValuePair<TKey, TValue>>()).Concat(dict).GetEnumerator();
+        (hasNullKeyedValue ? [new KeyValuePair<TKey, TValue>(default!, nullKeyedValue)] : Enumerable.Empty<KeyValuePair<TKey, TValue>>()).Concat(dict).GetEnumerator();
 
     IEnumerator IEnumerable.GetEnumerator() =>
         ((IEnumerable<KeyValuePair<TKey, TValue>>)this).GetEnumerator();

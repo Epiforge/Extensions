@@ -1,7 +1,7 @@
 namespace Epiforge.Extensions.Expressions.Observable;
 
-sealed class ObservableCoalesceExpression :
-    ObservableBinaryExpression
+sealed class ObservableCoalesceExpression(ExpressionObserver observer, BinaryExpression binaryExpression, bool deferEvaluation) :
+    ObservableBinaryExpression(observer, binaryExpression, deferEvaluation)
 {
     #region Cache Comparers
 
@@ -31,11 +31,6 @@ sealed class ObservableCoalesceExpression :
     {
         var parameter = Expression.Parameter(typeof(object));
         return Expression.Lambda<UnaryOperationDelegate>(Expression.Convert(Expression.Invoke(lambdaExpression, Expression.Convert(parameter, lambdaExpression.Parameters[0].Type)), typeof(object)), parameter).Compile();
-    }
-
-    public ObservableCoalesceExpression(ExpressionObserver observer, BinaryExpression binaryExpression, bool deferEvaluation) :
-        base(observer, binaryExpression, deferEvaluation)
-    {
     }
 
     UnaryOperationDelegate? conversionDelegate;

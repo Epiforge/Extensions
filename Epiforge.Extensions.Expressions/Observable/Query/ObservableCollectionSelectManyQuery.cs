@@ -1,25 +1,14 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-sealed class ObservableCollectionSelectManyQuery<TElement, TResult> :
-    ObservableCollectionQuery<TResult>
+sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> source, Expression<Func<TElement, IEnumerable<TResult>>> selector) :
+    ObservableCollectionQuery<TResult>(collectionObserver)
 {
-    public ObservableCollectionSelectManyQuery(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> source, Expression<Func<TElement, IEnumerable<TResult>>> selector) :
-        base(collectionObserver)
-    {
-        this.source = source;
-        Selector = selector;
-        access = new object();
-        enumerableInstances = new Dictionary<IEnumerable<TResult>, int>();
-    }
-
-    readonly object access;
+    readonly object access = new();
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     IObservableCollectionQuery<IEnumerable<TResult>>? select;
     int count;
-    readonly Dictionary<IEnumerable<TResult>, int> enumerableInstances;
-    readonly ObservableCollectionQuery<TElement> source;
-
-    internal readonly Expression<Func<TElement, IEnumerable<TResult>>> Selector;
+    readonly Dictionary<IEnumerable<TResult>, int> enumerableInstances = [];
+    internal readonly Expression<Func<TElement, IEnumerable<TResult>>> Selector = selector;
 
     public override TResult this[int index]
     {
@@ -228,7 +217,7 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult> :
                     {
                         var reducedNewStartingIndex = GetReducedStartingIndex(e.NewStartingIndex);
                         var reducedOldStartingIndex = GetReducedStartingIndex(e.OldStartingIndex);
-                        var movedItems = e.OldItems.Cast<IEnumerable<TResult>>().SelectMany(enumerable => enumerable ?? Enumerable.Empty<TResult>()).ToList().AsReadOnly();
+                        var movedItems = e.OldItems.Cast<IEnumerable<TResult>>().SelectMany(enumerable => enumerable ?? []).ToList().AsReadOnly();
                         if (e.OldStartingIndex > e.NewStartingIndex)
                             reducedOldStartingIndex += movedItems.Count;
                         eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Move, movedItems, reducedNewStartingIndex, reducedOldStartingIndex);

@@ -28,7 +28,11 @@ public abstract class SyncDisposable :
         OnDisposed(e);
     }
 
+#if IS_NET_9_0_OR_GREATER
+    readonly Lock disposalAccess = new();
+#else
     readonly object disposalAccess = new();
+#endif
     bool isDisposed;
     string? loggerSetStackTrace;
 
@@ -116,9 +120,16 @@ public abstract class SyncDisposable :
     /// Ensure the object has not been disposed
     /// </summary>
     /// <exception cref="ObjectDisposedException">The object has already been disposed</exception>
+#if IS_NET_7_0_OR_GREATER
+    [SuppressMessage("Style", "IDE0022: Use expression body for method")]
+#endif
     protected void ThrowIfDisposed()
     {
-        if (IsDisposed)
+#if IS_NET_7_0_OR_GREATER
+        ObjectDisposedException.ThrowIf(isDisposed, this);
+#else
+        if (isDisposed)
             throw new ObjectDisposedException(GetType().Name);
+#endif
     }
 }

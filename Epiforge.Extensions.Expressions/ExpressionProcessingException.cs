@@ -3,20 +3,17 @@ namespace Epiforge.Extensions.Expressions;
 /// <summary>
 /// An exception was thrown while processing an exception
 /// </summary>
-public sealed class ExpressionProcessingException :
-    Exception
+/// <remarks>
+/// Instantiates a new instance of the <see cref="ExpressionProcessingException"/>
+/// </remarks>
+/// <param name="expression"></param>
+/// <param name="innerException"></param>
+public sealed class ExpressionProcessingException(Expression expression, Exception innerException) :
+    Exception("An unexpected exception occurred while processing an expression", innerException)
 {
-    /// <summary>
-    /// Instantiates a new instance of the <see cref="ExpressionProcessingException"/>
-    /// </summary>
-    /// <param name="expression"></param>
-    /// <param name="innerException"></param>
-    public ExpressionProcessingException(Expression expression, Exception innerException) :
-        base("An unexpected exception occurred while processing an expression", innerException) =>
-        Expression = expression;
 
     /// <summary>
     /// Gets the expression that was being processed when the exception was thrown
     /// </summary>
-    public Expression Expression { get; }
+    public Expression Expression { get; } = expression;
 }

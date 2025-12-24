@@ -68,7 +68,7 @@ public static class ReflectionExtensions
     {
         if (constructor.DeclaringType is not { } declaringType)
             throw new ArgumentException("Cannot handle constructors without declaring types");
-        var dynamicMethod = new DynamicMethod($"CreateInstance_{declaringType.Name}", typeof(object), new[] { typeof(object[]) });
+        var dynamicMethod = new DynamicMethod($"CreateInstance_{declaringType.Name}", typeof(object), [typeof(object[])]);
         var ilGenerator = dynamicMethod.GetILGenerator();
         var parameters = constructor.GetParameters();
         for (var i = 0; i < parameters.Length; i++)
@@ -90,7 +90,7 @@ public static class ReflectionExtensions
     {
         if (method.DeclaringType is not { } declaringType)
             throw new ArgumentException("Cannot handle methods without declaring types");
-        var dynamicMethod = new DynamicMethod($"Invoke_{method.Name}", typeof(object), new[] { typeof(object), typeof(object[]) });
+        var dynamicMethod = new DynamicMethod($"Invoke_{method.Name}", typeof(object), [typeof(object), typeof(object[])]);
         var ilGenerator = dynamicMethod.GetILGenerator();
         if (!method.IsStatic)
         {
@@ -191,7 +191,7 @@ public static class ReflectionExtensions
 #else
         if (property.SetMethod is not { } setMethod)
             throw new ArgumentException("Cannot handle properties without setters");
-        FastInvoke(setMethod, instance, index.Concat(new object?[] { value }).ToArray());
+        FastInvoke(setMethod, instance, [..index, ..new object?[] { value }]);
 #endif
     }
 
@@ -222,7 +222,7 @@ public static class ReflectionExtensions
                 }
                 eventInfos.InsertRange(0, subType.GetEvents(bindingAttr).Where(x => !eventInfos.Contains(x)));
             }
-            return eventInfos.ToArray();
+            return [..eventInfos];
         }
         return type.GetEvents(bindingAttr);
     }
@@ -254,7 +254,7 @@ public static class ReflectionExtensions
                 }
                 methodInfos.InsertRange(0, subType.GetMethods(bindingAttr).Where(x => !methodInfos.Contains(x)));
             }
-            return methodInfos.ToArray();
+            return [..methodInfos];
         }
         return type.GetMethods(bindingAttr);
     }
@@ -286,7 +286,7 @@ public static class ReflectionExtensions
                 }
                 propertyInfos.InsertRange(0, subType.GetProperties(bindingAttr).Where(x => !propertyInfos.Contains(x)));
             }
-            return propertyInfos.ToArray();
+            return [..propertyInfos];
         }
         return type.GetProperties(bindingAttr);
     }

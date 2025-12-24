@@ -1,13 +1,8 @@
 namespace Epiforge.Extensions.Components;
 
-class XmlSerializerPooledObjectPolicy :
+class XmlSerializerPooledObjectPolicy(Type type) :
     IPooledObjectPolicy<XmlSerializer>
 {
-    public XmlSerializerPooledObjectPolicy(Type type) =>
-        this.type = type;
-
-    readonly Type type;
-
     public XmlSerializer Create() =>
         new(type);
 

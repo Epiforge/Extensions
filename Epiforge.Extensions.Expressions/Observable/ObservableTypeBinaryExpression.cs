@@ -1,7 +1,7 @@
 namespace Epiforge.Extensions.Expressions.Observable;
 
-sealed class ObservableTypeBinaryExpression :
-    ObservableExpression
+sealed class ObservableTypeBinaryExpression(ExpressionObserver observer, TypeBinaryExpression typeBinaryExpression, bool deferEvaluation) :
+    ObservableExpression(observer, typeBinaryExpression, deferEvaluation)
 {
     #region Delegates
 
@@ -17,16 +17,12 @@ sealed class ObservableTypeBinaryExpression :
         return Expression.Lambda<TypeIsDelegate>(Expression.TypeIs(parameter, type), parameter).Compile();
     }
 
-    public ObservableTypeBinaryExpression(ExpressionObserver observer, TypeBinaryExpression typeBinaryExpression, bool deferEvaluation) :
-        base(observer, typeBinaryExpression, deferEvaluation) =>
-        TypeBinaryExpression = typeBinaryExpression;
-
     TypeIsDelegate? @delegate;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     ObservableExpression? expression;
     Type? typeOperand;
 
-    internal readonly TypeBinaryExpression TypeBinaryExpression;
+    internal readonly TypeBinaryExpression TypeBinaryExpression = typeBinaryExpression;
 
     protected override bool Dispose(bool disposing)
     {

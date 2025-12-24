@@ -1,27 +1,16 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-sealed class ObservableCollectionUsingSyncRootEventuallyQuery<TElement> :
-    ObservableCollectionQuery<TElement>
+sealed class ObservableCollectionUsingSyncRootEventuallyQuery<TElement>(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> source, object syncRoot) :
+    ObservableCollectionQuery<TElement>(collectionObserver)
 {
-    public ObservableCollectionUsingSyncRootEventuallyQuery(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> source, object syncRoot) :
-        base(collectionObserver)
-    {
-        disposedCancellationTokenSource = new();
-        pendingCollectionChangedEventsQueue = new();
-        resetCancellationTokenSources = new();
-        this.source = source;
-        SyncRoot = syncRoot;
-    }
-
     AsyncProducerConsumerQueue<NotifyCollectionChangedEventArgs>? currentPendingCollectionChangedEvents;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     CancellationTokenSource? currentResetCancellationTokenSource;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
-    readonly CancellationTokenSource disposedCancellationTokenSource;
+    readonly CancellationTokenSource disposedCancellationTokenSource = new();
     ObservableRangeCollection<TElement>? elements;
-    readonly ConcurrentQueue<AsyncProducerConsumerQueue<NotifyCollectionChangedEventArgs>> pendingCollectionChangedEventsQueue;
-    readonly ConcurrentQueue<CancellationTokenSource> resetCancellationTokenSources;
-    readonly ObservableCollectionQuery<TElement> source;
+    readonly ConcurrentQueue<AsyncProducerConsumerQueue<NotifyCollectionChangedEventArgs>> pendingCollectionChangedEventsQueue = new();
+    readonly ConcurrentQueue<CancellationTokenSource> resetCancellationTokenSources = new();
 
     public override TElement this[int index] =>
         elements![index];
@@ -35,7 +24,7 @@ sealed class ObservableCollectionUsingSyncRootEventuallyQuery<TElement> :
         protected set => throw new NotImplementedException();
     }
 
-    public override object SyncRoot { get; }
+    public override object SyncRoot { get; } = syncRoot;
 
     protected override bool Dispose(bool disposing)
     {

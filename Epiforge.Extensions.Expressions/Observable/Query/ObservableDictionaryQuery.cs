@@ -1,7 +1,7 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-abstract class ObservableDictionaryQuery<TKey, TValue> :
-    ObservableQuery,
+abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collectionObserver) :
+    ObservableQuery(collectionObserver),
     IObservableDictionaryQuery<TKey, TValue>
     where TKey : notnull
 {
@@ -33,35 +33,45 @@ abstract class ObservableDictionaryQuery<TKey, TValue> :
     static readonly PropertyChangedEventArgs operationFaultPropertyChangedEventArgs = new(nameof(OperationFault));
     static readonly PropertyChangingEventArgs operationFaultPropertyChangingEventArgs = new(nameof(OperationFault));
 
-    protected ObservableDictionaryQuery(CollectionObserver collectionObserver) :
-        base(collectionObserver)
-    {
-    }
-
-    readonly Dictionary<(object seedFactory, object func, object resultSelector), ObservableQuery> cachedAggregateQueries = new();
-    readonly object cachedAggregateQueriesAccess = new();
+    readonly Dictionary<(object seedFactory, object func, object resultSelector), ObservableQuery> cachedAggregateQueries = [];
     readonly Dictionary<Expression, ObservableDictionaryAllQuery<TKey, TValue>> cachedAllQueries = new(ExpressionEqualityComparer.Default);
-    readonly object cachedAllQueriesAccess = new();
     readonly NullableKeyDictionary<Expression?, ObservableDictionaryAnyQuery<TKey, TValue>> cachedAnyQueries = new(ExpressionEqualityComparer.Default!);
-    readonly object cachedAnyQueriesAccess = new();
     ObservableDictionaryConcurrentQuery<TKey, TValue>? cachedConcurrentQuery;
-    readonly object cachedConcurrentQueryAccess = new();
     ObservableDictionaryCountQuery<TKey, TValue>? cachedCountQuery;
-    readonly object cachedCountQueryAccess = new();
-    readonly Dictionary<(IComparer<TKey>? keyComparer, bool notFoundIsDefault), ObservableDictionaryKeyedQuery<TKey, TValue>> cachedKeyedQueries = new();
-    readonly object cachedKeyedQueriesAccess = new();
+    readonly Dictionary<(IComparer<TKey>? keyComparer, bool notFoundIsDefault), ObservableDictionaryKeyedQuery<TKey, TValue>> cachedKeyedQueries = [];
     readonly Dictionary<(Expression keyValuePairSelector, object equalityComparer), ObservableQuery> cachedSelectQueries = new(CachedSelectQueryEqualityComparer.Default);
-    readonly object cachedSelectQueriesAccess = new();
     readonly Dictionary<Expression, ObservableQuery> cachedToCollectionQueries = new(ExpressionEqualityComparer.Default);
-    readonly object cachedToCollectionQueriesAccess = new();
-    readonly Dictionary<SynchronizationContext, ObservableDictionaryUsingSynchronizationContextEventuallyQuery<TKey, TValue>> cachedUsingSynchronizationContextEventuallyQueries = new();
-    readonly object cachedUsingSynchronizationContextEventuallyQueriesAccess = new();
-    readonly Dictionary<SynchronizationContext, ObservableDictionaryUsingSynchronizationContextQuery<TKey, TValue>> cachedUsingSynchronizationContextQueries = new();
-    readonly object cachedUsingSynchronizationContextQueriesAccess = new();
-    readonly Dictionary<(TKey key, bool notFoundIsDefault), ObservableDictionaryValueForQuery<TKey, TValue>> cachedValueForQueries = new();
-    readonly object cachedValueForQueriesAccess = new();
+    readonly Dictionary<SynchronizationContext, ObservableDictionaryUsingSynchronizationContextEventuallyQuery<TKey, TValue>> cachedUsingSynchronizationContextEventuallyQueries = [];
+    readonly Dictionary<SynchronizationContext, ObservableDictionaryUsingSynchronizationContextQuery<TKey, TValue>> cachedUsingSynchronizationContextQueries = [];
+    readonly Dictionary<(TKey key, bool notFoundIsDefault), ObservableDictionaryValueForQuery<TKey, TValue>> cachedValueForQueries = [];
     readonly Dictionary<Expression<Func<KeyValuePair<TKey, TValue>, bool>>, ObservableQuery> cachedWhereQueries = new(ExpressionEqualityComparer.Default);
+#if IS_NET_9_0_OR_GREATER
+    readonly Lock cachedAggregateQueriesAccess = new();
+    readonly Lock cachedAllQueriesAccess = new();
+    readonly Lock cachedAnyQueriesAccess = new();
+    readonly Lock cachedConcurrentQueryAccess = new();
+    readonly Lock cachedCountQueryAccess = new();
+    readonly Lock cachedKeyedQueriesAccess = new();
+    readonly Lock cachedSelectQueriesAccess = new();
+    readonly Lock cachedToCollectionQueriesAccess = new();
+    readonly Lock cachedUsingSynchronizationContextEventuallyQueriesAccess = new();
+    readonly Lock cachedUsingSynchronizationContextQueriesAccess = new();
+    readonly Lock cachedValueForQueriesAccess = new();
+    readonly Lock cachedWhereQueriesAccess = new();
+#else
+    readonly object cachedAggregateQueriesAccess = new();
+    readonly object cachedAllQueriesAccess = new();
+    readonly object cachedAnyQueriesAccess = new();
+    readonly object cachedConcurrentQueryAccess = new();
+    readonly object cachedCountQueryAccess = new();
+    readonly object cachedKeyedQueriesAccess = new();
+    readonly object cachedSelectQueriesAccess = new();
+    readonly object cachedToCollectionQueriesAccess = new();
+    readonly object cachedUsingSynchronizationContextEventuallyQueriesAccess = new();
+    readonly object cachedUsingSynchronizationContextQueriesAccess = new();
+    readonly object cachedValueForQueriesAccess = new();
     readonly object cachedWhereQueriesAccess = new();
+#endif
     Exception? operationFault;
 
     public abstract TValue this[TKey key] { get; }
@@ -441,7 +451,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue> :
     }
 
     [return: DisposeWhenDiscarded]
-    IObservableScalarQuery<KeyValuePair<TKey, TValue>> ObserveKeyed(IComparer<TKey>? keyComparer, bool notFoundIsDefault)
+    ObservableDictionaryKeyedQuery<TKey, TValue> ObserveKeyed(IComparer<TKey>? keyComparer, bool notFoundIsDefault)
     {
         ObservableDictionaryKeyedQuery<TKey, TValue> keyedQuery;
         lock (cachedKeyedQueriesAccess)
@@ -548,11 +558,11 @@ abstract class ObservableDictionaryQuery<TKey, TValue> :
         ArgumentNullException.ThrowIfNull(valueSelector);
         ArgumentNullException.ThrowIfNull(equalityComparer);
         var sourceKeyValuePairParameter = Expression.Parameter(typeof(KeyValuePair<TKey, TValue>));
-        var sourceKeyExpression = Expression.Property(sourceKeyValuePairParameter, nameof(KeyValuePair<TKey, TValue>.Key));
-        var sourceValueExpression = Expression.Property(sourceKeyValuePairParameter, nameof(KeyValuePair<TKey, TValue>.Value));
+        var sourceKeyExpression = Expression.Property(sourceKeyValuePairParameter, nameof(KeyValuePair<,>.Key));
+        var sourceValueExpression = Expression.Property(sourceKeyValuePairParameter, nameof(KeyValuePair<,>.Value));
         var keyExpression = Expression.Invoke(keySelector, sourceKeyExpression, sourceValueExpression);
         var valueExpression = Expression.Invoke(valueSelector, sourceKeyExpression, sourceValueExpression);
-        var keyValuePairExpression = Expression.New(typeof(KeyValuePair<TResultKey, TResultValue>).GetConstructor(new[] { typeof(TResultKey), typeof(TResultValue) })!, keyExpression, valueExpression);
+        var keyValuePairExpression = Expression.New(typeof(KeyValuePair<TResultKey, TResultValue>).GetConstructor([typeof(TResultKey), typeof(TResultValue)])!, keyExpression, valueExpression);
         var keyValuePairSelector = Expression.Lambda<Func<KeyValuePair<TKey, TValue>, KeyValuePair<TResultKey, TResultValue>>>(keyValuePairExpression, sourceKeyValuePairParameter);
 
         ObservableQuery selectQuery;
@@ -620,8 +630,8 @@ abstract class ObservableDictionaryQuery<TKey, TValue> :
     {
         ArgumentNullException.ThrowIfNull(selector);
         var keyValuePairParameter = Expression.Parameter(typeof(KeyValuePair<TKey, TValue>));
-        var keyExpression = Expression.Property(keyValuePairParameter, nameof(KeyValuePair<TKey, TValue>.Key));
-        var valueExpression = Expression.Property(keyValuePairParameter, nameof(KeyValuePair<TKey, TValue>.Value));
+        var keyExpression = Expression.Property(keyValuePairParameter, nameof(KeyValuePair<,>.Key));
+        var valueExpression = Expression.Property(keyValuePairParameter, nameof(KeyValuePair<,>.Value));
         var invokeSelectorExpression = Expression.Invoke(selector, keyExpression, valueExpression);
         ObservableQuery toCollectionQuery;
         var key = Expression.Lambda<Func<KeyValuePair<TKey, TValue>, TElement>>(invokeSelectorExpression, keyValuePairParameter);
@@ -685,7 +695,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue> :
         ObserveValueFor(key, true);
 
     [return: DisposeWhenDiscarded]
-    IObservableScalarQuery<TValue> ObserveValueFor(TKey key, bool notFoundIsDefault)
+    ObservableDictionaryValueForQuery<TKey, TValue> ObserveValueFor(TKey key, bool notFoundIsDefault)
     {
         ArgumentNullException.ThrowIfNull(key);
         ObservableDictionaryValueForQuery<TKey, TValue> valueForQuery;
@@ -708,8 +718,8 @@ abstract class ObservableDictionaryQuery<TKey, TValue> :
     {
         ArgumentNullException.ThrowIfNull(predicate);
         var keyValuePairParameter = Expression.Parameter(typeof(KeyValuePair<TKey, TValue>));
-        var keyExpression = Expression.Property(keyValuePairParameter, nameof(KeyValuePair<TKey, TValue>.Key));
-        var valueExpression = Expression.Property(keyValuePairParameter, nameof(KeyValuePair<TKey, TValue>.Value));
+        var keyExpression = Expression.Property(keyValuePairParameter, nameof(KeyValuePair<,>.Key));
+        var valueExpression = Expression.Property(keyValuePairParameter, nameof(KeyValuePair<,>.Value));
         var invokePredicateExpression = Expression.Invoke(predicate, keyExpression, valueExpression);
         ObservableQuery whereQuery;
         var key = Expression.Lambda<Func<KeyValuePair<TKey, TValue>, bool>>(invokePredicateExpression, keyValuePairParameter);

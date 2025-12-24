@@ -1,31 +1,16 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-sealed class ObservableDictionaryToCollectionQuery<TElement, TKey, TValue> :
-    ObservableCollectionQuery<TElement>
+sealed class ObservableDictionaryToCollectionQuery<TElement, TKey, TValue>(CollectionObserver collectionObserver, ObservableDictionaryQuery<TKey, TValue> source, Expression<Func<KeyValuePair<TKey, TValue>, TElement>> selector) :
+    ObservableCollectionQuery<TElement>(collectionObserver)
     where TKey : notnull
 {
-    public ObservableDictionaryToCollectionQuery(CollectionObserver collectionObserver, ObservableDictionaryQuery<TKey, TValue> source, Expression<Func<KeyValuePair<TKey, TValue>, TElement>> selector) :
-        base(collectionObserver)
-    {
-        access = new();
-        elementComparer = EqualityComparer<TElement>.Default;
-        elements = new();
-        evaluationsChanging = new();
-        keyComparer = EqualityComparer<TKey>.Default;
-        observableExpressions = new();
-        this.source = source;
-        Selector = selector;
-    }
-
-    readonly object access;
-    readonly IEqualityComparer<TElement> elementComparer;
-    readonly ObservableRangeCollection<TElement> elements;
-    readonly Dictionary<IObservableExpression<KeyValuePair<TKey, TValue>, TElement>, (Exception? fault, TElement result)> evaluationsChanging;
-    readonly IEqualityComparer<TKey> keyComparer;
-    readonly ObservableDictionary<TKey, IObservableExpression<KeyValuePair<TKey, TValue>, TElement>> observableExpressions;
-    readonly ObservableDictionaryQuery<TKey, TValue> source;
-
-    internal readonly Expression<Func<KeyValuePair<TKey, TValue>, TElement>> Selector;
+    readonly object access = new();
+    readonly EqualityComparer<TElement> elementComparer = EqualityComparer<TElement>.Default;
+    readonly ObservableRangeCollection<TElement> elements = [];
+    readonly Dictionary<IObservableExpression<KeyValuePair<TKey, TValue>, TElement>, (Exception? fault, TElement result)> evaluationsChanging = [];
+    readonly IEqualityComparer<TKey> keyComparer = EqualityComparer<TKey>.Default;
+    readonly ObservableDictionary<TKey, IObservableExpression<KeyValuePair<TKey, TValue>, TElement>> observableExpressions = [];
+    internal readonly Expression<Func<KeyValuePair<TKey, TValue>, TElement>> Selector = selector;
 
     public override TElement this[int index]
     {
@@ -82,7 +67,7 @@ sealed class ObservableDictionaryToCollectionQuery<TElement, TKey, TValue> :
 
     void ObservableExpressionPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (sender is IObservableExpression<KeyValuePair<TKey, TValue>, TElement> observableExpression && e.PropertyName == nameof(IObservableExpression<KeyValuePair<TKey, TValue>, TElement>.Evaluation))
+        if (sender is IObservableExpression<KeyValuePair<TKey, TValue>, TElement> observableExpression && e.PropertyName == nameof(IObservableExpression<,>.Evaluation))
             lock (access)
             {
                 var (oldFault, oldElement) = evaluationsChanging![observableExpression];
@@ -101,7 +86,7 @@ sealed class ObservableDictionaryToCollectionQuery<TElement, TKey, TValue> :
 
     void ObservableExpressionPropertyChanging(object? sender, PropertyChangingEventArgs e)
     {
-        if (sender is IObservableExpression<KeyValuePair<TKey, TValue>, TElement> observableExpression && e.PropertyName == nameof(IObservableExpression<KeyValuePair<TKey, TValue>, TElement>.Evaluation))
+        if (sender is IObservableExpression<KeyValuePair<TKey, TValue>, TElement> observableExpression && e.PropertyName == nameof(IObservableExpression<,>.Evaluation))
             lock (access)
                 evaluationsChanging.Add(observableExpression, observableExpression.Evaluation);
     }

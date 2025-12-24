@@ -64,7 +64,7 @@ class FaultList
             Add(operationFault);
     }
 
-    readonly List<Exception> exceptions = new();
+    readonly List<Exception> exceptions = [];
 
     public Exception? Fault =>
         exceptions.Count switch

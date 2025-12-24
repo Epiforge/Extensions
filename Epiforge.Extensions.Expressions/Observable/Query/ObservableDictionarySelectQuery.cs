@@ -1,35 +1,20 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceValue> :
-    ObservableDictionaryQuery<TKey, TValue>
+sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceValue>(CollectionObserver collectionObserver, ObservableDictionaryQuery<TSourceKey, TSourceValue> source, Expression<Func<KeyValuePair<TSourceKey, TSourceValue>, KeyValuePair<TKey, TValue>>> keyValuePairSelector, IEqualityComparer<TKey> equalityComparer) :
+    ObservableDictionaryQuery<TKey, TValue>(collectionObserver)
     where TKey : notnull
     where TSourceKey : notnull
 {
-    public ObservableDictionarySelectQuery(CollectionObserver collectionObserver, ObservableDictionaryQuery<TSourceKey, TSourceValue> source, Expression<Func<KeyValuePair<TSourceKey, TSourceValue>, KeyValuePair<TKey, TValue>>> keyValuePairSelector, IEqualityComparer<TKey> equalityComparer) :
-        base(collectionObserver)
-    {
-        access = new();
-        duplicateKeys = new();
-        evaluationsChanging = new();
-        observableExpressions = new();
-        result = new(equalityComparer);
-        this.source = source;
-        valueEqualityComparer = EqualityComparer<TValue>.Default;
-        KeyValuePairSelector = keyValuePairSelector;
-        EqualityComparer = equalityComparer;
-    }
-
-    readonly object access;
-    readonly ObservableDictionary<TKey, int> duplicateKeys;
-    readonly Dictionary<IObservableExpression<KeyValuePair<TSourceKey, TSourceValue>, KeyValuePair<TKey, TValue>>, (Exception? fault, KeyValuePair<TKey, TValue> result)> evaluationsChanging;
+    readonly object access = new();
+    readonly ObservableDictionary<TKey, int> duplicateKeys = [];
+    readonly Dictionary<IObservableExpression<KeyValuePair<TSourceKey, TSourceValue>, KeyValuePair<TKey, TValue>>, (Exception? fault, KeyValuePair<TKey, TValue> result)> evaluationsChanging = [];
     int nullKeys;
-    readonly ObservableDictionary<TSourceKey, IObservableExpression<KeyValuePair<TSourceKey, TSourceValue>, KeyValuePair<TKey, TValue>>> observableExpressions;
-    readonly ObservableDictionary<TKey, TValue> result;
-    readonly ObservableDictionaryQuery<TSourceKey, TSourceValue> source;
-    readonly IEqualityComparer<TValue> valueEqualityComparer;
+    readonly ObservableDictionary<TSourceKey, IObservableExpression<KeyValuePair<TSourceKey, TSourceValue>, KeyValuePair<TKey, TValue>>> observableExpressions = [];
+    readonly ObservableDictionary<TKey, TValue> result = new(equalityComparer);
+    readonly EqualityComparer<TValue> valueEqualityComparer = EqualityComparer<TValue>.Default;
 
-    internal readonly IEqualityComparer<TKey> EqualityComparer;
-    internal readonly Expression<Func<KeyValuePair<TSourceKey, TSourceValue>, KeyValuePair<TKey, TValue>>> KeyValuePairSelector;
+    internal readonly IEqualityComparer<TKey> EqualityComparer = equalityComparer;
+    internal readonly Expression<Func<KeyValuePair<TSourceKey, TSourceValue>, KeyValuePair<TKey, TValue>>> KeyValuePairSelector = keyValuePairSelector;
 
     public override TValue this[TKey key]
     {
@@ -123,7 +108,7 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
 
     void ObservableExpressionPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (sender is IObservableExpression<KeyValuePair<TSourceKey, TSourceValue>, KeyValuePair<TKey, TValue>> observableExpression && e.PropertyName == nameof(IObservableExpression<KeyValuePair<TSourceKey, TSourceValue>, KeyValuePair<TKey, TValue>>.Evaluation))
+        if (sender is IObservableExpression<KeyValuePair<TSourceKey, TSourceValue>, KeyValuePair<TKey, TValue>> observableExpression && e.PropertyName == nameof(IObservableExpression<,>.Evaluation))
             lock (access)
             {
                 var (oldFault, oldResult) = evaluationsChanging![observableExpression];
@@ -134,7 +119,7 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
                 var replacedFault = oldFault is not null && newFault is not null && !ReferenceEquals(oldFault, newFault);
                 if (addedFault || removedFault || replacedFault)
                 {
-                    var elementFaults = OperationFault is AggregateException aggregateException ? aggregateException.InnerExceptions.OfType<EvaluationFaultException>().ToList() : new List<EvaluationFaultException>();
+                    var elementFaults = OperationFault is AggregateException aggregateException ? aggregateException.InnerExceptions.OfType<EvaluationFaultException>().ToList() : [];
                     if (removedFault || replacedFault)
                         elementFaults.RemoveAll(elementFault => ReferenceEquals(elementFault.Element, observableExpression.Argument.Key));
                     if (addedFault || replacedFault)
@@ -154,7 +139,7 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
 
     void ObservableExpressionPropertyChanging(object? sender, PropertyChangingEventArgs e)
     {
-        if (sender is IObservableExpression<KeyValuePair<TSourceKey, TSourceValue>, KeyValuePair<TKey, TValue>> observableExpression && e.PropertyName == nameof(IObservableExpression<KeyValuePair<TSourceKey, TSourceValue>, KeyValuePair<TKey, TValue>>.Evaluation))
+        if (sender is IObservableExpression<KeyValuePair<TSourceKey, TSourceValue>, KeyValuePair<TKey, TValue>> observableExpression && e.PropertyName == nameof(IObservableExpression<,>.Evaluation))
             lock(access)
                 evaluationsChanging.Add(observableExpression, observableExpression.Evaluation);
     }

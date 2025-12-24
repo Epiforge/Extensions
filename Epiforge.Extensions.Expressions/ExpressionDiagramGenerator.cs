@@ -4,7 +4,7 @@ static class ExpressionDiagramGenerator
 {
     class IterationState
     {
-        public Dictionary<ParameterExpression, (int set, int index)> Parameters { get; } = new();
+        public Dictionary<ParameterExpression, (int set, int index)> Parameters { get; } = [];
         public int ParameterSet { get; set; } = -1;
     }
 

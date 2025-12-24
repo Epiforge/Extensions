@@ -1,15 +1,9 @@
-using System.Collections.Generic;
-
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-sealed class ObservableCollectionQueryReadOnlyList<TElement> :
-    ObservableCollectionQuery<TElement>
+sealed class ObservableCollectionQueryReadOnlyList<TElement>(CollectionObserver collectionObserver, IReadOnlyList<TElement> readOnlyList) :
+    ObservableCollectionQuery<TElement>(collectionObserver)
 {
-    public ObservableCollectionQueryReadOnlyList(CollectionObserver collectionObserver, IReadOnlyList<TElement> readOnlyList) :
-        base(collectionObserver) =>
-        ReadOnlyList = readOnlyList;
-
-    internal readonly IReadOnlyList<TElement> ReadOnlyList;
+    internal readonly IReadOnlyList<TElement> ReadOnlyList = readOnlyList;
 
     public override TElement this[int index] =>
         ReadOnlyList[index];
@@ -60,13 +54,13 @@ sealed class ObservableCollectionQueryReadOnlyList<TElement> :
 
     void PropertyChangedNotifierPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(IReadOnlyList<TElement>.Count))
+        if (e.PropertyName == nameof(IReadOnlyList<>.Count))
             OnPropertyChanged(e);
     }
 
     void PropertyChangingNotifierPropertyChanging(object? sender, PropertyChangingEventArgs e)
     {
-        if (e.PropertyName == nameof(IReadOnlyList<TElement>.Count))
+        if (e.PropertyName == nameof(IReadOnlyList<>.Count))
             OnPropertyChanging(e);
     }
 

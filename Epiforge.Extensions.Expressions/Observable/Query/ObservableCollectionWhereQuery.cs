@@ -1,27 +1,14 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-sealed class ObservableCollectionWhereQuery<TElement> :
-    ObservableCollectionQuery<TElement>
+sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> source, Expression<Func<TElement, bool>> predicate) :
+    ObservableCollectionQuery<TElement>(collectionObserver)
 {
-    public ObservableCollectionWhereQuery(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> source, Expression<Func<TElement, bool>> predicate) :
-        base(collectionObserver)
-    {
-        access = new();
-        evaluationsChanging = new();
-        observableExpressionCounts = new();
-        observableExpressions = new();
-        this.source = source;
-        Predicate = predicate;
-    }
-
-    readonly object access;
+    readonly object access = new();
     int count;
-    readonly Dictionary<IObservableExpression<TElement, bool>, (Exception? fault, bool result)> evaluationsChanging;
-    readonly Dictionary<IObservableExpression<TElement, bool>, int> observableExpressionCounts;
-    readonly List<IObservableExpression<TElement, bool>> observableExpressions;
-    readonly ObservableCollectionQuery<TElement> source;
-
-    internal readonly Expression<Func<TElement, bool>> Predicate;
+    readonly Dictionary<IObservableExpression<TElement, bool>, (Exception? fault, bool result)> evaluationsChanging = [];
+    readonly Dictionary<IObservableExpression<TElement, bool>, int> observableExpressionCounts = [];
+    readonly List<IObservableExpression<TElement, bool>> observableExpressions = [];
+    internal readonly Expression<Func<TElement, bool>> Predicate = predicate;
 
     public override TElement this[int index]
     {
@@ -80,7 +67,7 @@ sealed class ObservableCollectionWhereQuery<TElement> :
 
     void ObservableExpressionPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (sender is IObservableExpression<TElement, bool> observableExpression && e.PropertyName == nameof(IObservableExpression<TElement, bool>.Evaluation))
+        if (sender is IObservableExpression<TElement, bool> observableExpression && e.PropertyName == nameof(IObservableExpression<,>.Evaluation))
             lock (access)
             {
                 var (oldFault, oldResult) = evaluationsChanging![observableExpression];
@@ -91,7 +78,7 @@ sealed class ObservableCollectionWhereQuery<TElement> :
                 var replacedFault = oldFault is not null && newFault is not null && !ReferenceEquals(oldFault, newFault);
                 if (addedFault || removedFault || replacedFault)
                 {
-                    var elementFaults = OperationFault is AggregateException aggregateException ? aggregateException.InnerExceptions.OfType<EvaluationFaultException>().ToList() : new List<EvaluationFaultException>();
+                    var elementFaults = OperationFault is AggregateException aggregateException ? [..aggregateException.InnerExceptions.OfType<EvaluationFaultException>()] : new List<EvaluationFaultException>();
                     if (removedFault || replacedFault)
                         elementFaults.RemoveAll(elementFault => ReferenceEquals(elementFault.Element, observableExpression.Argument));
                     if (addedFault || replacedFault)
@@ -120,7 +107,7 @@ sealed class ObservableCollectionWhereQuery<TElement> :
 
     void ObservableExpressionPropertyChanging(object? sender, PropertyChangingEventArgs e)
     {
-        if (sender is IObservableExpression<TElement, bool> observableExpression && e.PropertyName == nameof(IObservableExpression<TElement, bool>.Evaluation))
+        if (sender is IObservableExpression<TElement, bool> observableExpression && e.PropertyName == nameof(IObservableExpression<,>.Evaluation))
             lock (access)
                 evaluationsChanging.Add(observableExpression, observableExpression.Evaluation);
     }

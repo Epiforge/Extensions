@@ -1,29 +1,15 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-sealed class ObservableDictionaryWhereQuery<TKey, TValue> :
-    ObservableDictionaryQuery<TKey, TValue>
+sealed class ObservableDictionaryWhereQuery<TKey, TValue>(CollectionObserver collectionObserver, ObservableDictionaryQuery<TKey, TValue> source, Expression<Func<KeyValuePair<TKey, TValue>, bool>> predicate) :
+    ObservableDictionaryQuery<TKey, TValue>(collectionObserver)
     where TKey : notnull
 {
-    public ObservableDictionaryWhereQuery(CollectionObserver collectionObserver, ObservableDictionaryQuery<TKey, TValue> source, Expression<Func<KeyValuePair<TKey, TValue>, bool>> predicate) :
-        base(collectionObserver)
-    {
-        access = new();
-        evaluationsChanging = new();
-        keyComparer = EqualityComparer<TKey>.Default;
-        observableExpressions = new();
-        Predicate = predicate;
-        result = new();
-        this.source = source;
-    }
-
-    readonly object access;
-    readonly Dictionary<IObservableExpression<KeyValuePair<TKey, TValue>, bool>, (Exception? fault, bool result)> evaluationsChanging;
-    readonly IEqualityComparer<TKey> keyComparer;
-    readonly Dictionary<TKey, IObservableExpression<KeyValuePair<TKey, TValue>, bool>> observableExpressions;
-    readonly ObservableDictionary<TKey, TValue> result;
-    readonly ObservableDictionaryQuery<TKey, TValue> source;
-
-    internal readonly Expression<Func<KeyValuePair<TKey, TValue>, bool>> Predicate;
+    readonly object access = new();
+    readonly Dictionary<IObservableExpression<KeyValuePair<TKey, TValue>, bool>, (Exception? fault, bool result)> evaluationsChanging = [];
+    readonly IEqualityComparer<TKey> keyComparer = EqualityComparer<TKey>.Default;
+    readonly Dictionary<TKey, IObservableExpression<KeyValuePair<TKey, TValue>, bool>> observableExpressions = [];
+    readonly ObservableDictionary<TKey, TValue> result = [];
+    internal readonly Expression<Func<KeyValuePair<TKey, TValue>, bool>> Predicate = predicate;
 
     public override TValue this[TKey key]
     {
@@ -157,7 +143,7 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue> :
 
     void ObservableExpressionPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (sender is IObservableExpression<KeyValuePair<TKey, TValue>, bool> observableExpression && e.PropertyName == nameof(IObservableExpression<KeyValuePair<TKey, TValue>, bool>.Evaluation))
+        if (sender is IObservableExpression<KeyValuePair<TKey, TValue>, bool> observableExpression && e.PropertyName == nameof(IObservableExpression<,>.Evaluation))
             lock (access)
             {
                 var (oldFault, oldPredicateResult) = evaluationsChanging![observableExpression];
@@ -175,7 +161,7 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue> :
 
     void ObservableExpressionPropertyChanging(object? sender, PropertyChangingEventArgs e)
     {
-        if (sender is IObservableExpression<KeyValuePair<TKey, TValue>, bool> observableExpression && e.PropertyName == nameof(IObservableExpression<KeyValuePair<TKey, TValue>, bool>.Evaluation))
+        if (sender is IObservableExpression<KeyValuePair<TKey, TValue>, bool> observableExpression && e.PropertyName == nameof(IObservableExpression<,>.Evaluation))
             lock (access)
                 evaluationsChanging.Add(observableExpression, observableExpression.Evaluation);
     }

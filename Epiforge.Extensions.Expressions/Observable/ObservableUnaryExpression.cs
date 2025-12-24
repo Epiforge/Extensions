@@ -1,7 +1,7 @@
 namespace Epiforge.Extensions.Expressions.Observable;
 
-sealed class ObservableUnaryExpression :
-    ObservableExpression
+sealed class ObservableUnaryExpression(ExpressionObserver observer, UnaryExpression unaryExpression, bool deferEvaluation) :
+    ObservableExpression(observer, unaryExpression, deferEvaluation)
 {
     #region Delegates
 
@@ -20,16 +20,12 @@ sealed class ObservableUnaryExpression :
         return Expression.Lambda<UnaryOperationDelegate>(Expression.Convert(key.Method is null ? Expression.MakeUnary(key.NodeType, operandConversion, key.ReturnValueType) : Expression.MakeUnary(key.NodeType, operandConversion, key.ReturnValueType, key.Method), typeof(object)), operandParameter).Compile();
     }
 
-    public ObservableUnaryExpression(ExpressionObserver observer, UnaryExpression unaryExpression, bool deferEvaluation) :
-        base(observer, unaryExpression, deferEvaluation) =>
-        UnaryExpression = unaryExpression;
-
     UnaryOperationDelegate? @delegate;
     MethodInfo? method;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     ObservableExpression? operand;
 
-    internal readonly UnaryExpression UnaryExpression;
+    internal readonly UnaryExpression UnaryExpression = unaryExpression;
 
     protected override bool Dispose(bool disposing)
     {

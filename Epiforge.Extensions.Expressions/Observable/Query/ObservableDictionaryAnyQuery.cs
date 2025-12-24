@@ -1,18 +1,14 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-sealed class ObservableDictionaryAnyQuery<TKey, TValue> :
-    ObservableDictionaryScalarQuery<TKey, TValue, bool>
+sealed class ObservableDictionaryAnyQuery<TKey, TValue>(CollectionObserver collectionObserver, ObservableDictionaryQuery<TKey, TValue> observableDictionaryQuery, Expression<Func<TKey, TValue, bool>>? predicate = null) :
+    ObservableDictionaryScalarQuery<TKey, TValue, bool>(collectionObserver, observableDictionaryQuery)
     where TKey : notnull
 {
-    public ObservableDictionaryAnyQuery(CollectionObserver collectionObserver, ObservableDictionaryQuery<TKey, TValue> observableDictionaryQuery, Expression<Func<TKey, TValue, bool>>? predicate = null) :
-        base(collectionObserver, observableDictionaryQuery) =>
-        Predicate = predicate;
-
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     IObservableDictionaryQuery<TKey, TValue>? where;
     int observableDictionaryQueryCount;
 
-    internal readonly Expression<Func<TKey, TValue, bool>>? Predicate;
+    internal readonly Expression<Func<TKey, TValue, bool>>? Predicate = predicate;
 
     protected override bool Dispose(bool disposing)
     {
@@ -50,7 +46,7 @@ sealed class ObservableDictionaryAnyQuery<TKey, TValue> :
 
     void ObservableDictionaryQueryPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(ObservableDictionaryQuery<TKey, TValue>.OperationFault))
+        if (e.PropertyName == nameof(ObservableDictionaryQuery<,>.OperationFault))
             Evaluate();
     }
 
@@ -79,7 +75,7 @@ sealed class ObservableDictionaryAnyQuery<TKey, TValue> :
 
     void WherePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(IObservableDictionaryQuery<TKey, TValue>.OperationFault))
+        if (e.PropertyName == nameof(IObservableDictionaryQuery<,>.OperationFault))
             Evaluate();
     }
 }

@@ -1,17 +1,9 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-sealed class ObservableCollectionUsingSyncRootQuery<TElement> :
-    ObservableCollectionQuery<TElement>
+sealed class ObservableCollectionUsingSyncRootQuery<TElement>(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> source, object syncRoot) :
+    ObservableCollectionQuery<TElement>(collectionObserver)
 {
-    public ObservableCollectionUsingSyncRootQuery(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> source, object syncRoot) :
-        base(collectionObserver)
-    {
-        this.source = source;
-        SyncRoot = syncRoot;
-    }
-
     ObservableRangeCollection<TElement>? elements;
-    readonly ObservableCollectionQuery<TElement> source;
 
     public override TElement this[int index] =>
         elements![index];
@@ -25,7 +17,7 @@ sealed class ObservableCollectionUsingSyncRootQuery<TElement> :
         protected set => throw new NotImplementedException();
     }
 
-    public override object SyncRoot { get; }
+    public override object SyncRoot { get; } = syncRoot;
 
     protected override bool Dispose(bool disposing)
     {

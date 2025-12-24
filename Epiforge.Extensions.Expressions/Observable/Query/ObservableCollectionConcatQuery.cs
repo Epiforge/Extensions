@@ -1,19 +1,12 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-sealed class ObservableCollectionConcatQuery<TElement> :
-    ObservableCollectionQuery<TElement>
+sealed class ObservableCollectionConcatQuery<TElement>(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> first, IObservableCollectionQuery<TElement> second) :
+    ObservableCollectionQuery<TElement>(collectionObserver)
 {
-    public ObservableCollectionConcatQuery(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> first, IObservableCollectionQuery<TElement> second) :
-        base(collectionObserver)
-    {
-        this.first = first;
-        Second = second;
-    }
-
-    readonly ObservableCollectionQuery<TElement> first;
     int firstCount;
 
-    internal readonly IObservableCollectionQuery<TElement> Second;
+    [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
+    internal readonly IObservableCollectionQuery<TElement> Second = second;
 
     public override TElement this[int index] =>
         index >= firstCount ? Second[index - firstCount] : first[index];
@@ -79,7 +72,7 @@ sealed class ObservableCollectionConcatQuery<TElement> :
 
     void SecondPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(IObservableCollectionQuery<TElement>.OperationFault))
+        if (e.PropertyName == nameof(IObservableCollectionQuery<>.OperationFault))
             SetOperationFault();
     }
 

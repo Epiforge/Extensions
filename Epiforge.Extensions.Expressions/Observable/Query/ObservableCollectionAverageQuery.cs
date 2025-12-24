@@ -1,17 +1,13 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-sealed class ObservableCollectionAverageQuery<TElement, TResult> :
-    ObservableCollectionScalarQuery<TElement, TResult>
+sealed class ObservableCollectionAverageQuery<TElement, TResult>(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> observableCollectionQuery, Expression<Func<TElement, TResult>> selector) :
+    ObservableCollectionScalarQuery<TElement, TResult>(collectionObserver, observableCollectionQuery)
 {
-    public ObservableCollectionAverageQuery(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> observableCollectionQuery, Expression<Func<TElement, TResult>> selector) :
-        base(collectionObserver, observableCollectionQuery) =>
-        Selector = selector;
-
     Func<TResult, TResult, TResult>? divide;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     IObservableScalarQuery<TResult>? sum;
 
-    internal readonly Expression<Func<TElement, TResult>> Selector;
+    internal readonly Expression<Func<TElement, TResult>> Selector = selector;
 
     protected override bool Dispose(bool disposing)
     {
@@ -38,7 +34,7 @@ sealed class ObservableCollectionAverageQuery<TElement, TResult> :
 
     void ObservableCollectionQueryPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(ObservableCollectionQuery<TElement>.Count))
+        if (e.PropertyName == nameof(ObservableCollectionQuery<>.Count))
             Evaluate();
     }
 
@@ -53,7 +49,7 @@ sealed class ObservableCollectionAverageQuery<TElement, TResult> :
 
     void SumPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(IObservableScalarQuery<TResult>.Evaluation))
+        if (e.PropertyName == nameof(IObservableScalarQuery<>.Evaluation))
             Evaluate();
     }
 

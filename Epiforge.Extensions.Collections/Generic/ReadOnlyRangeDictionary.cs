@@ -5,22 +5,16 @@ namespace Epiforge.Extensions.Collections.Generic;
 /// </summary>
 /// <typeparam name="TKey">The type of keys in the read-only dictionary</typeparam>
 /// <typeparam name="TValue">The type of values in the read-only dictionary</typeparam>
+/// <remarks>
+/// Initializes a new instance of the <see cref="ReadOnlyRangeDictionary{TKey, TValue}"/> class
+/// </remarks>
+/// <param name="rangeDictionary">The <see cref="IRangeDictionary{TKey, TValue}"/> around which to wrap</param>
 [SuppressMessage("Code Analysis", "CA1033: Interface methods should be callable by child types")]
-public class ReadOnlyRangeDictionary<TKey, TValue> :
-    ReadOnlyDictionary<TKey, TValue>,
+public class ReadOnlyRangeDictionary<TKey, TValue>(IRangeDictionary<TKey, TValue> rangeDictionary) :
+    ReadOnlyDictionary<TKey, TValue>(rangeDictionary),
     IRangeDictionary<TKey, TValue>
     where TKey : notnull
 {
-    /// <summary>
-    /// Initializes a new instance of the <see cref="ReadOnlyRangeDictionary{TKey, TValue}"/> class
-    /// </summary>
-    /// <param name="rangeDictionary">The <see cref="IRangeDictionary{TKey, TValue}"/> around which to wrap</param>
-    public ReadOnlyRangeDictionary(IRangeDictionary<TKey, TValue> rangeDictionary) :
-        base(rangeDictionary) =>
-        this.rangeDictionary = rangeDictionary;
-
-    readonly IRangeDictionary<TKey, TValue> rangeDictionary;
-
     void IDictionary<TKey, TValue>.Add(TKey key, TValue value) =>
         throw new NotSupportedException();
 

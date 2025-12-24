@@ -1,13 +1,9 @@
 namespace Epiforge.Extensions.Expressions.Observable;
 
-sealed class ObservableConstantExpression :
-    ObservableExpression
+sealed class ObservableConstantExpression(ExpressionObserver observer, ConstantExpression constantExpression, bool deferEvaluation) :
+    ObservableExpression(observer, constantExpression, deferEvaluation)
 {
-    public ObservableConstantExpression(ExpressionObserver observer, ConstantExpression constantExpression, bool deferEvaluation) :
-        base(observer, constantExpression, deferEvaluation) =>
-        ConstantExpression = constantExpression;
-
-    internal readonly ConstantExpression ConstantExpression;
+    internal readonly ConstantExpression ConstantExpression = constantExpression;
 
     protected override bool Dispose(bool disposing)
     {

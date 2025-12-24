@@ -1,13 +1,9 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-sealed class ObservableCollectionQueryGenericList<TElement> :
-    ObservableCollectionQuery<TElement>
+sealed class ObservableCollectionQueryGenericList<TElement>(CollectionObserver collectionObserver, IList<TElement> list) :
+    ObservableCollectionQuery<TElement>(collectionObserver)
 {
-    public ObservableCollectionQueryGenericList(CollectionObserver collectionObserver, IList<TElement> list) :
-        base(collectionObserver) =>
-        List = list;
-
-    internal readonly IList<TElement> List;
+    internal readonly IList<TElement> List = list;
 
     public override TElement this[int index] =>
         List[index];
@@ -58,13 +54,13 @@ sealed class ObservableCollectionQueryGenericList<TElement> :
 
     void PropertyChangedNotifierPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(IList<TElement>.Count))
+        if (e.PropertyName == nameof(IList<>.Count))
             OnPropertyChanged(e);
     }
 
     void PropertyChangingNotifierPropertyChanging(object? sender, PropertyChangingEventArgs e)
     {
-        if (e.PropertyName == nameof(IList<TElement>.Count))
+        if (e.PropertyName == nameof(IList<>.Count))
             OnPropertyChanging(e);
     }
 

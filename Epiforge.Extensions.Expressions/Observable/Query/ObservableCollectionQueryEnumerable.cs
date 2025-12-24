@@ -1,15 +1,9 @@
-using Microsoft.Extensions.Logging;
-
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-sealed class ObservableCollectionQueryEnumerable :
-    ObservableCollectionQuery<object?>
+sealed class ObservableCollectionQueryEnumerable(CollectionObserver collectionObserver, IEnumerable enumerable) :
+    ObservableCollectionQuery<object?>(collectionObserver)
 {
-    public ObservableCollectionQueryEnumerable(CollectionObserver collectionObserver, IEnumerable enumerable) :
-        base(collectionObserver) =>
-        Enumerable = enumerable;
-
-    internal readonly IEnumerable Enumerable;
+    internal readonly IEnumerable Enumerable = enumerable;
 
     public override object? this[int index] =>
         Enumerable.Cast<object?>().ElementAt(index);

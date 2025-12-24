@@ -1,23 +1,20 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-sealed class ObservableCollectionSumQuery<TElement, TResult> :
-    ObservableCollectionScalarQuery<TElement, TResult>
+sealed class ObservableCollectionSumQuery<TElement, TResult>(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> observableCollectionQuery, Expression<Func<TElement, TResult>> selector) :
+    ObservableCollectionScalarQuery<TElement, TResult>(collectionObserver, observableCollectionQuery)
 {
-    public ObservableCollectionSumQuery(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> observableCollectionQuery, Expression<Func<TElement, TResult>> selector) :
-        base(collectionObserver, observableCollectionQuery)
-    {
-        access = new();
-        Selector = selector;
-    }
-
-    readonly object access;
+#if IS_NET_9_0_OR_GREATER
+    readonly Lock access = new();
+#else
+    readonly object access = new();
+#endif
 
     Func<TResult, TResult, TResult>? add;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     IObservableCollectionQuery<TResult>? select;
     Func<TResult, TResult, TResult>? subtract;
 
-    internal readonly Expression<Func<TElement, TResult>> Selector;
+    internal readonly Expression<Func<TElement, TResult>> Selector = selector;
 
     protected override bool Dispose(bool disposing)
     {
@@ -67,8 +64,8 @@ sealed class ObservableCollectionSumQuery<TElement, TResult> :
                 else
                 {
                     var value = Evaluation.Result;
-                    var oldItems = e.OldItems?.Cast<TResult>() ?? Enumerable.Empty<TResult>();
-                    var newItems = e.NewItems?.Cast<TResult>() ?? Enumerable.Empty<TResult>();
+                    var oldItems = e.OldItems?.Cast<TResult>() ?? [];
+                    var newItems = e.NewItems?.Cast<TResult>() ?? [];
                     if (oldItems is not null)
                         value = subtract!(value, oldItems.Aggregate(default!, add!));
                     if (newItems is not null)
@@ -84,7 +81,7 @@ sealed class ObservableCollectionSumQuery<TElement, TResult> :
 
     void SelectPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(IObservableCollectionQuery<TResult>.OperationFault))
+        if (e.PropertyName == nameof(IObservableCollectionQuery<>.OperationFault))
             Evaluate();
     }
 

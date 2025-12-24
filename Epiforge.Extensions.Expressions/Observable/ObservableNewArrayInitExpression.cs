@@ -1,16 +1,12 @@
 namespace Epiforge.Extensions.Expressions.Observable;
 
-sealed class ObservableNewArrayInitExpression :
-    ObservableExpression
+sealed class ObservableNewArrayInitExpression(ExpressionObserver observer, NewArrayExpression newArrayExpression, bool deferEvaluation) :
+    ObservableExpression(observer, newArrayExpression, deferEvaluation)
 {
-    public ObservableNewArrayInitExpression(ExpressionObserver observer, NewArrayExpression newArrayExpression, bool deferEvaluation) :
-        base(observer, newArrayExpression, deferEvaluation) =>
-        NewArrayExpression = newArrayExpression;
-
     Type? elementType;
-    IReadOnlyList<ObservableExpression>? initializers;
+    ReadOnlyCollection<ObservableExpression>? initializers;
 
-    internal readonly NewArrayExpression NewArrayExpression;
+    internal readonly NewArrayExpression NewArrayExpression = newArrayExpression;
 
     protected override bool Dispose(bool disposing)
     {
@@ -67,7 +63,7 @@ sealed class ObservableNewArrayInitExpression :
                 initializer.PropertyChanged += InitializerPropertyChanged;
                 initializersList.Add(initializer);
             }
-            initializers = initializersList;
+            initializers = initializersList.AsReadOnly();
             EvaluateIfNotDeferred();
         }
         catch (Exception ex)

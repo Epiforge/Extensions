@@ -47,8 +47,7 @@ public class DynamicPropertyChangeNotifier :
     /// <exception cref="ArgumentNullException"><paramref name="e"/> is null</exception>
     protected virtual void OnPropertyChanged(PropertyChangedEventArgs e)
     {
-        if (e is null)
-            throw new ArgumentNullException(nameof(e));
+        ArgumentNullException.ThrowIfNull(e);
         Logger?.LogTrace(EventIds.Epiforge_Extensions_Components_RaisingPropertyChanged, "Raising PropertyChanged event for {PropertyName} property", e.PropertyName);
         PropertyChanged?.Invoke(this, e);
         Logger?.LogTrace(EventIds.Epiforge_Extensions_Components_RaisedPropertyChanged, "Raised PropertyChanged event for {PropertyName} property", e.PropertyName);
@@ -61,8 +60,7 @@ public class DynamicPropertyChangeNotifier :
 	/// <exception cref="ArgumentNullException"><paramref name="propertyName"/> is null</exception>
     protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
-        if (propertyName is null)
-            throw new ArgumentNullException(nameof(propertyName));
+        ArgumentNullException.ThrowIfNull(propertyName);
         OnPropertyChanged(new PropertyChangedEventArgs(propertyName));
     }
 
@@ -73,8 +71,7 @@ public class DynamicPropertyChangeNotifier :
     /// <exception cref="ArgumentNullException"><paramref name="e"/> is null</exception>
     protected virtual void OnPropertyChanging(PropertyChangingEventArgs e)
     {
-        if (e is null)
-            throw new ArgumentNullException(nameof(e));
+        ArgumentNullException.ThrowIfNull(e);
         Logger?.LogTrace(EventIds.Epiforge_Extensions_Components_RaisingPropertyChanging, "Raising PropertyChanging event for {PropertyName} property", e.PropertyName);
         PropertyChanging?.Invoke(this, e);
         Logger?.LogTrace(EventIds.Epiforge_Extensions_Components_RaisedPropertyChanging, "Raised PropertyChanging event for {PropertyName} property", e.PropertyName);
@@ -87,8 +84,7 @@ public class DynamicPropertyChangeNotifier :
     /// <exception cref="ArgumentNullException"><paramref name="propertyName"/> is null</exception>
     protected void OnPropertyChanging([CallerMemberName] string? propertyName = null)
     {
-        if (propertyName is null)
-            throw new ArgumentNullException(nameof(propertyName));
+        ArgumentNullException.ThrowIfNull(propertyName);
         OnPropertyChanging(new PropertyChangingEventArgs(propertyName));
     }
 

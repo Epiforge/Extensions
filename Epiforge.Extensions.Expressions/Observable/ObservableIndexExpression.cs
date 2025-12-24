@@ -1,12 +1,8 @@
 namespace Epiforge.Extensions.Expressions.Observable;
 
-sealed class ObservableIndexExpression :
-    ObservableExpression
+sealed class ObservableIndexExpression(ExpressionObserver observer, IndexExpression indexExpression, bool deferEvaluation) :
+    ObservableExpression(observer, indexExpression, deferEvaluation)
 {
-    public ObservableIndexExpression(ExpressionObserver observer, IndexExpression indexExpression, bool deferEvaluation) :
-        base(observer, indexExpression, deferEvaluation) =>
-        IndexExpression = indexExpression;
-
     EquatableList<ObservableExpression>? arguments;
     MethodInfo? getMethod;
     PropertyInfo? indexer;
@@ -14,7 +10,7 @@ sealed class ObservableIndexExpression :
     ObservableExpression? @object;
     object? objectResult;
 
-    internal readonly IndexExpression IndexExpression;
+    internal readonly IndexExpression IndexExpression = indexExpression;
 
     void ArgumentPropertyChanged(object? sender, PropertyChangedEventArgs e) =>
         Evaluate();
@@ -70,7 +66,7 @@ sealed class ObservableIndexExpression :
                     this.objectResult = objectResult;
                     SubscribeToObjectValueNotifications();
                 }
-                var value = getMethod?.FastInvoke(this.objectResult, arguments?.Select(argument => argument.Evaluation.Result).ToArray() ?? Array.Empty<object?>());
+                var value = getMethod?.FastInvoke(this.objectResult, arguments?.Select(argument => argument.Evaluation.Result).ToArray() ?? []);
                 Evaluation = (null, value);
                 observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{IndexExpression} evaluated: {Value}", IndexExpression, value);
             }

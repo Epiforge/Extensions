@@ -1,13 +1,9 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-sealed class ObservableCollectionQueryList :
-    ObservableCollectionQuery<object?>
+sealed class ObservableCollectionQueryList(CollectionObserver collectionObserver, IList list) :
+    ObservableCollectionQuery<object?>(collectionObserver)
 {
-    public ObservableCollectionQueryList(CollectionObserver collectionObserver, IList list) :
-        base(collectionObserver) =>
-        List = list;
-
-    internal readonly IList List;
+    internal readonly IList List = list;
 
     public override object? this[int index] =>
         List[index];

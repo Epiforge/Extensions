@@ -1,14 +1,10 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-sealed class ObservableDictionaryQueryReadOnlyDictionary<TKey, TValue> :
-    ObservableDictionaryQuery<TKey, TValue>
+sealed class ObservableDictionaryQueryReadOnlyDictionary<TKey, TValue>(CollectionObserver collectionObserver, IReadOnlyDictionary<TKey, TValue> readOnlyDictionary) :
+    ObservableDictionaryQuery<TKey, TValue>(collectionObserver)
     where TKey : notnull
 {
-    public ObservableDictionaryQueryReadOnlyDictionary(CollectionObserver collectionObserver, IReadOnlyDictionary<TKey, TValue> readOnlyDictionary) :
-        base(collectionObserver) =>
-        ReadOnlyDictionary = readOnlyDictionary;
-
-    internal readonly IReadOnlyDictionary<TKey, TValue> ReadOnlyDictionary;
+    internal readonly IReadOnlyDictionary<TKey, TValue> ReadOnlyDictionary = readOnlyDictionary;
 
     public override TValue this[TKey key] =>
         ReadOnlyDictionary[key];
@@ -95,13 +91,13 @@ sealed class ObservableDictionaryQueryReadOnlyDictionary<TKey, TValue> :
 
     void PropertyChangedNotifierPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(IReadOnlyDictionary<TKey, TValue>.Count))
+        if (e.PropertyName == nameof(IReadOnlyDictionary<,>.Count))
             OnPropertyChanged(e);
     }
 
     void PropertyChangingNotifierPropertyChanging(object? sender, PropertyChangingEventArgs e)
     {
-        if (e.PropertyName == nameof(IReadOnlyDictionary<TKey, TValue>.Count))
+        if (e.PropertyName == nameof(IReadOnlyDictionary<,>.Count))
             OnPropertyChanging(e);
     }
 

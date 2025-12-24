@@ -1,25 +1,16 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-sealed class ObservableGrouping<TKey, TElement> :
-    ObservableCollectionQuery<TElement>,
+sealed class ObservableGrouping<TKey, TElement>(CollectionObserver collectionObserver, TKey key, ObservableCollectionQuery<TElement> groupQuery) :
+    ObservableCollectionQuery<TElement>(collectionObserver),
     IObservableGrouping<TKey, TElement>
 {
-    public ObservableGrouping(CollectionObserver collectionObserver, TKey key, ObservableCollectionQuery<TElement> groupQuery) :
-        base(collectionObserver)
-    {
-        Key = key;
-        this.groupQuery = groupQuery;
-    }
-
-    readonly ObservableCollectionQuery<TElement> groupQuery;
-
     public override TElement this[int index] =>
         groupQuery[index];
 
     public override int Count =>
         groupQuery.Count;
 
-    public TKey Key { get; }
+    public TKey Key { get; } = key;
 
     public override void Dispose() =>
         throw new InvalidOperationException();

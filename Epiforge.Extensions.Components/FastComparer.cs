@@ -30,8 +30,8 @@ public class FastComparer :
         ArgumentNullException.ThrowIfNull(type);
         Type = type;
         var comparerType = typeof(Comparer<>).MakeGenericType(type);
-        comparer = comparerType.GetProperty(nameof(Comparer<object>.Default), BindingFlags.Public | BindingFlags.Static)!.FastGetValue(null)!;
-        compare = comparerType.GetMethod(nameof(Comparer<object>.Compare), new[] { type, type })!;
+        comparer = comparerType.GetProperty(nameof(Comparer<>.Default), BindingFlags.Public | BindingFlags.Static)!.FastGetValue(null)!;
+        compare = comparerType.GetMethod(nameof(Comparer<>.Compare), [type, type])!;
     }
 
     readonly object comparer;

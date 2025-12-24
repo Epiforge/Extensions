@@ -1,24 +1,16 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-sealed class ObservableScalarTransformQuery<TResult, TTransform> :
-    ObservableScalarQuery<TTransform>
+sealed class ObservableScalarTransformQuery<TResult, TTransform>(CollectionObserver collectionObserver, ObservableScalarQuery<TResult> sourceQuery, Expression<Func<TResult, TTransform>> transform) :
+    ObservableScalarQuery<TTransform>(collectionObserver)
 {
     static readonly ConcurrentDictionary<Expression<Func<TResult, TTransform>>, Func<TResult, TTransform>> compiledTransformCache = new(ExpressionEqualityComparer.Default);
 
     static Func<TResult, TTransform> CompiledTransformCacheValueFactory(Expression<Func<TResult, TTransform>> transform) =>
         transform.Compile();
 
-    public ObservableScalarTransformQuery(CollectionObserver collectionObserver, ObservableScalarQuery<TResult> sourceQuery, Expression<Func<TResult, TTransform>> transform) :
-        base(collectionObserver)
-    {
-        this.sourceQuery = sourceQuery;
-        Transform = transform;
-    }
-
-    readonly ObservableScalarQuery<TResult> sourceQuery;
     Func<TResult, TTransform>? transformDelegate;
 
-    internal readonly Expression<Func<TResult, TTransform>> Transform;
+    internal readonly Expression<Func<TResult, TTransform>> Transform = transform;
 
     protected override bool Dispose(bool disposing)
     {

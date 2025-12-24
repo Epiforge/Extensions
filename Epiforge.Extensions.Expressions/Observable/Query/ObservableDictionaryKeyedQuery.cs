@@ -1,20 +1,13 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-sealed class ObservableDictionaryKeyedQuery<TKey, TValue> :
-    ObservableDictionaryScalarQuery<TKey, TValue, KeyValuePair<TKey, TValue>>
+sealed class ObservableDictionaryKeyedQuery<TKey, TValue>(CollectionObserver collectionObserver, ObservableDictionaryQuery<TKey, TValue> observableDictionaryQuery, IComparer<TKey>? keyComparer, bool notFoundIsDefault) :
+    ObservableDictionaryScalarQuery<TKey, TValue, KeyValuePair<TKey, TValue>>(collectionObserver, observableDictionaryQuery)
     where TKey : notnull
 {
-    public ObservableDictionaryKeyedQuery(CollectionObserver collectionObserver, ObservableDictionaryQuery<TKey, TValue> observableDictionaryQuery, IComparer<TKey>? keyComparer, bool notFoundIsDefault) :
-        base(collectionObserver, observableDictionaryQuery)
-    {
-        KeyComparer = keyComparer;
-        NotFoundIsDefault = notFoundIsDefault;
-    }
-
     SortedDictionary<TKey, TValue>? sortedDictionary;
 
-    internal readonly IComparer<TKey>? KeyComparer;
-    internal readonly bool NotFoundIsDefault;
+    internal readonly IComparer<TKey>? KeyComparer = keyComparer;
+    internal readonly bool NotFoundIsDefault = notFoundIsDefault;
 
     protected override bool Dispose(bool disposing)
     {
@@ -89,7 +82,7 @@ sealed class ObservableDictionaryKeyedQuery<TKey, TValue> :
 
     void ObservableDictionaryQueryPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(IObservableDictionaryQuery<TKey, TValue>.OperationFault))
+        if (e.PropertyName == nameof(IObservableDictionaryQuery<,>.OperationFault))
             Evaluate();
     }
 

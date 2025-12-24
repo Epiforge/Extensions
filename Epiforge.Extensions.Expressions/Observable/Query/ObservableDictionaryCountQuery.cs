@@ -1,14 +1,9 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-sealed class ObservableDictionaryCountQuery<TKey, TValue> :
-    ObservableDictionaryScalarQuery<TKey, TValue, int>
+sealed class ObservableDictionaryCountQuery<TKey, TValue>(CollectionObserver collectionObserver, ObservableDictionaryQuery<TKey, TValue> observableDictionaryQuery) :
+    ObservableDictionaryScalarQuery<TKey, TValue, int>(collectionObserver, observableDictionaryQuery)
     where TKey : notnull
 {
-    public ObservableDictionaryCountQuery(CollectionObserver collectionObserver, ObservableDictionaryQuery<TKey, TValue> observableDictionaryQuery) :
-        base(collectionObserver, observableDictionaryQuery)
-    {
-    }
-
     protected override bool Dispose(bool disposing)
     {
         if (disposing)

@@ -25,7 +25,7 @@ public class ObservableSortedDictionary<TKey, TValue> :
     /// </summary>
     public ObservableSortedDictionary()
     {
-        gsd = new SortedDictionary<TKey, TValue>();
+        gsd = [];
         ci = gsd;
         gci = gsd;
         di = gsd;
@@ -197,7 +197,7 @@ public class ObservableSortedDictionary<TKey, TValue> :
     /// </summary>
     /// <param name="keyValuePairs">The key-value pairs to add</param>
     public virtual void AddRange(IEnumerable<KeyValuePair<TKey, TValue>> keyValuePairs) =>
-        AddRange(keyValuePairs.ToImmutableArray());
+        AddRange([..keyValuePairs]);
 
     /// <summary>
     /// Adds elements with the provided keys and values to the <see cref="IRangeDictionary{TKey, TValue}"/>
@@ -205,8 +205,7 @@ public class ObservableSortedDictionary<TKey, TValue> :
     /// <param name="keyValuePairs">The key-value pairs to add</param>
     public virtual void AddRange(IReadOnlyList<KeyValuePair<TKey, TValue>> keyValuePairs)
     {
-        if (keyValuePairs is null)
-            throw new ArgumentNullException(nameof(keyValuePairs));
+        ArgumentNullException.ThrowIfNull(keyValuePairs);
         if (keyValuePairs.Any(kvp => kvp.Key is null || gsd.ContainsKey(kvp.Key)))
             throw new ArgumentException("One of the keys was null or already found in the dictionary", nameof(keyValuePairs));
         if (keyValuePairs.Count > 0)
@@ -346,7 +345,7 @@ public class ObservableSortedDictionary<TKey, TValue> :
     /// <param name="keys">The keys of the elements to get</param>
     /// <returns>The elements with the specified keys</returns>
     public virtual IReadOnlyList<KeyValuePair<TKey, TValue>> GetRange(IEnumerable<TKey> keys) =>
-        keys.Select(key => new KeyValuePair<TKey, TValue>(key, this[key])).ToImmutableArray();
+        [..keys.Select(key => new KeyValuePair<TKey, TValue>(key, this[key]))];
 
     /// <summary>
     /// Gets the element with the specified key
@@ -535,7 +534,7 @@ public class ObservableSortedDictionary<TKey, TValue> :
             OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Remove, removed));
             NotifyCountChanged();
         }
-        return removed.ToImmutableArray();
+        return [..removed];
     }
 
     /// <summary>
@@ -551,7 +550,7 @@ public class ObservableSortedDictionary<TKey, TValue> :
             if (gsd.TryGetValue(key, out var value))
                 removingKeyValuePairs.Add(new KeyValuePair<TKey, TValue>(key, value));
         var removedKeys = new List<TKey>();
-        if (removingKeyValuePairs.Any())
+        if (removingKeyValuePairs.Count is not 0)
         {
             NotifyCountChanging();
             foreach (var removingKeyValuePair in removingKeyValuePairs)
@@ -562,7 +561,7 @@ public class ObservableSortedDictionary<TKey, TValue> :
             OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Remove, removingKeyValuePairs));
             NotifyCountChanged();
         }
-        return removedKeys.ToImmutableArray();
+        return [..removedKeys];
     }
 
     /// <summary>
@@ -610,7 +609,7 @@ public class ObservableSortedDictionary<TKey, TValue> :
         OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Replace, newKeyValuePairs, removingKeyValuePairs));
         if (countChanging)
             NotifyCountChanged();
-        return removedKeys.ToImmutableArray();
+        return [..removedKeys];
     }
 
     /// <summary>

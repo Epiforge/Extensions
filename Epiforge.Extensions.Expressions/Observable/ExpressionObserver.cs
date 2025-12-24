@@ -38,7 +38,7 @@ public class ExpressionObserver :
             case ConstantExpression constantExpression:
                 return constantExpression;
             case InvocationExpression invocationExpression:
-                return Expression.Invoke(ReplaceParameters(parameterTranslation, invocationExpression.Expression), invocationExpression.Arguments.Select(argument => ReplaceParameters(parameterTranslation, argument)).ToArray());
+                return Expression.Invoke(ReplaceParameters(parameterTranslation, invocationExpression.Expression), [..invocationExpression.Arguments.Select(argument => ReplaceParameters(parameterTranslation, argument))]);
             case IndexExpression indexExpression:
                 return Expression.MakeIndex(ReplaceParameters(parameterTranslation, indexExpression.Object!), indexExpression.Indexer, indexExpression.Arguments.Select(argument => ReplaceParameters(parameterTranslation, argument)));
             case LambdaExpression lambdaExpression:
@@ -46,7 +46,7 @@ public class ExpressionObserver :
             case MemberExpression memberExpression:
                 return Expression.MakeMemberAccess(memberExpression.Expression is { } instanceExpression ? ReplaceParameters(parameterTranslation, instanceExpression) : null, memberExpression.Member);
             case MemberInitExpression memberInitExpression:
-                return Expression.MemberInit((NewExpression)ReplaceParameters(parameterTranslation, memberInitExpression.NewExpression)!, memberInitExpression.Bindings.Cast<MemberAssignment>().Select(memberAssignment => memberAssignment.Update(ReplaceParameters(parameterTranslation, memberAssignment.Expression))).ToArray());
+                return Expression.MemberInit((NewExpression)ReplaceParameters(parameterTranslation, memberInitExpression.NewExpression)!, [..memberInitExpression.Bindings.Cast<MemberAssignment>().Select(memberAssignment => memberAssignment.Update(ReplaceParameters(parameterTranslation, memberAssignment.Expression)))]);
             case MethodCallExpression methodCallExpression:
                 return methodCallExpression.Object is null ? Expression.Call(methodCallExpression.Method, methodCallExpression.Arguments.Select(argument => ReplaceParameters(parameterTranslation, argument))) : Expression.Call(ReplaceParameters(parameterTranslation, methodCallExpression.Object), methodCallExpression.Method, methodCallExpression.Arguments.Select(argument => ReplaceParameters(parameterTranslation, argument)));
             case NewArrayExpression newArrayInitExpression when newArrayInitExpression.NodeType == ExpressionType.NewArrayInit:
@@ -63,6 +63,18 @@ public class ExpressionObserver :
             default:
                 throw new NotSupportedException($"Cannot replace parameters in {expression?.GetType().Name ?? "null expression"}");
         }
+    }
+
+    internal static Expression? ReplaceParametersWithoutOptimization(LambdaExpression lambdaExpression, params object?[] arguments)
+    {
+        var parameterTranslation = new Dictionary<ParameterExpression, ConstantExpression>();
+        for (var i = 0; i < lambdaExpression.Parameters.Count; ++i)
+        {
+            var parameter = lambdaExpression.Parameters[i];
+            var constant = Expression.Constant(arguments[i], parameter.Type);
+            parameterTranslation.Add(parameter, constant);
+        }
+        return ReplaceParameters(parameterTranslation, lambdaExpression.Body);
     }
 
     /// <summary>
@@ -89,45 +101,64 @@ public class ExpressionObserver :
         MemberExpressionsListenToGeneratedTypesFieldValuesForDictionaryChanged = options.MemberExpressionsListenToGeneratedTypesFieldValuesForDictionaryChanged;
         Optimizer = options.Optimizer;
         PreferAsyncDisposal = options.PreferAsyncDisposal;
-        disposeConstructedTypes = options.DisposeConstructedTypes.Keys.ToImmutableHashSet();
-        disposeMethodReturnValues = options.DisposeMethodReturnValues.Keys.ToImmutableHashSet();
-        ignoredPropertyChangeNotifications = options.IgnoredPropertyChangeNotifications.Keys.ToImmutableHashSet();
+        disposeConstructedTypes = [..options.DisposeConstructedTypes.Keys];
+        disposeMethodReturnValues = [..options.DisposeMethodReturnValues.Keys];
+        ignoredPropertyChangeNotifications = [..options.IgnoredPropertyChangeNotifications.Keys];
         Logger = options.Logger;
     }
 
     readonly Dictionary<Expression, IDisposable> cachedDoubleArgumentObservableExpressions = new(ExpressionEqualityComparer.Default);
-    readonly object cachedDoubleArgumentObservableExpressionsAccess = new();
     readonly Dictionary<BinaryExpression, ObservableBinaryExpression> cachedObservableBinaryExpressions = new(ExpressionEqualityComparer.Default);
-    readonly object cachedObservableBinaryExpressionsAccess = new();
     readonly Dictionary<ConditionalExpression, ObservableConditionalExpression> cachedObservableConditionalExpressions = new(ExpressionEqualityComparer.Default);
-    readonly object cachedObservableConditionalExpressionsAccess = new();
     readonly Dictionary<ConstantExpression, ObservableConstantExpression> cachedObservableConstantExpressionExpressions = new(ConstantExpressionExpressionEqualityComparer.Default);
     readonly Dictionary<ConstantExpression, ObservableConstantExpression> cachedObservableConstantExpressions = new(ExpressionEqualityComparer.Default);
-    readonly object cachedObservableConstantExpressionsAccess = new();
     readonly Dictionary<Expression, IDisposable> cachedObservableExpressions = new(ExpressionEqualityComparer.Default);
-    readonly object cachedObservableExpressionsAccess = new();
     readonly Dictionary<IndexExpression, ObservableIndexExpression> cachedObservableIndexExpressions = new(ExpressionEqualityComparer.Default);
-    readonly object cachedObservableIndexExpressionsAccess = new();
     readonly Dictionary<InvocationExpression, ObservableInvocationExpression> cachedObservableInvocationExpressions = new(ExpressionEqualityComparer.Default);
-    readonly object cachedObservableInvocationExpressionsAccess = new();
     readonly Dictionary<MemberExpression, ObservableMemberExpression> cachedObservableMemberExpressions = new(ExpressionEqualityComparer.Default);
-    readonly object cachedObservableMemberExpressionsAccess = new();
     readonly Dictionary<MemberInitExpression, ObservableMemberInitExpression> cachedObservableMemberInitExpressions = new(ExpressionEqualityComparer.Default);
-    readonly object cachedObservableMemberInitExpressionsAccess = new();
     readonly Dictionary<MethodCallExpression, ObservableMethodCallExpression> cachedObservableMethodCallExpressions = new(ExpressionEqualityComparer.Default);
-    readonly object cachedObservableMethodCallExpressionsAccess = new();
     readonly Dictionary<NewArrayExpression, ObservableNewArrayInitExpression> cachedObservableNewArrayInitExpressions = new(ExpressionEqualityComparer.Default);
-    readonly object cachedObservableNewArrayInitExpressionsAccess = new();
     readonly Dictionary<NewExpression, ObservableNewExpression> cachedObservableNewExpressions = new(ExpressionEqualityComparer.Default);
-    readonly object cachedObservableNewExpressionsAccess = new();
     readonly Dictionary<TypeBinaryExpression, ObservableTypeBinaryExpression> cachedObservableTypeBinaryExpressions = new(ExpressionEqualityComparer.Default);
-    readonly object cachedObservableTypeBinaryExpressionsAccess = new();
     readonly Dictionary<Expression, IDisposable> cachedSingleArgumentObservableExpressions = new(ExpressionEqualityComparer.Default);
-    readonly object cachedSingleArgumentObservableExpressionsAccess = new();
     readonly Dictionary<Expression, IDisposable> cachedTripleArgumentObservableExpressions = new(ExpressionEqualityComparer.Default);
-    readonly object cachedTripleArgumentObservableExpressionsAccess = new();
     readonly Dictionary<UnaryExpression, ObservableUnaryExpression> cachedObservableUnaryExpressions = new(ExpressionEqualityComparer.Default);
+#if IS_NET_9_0_OR_GREATER
+    readonly Lock cachedDoubleArgumentObservableExpressionsAccess = new();
+    readonly Lock cachedObservableBinaryExpressionsAccess = new();
+    readonly Lock cachedObservableConditionalExpressionsAccess = new();
+    readonly Lock cachedObservableConstantExpressionsAccess = new();
+    readonly Lock cachedObservableExpressionsAccess = new();
+    readonly Lock cachedObservableIndexExpressionsAccess = new();
+    readonly Lock cachedObservableInvocationExpressionsAccess = new();
+    readonly Lock cachedObservableMemberExpressionsAccess = new();
+    readonly Lock cachedObservableMemberInitExpressionsAccess = new();
+    readonly Lock cachedObservableMethodCallExpressionsAccess = new();
+    readonly Lock cachedObservableNewArrayInitExpressionsAccess = new();
+    readonly Lock cachedObservableNewExpressionsAccess = new();
+    readonly Lock cachedObservableTypeBinaryExpressionsAccess = new();
+    readonly Lock cachedSingleArgumentObservableExpressionsAccess = new();
+    readonly Lock cachedTripleArgumentObservableExpressionsAccess = new();
+    readonly Lock cachedObservableUnaryExpressionsAccess = new();
+#else
+    readonly object cachedDoubleArgumentObservableExpressionsAccess = new();
+    readonly object cachedObservableBinaryExpressionsAccess = new();
+    readonly object cachedObservableConditionalExpressionsAccess = new();
+    readonly object cachedObservableConstantExpressionsAccess = new();
+    readonly object cachedObservableExpressionsAccess = new();
+    readonly object cachedObservableIndexExpressionsAccess = new();
+    readonly object cachedObservableInvocationExpressionsAccess = new();
+    readonly object cachedObservableMemberExpressionsAccess = new();
+    readonly object cachedObservableMemberInitExpressionsAccess = new();
+    readonly object cachedObservableMethodCallExpressionsAccess = new();
+    readonly object cachedObservableNewArrayInitExpressionsAccess = new();
+    readonly object cachedObservableNewExpressionsAccess = new();
+    readonly object cachedObservableTypeBinaryExpressionsAccess = new();
+    readonly object cachedSingleArgumentObservableExpressionsAccess = new();
+    readonly object cachedTripleArgumentObservableExpressionsAccess = new();
     readonly object cachedObservableUnaryExpressionsAccess = new();
+#endif
     readonly ImmutableHashSet<(Type type, EquatableList<Type> constuctorParameterTypes)> disposeConstructedTypes;
     readonly ImmutableHashSet<MethodInfo> disposeMethodReturnValues;
     readonly ImmutableHashSet<PropertyInfo> ignoredPropertyChangeNotifications;
@@ -224,7 +255,7 @@ public class ExpressionObserver :
         }
         void propertyChangedHandler(object? sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == nameof(IObservableExpression<bool>.Evaluation))
+            if (e.PropertyName == nameof(IObservableExpression<>.Evaluation))
             {
                 if (observableExpression!.Evaluation.Fault is { } fault)
                 {
@@ -701,7 +732,7 @@ public class ExpressionObserver :
         ArgumentNullException.ThrowIfNull(constructor);
         if (constructor.DeclaringType is not { } declaringType)
             throw new ArgumentException("the constructor specified does not have a declaring type", nameof(constructor));
-        return disposeConstructedTypes.Contains((declaringType, new EquatableList<Type>(constructor.GetParameters().Select(parameterInfo => parameterInfo.ParameterType).ToList())));
+        return disposeConstructedTypes.Contains((declaringType, new EquatableList<Type>([..constructor.GetParameters().Select(parameterInfo => parameterInfo.ParameterType)])));
     }
 
     /// <inheritdoc/>
@@ -744,7 +775,7 @@ public class ExpressionObserver :
         return IsMethodReturnValueDisposed(getMethod);
     }
 
-    IObservableExpression<TResult> Observe<TResult>(object?[] arguments, Expression? parameterReplacedExpression)
+    ObservableExpression<TResult> Observe<TResult>(object?[] arguments, Expression? parameterReplacedExpression)
     {
         lock (cachedObservableExpressionsAccess)
         {
@@ -777,7 +808,7 @@ public class ExpressionObserver :
     {
         ArgumentNullException.ThrowIfNull(lambdaExpression);
         ArgumentNullException.ThrowIfNull(arguments);
-        var parameterReplacedExpression = ReplaceParametersWithoutOptimization(lambdaExpression, arguments);
+        var parameterReplacedExpression = ExpressionObserver.ReplaceParametersWithoutOptimization(lambdaExpression, arguments);
         return Observe<TResult>(arguments, parameterReplacedExpression);
     }
 
@@ -791,7 +822,7 @@ public class ExpressionObserver :
     public IObservableExpression<TResult> ObserveWithoutOptimization<TResult>(Expression<Func<TResult>> expression) =>
         ObserveWithoutOptimization<TResult>((LambdaExpression)expression);
 
-    IObservableExpression<TArgument, TResult> Observe<TArgument, TResult>(TArgument argument, Expression? parameterReplacedExpression)
+    ObservableExpression<TArgument, TResult> Observe<TArgument, TResult>(TArgument argument, Expression? parameterReplacedExpression)
     {
         lock (cachedSingleArgumentObservableExpressionsAccess)
         {
@@ -822,11 +853,11 @@ public class ExpressionObserver :
     public IObservableExpression<TArgument, TResult> ObserveWithoutOptimization<TArgument, TResult>(Expression<Func<TArgument, TResult>> expression, TArgument argument)
     {
         ArgumentNullException.ThrowIfNull(expression);
-        var parameterReplacedExpression = ReplaceParametersWithoutOptimization(expression, argument);
+        var parameterReplacedExpression = ExpressionObserver.ReplaceParametersWithoutOptimization(expression, argument);
         return Observe<TArgument, TResult>(argument, parameterReplacedExpression);
     }
 
-    IObservableExpression<TArgument1, TArgument2, TResult> Observe<TArgument1, TArgument2, TResult>(TArgument1 argument1, TArgument2 argument2, Expression? parameterReplacedExpression)
+    ObservableExpression<TArgument1, TArgument2, TResult> Observe<TArgument1, TArgument2, TResult>(TArgument1 argument1, TArgument2 argument2, Expression? parameterReplacedExpression)
     {
         lock (cachedDoubleArgumentObservableExpressionsAccess)
         {
@@ -857,11 +888,11 @@ public class ExpressionObserver :
     public IObservableExpression<TArgument1, TArgument2, TResult> ObserveWithoutOptimization<TArgument1, TArgument2, TResult>(Expression<Func<TArgument1, TArgument2, TResult>> expression, TArgument1 argument1, TArgument2 argument2)
     {
         ArgumentNullException.ThrowIfNull(expression);
-        var parameterReplacedExpression = ReplaceParametersWithoutOptimization(expression, argument1, argument2);
+        var parameterReplacedExpression = ExpressionObserver.ReplaceParametersWithoutOptimization(expression, argument1, argument2);
         return Observe<TArgument1, TArgument2, TResult>(argument1, argument2, parameterReplacedExpression);
     }
 
-    IObservableExpression<TArgument1, TArgument2, TArgument3, TResult> Observe<TArgument1, TArgument2, TArgument3, TResult>(TArgument1 argument1, TArgument2 argument2, TArgument3 argument3, Expression? parameterReplacedExpression)
+    ObservableExpression<TArgument1, TArgument2, TArgument3, TResult> Observe<TArgument1, TArgument2, TArgument3, TResult>(TArgument1 argument1, TArgument2 argument2, TArgument3 argument3, Expression? parameterReplacedExpression)
     {
         lock (cachedTripleArgumentObservableExpressionsAccess)
         {
@@ -892,25 +923,13 @@ public class ExpressionObserver :
     public IObservableExpression<TArgument1, TArgument2, TArgument3, TResult> ObserveWithoutOptimization<TArgument1, TArgument2, TArgument3, TResult>(Expression<Func<TArgument1, TArgument2, TArgument3, TResult>> expression, TArgument1 argument1, TArgument2 argument2, TArgument3 argument3)
     {
         ArgumentNullException.ThrowIfNull(expression);
-        var parameterReplacedExpression = ReplaceParametersWithoutOptimization(expression, argument1, argument2, argument3);
+        var parameterReplacedExpression = ExpressionObserver.ReplaceParametersWithoutOptimization(expression, argument1, argument2, argument3);
         return Observe<TArgument1, TArgument2, TArgument3, TResult>(argument1, argument2, argument3, parameterReplacedExpression);
     }
 
     internal Expression? ReplaceParameters(LambdaExpression lambdaExpression, params object?[] arguments)
     {
         lambdaExpression = (LambdaExpression)(Optimizer?.Invoke(lambdaExpression) ?? lambdaExpression);
-        return ReplaceParametersWithoutOptimization(lambdaExpression, arguments);
-    }
-
-    internal Expression? ReplaceParametersWithoutOptimization(LambdaExpression lambdaExpression, params object?[] arguments)
-    {
-        var parameterTranslation = new Dictionary<ParameterExpression, ConstantExpression>();
-        for (var i = 0; i < lambdaExpression.Parameters.Count; ++i)
-        {
-            var parameter = lambdaExpression.Parameters[i];
-            var constant = Expression.Constant(arguments[i], parameter.Type);
-            parameterTranslation.Add(parameter, constant);
-        }
-        return ReplaceParameters(parameterTranslation, lambdaExpression.Body);
+        return ExpressionObserver.ReplaceParametersWithoutOptimization(lambdaExpression, arguments);
     }
 }

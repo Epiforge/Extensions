@@ -1,19 +1,10 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-sealed class ObservableCollectionUsingSynchronizationContextQuery<TElement> :
-    ObservableCollectionQuery<TElement>
+sealed class ObservableCollectionUsingSynchronizationContextQuery<TElement>(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> source, SynchronizationContext synchronizationContext) :
+    ObservableCollectionQuery<TElement>(collectionObserver)
 {
-    public ObservableCollectionUsingSynchronizationContextQuery(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> source, SynchronizationContext synchronizationContext) :
-        base(collectionObserver)
-    {
-        this.source = source;
-        SynchronizationContext = synchronizationContext;
-    }
-
     ObservableRangeCollection<TElement>? elements;
-    readonly ObservableCollectionQuery<TElement> source;
-
-    internal readonly SynchronizationContext SynchronizationContext;
+    internal readonly SynchronizationContext SynchronizationContext = synchronizationContext;
 
     public override TElement this[int index] =>
         SynchronizationContext.Send(() => elements![index]);

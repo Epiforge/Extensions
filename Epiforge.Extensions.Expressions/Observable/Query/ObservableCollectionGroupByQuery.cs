@@ -8,7 +8,7 @@ sealed class ObservableCollectionGroupByQuery<TKey, TElement> :
     static Expression<Func<TElement, Tuple<TElement, TKey>>> CachedWrappedSelectorsValueFactory(Expression<Func<TElement, TKey>> selector)
     {
         var parameter = Expression.Parameter(typeof(TElement), "element");
-        return Expression.Lambda<Func<TElement, Tuple<TElement, TKey>>>(Expression.New(typeof(Tuple<TElement, TKey>).GetConstructor(new[] { typeof(TElement), typeof(TKey) })!, parameter, Expression.Invoke(selector, parameter)), parameter);
+        return Expression.Lambda<Func<TElement, Tuple<TElement, TKey>>>(Expression.New(typeof(Tuple<TElement, TKey>).GetConstructor([typeof(TElement), typeof(TKey)])!, parameter, Expression.Invoke(selector, parameter)), parameter);
     }
 
     public ObservableCollectionGroupByQuery(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> source, Expression<Func<TElement, TKey>> keySelector, IEqualityComparer<TKey> keyEqualityComparer) :
@@ -19,7 +19,7 @@ sealed class ObservableCollectionGroupByQuery<TKey, TElement> :
         KeyEqualityComparer = keyEqualityComparer;
         access = new();
         collectionAndGroupingByKey = new(KeyEqualityComparer);
-        groupings = new();
+        groupings = [];
     }
 
     readonly object access;
@@ -159,7 +159,7 @@ sealed class ObservableCollectionGroupByQuery<TKey, TElement> :
 
     void SelectPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(IObservableCollectionQuery<Tuple<TElement, TKey>>.OperationFault))
+        if (e.PropertyName == nameof(IObservableCollectionQuery<>.OperationFault))
             OperationFault = select!.OperationFault;
     }
 

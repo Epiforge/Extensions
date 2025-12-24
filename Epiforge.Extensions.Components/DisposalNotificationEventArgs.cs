@@ -3,20 +3,18 @@ namespace Epiforge.Extensions.Components;
 /// <summary>
 /// Represents the arguments for the <see cref="INotifyDisposalOverridden.DisposalOverridden"/>, <see cref="INotifyDisposed.Disposed"/>, and <see cref="INotifyDisposing.Disposing"/> events
 /// </summary>
-public sealed class DisposalNotificationEventArgs :
+/// <remarks>
+/// Initializes a new instance of the <see cref="DisposalNotificationEventArgs"/> class
+/// </remarks>
+/// <param name="isFinalizer"><c>true</c> if the object is being disposed by the finalizer; otherwise, <c>false</c></param>
+public sealed class DisposalNotificationEventArgs(bool isFinalizer) :
     EventArgs
 {
-    /// <summary>
-    /// Initializes a new instance of the <see cref="DisposalNotificationEventArgs"/> class
-    /// </summary>
-    /// <param name="isFinalizer"><c>true</c> if the object is being disposed by the finalizer; otherwise, <c>false</c></param>
-    public DisposalNotificationEventArgs(bool isFinalizer) =>
-        IsFinalizer = isFinalizer;
 
     /// <summary>
     /// Gets whether the object is being disposed by the finalizer
     /// </summary>
-    public bool IsFinalizer { get; }
+    public bool IsFinalizer { get; } = isFinalizer;
 
     /// <summary>
     /// Gets a reusable instance of arguments for when disposal is ocurring because <see cref="IDisposable.Dispose"/> or <see cref="IAsyncDisposable.DisposeAsync"/> was called

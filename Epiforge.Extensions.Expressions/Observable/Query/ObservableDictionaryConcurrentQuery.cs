@@ -1,16 +1,10 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-sealed class ObservableDictionaryConcurrentQuery<TKey, TValue> :
-    ObservableDictionaryQuery<TKey, TValue>
+sealed class ObservableDictionaryConcurrentQuery<TKey, TValue>(CollectionObserver collectionObserver, ObservableDictionaryQuery<TKey, TValue> source) :
+    ObservableDictionaryQuery<TKey, TValue>(collectionObserver)
     where TKey : notnull
 {
-    public ObservableDictionaryConcurrentQuery(CollectionObserver collectionObserver, ObservableDictionaryQuery<TKey, TValue> source) :
-        base(collectionObserver) =>
-        this.source = source;
-
     ObservableConcurrentDictionary<TKey, TValue>? observableConcurrentDictionary;
-
-    readonly ObservableDictionaryQuery<TKey, TValue> source;
 
     public override TValue this[TKey key] =>
         observableConcurrentDictionary![key];
@@ -56,7 +50,7 @@ sealed class ObservableDictionaryConcurrentQuery<TKey, TValue> :
         observableConcurrentDictionary!.GetEnumerator();
 
     public override IReadOnlyList<KeyValuePair<TKey, TValue>> GetRange(IEnumerable<TKey> keys) =>
-        keys.Select(key => new KeyValuePair<TKey, TValue>(key, observableConcurrentDictionary![key])).ToImmutableArray();
+        [..keys.Select(key => new KeyValuePair<TKey, TValue>(key, observableConcurrentDictionary![key]))];
 
     void ObservableConcurrentDictionaryCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
         OnCollectionChanged(e);

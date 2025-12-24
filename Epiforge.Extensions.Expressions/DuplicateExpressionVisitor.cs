@@ -3,7 +3,7 @@ namespace Epiforge.Extensions.Expressions;
 sealed class DuplicateExpressionVisitor :
     ExpressionVisitor
 {
-    [return: NotNullIfNotNull("node")]
+    [return: NotNullIfNotNull(nameof(node))]
     public override Expression? Visit(Expression? node)
     {
         if (node is DynamicExpression dynamic)

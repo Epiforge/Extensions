@@ -1,13 +1,8 @@
 namespace Epiforge.Extensions.Expressions.Observable;
 
-sealed class ObservableAndAlsoExpression :
-    ObservableBinaryExpression
+sealed class ObservableAndAlsoExpression(ExpressionObserver observer, BinaryExpression binaryExpression, bool deferEvaluation) :
+    ObservableBinaryExpression(observer, binaryExpression, deferEvaluation)
 {
-    public ObservableAndAlsoExpression(ExpressionObserver observer, BinaryExpression binaryExpression, bool deferEvaluation) :
-        base(observer, binaryExpression, deferEvaluation)
-    {
-    }
-
     protected override void Evaluate()
     {
         var (leftFault, leftResult) = left?.Evaluation ?? (null, null);

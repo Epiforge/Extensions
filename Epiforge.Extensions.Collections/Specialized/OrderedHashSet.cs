@@ -16,7 +16,7 @@ public sealed class OrderedHashSet<T> :
     /// </summary>
     public OrderedHashSet()
     {
-        dict = new NullableKeyDictionary<T, LinkedListNode<T>>();
+        dict = [];
         list = new LinkedList<T>();
     }
 
@@ -275,8 +275,7 @@ public sealed class OrderedHashSet<T> :
     /// <exception cref="ArgumentNullException"><paramref name="other"/> is null</exception>
     public bool IsSubsetOf(IEnumerable<T> other)
     {
-        if (other is null)
-            throw new ArgumentNullException(nameof(other));
+        ArgumentNullException.ThrowIfNull(other);
         var otherSet = GetSet(other);
         if (dict.Count > otherSet.Count)
             return false;
@@ -294,8 +293,7 @@ public sealed class OrderedHashSet<T> :
     /// <exception cref="ArgumentNullException"><paramref name="other"/> is null</exception>
     public bool IsSupersetOf(IEnumerable<T> other)
     {
-        if (other is null)
-            throw new ArgumentNullException(nameof(other));
+        ArgumentNullException.ThrowIfNull(other);
         var otherSet = GetSet(other);
         if (otherSet.Count > dict.Count)
             return false;

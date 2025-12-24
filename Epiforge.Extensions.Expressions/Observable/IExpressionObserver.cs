@@ -53,7 +53,7 @@ public interface IExpressionObserver
     /// <summary>
     /// Gets the method that will be invoked during the observable expression creation process to optimize expressions (default is <c>null</c>)
     /// </summary>
-    public Func<Expression, Expression>? Optimizer { get; }
+    Func<Expression, Expression>? Optimizer { get; }
 
     /// <summary>
     /// Gets whether the expression observer will prefer asynchronous disposal over synchronous disposal when both interfaces are implemented; the default is <c>true</c>

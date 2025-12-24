@@ -4,8 +4,8 @@ abstract class ObservableQuery :
     SyncDisposable,
     IObservableQuery
 {
-    protected static readonly PropertyChangedEventArgs countPropertyChangedEventArgs = new(nameof(IReadOnlyList<object>.Count));
-    protected static readonly PropertyChangingEventArgs countPropertyChangingEventArgs = new(nameof(IReadOnlyList<object>.Count));
+    protected static readonly PropertyChangedEventArgs countPropertyChangedEventArgs = new(nameof(IReadOnlyList<>.Count));
+    protected static readonly PropertyChangingEventArgs countPropertyChangingEventArgs = new(nameof(IReadOnlyList<>.Count));
 
     public ObservableQuery(CollectionObserver collectionObserver)
     {
@@ -14,7 +14,11 @@ abstract class ObservableQuery :
     }
 
     protected readonly CollectionObserver collectionObserver;
+#if IS_NET_9_0_OR_GREATER
+    readonly Lock initializationAccess = new();
+#else
     readonly object initializationAccess = new();
+#endif
     bool isInitialized;
 
     internal int Observations;

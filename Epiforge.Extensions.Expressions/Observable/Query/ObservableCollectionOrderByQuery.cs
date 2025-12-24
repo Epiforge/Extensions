@@ -8,7 +8,7 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
     static Expression<Func<TElement, Tuple<TElement, IComparable>>> CachedWrappedSelectorsValueFactory(Expression<Func<TElement, IComparable>> selector)
     {
         var parameter = Expression.Parameter(typeof(TElement), "element");
-        return Expression.Lambda<Func<TElement, Tuple<TElement, IComparable>>>(Expression.New(typeof(Tuple<TElement, IComparable>).GetConstructor(new[] { typeof(TElement), typeof(IComparable) })!, parameter, Expression.Invoke(selector, parameter)), parameter);
+        return Expression.Lambda<Func<TElement, Tuple<TElement, IComparable>>>(Expression.New(typeof(Tuple<TElement, IComparable>).GetConstructor([typeof(TElement), typeof(IComparable)])!, parameter, Expression.Invoke(selector, parameter)), parameter);
     }
 
     public ObservableCollectionOrderByQuery(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> source, IReadOnlyList<(Expression<Func<TElement, IComparable>> keySelectorExpression, bool isDescending)> selectorsAndDirections) :
@@ -18,14 +18,14 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
         equalityComparer = EqualityComparer<TElement>.Default;
         this.source = source;
         results = Logger is null ? new() : new(Logger);
-        startingIndiciesAndCounts = new();
+        startingIndiciesAndCounts = [];
         SelectorsAndDirections = selectorsAndDirections;
     }
 
     readonly object access;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     ObservableCollectionOrderingComparer<TElement>? comparer;
-    readonly IEqualityComparer<TElement> equalityComparer;
+    readonly EqualityComparer<TElement> equalityComparer;
     readonly ObservableRangeCollection<TElement> results;
     IReadOnlyList<(IObservableCollectionQuery<Tuple<TElement, IComparable>> selection, bool isDescending)>? selectionsAndDirections;
     readonly ObservableCollectionQuery<TElement> source;
@@ -103,6 +103,7 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
         }
     }
 
+    [SuppressMessage("Performance", "CA1859: Use concrete types when possible for improved performance")]
     void RebuildStartingIndiciesAndCounts(IReadOnlyList<TElement> fromSort)
     {
         startingIndiciesAndCounts.Clear();
@@ -177,7 +178,7 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
 
     void SelectionPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(IObservableCollectionQuery<Tuple<TElement, IComparable>>.OperationFault))
+        if (e.PropertyName == nameof(IObservableCollectionQuery<>.OperationFault))
             SetOperationFault();
     }
 

@@ -1,17 +1,10 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-sealed class ObservableCollectionIndexQuery<TElement> :
-    ObservableCollectionScalarQuery<TElement, TElement>
+sealed class ObservableCollectionIndexQuery<TElement>(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> observableCollectionQuery, Index? index, bool outOfRangeIsDefault) :
+    ObservableCollectionScalarQuery<TElement, TElement>(collectionObserver, observableCollectionQuery)
 {
-    public ObservableCollectionIndexQuery(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> observableCollectionQuery, Index? index, bool outOfRangeIsDefault) :
-        base(collectionObserver, observableCollectionQuery)
-    {
-        Index = index;
-        OutOfRangeIsDefault = outOfRangeIsDefault;
-    }
-
-    internal readonly Index? Index;
-    internal readonly bool OutOfRangeIsDefault;
+    internal readonly Index? Index = index;
+    internal readonly bool OutOfRangeIsDefault = outOfRangeIsDefault;
 
     protected override bool Dispose(bool disposing)
     {

@@ -22,18 +22,27 @@ public class CollectionObserver :
         ExpressionObserver = expressionObserver;
     }
 
-    readonly Dictionary<IEnumerable, ObservableQuery> cachedEnumerableObservableCollections = new();
+    readonly Dictionary<IEnumerable, ObservableQuery> cachedEnumerableObservableCollections = [];
+    readonly Dictionary<IEnumerable, ObservableQuery> cachedGenericEnumerableObservableCollections = [];
+    readonly Dictionary<IEnumerable, ObservableQuery> cachedGenericListObservableCollections = [];
+    readonly Dictionary<IEnumerable, ObservableQuery> cachedListObservableCollections = [];
+    readonly Dictionary<IEnumerable, ObservableQuery> cachedReadOnlyDictionaryObservableDictionaries = [];
+    readonly Dictionary<IEnumerable, ObservableQuery> cachedReadOnlyListObservableCollections = [];
+#if IS_NET_9_0_OR_GREATER
+    readonly Lock cachedEnumerableObservableCollectionsAccess = new();
+    readonly Lock cachedGenericEnumerableObservableCollectionsAccess = new();
+    readonly Lock cachedGenericListObservableCollectionsAccess = new();
+    readonly Lock cachedListObservableCollectionsAccess = new();
+    readonly Lock cachedReadOnlyDictionaryObservableDictionariesAccess = new();
+    readonly Lock cachedReadOnlyListObservableCollectionsAccess = new();
+#else
     readonly object cachedEnumerableObservableCollectionsAccess = new();
-    readonly Dictionary<IEnumerable, ObservableQuery> cachedGenericEnumerableObservableCollections = new();
     readonly object cachedGenericEnumerableObservableCollectionsAccess = new();
-    readonly Dictionary<IEnumerable, ObservableQuery> cachedGenericListObservableCollections = new();
     readonly object cachedGenericListObservableCollectionsAccess = new();
-    readonly Dictionary<IEnumerable, ObservableQuery> cachedListObservableCollections = new();
     readonly object cachedListObservableCollectionsAccess = new();
-    readonly Dictionary<IEnumerable, ObservableQuery> cachedReadOnlyDictionaryObservableDictionaries = new();
     readonly object cachedReadOnlyDictionaryObservableDictionariesAccess = new();
-    readonly Dictionary<IEnumerable, ObservableQuery> cachedReadOnlyListObservableCollections = new();
     readonly object cachedReadOnlyListObservableCollectionsAccess = new();
+#endif
 
     /// <inheritdoc/>
     public int CachedObservableQueries

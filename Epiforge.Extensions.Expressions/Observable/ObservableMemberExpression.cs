@@ -1,12 +1,8 @@
 namespace Epiforge.Extensions.Expressions.Observable;
 
-sealed class ObservableMemberExpression :
-    ObservableExpression
+sealed class ObservableMemberExpression(ExpressionObserver observer, MemberExpression memberExpression, bool deferEvaluation) :
+    ObservableExpression(observer, memberExpression, deferEvaluation)
 {
-    public ObservableMemberExpression(ExpressionObserver observer, MemberExpression memberExpression, bool deferEvaluation) :
-        base(observer, memberExpression, deferEvaluation) =>
-        MemberExpression = memberExpression;
-
     bool doNotListenForPropertyChanges;
     FieldInfo? field;
     MethodInfo? getMethod;
@@ -16,7 +12,7 @@ sealed class ObservableMemberExpression :
     ObservableExpression? observableExpression;
     object? observableExpressionResult;
 
-    internal readonly MemberExpression MemberExpression;
+    internal readonly MemberExpression MemberExpression = memberExpression;
 
     protected override bool Dispose(bool disposing)
     {
@@ -60,7 +56,7 @@ sealed class ObservableMemberExpression :
                     this.observableExpressionResult = observableExpressionResult;
                     SubscribeToExpressionValueNotifications();
                 }
-                var value = getMethod.FastInvoke(observableExpressionResult, Array.Empty<object?>());
+                var value = getMethod.FastInvoke(observableExpressionResult, []);
                 Evaluation = (null, value);
                 observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{MemberExpression} evaluated: {Value}", MemberExpression, value);
             }
@@ -106,7 +102,7 @@ sealed class ObservableMemberExpression :
             {
                 case FieldInfo field:
                     this.field = field;
-                    isFieldOfCompilerGeneratedType = MemberExpression.Expression?.Type.Name.StartsWith("<") ?? false;
+                    isFieldOfCompilerGeneratedType = MemberExpression.Expression?.Type.Name.StartsWith('<') ?? false;
                     break;
                 case PropertyInfo property:
                     doNotListenForPropertyChanges = observer.IsIgnoredPropertyChangeNotification(property);

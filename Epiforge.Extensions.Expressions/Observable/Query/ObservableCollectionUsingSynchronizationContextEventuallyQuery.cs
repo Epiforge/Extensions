@@ -1,7 +1,7 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-sealed class ObservableCollectionUsingSynchronizationContextEventuallyQuery<TElement> :
-    ObservableCollectionQuery<TElement>
+sealed class ObservableCollectionUsingSynchronizationContextEventuallyQuery<TElement>(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> source, SynchronizationContext synchronizationContext) :
+    ObservableCollectionQuery<TElement>(collectionObserver)
 {
     static T MarshalForFunc<T>(SynchronizationContext synchronizationContext, Func<T> func)
     {
@@ -22,17 +22,8 @@ sealed class ObservableCollectionUsingSynchronizationContextEventuallyQuery<TEle
         return tcs.Task.Result;
     }
 
-    public ObservableCollectionUsingSynchronizationContextEventuallyQuery(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> source, SynchronizationContext synchronizationContext) :
-        base(collectionObserver)
-    {
-        this.source = source;
-        SynchronizationContext = synchronizationContext;
-    }
-
     ObservableRangeCollection<TElement>? elements;
-    readonly ObservableCollectionQuery<TElement> source;
-
-    internal readonly SynchronizationContext SynchronizationContext;
+    internal readonly SynchronizationContext SynchronizationContext = synchronizationContext;
 
     public override TElement this[int index] =>
         MarshalForFunc(SynchronizationContext, () => elements![index]);

@@ -36,7 +36,7 @@ public readonly struct EquatableList<T> :
     {
         ArgumentNullException.ThrowIfNull(sequence);
         EqualityComparer = null;
-        elements = sequence.ToImmutableArray();
+        elements = [..sequence];
         var hashCode = new System.HashCode();
         foreach (var element in elements)
             hashCode.Add(element);
@@ -53,7 +53,7 @@ public readonly struct EquatableList<T> :
         ArgumentNullException.ThrowIfNull(sequence);
         ArgumentNullException.ThrowIfNull(equalityComparer);
         EqualityComparer = equalityComparer;
-        elements = sequence.ToImmutableArray();
+        elements = [..sequence];
         var hashCode = new System.HashCode();
         foreach (var element in elements)
             hashCode.Add(element, EqualityComparer);

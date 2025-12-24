@@ -1,30 +1,15 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-sealed class ObservableCollectionSelectQuery<TElement, TResult> :
-    ObservableCollectionQuery<TResult>
+sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> source, Expression<Func<TElement, TResult>> selector) :
+    ObservableCollectionQuery<TResult>(collectionObserver)
 {
-    public ObservableCollectionSelectQuery(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> source, Expression<Func<TElement, TResult>> selector) :
-        base(collectionObserver)
-    {
-        access = new();
-        elementComparer = EqualityComparer<TElement>.Default;
-        evaluationsChanging = new();
-        observableExpressionCounts = new();
-        observableExpressions = new();
-        resultComparer = EqualityComparer<TResult>.Default;
-        this.source = source;
-        Selector = selector;
-    }
-
-    readonly object access;
-    readonly IEqualityComparer<TElement> elementComparer;
-    readonly Dictionary<IObservableExpression<TElement, TResult>, (Exception? fault, TResult result)> evaluationsChanging;
-    readonly Dictionary<IObservableExpression<TElement, TResult>, int> observableExpressionCounts;
-    readonly List<IObservableExpression<TElement, TResult>> observableExpressions;
-    readonly IEqualityComparer<TResult> resultComparer;
-    readonly ObservableCollectionQuery<TElement> source;
-
-    internal readonly Expression<Func<TElement, TResult>> Selector;
+    readonly object access = new();
+    readonly IEqualityComparer<TElement> elementComparer = EqualityComparer<TElement>.Default;
+    readonly Dictionary<IObservableExpression<TElement, TResult>, (Exception? fault, TResult result)> evaluationsChanging = [];
+    readonly Dictionary<IObservableExpression<TElement, TResult>, int> observableExpressionCounts = [];
+    readonly List<IObservableExpression<TElement, TResult>> observableExpressions = [];
+    readonly EqualityComparer<TResult> resultComparer = EqualityComparer<TResult>.Default;
+    internal readonly Expression<Func<TElement, TResult>> Selector = selector;
 
     public override TResult this[int index]
     {
@@ -77,7 +62,7 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult> :
 
     void ObservableExpressionPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (sender is IObservableExpression<TElement, TResult> observableExpression && e.PropertyName == nameof(IObservableExpression<TElement, TResult>.Evaluation))
+        if (sender is IObservableExpression<TElement, TResult> observableExpression && e.PropertyName == nameof(IObservableExpression<,>.Evaluation))
             lock (access)
             {
                 var (oldFault, oldResult) = evaluationsChanging![observableExpression];
@@ -94,7 +79,7 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult> :
 
     void ObservableExpressionPropertyChanging(object? sender, PropertyChangingEventArgs e)
     {
-        if (sender is IObservableExpression<TElement, TResult> observableExpression && e.PropertyName == nameof(IObservableExpression<TElement, TResult>.Evaluation))
+        if (sender is IObservableExpression<TElement, TResult> observableExpression && e.PropertyName == nameof(IObservableExpression<,>.Evaluation))
             lock (access)
                 evaluationsChanging.Add(observableExpression, observableExpression.Evaluation);
     }

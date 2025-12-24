@@ -95,7 +95,7 @@ public class ExpressionObserverOptions
         ArgumentNullException.ThrowIfNull(constructor);
         if (constructor.DeclaringType is not { } declaringType)
             throw new ArgumentException("The constructor does not have a declaring type", nameof(constructor));
-        return DisposeConstructedTypes.TryAdd((declaringType, new EquatableList<Type>(constructor.GetParameters().Select(parameterInfo => parameterInfo.ParameterType).ToList())), 1);
+        return DisposeConstructedTypes.TryAdd((declaringType, new EquatableList<Type>([..constructor.GetParameters().Select(parameterInfo => parameterInfo.ParameterType)])), 1);
     }
 
     /// <summary>
@@ -205,7 +205,7 @@ public class ExpressionObserverOptions
         ArgumentNullException.ThrowIfNull(constructor);
         if (constructor.DeclaringType is not { } declaringType)
             throw new ArgumentException("the constructor specified does not have a declaring type", nameof(constructor));
-        return DisposeConstructedTypes.ContainsKey((declaringType, new EquatableList<Type>(constructor.GetParameters().Select(parameterInfo => parameterInfo.ParameterType).ToList())));
+        return DisposeConstructedTypes.ContainsKey((declaringType, new EquatableList<Type>([..constructor.GetParameters().Select(parameterInfo => parameterInfo.ParameterType)])));
     }
 
     /// <summary>
@@ -284,7 +284,7 @@ public class ExpressionObserverOptions
         ArgumentNullException.ThrowIfNull(constructor);
         if (constructor.DeclaringType is not { } declaringType)
             throw new ArgumentException("the constructor specified does not have a declaring type", nameof(constructor));
-        return DisposeConstructedTypes.TryRemove((declaringType, new EquatableList<Type>(constructor.GetParameters().Select(parameterInfo => parameterInfo.ParameterType).ToList())), out _);
+        return DisposeConstructedTypes.TryRemove((declaringType, new EquatableList<Type>([..constructor.GetParameters().Select(parameterInfo => parameterInfo.ParameterType)])), out _);
     }
 
     /// <summary>

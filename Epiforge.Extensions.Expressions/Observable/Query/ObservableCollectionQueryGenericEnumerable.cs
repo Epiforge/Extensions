@@ -1,13 +1,9 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-sealed class ObservableCollectionQueryGenericEnumerable<TElement> :
-    ObservableCollectionQuery<TElement>
+sealed class ObservableCollectionQueryGenericEnumerable<TElement>(CollectionObserver collectionObserver, IEnumerable<TElement> enumerable) :
+    ObservableCollectionQuery<TElement>(collectionObserver)
 {
-    public ObservableCollectionQueryGenericEnumerable(CollectionObserver collectionObserver, IEnumerable<TElement> enumerable) :
-        base(collectionObserver) =>
-        Enumerable = enumerable;
-
-    internal readonly IEnumerable<TElement> Enumerable;
+    internal readonly IEnumerable<TElement> Enumerable = enumerable;
 
     public override TElement this[int index] =>
         Enumerable.ElementAt(index);

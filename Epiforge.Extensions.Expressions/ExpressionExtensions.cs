@@ -221,13 +221,13 @@ public static class ExpressionExtensions
                     (
                         SubstituteMethodsImplementation(switchExpression.SwitchValue, substitutions),
                         SubstituteMethodsImplementation(switchExpressionDefaultBody, substitutions),
-                        switchExpression.Cases.Select(c => Expression.SwitchCase(SubstituteMethodsImplementation(c.Body, substitutions), c.TestValues.Select(e => SubstituteMethodsImplementation(e, substitutions)))).ToArray()
+                        [..switchExpression.Cases.Select(c => Expression.SwitchCase(SubstituteMethodsImplementation(c.Body, substitutions), c.TestValues.Select(e => SubstituteMethodsImplementation(e, substitutions))))]
                     ),
                 SwitchExpression switchExpression =>
                     Expression.Switch
                     (
                         SubstituteMethodsImplementation(switchExpression.SwitchValue, substitutions),
-                        switchExpression.Cases.Select(c => Expression.SwitchCase(SubstituteMethodsImplementation(c.Body, substitutions), c.TestValues.Select(e => SubstituteMethodsImplementation(e, substitutions)))).ToArray()
+                        [..switchExpression.Cases.Select(c => Expression.SwitchCase(SubstituteMethodsImplementation(c.Body, substitutions), c.TestValues.Select(e => SubstituteMethodsImplementation(e, substitutions))))]
                     ),
                 TryExpression tryExpression =>
                     Expression.MakeTry

@@ -1,26 +1,22 @@
 namespace Epiforge.Extensions.Expressions.Observable;
 
-sealed class ObservableInvocationExpression :
-    ObservableExpression
+sealed class ObservableInvocationExpression(ExpressionObserver observer, InvocationExpression invocationExpression, bool deferEvaluation) :
+    ObservableExpression(observer, invocationExpression, deferEvaluation)
 {
-    public ObservableInvocationExpression(ExpressionObserver observer, InvocationExpression invocationExpression, bool deferEvaluation) :
-        base(observer, invocationExpression, deferEvaluation) =>
-        InvocationExpression = invocationExpression;
-
     IReadOnlyList<ObservableExpression>? observableArguments;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     ObservableExpression? observableDelegateExpression;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     ObservableExpression? observableExpression;
 
-    internal readonly InvocationExpression InvocationExpression;
+    internal readonly InvocationExpression InvocationExpression = invocationExpression;
 
     void CreateObservableExpression()
     {
         switch (InvocationExpression.Expression)
         {
             case LambdaExpression lambdaExpression when observableArguments is not null:
-                observableExpression = observer.GetObservableExpression(observer.ReplaceParametersWithoutOptimization(lambdaExpression, observableArguments.Select(observableArgument => observableArgument.Evaluation.Result).ToArray() ?? Array.Empty<object?>())!, IsDeferringEvaluation);
+                observableExpression = observer.GetObservableExpression(ExpressionObserver.ReplaceParametersWithoutOptimization(lambdaExpression, observableArguments.Select(observableArgument => observableArgument.Evaluation.Result).ToArray() ?? [])!, IsDeferringEvaluation);
                 break;
             case Expression expression when typeof(Delegate).IsAssignableFrom(expression.Type):
                 var observableDelegateExpressionCreated = false;
@@ -136,7 +132,7 @@ sealed class ObservableInvocationExpression :
                     observableArgument.PropertyChanged += ObservableArgumentPropertyChanged;
                     observableArgumentsList.Add(observableArgument);
                 }
-                observableArguments = observableArgumentsList.ToImmutableArray();
+                observableArguments = [..observableArgumentsList];
             }
             CreateObservableExpression();
         }

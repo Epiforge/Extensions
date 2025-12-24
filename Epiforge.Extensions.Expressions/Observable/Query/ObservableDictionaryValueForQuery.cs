@@ -1,18 +1,11 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-sealed class ObservableDictionaryValueForQuery<TKey, TValue> :
-    ObservableDictionaryScalarQuery<TKey, TValue, TValue>
+sealed class ObservableDictionaryValueForQuery<TKey, TValue>(CollectionObserver collectionObserver, ObservableDictionaryQuery<TKey, TValue> observableDictionaryQuery, TKey key, bool notFoundIsDefault) :
+    ObservableDictionaryScalarQuery<TKey, TValue, TValue>(collectionObserver, observableDictionaryQuery)
     where TKey : notnull
 {
-    public ObservableDictionaryValueForQuery(CollectionObserver collectionObserver, ObservableDictionaryQuery<TKey, TValue> observableDictionaryQuery, TKey key, bool notFoundIsDefault) :
-        base(collectionObserver, observableDictionaryQuery)
-    {
-        Key = key;
-        NotFoundIsDefault = notFoundIsDefault;
-    }
-
-    internal readonly TKey Key;
-    internal readonly bool NotFoundIsDefault;
+    internal readonly TKey Key = key;
+    internal readonly bool NotFoundIsDefault = notFoundIsDefault;
 
     protected override bool Dispose(bool disposing)
     {

@@ -1,22 +1,15 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-sealed class ObservableCollectionComparisonQuery<TResult> :
-    ObservableScalarQuery<TResult>
+sealed class ObservableCollectionComparisonQuery<TResult>(CollectionObserver collectionObserver, ObservableCollectionQuery<TResult> observableCollectionQuery, int soughtComparison) :
+    ObservableScalarQuery<TResult>(collectionObserver)
 {
-    public ObservableCollectionComparisonQuery(CollectionObserver collectionObserver, ObservableCollectionQuery<TResult> observableCollectionQuery, int soughtComparison) :
-        base(collectionObserver)
-    {
-        access = new();
-        this.observableCollectionQuery = observableCollectionQuery;
-        SoughtComparison = soughtComparison;
-        comparer = Comparer<TResult>.Default;
-    }
-
-    readonly object access;
-    readonly IComparer<TResult> comparer;
-    readonly ObservableCollectionQuery<TResult> observableCollectionQuery;
-
-    internal readonly int SoughtComparison;
+#if IS_NET_9_0_OR_GREATER
+    readonly Lock access = new();
+#else
+    readonly object access = new();
+#endif
+    readonly Comparer<TResult> comparer = Comparer<TResult>.Default;
+    internal readonly int SoughtComparison = soughtComparison;
 
     protected override bool Dispose(bool disposing)
     {
@@ -116,7 +109,7 @@ sealed class ObservableCollectionComparisonQuery<TResult> :
 
     void ObservableCollectionQueryPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(ObservableCollectionQuery<TResult>.OperationFault))
+        if (e.PropertyName == nameof(ObservableCollectionQuery<>.OperationFault))
         {
             if (observableCollectionQuery.OperationFault is { } fault)
                 Evaluation = (fault, default!);

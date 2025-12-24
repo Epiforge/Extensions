@@ -1,20 +1,11 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-sealed class ObservableDictionaryUsingSynchronizationContextQuery<TKey, TValue> :
-    ObservableDictionaryQuery<TKey, TValue>
+sealed class ObservableDictionaryUsingSynchronizationContextQuery<TKey, TValue>(CollectionObserver collectionObserver, ObservableDictionaryQuery<TKey, TValue> source, SynchronizationContext synchronizationContext) :
+    ObservableDictionaryQuery<TKey, TValue>(collectionObserver)
     where TKey : notnull
 {
-    public ObservableDictionaryUsingSynchronizationContextQuery(CollectionObserver collectionObserver, ObservableDictionaryQuery<TKey, TValue> source, SynchronizationContext synchronizationContext) :
-        base(collectionObserver)
-    {
-        this.source = source;
-        SynchronizationContext = synchronizationContext;
-    }
-
     ObservableDictionary<TKey, TValue>? dictionary;
-    readonly ObservableDictionaryQuery<TKey, TValue> source;
-
-    internal readonly SynchronizationContext SynchronizationContext;
+    internal readonly SynchronizationContext SynchronizationContext = synchronizationContext;
 
     public override TValue this[TKey key] =>
         SynchronizationContext.Send(() => dictionary![key]);
@@ -85,7 +76,9 @@ sealed class ObservableDictionaryUsingSynchronizationContextQuery<TKey, TValue> 
 
     protected override void OnInitialization()
     {
+#pragma warning disable IDE0028 // Simplify collection initialization
         dictionary = new();
+#pragma warning restore IDE0028 // Simplify collection initialization
         dictionary.AddRange(source);
         source.DictionaryChanged += SourceDictionaryChanged;
         dictionary.CollectionChanged += DictionaryCollectionChanged;

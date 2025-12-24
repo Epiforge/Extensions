@@ -22,7 +22,11 @@ abstract class ObservableExpression :
 
     protected readonly object? defaultResult;
     bool deferringEvaluation;
+#if IS_NET_9_0_OR_GREATER
+    readonly Lock deferringEvaluationAccess = new();
+#else
     readonly object deferringEvaluationAccess = new();
+#endif
     (Exception? Fault, object? Result) evaluation;
     protected readonly ExpressionObserver observer;
     readonly FastEqualityComparer resultEqualityComparer;
@@ -220,7 +224,7 @@ class ObservableExpression<TArgument, TResult> :
         this.observableExpression.PropertyChanged += ObservableExpressionPropertyChanged;
         this.observableExpression.PropertyChanging += ObservableExpressionPropertyChanging;
         Argument = argument;
-        Arguments = new object?[] { argument };
+        Arguments = [argument];
     }
 
     readonly ObservableExpression observableExpression;
@@ -287,7 +291,7 @@ class ObservableExpression<TArgument1, TArgument2, TResult> :
         this.observableExpression.PropertyChanging += ObservableExpressionPropertyChanging;
         Argument1 = argument1;
         Argument2 = argument2;
-        Arguments = new object?[] { argument1, argument2 };
+        Arguments = [argument1, argument2];
     }
 
     readonly ObservableExpression observableExpression;
@@ -357,7 +361,7 @@ class ObservableExpression<TArgument1, TArgument2, TArgument3, TResult> :
         Argument1 = argument1;
         Argument2 = argument2;
         Argument3 = argument3;
-        Arguments = new object?[] { argument1, argument2, argument3 };
+        Arguments = [argument1, argument2, argument3];
     }
 
     readonly ObservableExpression observableExpression;
