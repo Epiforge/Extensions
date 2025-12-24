@@ -6,6 +6,7 @@ General utilities to help with stuff in .NET Development, from Epiforge.
 
 Supports `net6.0`, `net7.0`, `net8.0`, `net9.0`, and `net10.0`.
 
+
 ![Azure Pipelines](https://dev.azure.com/epiforge/extensions/_apis/build/status/epiforge.extensions)
 ![Build](https://img.shields.io/azure-devops/build/epiforge/extensions/4.svg?logo=azuredevops&logoColor=white)
 ![Tests](https://img.shields.io/azure-devops/tests/epiforge/extensions/4.svg?compact_message=&logo=azuredevops&logoColor=white)
