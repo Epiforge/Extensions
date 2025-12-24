@@ -30,6 +30,7 @@ public class DynamicSyncDisposable
     {
         var disposalNotificationEvents = new List<(string name, DisposalNotificationEventArgs args)>();
         var logger = Substitute.For<MockLogger<Derivation>>();
+        logger.IsEnabled(default).ReturnsForAnyArgs(true);
         Derivation derivation;
         using (derivation = new Derivation(logger))
         {

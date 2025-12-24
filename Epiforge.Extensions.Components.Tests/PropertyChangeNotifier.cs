@@ -173,6 +173,7 @@ public class PropertyChangeNotifier
         var propertiesChanged = new List<string>();
         var propertiesChanging = new List<string>();
         var logger = Substitute.For<MockLogger<Derivation>>();
+        logger.IsEnabled(default).ReturnsForAnyArgs(true);
         var derivation = new Derivation(logger, "text");
 
         void propertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -229,6 +230,7 @@ public class PropertyChangeNotifier
         var propertiesChanged = new List<string>();
         var propertiesChanging = new List<string>();
         var logger = Substitute.For<MockLogger<Derivation>>();
+        logger.IsEnabled(default).ReturnsForAnyArgs(true);
         var derivation = new Derivation(logger, "text");
 
         void propertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -270,6 +272,7 @@ public class PropertyChangeNotifier
         var propertiesChanged = new List<string>();
         var propertiesChanging = new List<string>();
         var logger = Substitute.For<MockLogger<Derivation>>();
+        logger.IsEnabled(default).ReturnsForAnyArgs(true);
         var derivation = new Derivation(logger, "text");
 
         void propertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -371,6 +374,7 @@ public class PropertyChangeNotifier
         var propertiesChanged = new List<string>();
         var propertiesChanging = new List<string>();
         var logger = Substitute.For<MockLogger<Derivation>>();
+        logger.IsEnabled(default).ReturnsForAnyArgs(true);
         var derivation = new Derivation(logger, "text");
 
         void propertyChanged(object? sender, PropertyChangedEventArgs e)

@@ -30,6 +30,7 @@ public class DynamicAsyncDisposable
     {
         var disposalNotificationEvents = new List<(string name, DisposalNotificationEventArgs args)>();
         var logger = Substitute.For<MockLogger<Derivation>>();
+        logger.IsEnabled(default).ReturnsForAnyArgs(true);
         Derivation derivation;
         await using (derivation = new Derivation(logger))
         {

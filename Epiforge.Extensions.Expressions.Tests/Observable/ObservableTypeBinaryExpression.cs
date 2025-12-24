@@ -8,8 +8,6 @@ public class ObservableTypeBinaryExpression
     public class SomeObject :
         PropertyChangeNotifier
     {
-        object? field;
-
         public object? Property
         {
             get => field;

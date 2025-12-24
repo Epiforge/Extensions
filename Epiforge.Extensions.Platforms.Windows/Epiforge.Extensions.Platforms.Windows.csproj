@@ -10,13 +10,7 @@
 
     <PropertyGroup>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-        <TargetFrameworks>net6.0-windows;net7.0-windows;net8.0-windows;net9.0-windows</TargetFrameworks>
-    </PropertyGroup>
-
-    <PropertyGroup>
-        <DefineConstants Condition="'$(TargetFramework)' == 'net7.0-windows' or '$(TargetFramework)' == 'net8.0-windows' or '$(TargetFramework)' == 'net9.0-windows'">$(DefineConstants);IS_NET_7_0_OR_GREATER</DefineConstants>
-        <DefineConstants Condition="'$(TargetFramework)' == 'net8.0-windows' or '$(TargetFramework)' == 'net9.0-windows'">$(DefineConstants);IS_NET_8_0_OR_GREATER</DefineConstants>
-        <DefineConstants Condition="'$(TargetFramework)' == 'net9.0-windows'">$(DefineConstants);IS_NET_9_0_OR_GREATER</DefineConstants>
+        <TargetFrameworks>net6.0-windows;net7.0-windows;net8.0-windows;net9.0-windows;net10.0-windows</TargetFrameworks>
     </PropertyGroup>
 
     <ItemGroup>

@@ -3,11 +3,12 @@
     <Import Project="..\Common\TestProject.props" />
 
     <PropertyGroup>
-        <TargetFrameworks>net6.0;net7.0;net8.0;net9.0</TargetFrameworks>
+        <TargetFrameworks>net6.0;net7.0;net8.0;net9.0;net10.0</TargetFrameworks>
     </PropertyGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\Epiforge.Extensions.Collections\Epiforge.Extensions.Collections.csproj" />
+        <ProjectReference Include="..\Epiforge.Extensions.Tests\Epiforge.Extensions.Tests.csproj" />
     </ItemGroup>
 
 </Project>
