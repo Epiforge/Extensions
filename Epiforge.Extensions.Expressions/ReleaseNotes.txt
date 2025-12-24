@@ -1,1 +1,1 @@
-We altered ObservableCollectionUsingSynchronizationContextEventuallyQuery to ensure it never invokes SynchronizationContext.Send.
+We added support for .NET 10.
