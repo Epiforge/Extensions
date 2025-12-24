@@ -24,6 +24,11 @@ steps:
   displayName: 'Install .NET 9'
   inputs:
     version: '9.x'
+
+- task: UseDotNet@2
+  displayName: 'Install .NET 10'
+  inputs:
+    version: '10.x'
     #includePreviewVersions: true
 
 - task: DotNetCoreCLI@2
