@@ -23,6 +23,23 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         }
     }
 
+    sealed class CachedLookupQueryEqualityComparer :
+        IEqualityComparer<(Expression keySelector, object keyEqualityComaprer)>
+    {
+        public static CachedLookupQueryEqualityComparer Default { get; } = new();
+
+        public bool Equals((Expression keySelector, object keyEqualityComaprer) x, (Expression keySelector, object keyEqualityComaprer) y) =>
+            ExpressionEqualityComparer.Default.Equals(x.keySelector, y.keySelector) && ReferenceEquals(x.keyEqualityComaprer, y.keyEqualityComaprer);
+
+        public int GetHashCode([DisallowNull] (Expression keySelector, object keyEqualityComaprer) obj)
+        {
+            var hashCode = new System.HashCode();
+            hashCode.Add(ExpressionEqualityComparer.Default.GetHashCode(obj.keySelector));
+            hashCode.Add(obj.keyEqualityComaprer?.GetHashCode() ?? 0);
+            return hashCode.ToHashCode();
+        }
+    }
+
     class CachedOrderByQueryEqualityComparer :
         IEqualityComparer<IReadOnlyList<(Expression<Func<TElement, IComparable>> selector, bool isDescending)>>
     {
@@ -86,6 +103,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
 
     static readonly PropertyChangedEventArgs operationFaultPropertyChangedEventArgs = new(nameof(OperationFault));
     static readonly PropertyChangingEventArgs operationFaultPropertyChangingEventArgs = new(nameof(OperationFault));
+
     readonly Dictionary<(object seedFactory, object func, object resultSelector), ObservableQuery> cachedAggregateQueries = [];
     readonly Dictionary<Expression<Func<TElement, bool>>, ObservableCollectionAllQuery<TElement>> cachedAllQueries = new(ExpressionEqualityComparer.Default);
     readonly NullableKeyDictionary<Expression<Func<TElement, bool>>?, ObservableCollectionAnyQuery<TElement>> cachedAnyQueries = new(ExpressionEqualityComparer.Default!);
@@ -101,6 +119,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     readonly Dictionary<Expression, ObservableQuery> cachedSelectManyQueries = new(ExpressionEqualityComparer.Default);
     readonly Dictionary<Expression, ObservableQuery> cachedSumQueries = new(ExpressionEqualityComparer.Default);
     readonly Dictionary<(Expression keySelector, Expression valueSelector, object equalityComparer), ObservableQuery> cachedToDictionaryQueries = new(CachedToDictionaryQueryEqualityComparer.Default);
+    readonly Dictionary<(Expression keySelector, object keyEqualityComparer), ObservableQuery> cachedToLookupQueries = new(CachedLookupQueryEqualityComparer.Default);
     readonly Dictionary<(object context, CollectionSynchronizationCallback synchronizationCallback), ObservableCollectionUsingSynchronizationCallbackEventuallyQuery<TElement>> cachedUsingSynchronizationCallbackEventuallyQueries = [];
     readonly Dictionary<(object context, CollectionSynchronizationCallback synchronizationCallback), ObservableCollectionUsingSynchronizationCallbackQuery<TElement>> cachedUsingSynchronizationCallbackQueries = [];
     readonly Dictionary<SynchronizationContext, ObservableCollectionUsingSynchronizationContextEventuallyQuery<TElement>> cachedUsingSynchronizationContextEventuallyQueries = [];
@@ -124,6 +143,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     readonly Lock cachedSelectManyQueriesAccess = new();
     readonly Lock cachedSumQueriesAccess = new();
     readonly Lock cachedToDictionaryQueriesAccess = new();
+    readonly Lock cachedToLookupQueriesAccess = new();
     readonly Lock cachedUsingSynchronizationCallbackEventuallyQueriesAccess = new();
     readonly Lock cachedUsingSynchronizationCallbackQueriesAccess = new();
     readonly Lock cachedUsingSynchronizationContextEventuallyQueriesAccess = new();
@@ -147,6 +167,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     readonly object cachedSelectManyQueriesAccess = new();
     readonly object cachedSumQueriesAccess = new();
     readonly object cachedToDictionaryQueriesAccess = new();
+    readonly object cachedToLookupQueriesAccess = new();
     readonly object cachedUsingSynchronizationCallbackEventuallyQueriesAccess = new();
     readonly object cachedUsingSynchronizationCallbackQueriesAccess = new();
     readonly object cachedUsingSynchronizationContextEventuallyQueriesAccess = new();
@@ -206,6 +227,8 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
                 count += cachedSumQueries.Values.Sum(sumQuery => 1 + sumQuery.CachedObservableQueries);
             lock (cachedToDictionaryQueriesAccess)
                 count += cachedToDictionaryQueries.Values.Sum(toDictionaryQuery => 1 + toDictionaryQuery.CachedObservableQueries);
+            lock (cachedToLookupQueriesAccess)
+                count += cachedToLookupQueries.Values.Sum(toLookupQuery => 1 + toLookupQuery.CachedObservableQueries);
             lock (cachedUsingSynchronizationCallbackEventuallyQueriesAccess)
                 count += cachedUsingSynchronizationCallbackEventuallyQueries.Values.Sum(usingSynchronizationCallbackEventuallyQuery => 1 + usingSynchronizationCallbackEventuallyQuery.CachedObservableQueries);
             lock (cachedUsingSynchronizationCallbackQueriesAccess)
@@ -929,6 +952,35 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     }
 
     [return: DisposeWhenDiscarded]
+    public IObservableLookupQuery<TKey, TElement> ObserveToLookup<TKey>(Expression<Func<TElement, TKey>> keySelector)
+        where TKey : notnull =>
+        ObserveToLookup(keySelector, EqualityComparer<TKey>.Default);
+
+    [return: DisposeWhenDiscarded]
+    public IObservableLookupQuery<TKey, TElement> ObserveToLookup<TKey>(Expression<Func<TElement, TKey>> keySelector, IEqualityComparer<TKey> keyEqualityComparer)
+        where TKey : notnull
+    {
+        ArgumentNullException.ThrowIfNull(keySelector);
+        ArgumentNullException.ThrowIfNull(keyEqualityComparer);
+        ObservableQuery lookupQuery;
+        var optimizedKeySelector = keySelector;
+        if (collectionObserver.ExpressionObserver.Optimizer is { } optimizer)
+            optimizedKeySelector = (Expression<Func<TElement, TKey>>)optimizer(optimizedKeySelector);
+        var key = (optimizedKeySelector, keyEqualityComparer);
+        lock (cachedToLookupQueriesAccess)
+        {
+            if (!cachedToLookupQueries.TryGetValue(key, out lookupQuery!))
+            {
+                lookupQuery = new ObservableCollectionLookupQuery<TKey, TElement>(collectionObserver, this, optimizedKeySelector, keyEqualityComparer);
+                cachedToLookupQueries.Add(key, lookupQuery);
+            }
+            ++lookupQuery.Observations;
+        }
+        lookupQuery.Initialize();
+        return (ObservableCollectionLookupQuery<TKey, TElement>)lookupQuery;
+    }
+
+    [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<TElement> ObserveUsingSynchronizationCallback(object context, CollectionSynchronizationCallback synchronizationCallback)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -1189,6 +1241,20 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
             if (--individualChangesQuery.Observations == 0)
             {
                 cachedIndividualChangeQuery = null;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    internal bool QueryDisposed<TKey>(ObservableCollectionLookupQuery<TKey, TElement> lookupQuery)
+        where TKey : notnull
+    {
+        lock (cachedToLookupQueriesAccess)
+        {
+            if (--lookupQuery.Observations == 0)
+            {
+                cachedToLookupQueries.Remove((lookupQuery.KeySelector, lookupQuery.KeyEqualityComparer));
                 return true;
             }
         }

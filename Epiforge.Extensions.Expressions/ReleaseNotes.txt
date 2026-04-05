@@ -1,1 +1,1 @@
-We added support for .NET 10.
+We added the ObserveToLookup method to IObservableCollectionQuery.

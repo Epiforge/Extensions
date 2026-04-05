@@ -399,6 +399,27 @@ public interface IObservableCollectionQuery<TElement> :
         where TKey : notnull;
 
     /// <summary>
+    /// Creates a collection of keys each continuously mapped to one or more values
+    /// </summary>
+    /// <typeparam name="TKey">The type of the key returned by <paramref name="keySelector"/></typeparam>
+    /// <param name="keySelector">A function to extract the key for each element</param>
+    /// <returns>A dictionary where each value is an <see cref="IObservableGrouping{TKey, TElement}"/> object which contains a sequence of objects and a key</returns>
+    [return: DisposeWhenDiscarded]
+    IObservableLookupQuery<TKey, TElement> ObserveToLookup<TKey>(Expression<Func<TElement, TKey>> keySelector)
+        where TKey : notnull;
+
+    /// <summary>
+    /// Creates a collection of keys each continuously mapped to one or more values
+    /// </summary>
+    /// <typeparam name="TKey">The type of the key returned by <paramref name="keySelector"/></typeparam>
+    /// <param name="keySelector">A function to extract the key for each element</param>
+    /// <param name="keyEqualityComparer">An <see cref="IEqualityComparer{T}"/> to compare keys</param>
+    /// <returns>A dictionary where each value is an <see cref="IObservableGrouping{TKey, TElement}"/> object which contains a sequence of objects and a key</returns>
+    [return: DisposeWhenDiscarded]
+    IObservableLookupQuery<TKey, TElement> ObserveToLookup<TKey>(Expression<Func<TElement, TKey>> keySelector, IEqualityComparer<TKey> keyEqualityComparer)
+        where TKey : notnull;
+
+    /// <summary>
     /// Creates a collection that is kept consistent with this collection via a mechanism other than a simple lock (use <see cref="ObserveUsingSynchronizationCallbackEventually(object, CollectionSynchronizationCallback)"/> instead when this method may produce a deadlock and/or only eventual consistency is required)
     /// </summary>
     /// <param name="context">An object that is passed to the callback</param>
