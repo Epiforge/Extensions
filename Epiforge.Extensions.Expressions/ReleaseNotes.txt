@@ -1,1 +1,1 @@
-We added the ObserveToLookup method to IObservableCollectionQuery.
+We improved the performance of ExpressionEqualityComparer with a weak cache.
