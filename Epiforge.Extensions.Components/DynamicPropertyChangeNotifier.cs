@@ -58,11 +58,8 @@ public class DynamicPropertyChangeNotifier :
     /// </summary>
     /// <param name="propertyName">The name of the property that changed</param>
 	/// <exception cref="ArgumentNullException"><paramref name="propertyName"/> is null</exception>
-    protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
-    {
-        ArgumentNullException.ThrowIfNull(propertyName);
+    protected void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
         OnPropertyChanged(new PropertyChangedEventArgs(propertyName));
-    }
 
     /// <summary>
     /// Raises the <see cref="PropertyChanging"/> event
@@ -82,11 +79,8 @@ public class DynamicPropertyChangeNotifier :
     /// </summary>
 	/// <param name="propertyName">The name of the property that is changing</param>
     /// <exception cref="ArgumentNullException"><paramref name="propertyName"/> is null</exception>
-    protected void OnPropertyChanging([CallerMemberName] string? propertyName = null)
-    {
-        ArgumentNullException.ThrowIfNull(propertyName);
+    protected void OnPropertyChanging([CallerMemberName] string? propertyName = null) =>
         OnPropertyChanging(new PropertyChangingEventArgs(propertyName));
-    }
 
     /// <summary>
     /// Compares a property's backing field and a new value for inequality, and when they are unequal, raises the <see cref="PropertyChanging"/> event, sets the backing field to the new value, and then raises the <see cref="PropertyChanged"/> event

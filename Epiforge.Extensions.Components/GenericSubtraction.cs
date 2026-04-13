@@ -14,7 +14,7 @@ public static class GenericSubtraction<TMinuend, TSubtrahend, TDifference>
         var minuend = Expression.Parameter(typeof(TMinuend), "minuend");
         var subtrahend = Expression.Parameter(typeof(TSubtrahend), "subtrahend");
         return Expression.Lambda<Func<TMinuend, TSubtrahend, TDifference>>(Expression.Subtract(minuend, subtrahend), minuend, subtrahend).Compile();
-    }, LazyThreadSafetyMode.PublicationOnly);
+    }, LazyThreadSafetyMode.ExecutionAndPublication);
 
     /// <summary>
     /// Gets the instance

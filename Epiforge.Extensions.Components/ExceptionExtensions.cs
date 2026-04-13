@@ -40,7 +40,17 @@ public static class ExceptionExtensions
             ).ToList().AsReadOnly();
 
     static IEnumerable<(string name, object? value)> GetAdditionalProperties(Exception ex, Type type) =>
-        propertiesByType.GetOrAdd(type, PropertiesByTypeValueFactory).Select(property => (property.Name, property.FastGetValue(ex)));
+        propertiesByType.GetOrAdd(type, PropertiesByTypeValueFactory).Select(property =>
+        {
+            try
+            {
+                return (property.Name, property.FastGetValue(ex));
+            }
+            catch (Exception getEx)
+            {
+                return (property.Name, getEx);
+            }
+        });
 
     static string GetMethodDescription(MethodBase method) =>
         $"{method.Name}({string.Join(", ", method.GetParameters().Select(p => $"{p.ParameterType.FullName} {p.Name}"))})";
@@ -98,8 +108,9 @@ public static class ExceptionExtensions
     }
 
     [SuppressMessage("Maintainability", "CA1502: Avoid excessive complexity")]
-    static void GetFullDetailsInJson(Exception ex, Utf8JsonWriter json)
+    static void GetFullDetailsInJson(Exception ex, Utf8JsonWriter json, HashSet<Exception>? visitedExs = null)
     {
+        visitedExs ??= [ex];
         json.WriteStartObject();
         var type = ex.GetType();
         json.WriteString("type", type.FullName);
@@ -193,7 +204,7 @@ public static class ExceptionExtensions
         var stackTrace = new StackTrace(ex, true);
         json.WritePropertyName("stackTrace");
         json.WriteStartArray();
-        foreach (var frame in stackTrace.GetFrames())
+        foreach (var frame in stackTrace.GetFrames() ?? Enumerable.Empty<StackFrame>())
         {
             json.WriteStartObject();
             if (frame.GetMethod() is { } method)
@@ -219,8 +230,8 @@ public static class ExceptionExtensions
                 json.WritePropertyName("loaderExceptions");
                 json.WriteStartArray();
                 foreach (var loader in reflectedTypeLoad.LoaderExceptions)
-                    if (loader is not null)
-                        GetFullDetailsInJson(loader, json);
+                    if (loader is not null && visitedExs.Add(loader))
+                        GetFullDetailsInJson(loader, json, visitedExs);
                 json.WriteEndArray();
             }
             if (reflectedTypeLoad.Types?.Length > 0)
@@ -238,19 +249,21 @@ public static class ExceptionExtensions
             json.WritePropertyName("innerExceptions");
             json.WriteStartArray();
             foreach (var inner in aggregate.InnerExceptions)
-                GetFullDetailsInJson(inner, json);
+                if (visitedExs.Add(inner))
+                    GetFullDetailsInJson(inner, json, visitedExs);
             json.WriteEndArray();
         }
-        else if (ex.InnerException is Exception inner)
+        else if (ex.InnerException is Exception inner && visitedExs.Add(inner))
         {
             json.WritePropertyName("innerException");
-            GetFullDetailsInJson(inner, json);
+            GetFullDetailsInJson(inner, json, visitedExs);
         }
         json.WriteEndObject();
     }
 
-    static string GetFullDetailsInPlainText(Exception? ex, int indent)
+    static string GetFullDetailsInPlainText(Exception? ex, int indent, HashSet<Exception?>? visitedExs = null)
     {
+        visitedExs ??= [ex];
         var exceptionDetails = new List<string>();
         var top = true;
         while (ex is not null)
@@ -284,17 +297,18 @@ public static class ExceptionExtensions
             if (reflectionTypeLoad?.LoaderExceptions?.Length > 0)
             {
                 foreach (var loader in reflectionTypeLoad.LoaderExceptions)
-                    if (loader is not null)
-                        exceptionDetails.Add(GetFullDetailsInPlainText(loader, indent + 1));
+                    if (loader is not null && visitedExs.Add(loader))
+                        exceptionDetails.Add(GetFullDetailsInPlainText(loader, indent + 1, visitedExs));
                 break;
             }
             else if (ex is AggregateException aggregate && aggregate.InnerExceptions?.Count > 0)
             {
                 foreach (var inner in aggregate.InnerExceptions)
-                    exceptionDetails.Add(GetFullDetailsInPlainText(inner, indent + 1));
+                    if (visitedExs.Add(inner))
+                        exceptionDetails.Add(GetFullDetailsInPlainText(inner, indent + 1, visitedExs));
                 break;
             }
-            else
+            else if (visitedExs.Add(ex.InnerException))
                 ex = ex.InnerException;
             top = false;
         }
@@ -302,8 +316,9 @@ public static class ExceptionExtensions
     }
 
     [SuppressMessage("Maintainability", "CA1502: Avoid excessive complexity")]
-    static void GetFullDetailsInXml(Exception ex, XmlWriter xml)
+    static void GetFullDetailsInXml(Exception ex, XmlWriter xml, HashSet<Exception>? visitedExs = null)
     {
+        visitedExs ??= [ex];
         var type = ex.GetType();
         xml.WriteAttributeString("type", type.FullName);
         xml.WriteAttributeString("message", ex.Message);
@@ -357,7 +372,7 @@ public static class ExceptionExtensions
             }
         var stackTrace = new StackTrace(ex, true);
         xml.WriteStartElement("stackTrace");
-        foreach (var frame in stackTrace.GetFrames())
+        foreach (var frame in stackTrace.GetFrames() ?? Enumerable.Empty<StackFrame>())
         {
             xml.WriteStartElement("frame");
             if (frame.GetMethod() is { } method)
@@ -380,10 +395,10 @@ public static class ExceptionExtensions
         {
             if (reflectedTypeLoad.LoaderExceptions?.Length > 0)
                 foreach (var loader in reflectedTypeLoad.LoaderExceptions)
-                    if (loader is not null)
+                    if (loader is not null && visitedExs.Add(loader))
                     {
                         xml.WriteStartElement("loaderException");
-                        GetFullDetailsInXml(loader, xml);
+                        GetFullDetailsInXml(loader, xml, visitedExs);
                         xml.WriteEndElement();
                     }
             if (reflectedTypeLoad.Types?.Length > 0)
@@ -392,16 +407,16 @@ public static class ExceptionExtensions
                         xml.WriteElementString("type", reflectedTypeLoadType.FullName);
         }
         else if (ex is AggregateException aggregate && aggregate.InnerExceptions?.Count > 0)
-            foreach (var inner in aggregate.InnerExceptions)
+            foreach (var inner in aggregate.InnerExceptions.Where(visitedExs.Add))
             {
                 xml.WriteStartElement("innerException");
-                GetFullDetailsInXml(inner, xml);
+                GetFullDetailsInXml(inner, xml, visitedExs);
                 xml.WriteEndElement();
             }
-        else if (ex.InnerException is Exception inner)
+        else if (ex.InnerException is Exception inner && visitedExs.Add(inner))
         {
             xml.WriteStartElement("innerException");
-            GetFullDetailsInXml(inner, xml);
+            GetFullDetailsInXml(inner, xml, visitedExs);
             xml.WriteEndElement();
         }
     }

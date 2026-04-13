@@ -21,11 +21,11 @@ public abstract class AsyncDisposable :
             Logger?.LogWarning(EventIds.Epiforge_Extensions_Components_FinalizerCalled, "Finalizer called: did you forget to dispose an object? (set logging minimum level to Trace to see the stack trace for when the Logger was set)");
         else
             Logger?.LogWarning(EventIds.Epiforge_Extensions_Components_FinalizerCalled, "Finalizer called: did you forget to dispose an object? (stack trace for when the Logger was set: {LoggerSetStackTrace})", loggerSetStackTrace);
-        var e = DisposalNotificationEventArgs.ByCallingFinalizer;
-        OnDisposing(e);
-        DisposeAsync(false).AsTask().Wait();
-        IsDisposed = true;
-        OnDisposed(e);
+        Task.Run(async () =>
+        {
+            await DisposeAsync(false).ConfigureAwait(false);
+            IsDisposed = true;
+        });
     }
 
     readonly AsyncLock disposalAccess = new();

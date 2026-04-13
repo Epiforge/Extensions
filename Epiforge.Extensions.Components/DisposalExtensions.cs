@@ -19,9 +19,8 @@ public static class DisposalExtensions
         ArgumentNullException.ThrowIfNull(dependencies);
         dependent.Disposed += (_, e) => Task.Run(async () =>
         {
-            if (!e.IsFinalizer)
-                foreach (var dependency in dependencies.Reverse())
-                    await dependency.DisposeAsync().ConfigureAwait(false);
+            foreach (var dependency in dependencies.Reverse())
+                await dependency.DisposeAsync().ConfigureAwait(false);
         });
         return dependent;
     }
@@ -53,11 +52,7 @@ public static class DisposalExtensions
         ArgumentNullException.ThrowIfNull(dependency);
         ArgumentNullException.ThrowIfNull(dependentFactory);
         var dependent = dependentFactory();
-        dependent.Disposed += (_, e) => Task.Run(async () =>
-        {
-            if (!e.IsFinalizer)
-                await dependency.DisposeAsync().ConfigureAwait(false);
-        });
+        dependent.Disposed += (_, e) => Task.Run(async () => await dependency.DisposeAsync().ConfigureAwait(false));
         return dependent;
     }
 
@@ -77,11 +72,7 @@ public static class DisposalExtensions
         ArgumentNullException.ThrowIfNull(dependency);
         ArgumentNullException.ThrowIfNull(dependentFactory);
         var dependent = dependentFactory(dependency);
-        dependent.Disposed += (_, e) => Task.Run(async () =>
-        {
-            if (!e.IsFinalizer)
-                await dependency.DisposeAsync().ConfigureAwait(false);
-        });
+        dependent.Disposed += (_, e) => Task.Run(async () => await dependency.DisposeAsync().ConfigureAwait(false));
         return dependent;
     }
 
@@ -101,11 +92,7 @@ public static class DisposalExtensions
         ArgumentNullException.ThrowIfNull(dependency);
         ArgumentNullException.ThrowIfNull(asyncDependentFactory);
         var dependent = await asyncDependentFactory().ConfigureAwait(false);
-        dependent.Disposed += (_, e) => Task.Run(async () =>
-        {
-            if (!e.IsFinalizer)
-                await dependency.DisposeAsync().ConfigureAwait(false);
-        });
+        dependent.Disposed += (_, e) => Task.Run(async () => await dependency.DisposeAsync().ConfigureAwait(false));
         return dependent;
     }
 
@@ -125,11 +112,7 @@ public static class DisposalExtensions
         ArgumentNullException.ThrowIfNull(dependency);
         ArgumentNullException.ThrowIfNull(asyncDependentFactory);
         var dependent = await asyncDependentFactory(dependency).ConfigureAwait(false);
-        dependent.Disposed += (_, e) => Task.Run(async () =>
-        {
-            if (!e.IsFinalizer)
-                await dependency.DisposeAsync().ConfigureAwait(false);
-        });
+        dependent.Disposed += (_, e) => Task.Run(async () => await dependency.DisposeAsync().ConfigureAwait(false));
         return dependent;
     }
 
@@ -147,9 +130,8 @@ public static class DisposalExtensions
         ArgumentNullException.ThrowIfNull(dependencies);
         dependent.Disposed += (_, e) =>
         {
-            if (!e.IsFinalizer)
-                foreach (var dependency in dependencies.Reverse())
-                    dependency.Dispose();
+            foreach (var dependency in dependencies.Reverse())
+                dependency.Dispose();
         };
         return dependent;
     }
@@ -181,11 +163,7 @@ public static class DisposalExtensions
         ArgumentNullException.ThrowIfNull(dependency);
         ArgumentNullException.ThrowIfNull(dependentFactory);
         var dependent = dependentFactory();
-        dependent.Disposed += (_, e) =>
-        {
-            if (!e.IsFinalizer)
-                dependency.Dispose();
-        };
+        dependent.Disposed += (_, e) => dependency.Dispose();
         return dependent;
     }
 
@@ -205,11 +183,7 @@ public static class DisposalExtensions
         ArgumentNullException.ThrowIfNull(dependency);
         ArgumentNullException.ThrowIfNull(dependentFactory);
         var dependent = dependentFactory(dependency);
-        dependent.Disposed += (_, e) =>
-        {
-            if (!e.IsFinalizer)
-                dependency.Dispose();
-        };
+        dependent.Disposed += (_, e) => dependency.Dispose();
         return dependent;
     }
 
@@ -229,11 +203,7 @@ public static class DisposalExtensions
         ArgumentNullException.ThrowIfNull(dependency);
         ArgumentNullException.ThrowIfNull(asyncDependentFactory);
         var dependent = await asyncDependentFactory().ConfigureAwait(false);
-        dependent.Disposed += (_, e) =>
-        {
-            if (!e.IsFinalizer)
-                dependency.Dispose();
-        };
+        dependent.Disposed += (_, e) => dependency.Dispose();
         return dependent;
     }
 
@@ -253,11 +223,7 @@ public static class DisposalExtensions
         ArgumentNullException.ThrowIfNull(dependency);
         ArgumentNullException.ThrowIfNull(asyncDependentFactory);
         var dependent = await asyncDependentFactory(dependency).ConfigureAwait(false);
-        dependent.Disposed += (_, e) =>
-        {
-            if (!e.IsFinalizer)
-                dependency.Dispose();
-        };
+        dependent.Disposed += (_, e) => dependency.Dispose();
         return dependent;
     }
 }

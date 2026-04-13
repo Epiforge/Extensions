@@ -14,7 +14,7 @@ public static class GenericAddition<TLeftAddend, TRightAddend, TSum>
         var leftAddend = Expression.Parameter(typeof(TLeftAddend), "leftAddend");
         var rightAddend = Expression.Parameter(typeof(TRightAddend), "rightAddend");
         return Expression.Lambda<Func<TLeftAddend, TRightAddend, TSum>>(Expression.Add(leftAddend, rightAddend), leftAddend, rightAddend).Compile();
-    }, LazyThreadSafetyMode.PublicationOnly);
+    }, LazyThreadSafetyMode.ExecutionAndPublication);
 
     /// <summary>
     /// Gets the delegate

@@ -28,7 +28,6 @@ public sealed class AsyncSynchronizationContext :
     public AsyncSynchronizationContext()
     {
         queuedCallbacks = new();
-        queuedCallbacksCancellationTokenSource = new();
         Task.Run(ProcessCallbacksAsync);
     }
 
@@ -38,12 +37,12 @@ public sealed class AsyncSynchronizationContext :
     ~AsyncSynchronizationContext() =>
         Dispose(false);
 
+    bool isDisposed;
     readonly AsyncProducerConsumerQueue<QueuedCallback> queuedCallbacks;
-    readonly CancellationTokenSource queuedCallbacksCancellationTokenSource;
 
     /// <inheritdoc/>
     public override SynchronizationContext CreateCopy() =>
-        this;
+        new AsyncSynchronizationContext();
 
     /// <inheritdoc/>
     public void Dispose()
@@ -55,24 +54,23 @@ public sealed class AsyncSynchronizationContext :
     void Dispose(bool disposing)
     {
         if (disposing)
-        {
-            queuedCallbacksCancellationTokenSource.Cancel();
-            queuedCallbacksCancellationTokenSource.Dispose();
-        }
+            queuedCallbacks.CompleteAdding();
+        isDisposed = true;
     }
 
     /// <inheritdoc/>
     public override void Post(SendOrPostCallback d, object? state)
     {
+        ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(d);
         queuedCallbacks.Enqueue(new QueuedCallback(d, state, null));
     }
 
     async Task ProcessCallbacksAsync()
     {
-        while (true)
+        while (await queuedCallbacks.OutputAvailableAsync().ConfigureAwait(false))
         {
-            var queuedCallback = await queuedCallbacks.DequeueAsync(queuedCallbacksCancellationTokenSource.Token).ConfigureAwait(false);
+            var queuedCallback = await queuedCallbacks.DequeueAsync().ConfigureAwait(false);
             var currentContext = Current;
             SetSynchronizationContext(this);
             try
@@ -83,14 +81,21 @@ public sealed class AsyncSynchronizationContext :
             {
                 queuedCallback.Exception = ex;
             }
-            queuedCallback.Signal?.Set();
-            SetSynchronizationContext(currentContext);
+            try
+            {
+                queuedCallback.Signal?.Set();
+            }
+            finally
+            {
+                SetSynchronizationContext(currentContext);
+            }
         }
     }
 
     /// <inheritdoc/>
     public override void Send(SendOrPostCallback d, object? state)
     {
+        ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(d);
         using var signal = new ManualResetEventSlim(false);
         var queuedCallback = new QueuedCallback(d, state, signal);
@@ -98,5 +103,18 @@ public sealed class AsyncSynchronizationContext :
         signal.Wait();
         if (queuedCallback.Exception is { } exception)
             ExceptionDispatchInfo.Capture(exception).Throw();
+    }
+
+#if IS_NET_7_0_OR_GREATER
+    [SuppressMessage("Style", "IDE0022: Use expression body for method")]
+#endif
+    void ThrowIfDisposed()
+    {
+#if IS_NET_7_0_OR_GREATER
+        ObjectDisposedException.ThrowIf(isDisposed, this);
+#else
+        if (isDisposed)
+            throw new ObjectDisposedException(GetType().Name);
+#endif
     }
 }

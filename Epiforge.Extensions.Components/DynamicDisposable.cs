@@ -4,7 +4,7 @@ namespace Epiforge.Extensions.Components;
 /// Provides an overridable mechanism for releasing unmanaged resources asynchronously or synchronously for a <see cref="DynamicObject"/>
 /// </summary>
 public abstract class DynamicDisposable :
-    PropertyChangeNotifier,
+    DynamicPropertyChangeNotifier,
     IAsyncDisposable,
     IDisposable,
     INotifyDisposalOverridden,
@@ -22,11 +22,8 @@ public abstract class DynamicDisposable :
             Logger?.LogWarning(EventIds.Epiforge_Extensions_Components_FinalizerCalled, "Finalizer called: did you forget to dispose an object? (set logging minimum level to Trace to see the stack trace for when the Logger was set)");
         else
             Logger?.LogWarning(EventIds.Epiforge_Extensions_Components_FinalizerCalled, "Finalizer called: did you forget to dispose an object? (stack trace for when the Logger was set: {LoggerSetStackTrace})", loggerSetStackTrace);
-        var e = DisposalNotificationEventArgs.ByCallingFinalizer;
-        OnDisposing(e);
         Dispose(false);
         IsDisposed = true;
-        OnDisposed(e);
     }
 
     readonly AsyncLock disposalAccess = new();

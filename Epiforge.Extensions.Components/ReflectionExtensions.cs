@@ -206,7 +206,7 @@ public static class ReflectionExtensions
         if (type.IsInterface)
         {
             var eventInfos = new List<EventInfo>();
-            var considered = new List<Type>();
+            var considered = new HashSet<Type>();
             var queue = new Queue<Type>();
             considered.Add(type);
             queue.Enqueue(type);
@@ -238,7 +238,7 @@ public static class ReflectionExtensions
         if (type.IsInterface)
         {
             var methodInfos = new List<MethodInfo>();
-            var considered = new List<Type>();
+            var considered = new HashSet<Type>();
             var queue = new Queue<Type>();
             considered.Add(type);
             queue.Enqueue(type);
@@ -270,7 +270,7 @@ public static class ReflectionExtensions
         if (type.IsInterface)
         {
             var propertyInfos = new List<PropertyInfo>();
-            var considered = new List<Type>();
+            var considered = new HashSet<Type>();
             var queue = new Queue<Type>();
             considered.Add(type);
             queue.Enqueue(type);

@@ -14,7 +14,7 @@ public static class GenericMultiplication<TMultiplicand, TMultiplier, TProduct>
         var multiplicand = Expression.Parameter(typeof(TMultiplicand), "multiplicand");
         var multiplier = Expression.Parameter(typeof(TMultiplier), "multiplier");
         return Expression.Lambda<Func<TMultiplicand, TMultiplier, TProduct>>(Expression.Multiply(multiplicand, multiplier), multiplicand, multiplier).Compile();
-    }, LazyThreadSafetyMode.PublicationOnly);
+    }, LazyThreadSafetyMode.ExecutionAndPublication);
 
     /// <summary>
     /// Gets the instance

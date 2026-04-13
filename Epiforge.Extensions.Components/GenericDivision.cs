@@ -14,7 +14,7 @@ public static class GenericDivision<TDividend, TDivisor, TQuotient>
         var dividend = Expression.Parameter(typeof(TDividend), "dividend");
         var divisor = Expression.Parameter(typeof(TDivisor), "divisor");
         return Expression.Lambda<Func<TDividend, TDivisor, TQuotient>>(Expression.Divide(dividend, divisor), dividend, divisor).Compile();
-    }, LazyThreadSafetyMode.PublicationOnly);
+    }, LazyThreadSafetyMode.ExecutionAndPublication);
 
     /// <summary>
     /// Gets the instance
