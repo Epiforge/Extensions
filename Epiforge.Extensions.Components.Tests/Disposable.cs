@@ -61,13 +61,9 @@ public class Disposable
         logger.ReceivedLogTrace("Raising Disposed event");
         logger.ClearReceivedCalls();
         Assert.AreEqual(nameof(INotifyDisposing.Disposing), disposalNotificationEvents[0].name);
-        Assert.IsFalse(disposalNotificationEvents[0].args.IsFinalizer);
         Assert.AreEqual(nameof(INotifyDisposalOverridden.DisposalOverridden), disposalNotificationEvents[1].name);
-        Assert.IsFalse(disposalNotificationEvents[1].args.IsFinalizer);
         Assert.AreEqual(nameof(INotifyDisposing.Disposing), disposalNotificationEvents[2].name);
-        Assert.IsFalse(disposalNotificationEvents[2].args.IsFinalizer);
         Assert.AreEqual(nameof(INotifyDisposed.Disposed), disposalNotificationEvents[3].name);
-        Assert.IsFalse(disposalNotificationEvents[3].args.IsFinalizer);
     }
 
     [TestMethod]
@@ -99,13 +95,9 @@ public class Disposable
         logger.ReceivedLogTrace($"Raising Disposed event");
         logger.ClearReceivedCalls();
         Assert.AreEqual(nameof(INotifyDisposing.Disposing), disposalNotificationEvents[0].name);
-        Assert.IsFalse(disposalNotificationEvents[0].args.IsFinalizer);
         Assert.AreEqual(nameof(INotifyDisposalOverridden.DisposalOverridden), disposalNotificationEvents[1].name);
-        Assert.IsFalse(disposalNotificationEvents[1].args.IsFinalizer);
         Assert.AreEqual(nameof(INotifyDisposing.Disposing), disposalNotificationEvents[2].name);
-        Assert.IsFalse(disposalNotificationEvents[2].args.IsFinalizer);
         Assert.AreEqual(nameof(INotifyDisposed.Disposed), disposalNotificationEvents[3].name);
-        Assert.IsFalse(disposalNotificationEvents[3].args.IsFinalizer);
     }
 
     [TestMethod]

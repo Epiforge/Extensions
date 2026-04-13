@@ -143,13 +143,15 @@ public class PropertyChangeNotifier
         derivation.NullPropertyChangedEventArgs();
     }
 
-    [TestMethod]
-    [ExpectedException(typeof(ArgumentNullException))]
-    public void NullPropertyChangedName()
-    {
-        var derivation = new Derivation(Substitute.For<ILogger<Derivation>>(), "text");
-        derivation.NullPropertyChangedName();
-    }
+    // Removed as some frameworks allow null or zero-length property names to denote a full object reset
+
+    //[TestMethod]
+    //[ExpectedException(typeof(ArgumentNullException))]
+    //public void NullPropertyChangedName()
+    //{
+    //    var derivation = new Derivation(Substitute.For<ILogger<Derivation>>(), "text");
+    //    derivation.NullPropertyChangedName();
+    //}
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
@@ -159,13 +161,15 @@ public class PropertyChangeNotifier
         derivation.NullPropertyChangingEventArgs();
     }
 
-    [TestMethod]
-    [ExpectedException(typeof(ArgumentNullException))]
-    public void NullPropertyChangingName()
-    {
-        var derivation = new Derivation(Substitute.For<ILogger<Derivation>>(), "text");
-        derivation.NullPropertyChangingName();
-    }
+    // Removed as some frameworks allow null or zero-length property names to denote a full object reset
+
+    //[TestMethod]
+    //[ExpectedException(typeof(ArgumentNullException))]
+    //public void NullPropertyChangingName()
+    //{
+    //    var derivation = new Derivation(Substitute.For<ILogger<Derivation>>(), "text");
+    //    derivation.NullPropertyChangingName();
+    //}
 
     [TestMethod]
     public void PropertyChanges()
