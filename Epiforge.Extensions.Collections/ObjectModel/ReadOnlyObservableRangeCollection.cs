@@ -41,9 +41,6 @@ public sealed class ReadOnlyObservableRangeCollection<T> :
     public event NotifyCollectionChangedEventHandler? CollectionChanged;
 
     /// <inheritdoc/>
-    public event PropertyChangedEventHandler? PropertyChanged;
-
-    /// <inheritdoc/>
     public int Count =>
         ((ICollection)rangeObservableCollection).Count;
 
@@ -146,9 +143,6 @@ public sealed class ReadOnlyObservableRangeCollection<T> :
 
     void OnCollectionChanged(NotifyCollectionChangedEventArgs e) =>
         CollectionChanged?.Invoke(this, e);
-
-    void OnPropertyChanged(PropertyChangedEventArgs e) =>
-        PropertyChanged?.Invoke(this, e);
 
     void RangeObservableCollectionCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
         OnCollectionChanged(e);

@@ -4,7 +4,7 @@
 
     <PropertyGroup>
         <Product>Epiforge.Extensions.Collections</Product>
-        <Version>2.1.0</Version>
+        <Version>2.1.1</Version>
         <Description>This package assists in operating with collections.</Description>
     </PropertyGroup>
 
