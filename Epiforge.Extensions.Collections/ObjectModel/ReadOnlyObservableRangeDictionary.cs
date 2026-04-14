@@ -7,6 +7,7 @@ namespace Epiforge.Extensions.Collections.ObjectModel;
 /// <typeparam name="TValue">The type of values in the read-only dictionary</typeparam>
 public class ReadOnlyObservableRangeDictionary<TKey, TValue> :
     ReadOnlyRangeDictionary<TKey, TValue>,
+    IDisposable,
     IObservableRangeDictionary<TKey, TValue>
     where TKey : notnull
 {
@@ -18,10 +19,17 @@ public class ReadOnlyObservableRangeDictionary<TKey, TValue> :
     public ReadOnlyObservableRangeDictionary(IObservableRangeDictionary<TKey, TValue> observableRangeDictionary) :
         base(observableRangeDictionary)
     {
-        observableRangeDictionary!.CollectionChanged += HandleCollectionChanged;
-        ((INotifyDictionaryChanged)observableRangeDictionary).DictionaryChanged += HandleDictionaryChanged;
-        ((INotifyDictionaryChanged<TKey, TValue>)observableRangeDictionary).DictionaryChanged += HandleDictionaryChanged;
+        this.observableRangeDictionary = observableRangeDictionary;
+        this.observableRangeDictionary!.CollectionChanged += HandleCollectionChanged;
+        ((INotifyDictionaryChanged)this.observableRangeDictionary).DictionaryChanged += HandleDictionaryChanged;
+        ((INotifyDictionaryChanged<TKey, TValue>)this.observableRangeDictionary).DictionaryChanged += HandleDictionaryChanged;
     }
+
+    ~ReadOnlyObservableRangeDictionary() =>
+        Dispose(false);
+
+    bool isDisposed;
+    readonly IObservableRangeDictionary<TKey, TValue> observableRangeDictionary;
 
     /// <summary>
     /// Occurs when the dictionary changes
@@ -42,6 +50,25 @@ public class ReadOnlyObservableRangeDictionary<TKey, TValue> :
     {
         add => NonGenericDictionaryChanged += value;
         remove => NonGenericDictionaryChanged -= value;
+    }
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (isDisposed)
+            return;
+        if (disposing)
+        {
+            observableRangeDictionary!.CollectionChanged += HandleCollectionChanged;
+            ((INotifyDictionaryChanged)observableRangeDictionary).DictionaryChanged -= HandleDictionaryChanged;
+            ((INotifyDictionaryChanged<TKey, TValue>)observableRangeDictionary).DictionaryChanged -= HandleDictionaryChanged;
+        }
+        isDisposed = true;
     }
 
     void HandleCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>

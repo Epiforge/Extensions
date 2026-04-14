@@ -6,7 +6,7 @@ namespace Epiforge.Extensions.Collections.ObjectModel;
 /// <typeparam name="TKey">The type of the keys in the dictionary</typeparam>
 /// <typeparam name="TValue">The type of the values in the dictionary</typeparam>
 public sealed class ReadOnlyObservableConcurrentDictionary<TKey, TValue> :
-    PropertyChangeNotifier,
+    SyncDisposable,
     ICollection,
     ICollection<KeyValuePair<TKey, TValue>>,
     IEnumerable,
@@ -214,6 +214,19 @@ public sealed class ReadOnlyObservableConcurrentDictionary<TKey, TValue> :
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     void ICollection.CopyTo(Array array, int index) =>
         ((ICollection)ocd).CopyTo(array, index);
+
+    protected override bool Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            ocd.CollectionChanged -= ObservableConcurrentDictionaryCollectionChanged;
+            ((INotifyDictionaryChanged)ocd).DictionaryChanged -= ObservableConcurrentDictionaryDictionaryChanged;
+            ocd.DictionaryChanged -= ObservableConcurrentDictionaryDictionaryChanged;
+            ocd.PropertyChanged -= ObservableConcurrentDictionaryPropertyChanged;
+            ocd.PropertyChanging -= ObservableConcurrentDictionaryPropertyChanging;
+        }
+        return true;
+    }
 
     /// <summary>
     /// Returns an enumerator that iterates through the <see cref="ReadOnlyObservableConcurrentDictionary{TKey, TValue}"/>

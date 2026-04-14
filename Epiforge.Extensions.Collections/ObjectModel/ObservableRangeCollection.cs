@@ -181,7 +181,6 @@ public class ObservableRangeCollection<T> :
                 foreach (var item in movedItems)
                     Items.Insert(++insertionIndex, item);
                 OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Move, movedItems, newStartIndex, oldStartIndex));
-                NotifyCountChanged();
             }
         }
     }

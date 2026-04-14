@@ -103,7 +103,6 @@ public static class EnumerableExtensions
             return FindTypedIndicies(typedArray, predicate);
         if (source is List<TSource> genericList)
             return FindTypedIndicies(genericList, predicate);
-        var equalityComparer = EqualityComparer<TSource>.Default;
         return FindEnumerableIndicies(source, predicate);
     }
 

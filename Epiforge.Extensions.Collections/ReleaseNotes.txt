@@ -1,1 +1,1 @@
-We added support for .NET 10.
+Unnecessary allocations and raised events were removed. TryRemove on non-generic dictionaries actually removes keys. Corrected a mutation defect in ObservableDictionary when using the non-generic interface. Read-only observable collections/dictionaries are now disposable to make them unwire from their underlying data structures. Nullable key dictionaries now copy null key pairs to the caller's specified index.

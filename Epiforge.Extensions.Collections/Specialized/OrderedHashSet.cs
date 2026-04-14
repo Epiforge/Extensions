@@ -177,7 +177,7 @@ public sealed class OrderedHashSet<T> :
     /// <param name="arrayIndex">The zero-based index in array at which copying begins</param>
     /// <param name="count">The number of elements to copy to array</param>
     public void CopyTo(T[] array, int arrayIndex, int count) =>
-        list.Cast<T>().Take(count).ToImmutableArray().CopyTo(array, arrayIndex);
+        list.Cast<T>().Take(count).ToList().AsReadOnly().CopyTo(array, arrayIndex);
 
     /// <summary>
     /// Ensures that this hash set can hold the specified number of elements without growing
@@ -412,7 +412,7 @@ public sealed class OrderedHashSet<T> :
     {
         ArgumentNullException.ThrowIfNull(match);
         var count = 0;
-        foreach (var item in list.ToImmutableArray())
+        foreach (var item in list.ToList().AsReadOnly())
             if (match(item))
             {
                 Remove(item);

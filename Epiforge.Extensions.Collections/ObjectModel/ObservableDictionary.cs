@@ -229,10 +229,22 @@ public class ObservableDictionary<TKey, TValue> :
     protected virtual void Add(object key, object? value)
     {
         ArgumentNullException.ThrowIfNull(key);
-        if (key is TKey typedKey && !gd.ContainsKey(typedKey))
-            NotifyCountChanging();
+        TValue typedValue;
+        try
+        {
+            typedValue = (TValue)value!;
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidCastException("value could not be cast to the appropriate type", ex);
+        }
+        if (key is not TKey typedKey)
+            throw new InvalidCastException("key could not be cast to the appropriate type");
+        if (gd.ContainsKey(typedKey))
+            throw new ArgumentException("duplicate key already exists", nameof(key));
+        NotifyCountChanging();
         di.Add(key, value);
-        OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, (TKey)key, (TValue)value!));
+        OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, typedKey, typedValue));
         NotifyCountChanged();
     }
 

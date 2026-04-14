@@ -238,7 +238,7 @@ public sealed class NullableKeyDictionary<TKey, TValue> :
     void ICollection<KeyValuePair<TKey, TValue>>.CopyTo(KeyValuePair<TKey, TValue>[] array, int arrayIndex)
     {
         if (hasNullKeyedValue)
-            array[0] = new KeyValuePair<TKey, TValue>(default!, nullKeyedValue);
+            array[arrayIndex] = new KeyValuePair<TKey, TValue>(default!, nullKeyedValue);
         ((IDictionary<TKey, TValue>)dict).CopyTo(array, arrayIndex + (hasNullKeyedValue ? 1 : 0));
     }
 

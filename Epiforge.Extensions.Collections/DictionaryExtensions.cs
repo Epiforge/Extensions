@@ -60,6 +60,7 @@ public static class DictionaryExtensions
         if (dictionary.Contains(key))
         {
             value = dictionary[key];
+            dictionary.Remove(key);
             return true;
         }
         value = default;

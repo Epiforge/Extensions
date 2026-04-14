@@ -5,6 +5,7 @@ namespace Epiforge.Extensions.Collections.ObjectModel;
 /// </summary>
 /// <typeparam name="T">The type of elements in the read-only collection</typeparam>
 public sealed class ReadOnlyObservableRangeCollection<T> :
+    SyncDisposable,
     IObservableRangeCollection<T>
 {
     /// <summary>
@@ -93,6 +94,16 @@ public sealed class ReadOnlyObservableRangeCollection<T> :
 
     void ICollection.CopyTo(Array array, int index) =>
         rangeObservableCollection.CopyTo(array, index);
+
+    protected override bool Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            rangeObservableCollection.CollectionChanged -= RangeObservableCollectionCollectionChanged;
+            rangeObservableCollection.PropertyChanged -= RangeObservableCollectionPropertyChanged;
+        }
+        return true;
+    }
 
     IReadOnlyList<T> IObservableRangeCollection<T>.GetAndRemoveAll(Func<T, bool> predicate) =>
         throw new NotSupportedException();
