@@ -66,10 +66,8 @@ sealed class ObservableCollectionSumQuery<TElement, TResult>(CollectionObserver 
                     var value = Evaluation.Result;
                     var oldItems = e.OldItems?.Cast<TResult>() ?? [];
                     var newItems = e.NewItems?.Cast<TResult>() ?? [];
-                    if (oldItems is not null)
-                        value = subtract!(value, oldItems.Aggregate(default!, add!));
-                    if (newItems is not null)
-                        value = add!(value, newItems.Aggregate(default!, add!));
+                    value = subtract!(value, oldItems.Aggregate(default!, add!));
+                    value = add!(value, newItems.Aggregate(default!, add!));
                     Evaluation = (null, value);
                 }
                 break;

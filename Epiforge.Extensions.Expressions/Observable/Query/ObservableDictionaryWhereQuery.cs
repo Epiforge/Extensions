@@ -215,7 +215,6 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue>(CollectionObserver col
                     observableExpression.Dispose();
                     observableExpressions.Remove(key);
                     evaluationsChanging.Remove(observableExpression);
-                    result.Remove(key);
                 }
                 foreach (var keyValuePair in e.NewItems)
                 {

@@ -245,13 +245,15 @@ public class ExpressionObserver :
     /// <inheritdoc/>
     public Task ConditionAsync(Expression<Func<bool>> condition, CancellationToken cancellationToken)
     {
-        var taskCompletionSource = new TaskCompletionSource<object?>();
+        var taskCompletionSource = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
         IObservableExpression<bool>? observableExpression = null;
+        CancellationTokenRegistration registration = default;
         void cancellationTokenCancelled()
         {
             observableExpression.PropertyChanged -= propertyChangedHandler;
             observableExpression.Dispose();
-            taskCompletionSource.SetCanceled(cancellationToken);
+            taskCompletionSource.TrySetCanceled(cancellationToken);
+            registration.Dispose();
         }
         void propertyChangedHandler(object? sender, PropertyChangedEventArgs e)
         {
@@ -261,19 +263,22 @@ public class ExpressionObserver :
                 {
                     observableExpression.PropertyChanged -= propertyChangedHandler;
                     observableExpression.Dispose();
-                    taskCompletionSource!.SetException(fault);
+                    taskCompletionSource!.TrySetException(fault);
+                    registration.Dispose();
                 }
                 else if (observableExpression!.Evaluation.Result)
                 {
                     observableExpression.PropertyChanged -= propertyChangedHandler;
                     observableExpression.Dispose();
-                    taskCompletionSource!.SetResult(null);
+                    taskCompletionSource!.TrySetResult(null);
+                    registration.Dispose();
                 }
             }
         }
         if (cancellationToken.CanBeCanceled && cancellationToken.IsCancellationRequested)
             return Task.FromCanceled(cancellationToken);
         observableExpression = Observe(condition);
+        observableExpression.PropertyChanged += propertyChangedHandler;
         var (observableExpressionFault, observableExpressionResult) = observableExpression.Evaluation;
         if (observableExpressionFault is not null)
         {
@@ -286,8 +291,7 @@ public class ExpressionObserver :
             return Task.CompletedTask;
         }
         if (cancellationToken.CanBeCanceled)
-            cancellationToken.Register(cancellationTokenCancelled);
-        observableExpression.PropertyChanged += propertyChangedHandler;
+            registration = cancellationToken.Register(cancellationTokenCancelled);
         return taskCompletionSource.Task;
     }
 

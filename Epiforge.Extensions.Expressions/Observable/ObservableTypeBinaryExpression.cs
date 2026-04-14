@@ -54,7 +54,7 @@ sealed class ObservableTypeBinaryExpression(ExpressionObserver observer, TypeBin
         else
         {
             var value = @delegate?.Invoke(expressionValue);
-            Evaluation = (null, @delegate?.Invoke(expressionValue));
+            Evaluation = (null, value);
             observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{TypeBinaryExpression} evaluated: {Value}", TypeBinaryExpression, value);
         }
     }

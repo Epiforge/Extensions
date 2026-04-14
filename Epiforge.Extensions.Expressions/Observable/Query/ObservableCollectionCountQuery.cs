@@ -9,7 +9,10 @@ sealed class ObservableCollectionCountQuery<TElement>(CollectionObserver collect
         {
             var removedFromCache = observableCollectionQuery.QueryDisposed(this);
             if (removedFromCache)
+            {
                 observableCollectionQuery.CollectionChanged -= ObservableCollectionQueryCollectionChanged;
+                observableCollectionQuery.PropertyChanged -= ObservableCollectionQueryPropertyChanged;
+            }
             return removedFromCache;
         }
         return true;
@@ -29,7 +32,14 @@ sealed class ObservableCollectionCountQuery<TElement>(CollectionObserver collect
     protected override void OnInitialization()
     {
         observableCollectionQuery.CollectionChanged += ObservableCollectionQueryCollectionChanged;
+        observableCollectionQuery.PropertyChanged += ObservableCollectionQueryPropertyChanged;
         Evaluate();
+    }
+
+    void ObservableCollectionQueryPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ObservableCollectionQuery<>.OperationFault))
+            Evaluate();
     }
 
     public override string ToString() =>

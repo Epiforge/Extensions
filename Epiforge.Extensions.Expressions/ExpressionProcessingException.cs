@@ -1,7 +1,7 @@
 namespace Epiforge.Extensions.Expressions;
 
 /// <summary>
-/// An exception was thrown while processing an exception
+/// An exception was thrown while processing an expression
 /// </summary>
 /// <remarks>
 /// Instantiates a new instance of the <see cref="ExpressionProcessingException"/>

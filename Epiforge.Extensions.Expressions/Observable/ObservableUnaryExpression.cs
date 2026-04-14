@@ -36,9 +36,9 @@ sealed class ObservableUnaryExpression(ExpressionObserver observer, UnaryExpress
             {
                 if (operand is not null)
                 {
-                    DisposeValueIfNecessaryAndPossible();
                     operand.PropertyChanged -= OperandPropertyChanged;
                     operand.Dispose();
+                    DisposeValueIfNecessaryAndPossible();
                 }
                 RemovedFromCache();
             }

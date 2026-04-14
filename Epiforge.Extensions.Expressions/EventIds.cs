@@ -3,7 +3,7 @@ namespace Epiforge.Extensions.Expressions;
 #pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
 
 /// <summary>
-/// Provides all the event IDs for the Epiforge.Extensions.Collections namespace
+/// Provides all the event IDs for the Epiforge.Extensions.Expressions namespace
 /// </summary>
 public static class EventIds
 {

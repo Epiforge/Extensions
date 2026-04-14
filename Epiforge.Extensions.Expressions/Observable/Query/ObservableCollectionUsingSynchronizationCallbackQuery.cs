@@ -21,7 +21,7 @@ sealed class ObservableCollectionUsingSynchronizationCallbackQuery<TElement>(Col
             if (removedFromCache)
             {
                 source.CollectionChanged -= SourceCollectionChanged;
-                elements!.CollectionChanged += ElementsCollectionChanged;
+                elements!.CollectionChanged -= ElementsCollectionChanged;
                 ((INotifyPropertyChanged)elements!).PropertyChanged -= ElementsPropertyChanged;
                 RemovedFromCache();
             }

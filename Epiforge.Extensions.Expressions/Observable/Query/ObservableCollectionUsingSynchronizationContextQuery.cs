@@ -29,7 +29,7 @@ sealed class ObservableCollectionUsingSynchronizationContextQuery<TElement>(Coll
             if (removedFromCache)
             {
                 source.CollectionChanged -= SourceCollectionChanged;
-                elements!.CollectionChanged += ElementsCollectionChanged;
+                elements!.CollectionChanged -= ElementsCollectionChanged;
                 ((INotifyPropertyChanged)elements!).PropertyChanged -= ElementsPropertyChanged;
                 RemovedFromCache();
             }
@@ -55,8 +55,9 @@ sealed class ObservableCollectionUsingSynchronizationContextQuery<TElement>(Coll
     void ElementsPropertyChanged(object? sender, PropertyChangedEventArgs e) =>
         OnPropertyChanged(e);
 
-    void SourceCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
-        SynchronizationContext.Send(() =>
+    void SourceCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        void handleEventArgs()
         {
             switch (e.Action)
             {
@@ -76,7 +77,12 @@ sealed class ObservableCollectionUsingSynchronizationContextQuery<TElement>(Coll
                     elements!.Reset(source);
                     break;
             }
-        });
+        }
+        if (SynchronizationContext == SynchronizationContext.Current)
+            handleEventArgs();
+        else
+            SynchronizationContext.Send(handleEventArgs);
+    }
 
     public override string ToString() =>
         $"synchronizing {source} using {SynchronizationContext}";

@@ -62,11 +62,15 @@ sealed class ObservableMemberExpression(ExpressionObserver observer, MemberExpre
             }
             else if (field is not null)
             {
-                UnsubscribeFromValueNotifications();
+                var previousValue = Evaluation.Result;
                 var value = field.GetValue(observableExpressionResult);
-                Evaluation = (null, value);
-                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{MemberExpression} evaluated: {Value}", MemberExpression, value);
-                SubscribeToValueNotifications();
+                if (!ReferenceEquals(previousValue, value))
+                {
+                    UnsubscribeFromValueNotifications();
+                    Evaluation = (null, value);
+                    observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{MemberExpression} evaluated: {Value}", MemberExpression, value);
+                    SubscribeToValueNotifications();
+                }
             }
         }
         catch (Exception ex)
@@ -84,7 +88,7 @@ sealed class ObservableMemberExpression(ExpressionObserver observer, MemberExpre
 
     void ObservableExpressionValuePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == member?.Name)
+        if (string.IsNullOrEmpty(e.PropertyName) || e.PropertyName == member?.Name)
             Evaluate();
     }
 

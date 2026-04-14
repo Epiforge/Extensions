@@ -6,12 +6,12 @@ sealed class ObservableCoalesceExpression(ExpressionObserver observer, BinaryExp
     #region Cache Comparers
 
     class ConverterEqualityComparer :
-    IEqualityComparer<LambdaExpression>
+        IEqualityComparer<LambdaExpression>
     {
         public static ConverterEqualityComparer Default { get; } = new();
 
         public bool Equals(LambdaExpression? x, LambdaExpression? y) =>
-            x?.Parameters[0].Type == y?.Parameters[0].Type && x?.Body.Type == y?.Body.Type;
+            x?.Parameters[0].Type == y?.Parameters[0].Type && ExpressionEqualityComparer.Default.Equals(x?.Body, y?.Body);
 
         public int GetHashCode(LambdaExpression obj) =>
             HashCode.Combine(obj.Parameters[0].Type, obj.Body.Type);

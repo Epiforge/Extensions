@@ -307,6 +307,6 @@ sealed class ObservableCollectionLookupQuery<TKey, TElement> :
     public bool TryGetValue(TKey key, out IObservableGrouping<TKey, TElement> value)
     {
         lock (access)
-            return TryGetValue(key, out value);
+            return groupingByKey.TryGetValue(key, out value);
     }
 }

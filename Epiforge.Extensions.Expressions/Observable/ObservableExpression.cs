@@ -93,23 +93,26 @@ abstract class ObservableExpression :
 
     internal void EvaluateIfDeferred()
     {
+        var shouldEvaluate = false;
         lock (deferringEvaluationAccess)
         {
             if (deferringEvaluation)
             {
                 deferringEvaluation = false;
-                Evaluate();
+                shouldEvaluate = true;
             }
         }
+        if (shouldEvaluate)
+            Evaluate();
     }
 
     protected void EvaluateIfNotDeferred()
     {
+        bool shouldEvaluate;
         lock (deferringEvaluationAccess)
-        {
-            if (!deferringEvaluation)
-                Evaluate();
-        }
+            shouldEvaluate = !deferringEvaluation;
+        if (shouldEvaluate)
+            Evaluate();
     }
 
     protected virtual bool GetShouldValueBeDisposed() =>

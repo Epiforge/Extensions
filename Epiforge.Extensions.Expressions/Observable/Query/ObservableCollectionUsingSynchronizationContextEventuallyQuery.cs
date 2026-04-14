@@ -48,7 +48,7 @@ sealed class ObservableCollectionUsingSynchronizationContextEventuallyQuery<TEle
             if (removedFromCache)
             {
                 source.CollectionChanged -= SourceCollectionChanged;
-                elements!.CollectionChanged += ElementsCollectionChanged;
+                elements!.CollectionChanged -= ElementsCollectionChanged;
                 ((INotifyPropertyChanged)elements!).PropertyChanged -= ElementsPropertyChanged;
                 RemovedFromCache();
             }
