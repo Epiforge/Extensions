@@ -9,8 +9,8 @@ public class TestPerson :
     public static ObservableDictionary<int, TestPerson> CreatePeopleDictionary(SynchronizationContext? synchronizationContext = null) =>
         new(MakePeople().Select((person, index) => (person, index)).ToDictionary(pi => pi.index, pi => pi.person));
 
-    public static IEnumerable<TestPerson> MakePeople() => new TestPerson[]
-    {
+    public static IEnumerable<TestPerson> MakePeople() =>
+    [
         new TestPerson("John"),
         new TestPerson("Emily"),
         new TestPerson("Charles"),
@@ -25,7 +25,7 @@ public class TestPerson :
         new TestPerson("Bryan"),
         new TestPerson("James"),
         new TestPerson("Steve")
-    };
+    ];
 
     public TestPerson()
     {

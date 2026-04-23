@@ -60,6 +60,14 @@ public interface IObservableCollectionQuery<TElement> :
     IObservableScalarQuery<bool> ObserveAny(Expression<Func<TElement, bool>> predicate);
 
     /// <summary>
+    /// Continuously appends an element to the end of the sequence
+    /// </summary>
+    /// <param name="element">The element to append</param>
+    /// <returns>A new collection query that ends with <paramref name="element"/></returns>
+    [return: DisposeWhenDiscarded]
+    IObservableCollectionQuery<TElement> ObserveAppend(TElement element);
+
+    /// <summary>
     /// Continuously computes the average of the values in the collection
     /// </summary>
     /// <returns>The average value of the collection</returns>
@@ -287,6 +295,14 @@ public interface IObservableCollectionQuery<TElement> :
     /// <returns>A collection whose elements are sorted according to key selectors and directions</returns>
     [return: DisposeWhenDiscarded]
     IObservableCollectionQuery<TElement> ObserveOrderBy(params (Expression<Func<TElement, IComparable>> selector, bool isDescending)[] selectorsAndDirections);
+
+    /// <summary>
+    /// Continuously prepends an element to the beginning of the sequence
+    /// </summary>
+    /// <param name="element">The element to prepend</param>
+    /// <returns>A new collection query that begins with <paramref name="element"/></returns>
+    [return: DisposeWhenDiscarded]
+    IObservableCollectionQuery<TElement> ObservePrepend(TElement element);
 
     /// <summary>
     /// Continuously projects each element of the collection into a new form

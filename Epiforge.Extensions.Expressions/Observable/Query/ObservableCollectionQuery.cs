@@ -107,6 +107,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     readonly Dictionary<(object seedFactory, object func, object resultSelector), ObservableQuery> cachedAggregateQueries = [];
     readonly Dictionary<Expression<Func<TElement, bool>>, ObservableCollectionAllQuery<TElement>> cachedAllQueries = new(ExpressionEqualityComparer.Default);
     readonly NullableKeyDictionary<Expression<Func<TElement, bool>>?, ObservableCollectionAnyQuery<TElement>> cachedAnyQueries = new(ExpressionEqualityComparer.Default!);
+    readonly NullableKeyDictionary<TElement, ObservableCollectionAppendQuery<TElement>> cachedAppendQueries = [];
     readonly Dictionary<Expression, ObservableQuery> cachedAverageQueries = new(ExpressionEqualityComparer.Default);
     readonly Dictionary<int, ObservableCollectionComparisonQuery<TElement>> cachedComparisonQueries = [];
     readonly Dictionary<IObservableCollectionQuery<TElement>, ObservableCollectionConcatQuery<TElement>> cachedConcatQueries = [];
@@ -115,6 +116,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     readonly Dictionary<(Index? index, bool outOfRangeIsDefault), ObservableQuery> cachedIndexQueries = [];
     ObservableCollectionIndividualChangesQuery<TElement>? cachedIndividualChangeQuery;
     readonly Dictionary<IReadOnlyList<(Expression<Func<TElement, IComparable>> selector, bool isDescending)>, ObservableCollectionOrderByQuery<TElement>> cachedOrderByQueries = new(CachedOrderByQueryEqualityComparer.Default);
+    readonly NullableKeyDictionary<TElement, ObservableCollectionPrependQuery<TElement>> cachedPrependQueries = [];
     readonly Dictionary<Expression, ObservableQuery> cachedSelectQueries = new(ExpressionEqualityComparer.Default);
     readonly Dictionary<Expression, ObservableQuery> cachedSelectManyQueries = new(ExpressionEqualityComparer.Default);
     readonly Dictionary<Expression, ObservableQuery> cachedSumQueries = new(ExpressionEqualityComparer.Default);
@@ -131,6 +133,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     readonly Lock cachedAggregateQueriesAccess = new();
     readonly Lock cachedAllQueriesAccess = new();
     readonly Lock cachedAnyQueriesAccess = new();
+    readonly Lock cachedAppendQueriesAccess = new();
     readonly Lock cachedAverageQueriesAccess = new();
     readonly Lock cachedComparisonQueriesAccess = new();
     readonly Lock cachedConcatQueriesAccess = new();
@@ -139,6 +142,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     readonly Lock cachedIndexQueriesAccess = new();
     readonly Lock cachedIndividualChangeQueryAccess = new();
     readonly Lock cachedOrderByQueriesAccess = new();
+    readonly Lock cachedPrependQueriesAccess = new();
     readonly Lock cachedSelectQueriesAccess = new();
     readonly Lock cachedSelectManyQueriesAccess = new();
     readonly Lock cachedSumQueriesAccess = new();
@@ -155,6 +159,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     readonly object cachedAggregateQueriesAccess = new();
     readonly object cachedAllQueriesAccess = new();
     readonly object cachedAnyQueriesAccess = new();
+    readonly object cachedAppendQueriesAccess = new();
     readonly object cachedAverageQueriesAccess = new();
     readonly object cachedComparisonQueriesAccess = new();
     readonly object cachedConcatQueriesAccess = new();
@@ -163,6 +168,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     readonly object cachedIndexQueriesAccess = new();
     readonly object cachedIndividualChangeQueryAccess = new();
     readonly object cachedOrderByQueriesAccess = new();
+    readonly object cachedPrependQueriesAccess = new();
     readonly object cachedSelectQueriesAccess = new();
     readonly object cachedSelectManyQueriesAccess = new();
     readonly object cachedSumQueriesAccess = new();
@@ -203,6 +209,8 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
                 count += cachedAllQueries.Values.Sum(allQuery => 1 + allQuery.CachedObservableQueries);
             lock (cachedAnyQueriesAccess)
                 count += cachedAnyQueries.Values.Sum(anyQuery => 1 + anyQuery.CachedObservableQueries);
+            lock (cachedAppendQueriesAccess)
+                count += cachedAppendQueries.Values.Sum(appendQuery => 1 + appendQuery.CachedObservableQueries);
             lock (cachedAverageQueriesAccess)
                 count += cachedAverageQueries.Values.Sum(averageQuery => 1 + averageQuery.CachedObservableQueries);
             lock (cachedComparisonQueriesAccess)
@@ -219,6 +227,8 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
                 count += cachedIndividualChangeQuery is null ? 0 : 1 + cachedIndividualChangeQuery.CachedObservableQueries;
             lock (cachedOrderByQueriesAccess)
                 count += cachedOrderByQueries.Values.Sum(orderByQuery => 1 + orderByQuery.CachedObservableQueries);
+            lock (cachedPrependQueriesAccess)
+                count += cachedPrependQueries.Values.Sum(prependQuery => 1 + prependQuery.CachedObservableQueries);
             lock (cachedSelectQueriesAccess)
                 count += cachedSelectQueries.Values.Sum(selectQuery => 1 + selectQuery.CachedObservableQueries);
             lock (cachedSelectManyQueriesAccess)
@@ -537,6 +547,23 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         ObserveAverage(element => element);
 
     [return: DisposeWhenDiscarded]
+    public IObservableCollectionQuery<TElement> ObserveAppend(TElement element)
+    {
+        ObservableCollectionAppendQuery<TElement> appendQuery;
+        lock (cachedAppendQueriesAccess)
+        {
+            if (!cachedAppendQueries.TryGetValue(element, out appendQuery!))
+            {
+                appendQuery = new ObservableCollectionAppendQuery<TElement>(collectionObserver, this, element);
+                cachedAppendQueries.Add(element, appendQuery);
+            }
+            ++appendQuery.Observations;
+        }
+        appendQuery.Initialize();
+        return appendQuery;
+    }
+
+    [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TResult> ObserveAverage<TResult>(Expression<Func<TElement, TResult>> selector)
     {
         ArgumentNullException.ThrowIfNull(selector);
@@ -815,6 +842,23 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         }
         orderByQuery.Initialize();
         return orderByQuery;
+    }
+
+    [return: DisposeWhenDiscarded]
+    public IObservableCollectionQuery<TElement> ObservePrepend(TElement element)
+    {
+        ObservableCollectionPrependQuery<TElement> prependQuery;
+        lock (cachedPrependQueriesAccess)
+        {
+            if (!cachedPrependQueries.TryGetValue(element, out prependQuery!))
+            {
+                prependQuery = new ObservableCollectionPrependQuery<TElement>(collectionObserver, this, element);
+                cachedPrependQueries.Add(element, prependQuery);
+            }
+            ++prependQuery.Observations;
+        }
+        prependQuery.Initialize();
+        return prependQuery;
     }
 
     [return: DisposeWhenDiscarded]
@@ -1156,6 +1200,19 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         return false;
     }
 
+    internal bool QueryDisposed(ObservableCollectionAppendQuery<TElement> appendQuery)
+    {
+        lock (cachedAppendQueriesAccess)
+        {
+            if (--appendQuery.Observations == 0)
+            {
+                cachedAppendQueries.Remove(appendQuery.Appended);
+                return true;
+            }
+        }
+        return false;
+    }
+
     internal bool QueryDisposed<TResult>(ObservableCollectionAverageQuery<TElement, TResult> averageQuery)
     {
         lock (cachedAverageQueriesAccess)
@@ -1268,6 +1325,19 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
             if (--orderByQuery.Observations == 0)
             {
                 cachedOrderByQueries.Remove(orderByQuery.SelectorsAndDirections);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    internal bool QueryDisposed(ObservableCollectionPrependQuery<TElement> prependQuery)
+    {
+        lock (cachedPrependQueriesAccess)
+        {
+            if (--prependQuery.Observations == 0)
+            {
+                cachedPrependQueries.Remove(prependQuery.Prepended);
                 return true;
             }
         }
