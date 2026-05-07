@@ -1,1 +1,1 @@
-We added ObserveSkip and ObserveTake to observable collection queries.
+We corrected defects in the ObserveSlice, ObserveSkip, and ObserveTake implementation.

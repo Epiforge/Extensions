@@ -10,6 +10,7 @@ sealed class ObservableCollectionSliceQuery<TElement>(CollectionObserver collect
 #endif
     int count;
     internal readonly Range Range = range;
+    int sourceCount;
 
     public override TElement this[int index]
     {
@@ -17,9 +18,9 @@ sealed class ObservableCollectionSliceQuery<TElement>(CollectionObserver collect
         {
             lock (access)
             {
-                if (index < 0 || index >= Count)
+                if (index < 0 || index >= count)
                     throw ExceptionHelper.IndexArgumentWasOutOfRange;
-                return source[Range.Start.GetOffset(source.Count) + index];
+                return source[Range.Start.GetOffset(sourceCount) + index];
             }
         }
     }
@@ -57,6 +58,13 @@ sealed class ObservableCollectionSliceQuery<TElement>(CollectionObserver collect
         }
     }
 
+    (int offset, int length) GetOffsetAndLength()
+    {
+        var lowerOffset = Range.Start.GetOffset(sourceCount);
+        var upperOffset = Range.End.GetOffset(sourceCount);
+        return (lowerOffset, upperOffset - lowerOffset);
+    }
+
     protected override void OnInitialization()
     {
         lock (access)
@@ -68,8 +76,8 @@ sealed class ObservableCollectionSliceQuery<TElement>(CollectionObserver collect
 
     void ResetCount()
     {
-        var sourceCount = source.Count;
-        var (offset, length) = Range.GetOffsetAndLength(sourceCount);
+        sourceCount = source.Count;
+        var (offset, length) = GetOffsetAndLength();
         SetBackedProperty(ref count, Math.Max(0, Math.Min(length, sourceCount - offset)), countPropertyChangingEventArgs, countPropertyChangedEventArgs);
     }
 
@@ -77,24 +85,9 @@ sealed class ObservableCollectionSliceQuery<TElement>(CollectionObserver collect
     {
         lock (access)
         {
-            NotifyCollectionChangedEventArgs? eventArgs = null;
-            if (e.Action is NotifyCollectionChangedAction.Reset)
-                eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset);
-            else
-            {
-                var oldItemsCount = e.OldItems?.Count ?? 0;
-                var newItemsCount = e.NewItems?.Count ?? 0;
-                var (oldOffset, oldLength) = Range.GetOffsetAndLength(count);
-                var oldUpperBound = oldOffset + oldLength;
-                if (oldItemsCount is > 0 && e.OldStartingIndex < oldUpperBound || newItemsCount is > 0 && e.NewStartingIndex < oldUpperBound)
-                    eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset);
-            }
-            if (eventArgs is not null)
-            {
-                if (eventArgs.Action != NotifyCollectionChangedAction.Move)
-                    ResetCount();
-                OnCollectionChanged(eventArgs);
-            }
+            if (e.Action != NotifyCollectionChangedAction.Move)
+                ResetCount();
+            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
         }
     }
 }
