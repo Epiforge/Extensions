@@ -1,1 +1,1 @@
-We added ObserveAppend and ObservePrepend to observable collection queries.
+We added ObserveSkip and ObserveTake to observable collection queries.

@@ -353,6 +353,22 @@ public interface IObservableCollectionQuery<TElement> :
     IObservableScalarQuery<TElement> ObserveSingleOrDefault(Expression<Func<TElement, bool>> predicate);
 
     /// <summary>
+    /// Continuously bypasses a specified number of elements in the collection and then returns the remaining elements
+    /// </summary>
+    /// <param name="count">The number of elements to skip before returning the remaining elements</param>
+    /// <returns>An collection that contains the elements that occur after the specified index in the input sequence</returns>
+    [return: DisposeWhenDiscarded]
+    IObservableCollectionQuery<TElement> ObserveSkip(int count);
+
+    /// <summary>
+    /// Continuously returns the range of elements in the collection 
+    /// </summary>
+    /// <param name="range">The range of elements to return</param>
+    /// <returns>An collection that contains the range of elements that occur in the specified range</returns>
+    [return: DisposeWhenDiscarded]
+    IObservableCollectionQuery<TElement> ObserveSlice(Range range);
+
+    /// <summary>
     /// Continuously computes the sum of the values in the collection
     /// </summary>
     /// <returns>The sum of the values in the collection</returns>
@@ -367,6 +383,14 @@ public interface IObservableCollectionQuery<TElement> :
     /// <returns>The sum of the projected values</returns>
     [return: DisposeWhenDiscarded]
     IObservableScalarQuery<TResult> ObserveSum<TResult>(Expression<Func<TElement, TResult>> selector);
+
+    /// <summary>
+    /// Continuously returns a specified number of contiguous elements from the start of a sequence
+    /// </summary>
+    /// <param name="count">The number of elements to return</param>
+    /// <returns>An collection that contains the specified number of elements from the start of the input sequence</returns>
+    [return: DisposeWhenDiscarded]
+    IObservableCollectionQuery<TElement> ObserveTake(int count);
 
     /// <summary>
     /// Creates a dictionary which continuously projects each element of the collection into a key/value pair

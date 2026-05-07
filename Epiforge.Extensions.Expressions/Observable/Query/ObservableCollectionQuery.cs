@@ -119,6 +119,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     readonly NullableKeyDictionary<TElement, ObservableCollectionPrependQuery<TElement>> cachedPrependQueries = [];
     readonly Dictionary<Expression, ObservableQuery> cachedSelectQueries = new(ExpressionEqualityComparer.Default);
     readonly Dictionary<Expression, ObservableQuery> cachedSelectManyQueries = new(ExpressionEqualityComparer.Default);
+    readonly Dictionary<Range, ObservableCollectionSliceQuery<TElement>> cachedSliceQueries = [];
     readonly Dictionary<Expression, ObservableQuery> cachedSumQueries = new(ExpressionEqualityComparer.Default);
     readonly Dictionary<(Expression keySelector, Expression valueSelector, object equalityComparer), ObservableQuery> cachedToDictionaryQueries = new(CachedToDictionaryQueryEqualityComparer.Default);
     readonly Dictionary<(Expression keySelector, object keyEqualityComparer), ObservableQuery> cachedToLookupQueries = new(CachedLookupQueryEqualityComparer.Default);
@@ -145,6 +146,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     readonly Lock cachedPrependQueriesAccess = new();
     readonly Lock cachedSelectQueriesAccess = new();
     readonly Lock cachedSelectManyQueriesAccess = new();
+    readonly Lock cachedSliceQueriesAccess = new();
     readonly Lock cachedSumQueriesAccess = new();
     readonly Lock cachedToDictionaryQueriesAccess = new();
     readonly Lock cachedToLookupQueriesAccess = new();
@@ -171,6 +173,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     readonly object cachedPrependQueriesAccess = new();
     readonly object cachedSelectQueriesAccess = new();
     readonly object cachedSelectManyQueriesAccess = new();
+    readonly object cachedSliceQueriesAccess = new();
     readonly object cachedSumQueriesAccess = new();
     readonly object cachedToDictionaryQueriesAccess = new();
     readonly object cachedToLookupQueriesAccess = new();
@@ -233,6 +236,8 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
                 count += cachedSelectQueries.Values.Sum(selectQuery => 1 + selectQuery.CachedObservableQueries);
             lock (cachedSelectManyQueriesAccess)
                 count += cachedSelectManyQueries.Values.Sum(selectManyQuery => 1 + selectManyQuery.CachedObservableQueries);
+            lock (cachedSliceQueriesAccess)
+                count += cachedSliceQueries.Values.Sum(sliceQuery => 1 + sliceQuery.CachedObservableQueries);
             lock (cachedSumQueriesAccess)
                 count += cachedSumQueries.Values.Sum(sumQuery => 1 + sumQuery.CachedObservableQueries);
             lock (cachedToDictionaryQueriesAccess)
@@ -932,6 +937,27 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     }
 
     [return: DisposeWhenDiscarded]
+    public IObservableCollectionQuery<TElement> ObserveSkip(int count) =>
+        ObserveSlice(count..^0);
+
+    [return: DisposeWhenDiscarded]
+    public IObservableCollectionQuery<TElement> ObserveSlice(Range range)
+    {
+        ObservableCollectionSliceQuery<TElement> sliceQuery;
+        lock (cachedSliceQueriesAccess)
+        {
+            if (!cachedSliceQueries.TryGetValue(range, out sliceQuery!))
+            {
+                sliceQuery = new ObservableCollectionSliceQuery<TElement>(collectionObserver, this, range);
+                cachedSliceQueries.Add(range, sliceQuery);
+            }
+            ++sliceQuery.Observations;
+        }
+        sliceQuery.Initialize();
+        return sliceQuery;
+    }
+
+    [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TElement> ObserveSum() =>
         ObserveSum(element => element);
 
@@ -955,6 +981,10 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         sumQuery.Initialize();
         return (ObservableCollectionSumQuery<TElement, TResult>)sumQuery;
     }
+
+    [return: DisposeWhenDiscarded]
+    public IObservableCollectionQuery<TElement> ObserveTake(int count) =>
+        ObserveSlice(0..count);
 
     [return: DisposeWhenDiscarded]
     public IObservableDictionaryQuery<TKey, TElement> ObserveToDictionary<TKey>(Expression<Func<TElement, TKey>> keySelector)
@@ -1364,6 +1394,19 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
             if (--selectManyQuery.Observations == 0)
             {
                 cachedSelectManyQueries.Remove(selectManyQuery.Selector);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    internal bool QueryDisposed(ObservableCollectionSliceQuery<TElement> sliceQuery)
+    {
+        lock (cachedSliceQueriesAccess)
+        {
+            if (--sliceQuery.Observations == 0)
+            {
+                cachedSliceQueries.Remove(sliceQuery.Range);
                 return true;
             }
         }
