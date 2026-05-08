@@ -1,1 +1,1 @@
-We corrected defects in the ObserveSlice, ObserveSkip, and ObserveTake implementation.
+We improved the performance of expression observation with regard to disposal.

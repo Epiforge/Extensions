@@ -1,5 +1,3 @@
-using Microsoft.Extensions.Logging;
-
 namespace Epiforge.Extensions.Expressions.Observable;
 
 /// <summary>

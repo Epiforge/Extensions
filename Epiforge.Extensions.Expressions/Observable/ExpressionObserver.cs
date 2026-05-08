@@ -22,7 +22,11 @@ public class ExpressionObserver :
 
     #endregion Cache Comparers
 
+    static readonly ConcurrentDictionary<MethodInfo, bool> disposeWhenDiscardedAttributeExistsByMethodInfo = [];
     static readonly ConcurrentDictionary<MethodInfo, PropertyInfo?> propertyGetMethodToProperty = new();
+
+    static bool DisposeWhenDiscardedAttributeExistsByMethodInfoValueFactory(MethodInfo method) =>
+        method.ReturnParameter.GetCustomAttributes(true).OfType<DisposeWhenDiscardedAttribute>().Any();
 
     static PropertyInfo? GetPropertyFromGetMethod(MethodInfo getMethod) =>
         getMethod.DeclaringType?.GetProperties().FirstOrDefault(property => property.GetMethod == getMethod);
@@ -767,7 +771,7 @@ public class ExpressionObserver :
     public bool IsMethodReturnValueDisposed(MethodInfo method)
     {
         ArgumentNullException.ThrowIfNull(method);
-        return method.IsStatic && DisposeStaticMethodReturnValues || disposeMethodReturnValues.Contains(method) || method.IsGenericMethod && disposeMethodReturnValues.Contains(ExpressionObserverOptions.GenericMethodToGenericMethodDefinition.GetOrAdd(method, ExpressionObserverOptions.GetGenericMethodDefinitionFromGenericMethod)) || method.ReturnParameter.GetCustomAttributes(true).OfType<DisposeWhenDiscardedAttribute>().Any();
+        return method.IsStatic && DisposeStaticMethodReturnValues || disposeMethodReturnValues.Contains(method) || method.IsGenericMethod && disposeMethodReturnValues.Contains(ExpressionObserverOptions.GenericMethodToGenericMethodDefinition.GetOrAdd(method, ExpressionObserverOptions.GetGenericMethodDefinitionFromGenericMethod)) || disposeWhenDiscardedAttributeExistsByMethodInfo.GetOrAdd(method, DisposeWhenDiscardedAttributeExistsByMethodInfoValueFactory);
     }
 
     /// <inheritdoc/>
