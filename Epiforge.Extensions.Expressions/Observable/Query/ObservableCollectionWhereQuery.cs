@@ -279,7 +279,7 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
                     eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset);
                     break;
                 default:
-                    throw new NotSupportedException($"Unknown collection changed action {e.Action}");
+                    throw new NotSupportedException($"collection changed action {e.Action} is not supported");
             }
             if (evaluationFaultExceptionsChanged)
                 OperationFault = evaluationFaultExceptions.Count == 0 ? null : new AggregateException(evaluationFaultExceptions);

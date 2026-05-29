@@ -124,7 +124,7 @@ public class ExpressionObserverOptions
             MethodCallExpression methodCallExpressionForPropertyGet when methodCallExpressionForPropertyGet.Method is { } method && PropertyGetMethodToProperty.GetOrAdd(method, GetPropertyFromGetMethod) is { } property => AddPropertyValueDisposal(property, useGenericDefinition),
             MethodCallExpression methodCall when methodCall.Method is { } method => AddMethodReturnValueDisposal(method, useGenericDefinition),
             UnaryExpression unary when unary.Method is { } method => AddMethodReturnValueDisposal(method, useGenericDefinition),
-            _ => throw new NotSupportedException(),
+            _ => throw new NotSupportedException($"lambda expression body type {lambda.Body.GetType().Name} is not supported"),
         };
     }
 
@@ -224,7 +224,7 @@ public class ExpressionObserverOptions
             MethodCallExpression methodCallExpressionForPropertyGet when methodCallExpressionForPropertyGet.Method is { } method && PropertyGetMethodToProperty.GetOrAdd(method, GetPropertyFromGetMethod) is { } property => IsPropertyValueDisposed(property),
             MethodCallExpression methodCall when methodCall.Method is { } method => IsMethodReturnValueDisposed(method),
             UnaryExpression unary when unary.Method is { } method => IsMethodReturnValueDisposed(method),
-            _ => throw new NotSupportedException(),
+            _ => throw new NotSupportedException($"lambda expression body type {lambda.Body.GetType().Name} is not supported"),
         };
     }
 
@@ -303,7 +303,7 @@ public class ExpressionObserverOptions
             MethodCallExpression methodCallExpressionForPropertyGet when methodCallExpressionForPropertyGet.Method is { } method && PropertyGetMethodToProperty.GetOrAdd(method, GetPropertyFromGetMethod) is { } property => RemovePropertyValueDisposal(property),
             MethodCallExpression methodCall when methodCall.Method is { } method => RemoveMethodReturnValueDisposal(method),
             UnaryExpression unary when unary.Method is { } method => RemoveMethodReturnValueDisposal(method),
-            _ => throw new NotSupportedException(),
+            _ => throw new NotSupportedException($"lambda expression body type {lambda.Body.GetType().Name} is not supported"),
         };
     }
 

@@ -67,7 +67,7 @@ sealed class ObservableCollectionConcatQuery<TElement>(CollectionObserver collec
             NotifyCollectionChangedAction.Remove => new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, e.OldItems, firstCount + e.OldStartingIndex),
             NotifyCollectionChangedAction.Replace => new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, e.NewItems!, e.OldItems!, firstCount + e.NewStartingIndex),
             NotifyCollectionChangedAction.Reset => new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset),
-            _ => throw new NotSupportedException(),
+            _ => throw new NotSupportedException($"collection changed action {e.Action} is not supported"),
         });
 
     void SecondPropertyChanged(object? sender, PropertyChangedEventArgs e)

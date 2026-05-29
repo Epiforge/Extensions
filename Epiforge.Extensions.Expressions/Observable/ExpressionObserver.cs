@@ -526,7 +526,7 @@ public class ExpressionObserver :
             TypeBinaryExpression typeBinaryExpression when typeBinaryExpression.NodeType is not ExpressionType.TypeAs => GetObservableExpression(typeBinaryExpression, deferEvaluation),
             UnaryExpression unaryExpression when unaryExpression.NodeType is ExpressionType.Quote => GetObservableExpression(Expression.Constant(unaryExpression.Operand), deferEvaluation),
             UnaryExpression unaryExpression => GetObservableExpression(unaryExpression, deferEvaluation),
-            _ => throw new NotSupportedException()
+            _ => throw new NotSupportedException($"expression type {expression.GetType().Name} is not supported")
         };
         lock (observableExpression.InitializationAccess)
         {
@@ -756,7 +756,7 @@ public class ExpressionObserver :
             MethodCallExpression methodCallExpressionForPropertyGet when methodCallExpressionForPropertyGet.Method is { } method && ExpressionObserverOptions.PropertyGetMethodToProperty.GetOrAdd(method, ExpressionObserverOptions.GetPropertyFromGetMethod) is { } property => IsPropertyValueDisposed(property),
             MethodCallExpression methodCall when methodCall.Method is { } method => IsMethodReturnValueDisposed(method),
             UnaryExpression unary when unary.Method is { } method => IsMethodReturnValueDisposed(method),
-            _ => throw new NotSupportedException(),
+            _ => throw new NotSupportedException($"lambda expression body type {lambda.Body.GetType().Name} is not supported"),
         };
     }
 

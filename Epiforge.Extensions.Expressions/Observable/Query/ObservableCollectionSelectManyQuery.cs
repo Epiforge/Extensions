@@ -58,7 +58,7 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
                                     NotifyCollectionChangedAction.Move => new NotifyCollectionChangedEventArgs(e.Action, e.NewItems ?? e.OldItems, reducedIndex + e.NewStartingIndex, reducedIndex + e.OldStartingIndex),
                                     NotifyCollectionChangedAction.Remove => new NotifyCollectionChangedEventArgs(e.Action, e.OldItems, reducedIndex + e.OldStartingIndex),
                                     NotifyCollectionChangedAction.Replace => new NotifyCollectionChangedEventArgs(e.Action, e.NewItems!, e.OldItems!, reducedIndex + e.OldStartingIndex),
-                                    _ => throw new NotSupportedException()
+                                    _ => throw new NotSupportedException($"collection changed action {e.Action} is not supported")
                                 });
                                 reducedIndex += reducedCount;
                             }

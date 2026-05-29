@@ -1,1 +1,1 @@
-We improved the performance of expression observation with regard to disposal.
+We increased the detail of NotSupportedException messages in various places.

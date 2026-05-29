@@ -31,7 +31,7 @@ sealed class ObservableInvocationExpression(ExpressionObserver observer, Invocat
                     observableDelegateExpression.PropertyChanged += ObservableDelegateExpressionPropertyChanged;
                 break;
             default:
-                throw new NotSupportedException();
+                throw new NotSupportedException($"invocation expression expression type {InvocationExpression.Expression.GetType().Name} is not supported");
         }
         if (observableExpression is not null)
             observableExpression.PropertyChanged += ObservableExpressionPropertyChanged;

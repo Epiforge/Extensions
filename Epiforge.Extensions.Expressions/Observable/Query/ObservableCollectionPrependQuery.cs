@@ -59,7 +59,7 @@ sealed class ObservableCollectionPrependQuery<TElement>(CollectionObserver colle
             NotifyCollectionChangedAction.Remove => new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, e.OldItems, e.OldStartingIndex + 1),
             NotifyCollectionChangedAction.Replace => new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, e.NewItems!, e.OldItems!, e.NewStartingIndex + 1),
             NotifyCollectionChangedAction.Reset => new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset),
-            _ => throw new NotSupportedException(),
+            _ => throw new NotSupportedException($"collection changed action {e.Action} is not supported"),
         });
     }
 
