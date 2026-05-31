@@ -1,1 +1,1 @@
-We increased the detail of NotSupportedException messages in various places.
+We corrected a defect in ObserveSelectMany.

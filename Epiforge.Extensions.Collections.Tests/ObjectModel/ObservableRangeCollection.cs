@@ -1,7 +1,7 @@
 namespace Epiforge.Extensions.Collections.Tests.ObjectModel;
 
 [TestClass]
-public class RangeObservableCollection
+public class ObservableRangeCollection
 {
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
@@ -60,13 +60,14 @@ public class RangeObservableCollection
             Assert.IsNotNull(e.OldItems);
             foreach (var item in e.OldItems)
             {
-                Assert.IsInstanceOfType(item, typeof(int));
+                Assert.IsInstanceOfType<int>(item);
                 Assert.AreEqual(0, (int)item % 3);
             }
         }
         rangeObservableCollection.CollectionChanged += collectionChangedHandler;
         Assert.AreEqual(10, rangeObservableCollection.Count);
         var removed = rangeObservableCollection.GetAndRemoveAll(i => i % 3 == 0);
+        Assert.AreEqual(3, collectionChanged);
         Assert.AreEqual(3, removed.Count);
         Assert.AreEqual(3, removed[0]);
         Assert.AreEqual(6, removed[1]);

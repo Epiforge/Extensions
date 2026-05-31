@@ -25,29 +25,29 @@ public class CollectionSelectMany
                 var development = new TestTeam();
                 source.Add(development);
                 checkMergedNames("Charles");
-                development.People!.AddRange(new TestPerson[]
-                {
+                development.People!.AddRange
+                ([
                     new TestPerson("John"),
                     new TestPerson("Emily"),
                     new TestPerson("Edward"),
                     new TestPerson("Andrew")
-                });
+                ]);
                 checkMergedNames("CharlesJohnEmilyEdwardAndrew");
                 development.People.RemoveRange(2, 2);
                 checkMergedNames("CharlesJohnEmily");
                 var qa = new TestTeam();
-                qa.People!.AddRange(new TestPerson[]
-                {
+                qa.People!.AddRange
+                ([
                     new TestPerson("Aaron"),
                     new TestPerson("Cliff")
-                });
+                ]);
                 source.Add(qa);
                 checkMergedNames("CharlesJohnEmilyAaronCliff");
                 qa.People[0].Name = "Erin";
                 checkMergedNames("CharlesJohnEmilyErinCliff");
                 var bryan = new TestPerson("Brian");
                 var it = new TestTeam();
-                it.People!.AddRange(new TestPerson[] { bryan, bryan });
+                it.People!.AddRange([bryan, bryan]);
                 source.Add(it);
                 checkMergedNames("CharlesJohnEmilyErinCliffBrianBrian");
                 bryan.Name = "Bryan";
@@ -56,10 +56,10 @@ public class CollectionSelectMany
                 checkMergedNames("CharlesJohnEmilyErinCliff");
                 it.People = null;
                 checkMergedNames("CharlesJohnEmilyErinCliff");
-                it.People = new ObservableRangeCollection<TestPerson>()
-                {
+                it.People =
+                [
                     new TestPerson("Paul")
-                };
+                ];
                 checkMergedNames("CharlesJohnEmilyErinCliffPaul");
                 it.People[0] = new TestPerson("Alex");
                 checkMergedNames("CharlesJohnEmilyErinCliffAlex");
@@ -68,7 +68,7 @@ public class CollectionSelectMany
                 development.People.ReplaceRange(0, 2, development.People.GetRange(0, 1));
                 checkMergedNames("CharlesEmilyErinCliffAlex");
                 it.People.Clear();
-                it.People.Reset(new TestPerson[] { new TestPerson("Daniel") });
+                it.People.Reset([new TestPerson("Daniel")]);
                 checkMergedNames("CharlesEmilyErinCliffDaniel");
                 source.Add(management);
                 checkMergedNames("CharlesEmilyErinCliffDanielCharles");
@@ -77,12 +77,13 @@ public class CollectionSelectMany
                 var currentManagers = management.People;
                 var otherManagers = new ObservableRangeCollection<TestPerson>()
                 {
-                    new TestPerson("Josh"),
-                    new TestPerson("Jessica")
+                    new("Josh"),
+                    new("Jessica")
                 };
                 management.People = otherManagers;
                 checkMergedNames("JoshJessicaEmilyErinCliffDanielJoshJessica");
                 management.People = currentManagers;
+                checkMergedNames("GeorgeCharlesEmilyErinCliffDanielGeorgeCharles");
                 source.RemoveAt(source.Count - 1);
                 checkMergedNames("GeorgeCharlesEmilyErinCliffDaniel");
                 source.Insert(0, management);

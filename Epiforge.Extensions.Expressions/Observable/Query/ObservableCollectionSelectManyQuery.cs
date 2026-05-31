@@ -106,16 +106,14 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
 
     int GetReducedStartingIndex(int mapIndex)
     {
-        if (mapIndex < 0 || mapIndex >= select!.Count)
-            return -1;
         var reducedIndex = 0;
-        for (int i = 0, ii = select.Count; i < ii; ++i)
+        for (int i = 0, ii = select!.Count; i < ii; ++i)
         {
             if (i == mapIndex)
                 return reducedIndex;
             reducedIndex += select[i].Count();
         }
-        return -1;
+        return reducedIndex;
     }
 
     protected override void OnInitialization()
