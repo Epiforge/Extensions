@@ -301,11 +301,14 @@ public class ExpressionExtensions
     public void NullSubstitutions() =>
         ((Expression<Func<int, int, int>>)((a, b) => a + b)).SubstituteMethods(null!);
 
-    void SubstituteMethods(Expression expression)
+    void SubstituteMethods(Expression expression) =>
+        SubstituteMethods(expression, expression);
+
+    void SubstituteMethods(Expression expression, Expression expected)
     {
         var toString = typeof(object).GetMethod(nameof(ToString), System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)!;
         var substituted = expression.SubstituteMethods((toString, toString));
-        Assert.AreEqual(expression.ToString(), substituted.ToString());
+        Assert.AreEqual(expected.ToString(), substituted.ToString());
     }
 
     [TestMethod]
@@ -314,11 +317,19 @@ public class ExpressionExtensions
 
     [TestMethod]
     public void SubstituteMethodsCall() =>
-        SubstituteMethods(Expression.Call(Expression.Constant(1), typeof(int).GetMethod(nameof(int.ToString), new Type[] { typeof(string) })!, Expression.Constant("f")));
+        SubstituteMethods
+        (
+            Expression.Call(Expression.Constant(1), typeof(int).GetMethod(nameof(int.ToString), new Type[] { typeof(string) })!, Expression.Constant("f")),
+            Expression.Call(Expression.Constant(1), typeof(int).GetMethod(nameof(int.ToString), new Type[] { typeof(string) })!, Expression.Convert(Expression.Constant("f"), typeof(string)))
+        );
 
     [TestMethod]
     public void SubstituteMethodsCallStatic() =>
-        SubstituteMethods(Expression.Call(typeof(int).GetMethod(nameof(int.Parse), new Type[] { typeof(string) })!, Expression.Constant("1")));
+        SubstituteMethods
+        (
+            Expression.Call(typeof(int).GetMethod(nameof(int.Parse), new Type[] { typeof(string) })!, Expression.Constant("1")),
+            Expression.Call(typeof(int).GetMethod(nameof(int.Parse), new Type[] { typeof(string) })!, Expression.Convert(Expression.Constant("1"), typeof(string)))
+        );
 
     [TestMethod]
     public void SubstituteMethodsCondition() =>
