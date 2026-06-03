@@ -169,18 +169,18 @@ public static class ExpressionExtensions
                         (NewExpression)SubstituteMethodsImplementation(memberInitExpression.NewExpression, substitutions),
                         memberInitExpression.Bindings
                     ),
-                MethodCallExpression methodCallExpression when SubstituteMethod(methodCallExpression.Method, substitutions) is { } method && methodCallExpression.Object is { } methodCallExpressionObject =>
+                MethodCallExpression methodCallExpression when SubstituteMethod(methodCallExpression.Method, substitutions) is { } method && methodCallExpression.Object is { } methodCallExpressionObject && method.GetParameters() is { } methodParameters =>
                     Expression.Call
                     (
                         SubstituteMethodsImplementation(methodCallExpressionObject.Type == method.DeclaringType ? methodCallExpressionObject : Expression.Convert(methodCallExpressionObject, method.DeclaringType!), substitutions),
                         method,
-                        methodCallExpression.Arguments.Select(e => SubstituteMethodsImplementation(e, substitutions))
+                        methodCallExpression.Arguments.Select((e, i) => Expression.Convert(SubstituteMethodsImplementation(e, substitutions), methodParameters[i].ParameterType))
                     ),
-                MethodCallExpression methodCallExpression =>
+                MethodCallExpression methodCallExpression when methodCallExpression.Method.GetParameters() is { } methodParameters =>
                     Expression.Call
                     (
                         SubstituteMethod(methodCallExpression.Method, substitutions),
-                        methodCallExpression.Arguments.Select(e => SubstituteMethodsImplementation(e, substitutions))
+                        methodCallExpression.Arguments.Select((e, i) => Expression.Convert(SubstituteMethodsImplementation(e, substitutions), methodParameters[i].ParameterType))
                     ),
                 NewArrayExpression newArrayExpression when newArrayExpression.NodeType is ExpressionType.NewArrayBounds =>
                     Expression.NewArrayBounds
