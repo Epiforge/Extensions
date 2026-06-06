@@ -1,1 +1,1 @@
-We fixed a defect in ObserveWhere for collections.
+We made a defect correction in a previous revision smarter and leaner.
