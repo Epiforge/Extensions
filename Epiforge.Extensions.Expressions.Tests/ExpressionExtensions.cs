@@ -313,20 +313,22 @@ public class ExpressionExtensions
 
     [TestMethod]
     public void SubstituteMethodsBlock() =>
-        SubstituteMethods(Expression.Block([Expression.Parameter(typeof(int))], Expression.Constant(1), Expression.Constant(2)));
+        SubstituteMethods(Expression.Block(new ParameterExpression[] { Expression.Parameter(typeof(int)) }, Expression.Constant(1), Expression.Constant(2)));
 
     [TestMethod]
     public void SubstituteMethodsCall() =>
         SubstituteMethods
         (
-            Expression.Call(Expression.Constant(1), typeof(int).GetMethod(nameof(int.ToString), [typeof(string)])!, Expression.Constant("f"))
+            Expression.Call(Expression.Constant(1), typeof(int).GetMethod(nameof(int.ToString), new Type[] { typeof(string) })!, Expression.Constant("f")),
+            Expression.Call(Expression.Constant(1), typeof(int).GetMethod(nameof(int.ToString), new Type[] { typeof(string) })!, Expression.Convert(Expression.Constant("f"), typeof(string)))
         );
 
     [TestMethod]
     public void SubstituteMethodsCallStatic() =>
         SubstituteMethods
         (
-            Expression.Call(typeof(int).GetMethod(nameof(int.Parse), [typeof(string)])!, Expression.Constant("1"))
+            Expression.Call(typeof(int).GetMethod(nameof(int.Parse), new Type[] { typeof(string) })!, Expression.Constant("1")),
+            Expression.Call(typeof(int).GetMethod(nameof(int.Parse), new Type[] { typeof(string) })!, Expression.Convert(Expression.Constant("1"), typeof(string)))
         );
 
     [TestMethod]
