@@ -89,17 +89,17 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
                 {
                     var action = newResult ? NotifyCollectionChangedAction.Add : NotifyCollectionChangedAction.Remove;
                     var countIteration = newResult ? 1 : -1;
-                    var translatedIndex = -1;
+                    var translatedIndex = 0;
                     for (int i = 0, ii = observableExpressions.Count; i < ii; ++i)
                     {
                         var iObservableExpression = observableExpressions[i];
-                        if (iObservableExpression.Evaluation.Result)
-                            ++translatedIndex;
                         if (ReferenceEquals(iObservableExpression, observableExpression))
                         {
                             SetCount(count + countIteration);
                             OnCollectionChanged(new NotifyCollectionChangedEventArgs(action, iObservableExpression.Argument, translatedIndex));
                         }
+                        if (iObservableExpression.Evaluation.Result)
+                            ++translatedIndex;
                     }
                 }
             }

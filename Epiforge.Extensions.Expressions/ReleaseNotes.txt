@@ -1,1 +1,1 @@
-Method substitution could have run into one of the sharper edges of the .NET Expression Tree API when the value of an argument was legally null. We have added an explicit call to Expression.Convert as a theoretically unnecessary but successful workaround.
+We fixed a defect in ObserveWhere for collections.
