@@ -1,1 +1,1 @@
-We made a defect correction in a previous revision smarter and leaner.
+The change in the previous revision has been reverted.

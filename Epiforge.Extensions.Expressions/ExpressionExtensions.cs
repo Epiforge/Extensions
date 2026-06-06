@@ -174,13 +174,13 @@ public static class ExpressionExtensions
                     (
                         SubstituteMethodsImplementation(methodCallExpressionObject.Type == method.DeclaringType ? methodCallExpressionObject : Expression.Convert(methodCallExpressionObject, method.DeclaringType!), substitutions),
                         method,
-                        methodCallExpression.Arguments.Select((e, i) => e.Type == methodParameters[i].ParameterType ? SubstituteMethodsImplementation(e, substitutions) : Expression.Convert(SubstituteMethodsImplementation(e, substitutions), methodParameters[i].ParameterType))
+                        methodCallExpression.Arguments.Select((e, i) => Expression.Convert(SubstituteMethodsImplementation(e, substitutions), methodParameters[i].ParameterType))
                     ),
                 MethodCallExpression methodCallExpression when methodCallExpression.Method.GetParameters() is { } methodParameters =>
                     Expression.Call
                     (
                         SubstituteMethod(methodCallExpression.Method, substitutions),
-                        methodCallExpression.Arguments.Select((e, i) => e.Type == methodParameters[i].ParameterType ? SubstituteMethodsImplementation(e, substitutions) : Expression.Convert(SubstituteMethodsImplementation(e, substitutions), methodParameters[i].ParameterType))
+                        methodCallExpression.Arguments.Select((e, i) => Expression.Convert(SubstituteMethodsImplementation(e, substitutions), methodParameters[i].ParameterType))
                     ),
                 NewArrayExpression newArrayExpression when newArrayExpression.NodeType is ExpressionType.NewArrayBounds =>
                     Expression.NewArrayBounds
