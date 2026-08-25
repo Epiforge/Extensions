@@ -91,12 +91,12 @@ public readonly struct EquatableList<T> :
         obj is EquatableList<T> other && Equals(other);
 
     /// <summary>
-    /// Determines whether the specified <see cref="EquatableList{T}"/> is equal to the current <see cref="EquatableList{T}"/> using the current <see cref="IEqualityComparer{T}"/> (see <see cref="EqualityComparer"/>)
+    /// Determines whether the specified <see cref="EquatableList{T}"/> is equal to the current <see cref="EquatableList{T}"/>, which requires that both use equal <see cref="IEqualityComparer{T}"/>s (see <see cref="EqualityComparer"/>) and that their elements are equal under it
     /// </summary>
     /// <param name="other">The <see cref="EquatableList{T}"/> to compare with the current <see cref="EquatableList{T}"/></param>
     /// <returns><c>true</c> if the specified <see cref="EquatableList{T}"/> is equal to the current <see cref="EquatableList{T}"/>; otherwise, <c>false</c></returns>
     public readonly bool Equals(EquatableList<T> other) =>
-        EqualityComparer is not null && EqualityComparer.Equals(other.EqualityComparer) && elements.SequenceEqual(other.elements, EqualityComparer) || other.EqualityComparer is null && elements.SequenceEqual(other.elements);
+        object.Equals(EqualityComparer, other.EqualityComparer) && elements.SequenceEqual(other.elements, EqualityComparer);
 
     /// <summary>
     /// Returns an enumerator that iterates through the <see cref="EquatableList{T}"/>

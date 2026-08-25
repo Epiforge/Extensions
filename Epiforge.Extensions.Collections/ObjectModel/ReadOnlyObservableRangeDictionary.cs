@@ -64,7 +64,7 @@ public class ReadOnlyObservableRangeDictionary<TKey, TValue> :
             return;
         if (disposing)
         {
-            observableRangeDictionary!.CollectionChanged += HandleCollectionChanged;
+            observableRangeDictionary!.CollectionChanged -= HandleCollectionChanged;
             ((INotifyDictionaryChanged)observableRangeDictionary).DictionaryChanged -= HandleDictionaryChanged;
             ((INotifyDictionaryChanged<TKey, TValue>)observableRangeDictionary).DictionaryChanged -= HandleDictionaryChanged;
         }

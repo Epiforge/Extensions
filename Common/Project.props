@@ -3,6 +3,7 @@
     <PropertyGroup>
         <Authors>Epiforge</Authors>
         <Company>Epiforge</Company>
+        <ContinuousIntegrationBuild Condition="'$(TF_BUILD)' == 'true' or '$(CI)' == 'true'">true</ContinuousIntegrationBuild>
         <EmbedUntrackedSources>true</EmbedUntrackedSources>
         <EnableNETAnalyzers>true</EnableNETAnalyzers>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>

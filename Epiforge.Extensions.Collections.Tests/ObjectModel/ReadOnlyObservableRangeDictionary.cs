@@ -15,6 +15,34 @@ public class ReadOnlyObservableRangeDictionary
     }
 
     [TestMethod]
+    public void DisposeUnsubscribesFromCollectionChanged()
+    {
+        var dictionary = new ObservableDictionary<string, string>();
+        var readOnlyDictionary = new ReadOnlyObservableRangeDictionary<string, string>(dictionary);
+        var collectionChanges = 0;
+        readOnlyDictionary.CollectionChanged += (sender, e) => ++collectionChanges;
+        dictionary.Add("key", "value");
+        Assert.AreEqual(1, collectionChanges);
+        readOnlyDictionary.Dispose();
+        dictionary.Add("otherKey", "otherValue");
+        Assert.AreEqual(1, collectionChanges);
+    }
+
+    [TestMethod]
+    public void DisposeUnsubscribesFromDictionaryChanged()
+    {
+        var dictionary = new ObservableDictionary<string, string>();
+        var readOnlyDictionary = new ReadOnlyObservableRangeDictionary<string, string>(dictionary);
+        var dictionaryChanges = 0;
+        readOnlyDictionary.DictionaryChanged += (sender, e) => ++dictionaryChanges;
+        dictionary.Add("key", "value");
+        Assert.AreEqual(1, dictionaryChanges);
+        readOnlyDictionary.Dispose();
+        dictionary.Add("otherKey", "otherValue");
+        Assert.AreEqual(1, dictionaryChanges);
+    }
+
+    [TestMethod]
     public void NonGenericDictionaryChanged()
     {
         var dictionary = new ObservableDictionary<string, string>();

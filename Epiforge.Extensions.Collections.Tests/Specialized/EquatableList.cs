@@ -32,6 +32,15 @@ public class EquatableList
     }
 
     [TestMethod]
+    public void EqualsWithMismatchedEqualityComparers()
+    {
+        var list1 = new EquatableList<string>(new string[] { "a", "b", "c" });
+        var list2 = new EquatableList<string>(new string[] { "a", "b", "c" }, StringComparer.OrdinalIgnoreCase);
+        Assert.AreEqual(list1.Equals(list2), list2.Equals(list1));
+        Assert.IsFalse(list1.Equals(list2));
+    }
+
+    [TestMethod]
     public void GetEnumerator()
     {
         var sum = 0;
@@ -55,6 +64,15 @@ public class EquatableList
         var list1 = new EquatableList<string>(new string[] { "a", "b", "c" }, StringComparer.OrdinalIgnoreCase);
         var list2 = new EquatableList<string>(new string[] { "A", "B", "C" }, StringComparer.OrdinalIgnoreCase);
         Assert.AreEqual(list1.GetHashCode(), list2.GetHashCode());
+    }
+
+    [TestMethod]
+    public void GetHashCodeIsConsistentWithEquals()
+    {
+        var list1 = new EquatableList<string>(new string[] { "a", "b", "c" });
+        var list2 = new EquatableList<string>(new string[] { "a", "b", "c" }, StringComparer.OrdinalIgnoreCase);
+        Assert.IsFalse(list1.Equals(list2) && list1.GetHashCode() != list2.GetHashCode());
+        Assert.IsFalse(list2.Equals(list1) && list2.GetHashCode() != list1.GetHashCode());
     }
 
     [TestMethod]

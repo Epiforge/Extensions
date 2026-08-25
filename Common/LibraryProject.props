@@ -3,7 +3,6 @@
     <Import Project="..\Common\Project.props" />
 
     <PropertyGroup>
-        <CodeAnalysisRuleSet>..\.ruleset</CodeAnalysisRuleSet>
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
         <IncludeSymbols>true</IncludeSymbols>
         <PackageIcon>NuGet.jpg</PackageIcon>
