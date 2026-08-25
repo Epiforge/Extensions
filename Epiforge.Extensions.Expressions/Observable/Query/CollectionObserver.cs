@@ -22,12 +22,12 @@ public class CollectionObserver :
         ExpressionObserver = expressionObserver;
     }
 
-    readonly Dictionary<IEnumerable, ObservableQuery> cachedEnumerableObservableCollections = [];
-    readonly Dictionary<IEnumerable, ObservableQuery> cachedGenericEnumerableObservableCollections = [];
-    readonly Dictionary<IEnumerable, ObservableQuery> cachedGenericListObservableCollections = [];
-    readonly Dictionary<IEnumerable, ObservableQuery> cachedListObservableCollections = [];
-    readonly Dictionary<IEnumerable, ObservableQuery> cachedReadOnlyDictionaryObservableDictionaries = [];
-    readonly Dictionary<IEnumerable, ObservableQuery> cachedReadOnlyListObservableCollections = [];
+    readonly Dictionary<IEnumerable, ObservableQuery> cachedEnumerableObservableCollections = new(ReferenceEqualityComparer.Instance);
+    readonly Dictionary<IEnumerable, ObservableQuery> cachedGenericEnumerableObservableCollections = new(ReferenceEqualityComparer.Instance);
+    readonly Dictionary<IEnumerable, ObservableQuery> cachedGenericListObservableCollections = new(ReferenceEqualityComparer.Instance);
+    readonly Dictionary<IEnumerable, ObservableQuery> cachedListObservableCollections = new(ReferenceEqualityComparer.Instance);
+    readonly Dictionary<IEnumerable, ObservableQuery> cachedReadOnlyDictionaryObservableDictionaries = new(ReferenceEqualityComparer.Instance);
+    readonly Dictionary<IEnumerable, ObservableQuery> cachedReadOnlyListObservableCollections = new(ReferenceEqualityComparer.Instance);
 #if IS_NET_9_0_OR_GREATER
     readonly Lock cachedEnumerableObservableCollectionsAccess = new();
     readonly Lock cachedGenericEnumerableObservableCollectionsAccess = new();
