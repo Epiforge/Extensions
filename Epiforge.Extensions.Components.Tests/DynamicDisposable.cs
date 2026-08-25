@@ -24,12 +24,8 @@ public class DynamicDisposable
             return true;
         }
 
-        protected override ValueTask<bool> DisposeAsync(bool disposing)
-        {
-            if (disposing)
-                return new(--referenceCount == 0);
-            return new(true);
-        }
+        protected override ValueTask<bool> DisposeAsyncCore() =>
+            new(--referenceCount == 0);
     }
 
     [TestMethod]

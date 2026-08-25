@@ -4,6 +4,8 @@ sealed class ObservableGrouping<TKey, TElement>(CollectionObserver collectionObs
     ObservableCollectionQuery<TElement>(collectionObserver),
     IObservableGrouping<TKey, TElement>
 {
+    bool ownerDisposing;
+
     public override TElement this[int index] =>
         groupQuery[index];
 
@@ -12,11 +14,10 @@ sealed class ObservableGrouping<TKey, TElement>(CollectionObserver collectionObs
 
     public TKey Key { get; } = key;
 
-    public override void Dispose() =>
-        throw new InvalidOperationException();
-
     protected override bool Dispose(bool disposing)
     {
+        if (!ownerDisposing)
+            return false;
         if (disposing)
         {
             groupQuery.CollectionChanged -= GroupQueryCollectionChanged;
@@ -39,8 +40,11 @@ sealed class ObservableGrouping<TKey, TElement>(CollectionObserver collectionObs
     void GroupQueryPropertyChanging(object? sender, PropertyChangingEventArgs e) =>
         OnPropertyChanging(e);
 
-    internal void InternalDispose() =>
-        base.Dispose();
+    internal void InternalDispose()
+    {
+        ownerDisposing = true;
+        Dispose();
+    }
 
     protected override void OnInitialization()
     {

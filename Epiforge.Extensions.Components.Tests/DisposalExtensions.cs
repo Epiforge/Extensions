@@ -9,7 +9,7 @@ public class DisposalExtensions
         protected override bool Dispose(bool disposing) =>
             true;
 
-        protected override ValueTask<bool> DisposeAsync(bool disposing) =>
+        protected override ValueTask<bool> DisposeAsyncCore() =>
             new(true);
     }
 

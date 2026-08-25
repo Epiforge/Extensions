@@ -21,11 +21,7 @@ public abstract class AsyncDisposable :
             Logger?.LogWarning(EventIds.Epiforge_Extensions_Components_FinalizerCalled, "Finalizer called: did you forget to dispose an object? (set logging minimum level to Trace to see the stack trace for when the Logger was set)");
         else
             Logger?.LogWarning(EventIds.Epiforge_Extensions_Components_FinalizerCalled, "Finalizer called: did you forget to dispose an object? (stack trace for when the Logger was set: {LoggerSetStackTrace})", loggerSetStackTrace);
-        Task.Run(async () =>
-        {
-            await DisposeAsync(false).ConfigureAwait(false);
-            IsDisposed = true;
-        });
+        isDisposed = true;
     }
 
     readonly AsyncLock disposalAccess = new();
@@ -59,7 +55,7 @@ public abstract class AsyncDisposable :
     /// <summary>
     /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources
     /// </summary>
-    public virtual async ValueTask DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         Logger?.LogTrace(EventIds.Epiforge_Extensions_Components_DisposeCalled, "DisposeAsync called");
         using (await disposalAccess.LockAsync().ConfigureAwait(false))
@@ -67,7 +63,7 @@ public abstract class AsyncDisposable :
             {
                 var e = DisposalNotificationEventArgs.ByCallingDispose;
                 OnDisposing(e);
-                if (IsDisposed = await DisposeAsync(true).ConfigureAwait(false))
+                if (IsDisposed = await DisposeAsyncCore().ConfigureAwait(false))
                 {
                     OnDisposed(e);
                     GC.SuppressFinalize(this);
@@ -78,11 +74,10 @@ public abstract class AsyncDisposable :
     }
 
     /// <summary>
-    /// Frees, releases, or resets unmanaged resources
+    /// Frees, releases, or resets resources
     /// </summary>
-    /// <param name="disposing">false if invoked by the finalizer because the object is being garbage collected; otherwise, true</param>
     /// <returns>true if disposal completed; otherwise, false</returns>
-    protected abstract ValueTask<bool> DisposeAsync(bool disposing);
+    protected abstract ValueTask<bool> DisposeAsyncCore();
 
     /// <inheritdoc/>
     protected override void LoggerSet()

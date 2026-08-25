@@ -22,7 +22,7 @@ public abstract class SyncDisposable :
         else
             Logger?.LogWarning(EventIds.Epiforge_Extensions_Components_FinalizerCalled, "Finalizer called: did you forget to dispose an object? (stack trace for when the Logger was set: {LoggerSetStackTrace})", loggerSetStackTrace);
         Dispose(false);
-        IsDisposed = true;
+        isDisposed = true;
     }
 
 #if IS_NET_9_0_OR_GREATER
@@ -60,7 +60,7 @@ public abstract class SyncDisposable :
     /// <summary>
     /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources
     /// </summary>
-    public virtual void Dispose()
+    public void Dispose()
     {
         Logger?.LogTrace(EventIds.Epiforge_Extensions_Components_DisposeCalled, "Dispose called");
         lock (disposalAccess)
