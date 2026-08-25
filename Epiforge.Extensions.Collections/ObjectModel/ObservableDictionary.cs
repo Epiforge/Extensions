@@ -829,9 +829,18 @@ public class ObservableDictionary<TKey, TValue> :
         get => gd[key];
         set
         {
-            var oldValue = gd[key];
-            gd[key] = value;
-            OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Replace, key, value, oldValue));
+            if (gd.TryGetValue(key, out var oldValue))
+            {
+                gd[key] = value;
+                OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Replace, key, value, oldValue));
+            }
+            else
+            {
+                NotifyCountChanging();
+                gd[key] = value;
+                OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, key, value));
+                NotifyCountChanged();
+            }
         }
     }
 

@@ -133,10 +133,10 @@ public sealed class NullableKeySortedDictionary<TKey, TValue> :
         set
         {
             if (key is null)
-                if (hasNullKeyedValue)
-                    nullKeyedValue = value;
-                else
-                    throw new KeyNotFoundException();
+            {
+                nullKeyedValue = value;
+                hasNullKeyedValue = true;
+            }
             else
                 dict[key] = value;
             logger?.LogTrace("NullableKeySortedDictionary changed: set [{Key}, {Value}]", key, value);

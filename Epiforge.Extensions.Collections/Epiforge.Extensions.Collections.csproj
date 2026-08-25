@@ -14,7 +14,6 @@
 
     <ItemGroup>
         <PackageReference Include="Epiforge.Extensions.Components" Version="3.0.0" />
-        <PackageReference Include="NSubstitute" Version="5.3.0" />
         <PackageReference Include="System.Collections.Immutable" Version="8.0.0" />
     </ItemGroup>
 

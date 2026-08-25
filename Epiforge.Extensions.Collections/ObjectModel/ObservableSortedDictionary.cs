@@ -731,9 +731,18 @@ public class ObservableSortedDictionary<TKey, TValue> :
         get => gsd[key];
         set
         {
-            var oldValue = gsd[key];
-            gsd[key] = value;
-            OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Replace, key, value, oldValue));
+            if (gsd.TryGetValue(key, out var oldValue))
+            {
+                gsd[key] = value;
+                OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Replace, key, value, oldValue));
+            }
+            else
+            {
+                NotifyCountChanging();
+                gsd[key] = value;
+                OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, key, value));
+                NotifyCountChanged();
+            }
         }
     }
 

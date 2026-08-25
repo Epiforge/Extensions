@@ -207,14 +207,23 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
         {
             var updated = false;
             TValue oldValue = default!; // this is only ever forwarded if it has been set
-            var newValue = cd.AddOrUpdate(key, k => throw new KeyNotFoundException(), (k, v) =>
+            var newValue = cd.AddOrUpdate(key, value, (k, v) =>
             {
                 updated = true;
                 oldValue = v;
                 return value;
             });
+            // if another thread removes the key between this operation reading it and updating it,
+            // the retry adds instead, but the update factory has already run, so that addition is
+            // reported as a replacement; notification ordering across concurrent mutations is not
+            // guaranteed by this type regardless, so this is not corrected here
             if (updated)
                 OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Replace, key, newValue, oldValue));
+            else
+            {
+                NotifyCountChanged();
+                OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, key, newValue));
+            }
         }
     }
 
