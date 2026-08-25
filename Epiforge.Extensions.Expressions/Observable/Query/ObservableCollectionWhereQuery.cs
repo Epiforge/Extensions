@@ -5,6 +5,7 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
 {
     readonly object access = new();
     int count;
+    readonly IEqualityComparer<TElement> elementComparer = EqualityComparer<TElement>.Default;
     readonly Dictionary<IObservableExpression<TElement, bool>, (Exception? fault, bool result)> evaluationsChanging = [];
     readonly Dictionary<IObservableExpression<TElement, bool>, int> observableExpressionCounts = [];
     readonly List<IObservableExpression<TElement, bool>> observableExpressions = [];
@@ -73,18 +74,8 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
                 var (oldFault, oldResult) = evaluationsChanging![observableExpression];
                 evaluationsChanging.Remove(observableExpression);
                 var (newFault, newResult) = observableExpression.Evaluation;
-                var addedFault = oldFault is null && newFault is not null;
-                var removedFault = oldFault is not null && newFault is null;
-                var replacedFault = oldFault is not null && newFault is not null && !ReferenceEquals(oldFault, newFault);
-                if (addedFault || removedFault || replacedFault)
-                {
-                    var elementFaults = OperationFault is AggregateException aggregateException ? [..aggregateException.InnerExceptions.OfType<EvaluationFaultException>()] : new List<EvaluationFaultException>();
-                    if (removedFault || replacedFault)
-                        elementFaults.RemoveAll(elementFault => ReferenceEquals(elementFault.Element, observableExpression.Argument));
-                    if (addedFault || replacedFault)
-                        elementFaults.Add(new EvaluationFaultException(observableExpression.Argument, newFault!));
-                    OperationFault = elementFaults.Count == 0 ? null : new AggregateException(elementFaults);
-                }
+                if (FaultList.ExchangeElementFault(OperationFault, observableExpression.Argument, elementComparer, oldFault, newFault, out var newOperationFault))
+                    OperationFault = newOperationFault;
                 if (oldResult != newResult)
                 {
                     var action = newResult ? NotifyCollectionChangedAction.Add : NotifyCollectionChangedAction.Remove;
@@ -116,14 +107,13 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
     {
         lock (access)
         {
-            var evaluationFaultExceptions = new List<EvaluationFaultException>();
+            var faultList = new FaultList();
 
             void processElement(TElement element)
             {
                 var observableExpression = collectionObserver.ExpressionObserver.ObserveWithoutOptimization(Predicate, element);
                 observableExpressions.Add(observableExpression);
-                if (observableExpression.Evaluation.Fault is { } fault)
-                    evaluationFaultExceptions!.Add(new EvaluationFaultException(element, fault));
+                faultList!.Check(observableExpression);
                 if (observableExpression.Evaluation.Result)
                     ++count;
                 if (observableExpressionCounts.TryGetValue(observableExpression, out var observableExpressionCount))
@@ -143,8 +133,7 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
                 foreach (var element in source)
                     processElement(element);
 
-            if (evaluationFaultExceptions.Count > 0)
-                OperationFault = new AggregateException(evaluationFaultExceptions);
+            OperationFault = faultList.Fault;
 
             source.CollectionChanged += SourceCollectionChanged;
         }
@@ -158,8 +147,7 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
     {
         lock (access)
         {
-            var evaluationFaultExceptions = new List<EvaluationFaultException>();
-            var evaluationFaultExceptionsChanged = false;
+            FaultList? faultList = null;
             NotifyCollectionChangedEventArgs? eventArgs = null;
             var newCount = 0;
             switch (e.Action)
@@ -185,8 +173,8 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
                             }
                             if (observableExpression.Evaluation.Fault is not null)
                             {
-                                evaluationFaultExceptions.RemoveAll(elementFault => ReferenceEquals(elementFault.Element, observableExpression.Argument));
-                                evaluationFaultExceptionsChanged = true;
+                                faultList ??= new FaultList(OperationFault);
+                                faultList.RemoveElement(observableExpression.Argument, elementComparer);
                             }
                             if (observableExpression.Evaluation.Result)
                                 oldItems.Add(element);
@@ -207,10 +195,10 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
                                 observableExpression.PropertyChanging += ObservableExpressionPropertyChanging;
                                 observableExpression.PropertyChanged += ObservableExpressionPropertyChanged;
                             }
-                            if (observableExpression.Evaluation.Fault is { } fault)
+                            if (observableExpression.Evaluation.Fault is not null)
                             {
-                                evaluationFaultExceptions.Add(new EvaluationFaultException(element, fault));
-                                evaluationFaultExceptionsChanged = true;
+                                faultList ??= new FaultList(OperationFault);
+                                faultList.Check(observableExpression);
                             }
                             if (observableExpression.Evaluation.Result)
                                 newItems.Add(element);
@@ -243,7 +231,7 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
                     }
                     break;
                 case NotifyCollectionChangedAction.Reset:
-                    evaluationFaultExceptionsChanged = true;
+                    faultList = new FaultList();
                     foreach (var observableExpression in observableExpressionCounts.Keys)
                     {
                         observableExpression.PropertyChanging -= ObservableExpressionPropertyChanging;
@@ -257,8 +245,7 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
                     {
                         var observableExpression = collectionObserver.ExpressionObserver.ObserveWithoutOptimization(Predicate, element);
                         observableExpressions.Add(observableExpression);
-                        if (observableExpression.Evaluation.Fault is { } fault)
-                            evaluationFaultExceptions!.Add(new EvaluationFaultException(element, fault));
+                        faultList!.Check(observableExpression);
                         if (observableExpression.Evaluation.Result)
                             ++newCount;
                         if (observableExpressionCounts.TryGetValue(observableExpression, out var observableExpressionCount))
@@ -281,8 +268,8 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
                 default:
                     throw new NotSupportedException($"collection changed action {e.Action} is not supported");
             }
-            if (evaluationFaultExceptionsChanged)
-                OperationFault = evaluationFaultExceptions.Count == 0 ? null : new AggregateException(evaluationFaultExceptions);
+            if (faultList is not null)
+                OperationFault = faultList.Fault;
             if (eventArgs is not null)
             {
                 if (eventArgs.Action != NotifyCollectionChangedAction.Move)

@@ -3,6 +3,65 @@ namespace Epiforge.Extensions.Expressions.Tests.Observable.Query;
 [TestClass]
 public class CollectionWhere
 {
+    static int ElementFaultCount(Exception? operationFault) =>
+        operationFault switch
+        {
+            null => 0,
+            AggregateException aggregateException => aggregateException.InnerExceptions.OfType<EvaluationFaultException>().Count(),
+            EvaluationFaultException => 1,
+            _ => -1
+        };
+
+    [TestMethod]
+    public void ElementFaultsAccumulateAcrossSourceChanges()
+    {
+        var source = TestPerson.CreatePeopleCollection();
+        var collectionObserver = CollectionObserverHelpers.Create();
+        using (var sourceQuery = collectionObserver.ObserveReadOnlyList(source))
+        {
+            using (var whereQuery = sourceQuery.ObserveWhere(p => p.Name!.Length == 4))
+            {
+                Assert.IsNull(whereQuery.OperationFault);
+                var firstFaulting = new TestPerson();
+                var secondFaulting = new TestPerson();
+                source.Add(firstFaulting);
+                Assert.AreEqual(1, ElementFaultCount(whereQuery.OperationFault));
+                source.Add(secondFaulting);
+                Assert.AreEqual(2, ElementFaultCount(whereQuery.OperationFault));
+                source.Remove(firstFaulting);
+                Assert.AreEqual(1, ElementFaultCount(whereQuery.OperationFault));
+                source.Remove(secondFaulting);
+                Assert.IsNull(whereQuery.OperationFault);
+            }
+            Assert.AreEqual(0, sourceQuery.CachedObservableQueries);
+        }
+        Assert.AreEqual(0, collectionObserver.CachedObservableQueries);
+        Assert.AreEqual(0, collectionObserver.ExpressionObserver.CachedObservableExpressions);
+    }
+
+    [TestMethod]
+    public void ElementFaultsSurviveUnrelatedRemoval()
+    {
+        var source = TestPerson.CreatePeopleCollection();
+        var collectionObserver = CollectionObserverHelpers.Create();
+        using (var sourceQuery = collectionObserver.ObserveReadOnlyList(source))
+        {
+            using (var whereQuery = sourceQuery.ObserveWhere(p => p.Name!.Length == 4))
+            {
+                var faulting = new TestPerson();
+                source.Add(faulting);
+                Assert.AreEqual(1, ElementFaultCount(whereQuery.OperationFault));
+                source.RemoveAt(0);
+                Assert.AreEqual(1, ElementFaultCount(whereQuery.OperationFault));
+                source.Remove(faulting);
+                Assert.IsNull(whereQuery.OperationFault);
+            }
+            Assert.AreEqual(0, sourceQuery.CachedObservableQueries);
+        }
+        Assert.AreEqual(0, collectionObserver.CachedObservableQueries);
+        Assert.AreEqual(0, collectionObserver.ExpressionObserver.CachedObservableExpressions);
+    }
+
     [TestMethod]
     public void ElementResultChanges()
     {
