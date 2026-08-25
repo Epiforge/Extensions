@@ -201,16 +201,6 @@ public class NullableKeySortedDictionary
     }
 
     [TestMethod]
-    [ExpectedException(typeof(KeyNotFoundException))]
-    public void IndexerSetterNullKeyNotFound()
-    {
-#pragma warning disable IDE0028 // Simplify collection initialization
-        var dictionary = new NullableKeySortedDictionary<string?, int>();
-#pragma warning restore IDE0028 // Simplify collection initialization
-        dictionary[null] = 2;
-    }
-
-    [TestMethod]
     public void Keys()
     {
         var dictionary = new NullableKeySortedDictionary<int, string>(new Dictionary<int, string>

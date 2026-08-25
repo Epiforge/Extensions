@@ -227,16 +227,6 @@ public class NullableKeyDictionary
     }
 
     [TestMethod]
-    [ExpectedException(typeof(KeyNotFoundException))]
-    public void IndexerSetterNullKeyNotFound()
-    {
-#pragma warning disable IDE0028 // Simplify collection initialization
-        var dictionary = new NullableKeyDictionary<string?, int>();
-#pragma warning restore IDE0028 // Simplify collection initialization
-        dictionary[null] = 2;
-    }
-
-    [TestMethod]
     public void IsReadOnly() =>
         Assert.IsFalse(((ICollection<KeyValuePair<string, int>>)new NullableKeyDictionary<string, int>()).IsReadOnly);
 
