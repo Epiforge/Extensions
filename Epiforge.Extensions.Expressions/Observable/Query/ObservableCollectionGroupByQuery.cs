@@ -3,9 +3,7 @@ namespace Epiforge.Extensions.Expressions.Observable.Query;
 sealed class ObservableCollectionGroupByQuery<TKey, TElement> :
     ObservableCollectionQuery<IObservableGrouping<TKey, TElement>>
 {
-    static readonly ConcurrentDictionary<Expression<Func<TElement, TKey>>, Expression<Func<TElement, Tuple<TElement, TKey>>>> cachedWrappedSelectors = new(ExpressionEqualityComparer.Default);
-
-    static Expression<Func<TElement, Tuple<TElement, TKey>>> CachedWrappedSelectorsValueFactory(Expression<Func<TElement, TKey>> selector)
+    static Expression<Func<TElement, Tuple<TElement, TKey>>> WrapSelector(Expression<Func<TElement, TKey>> selector)
     {
         var parameter = Expression.Parameter(typeof(TElement), "element");
         return Expression.Lambda<Func<TElement, Tuple<TElement, TKey>>>(Expression.New(typeof(Tuple<TElement, TKey>).GetConstructor([typeof(TElement), typeof(TKey)])!, parameter, Expression.Invoke(selector, parameter)), parameter);
@@ -105,7 +103,7 @@ sealed class ObservableCollectionGroupByQuery<TKey, TElement> :
     protected override void OnInitialization()
     {
         groupings.CollectionChanged += GroupingsCollectionChanged;
-        select = source.ObserveSelect(cachedWrappedSelectors.GetOrAdd(KeySelector, CachedWrappedSelectorsValueFactory));
+        select = source.ObserveSelect(WrapSelector(KeySelector));
         select.CollectionChanged += SelectCollectionChanged;
         select.PropertyChanged += SelectPropertyChanged;
         lock (access)

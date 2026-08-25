@@ -3,9 +3,7 @@ namespace Epiforge.Extensions.Expressions.Observable.Query;
 sealed class ObservableCollectionOrderByQuery<TElement> :
     ObservableCollectionQuery<TElement>
 {
-    static readonly ConcurrentDictionary<Expression<Func<TElement, IComparable>>, Expression<Func<TElement, Tuple<TElement, IComparable>>>> cachedWrappedSelectors = new(ExpressionEqualityComparer.Default);
-
-    static Expression<Func<TElement, Tuple<TElement, IComparable>>> CachedWrappedSelectorsValueFactory(Expression<Func<TElement, IComparable>> selector)
+    static Expression<Func<TElement, Tuple<TElement, IComparable>>> WrapSelector(Expression<Func<TElement, IComparable>> selector)
     {
         var parameter = Expression.Parameter(typeof(TElement), "element");
         return Expression.Lambda<Func<TElement, Tuple<TElement, IComparable>>>(Expression.New(typeof(Tuple<TElement, IComparable>).GetConstructor([typeof(TElement), typeof(IComparable)])!, parameter, Expression.Invoke(selector, parameter)), parameter);
@@ -85,7 +83,7 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
     {
         lock (access)
         {
-            selectionsAndDirections = SelectorsAndDirections.Select(t => (selection: source.ObserveSelect(cachedWrappedSelectors.GetOrAdd(t.keySelectorExpression, CachedWrappedSelectorsValueFactory)), t.isDescending)).ToList().AsReadOnly();
+            selectionsAndDirections = SelectorsAndDirections.Select(t => (selection: source.ObserveSelect(WrapSelector(t.keySelectorExpression)), t.isDescending)).ToList().AsReadOnly();
             comparer = new(selectionsAndDirections);
             var sortedSource = source.ToList();
             sortedSource.Sort(comparer);
