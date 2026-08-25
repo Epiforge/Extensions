@@ -206,17 +206,13 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
         set
         {
             var updated = false;
-            TValue oldValue = default!; // this is only ever forwarded if it has been set
+            TValue oldValue = default!;
             var newValue = cd.AddOrUpdate(key, value, (k, v) =>
             {
                 updated = true;
                 oldValue = v;
                 return value;
             });
-            // if another thread removes the key between this operation reading it and updating it,
-            // the retry adds instead, but the update factory has already run, so that addition is
-            // reported as a replacement; notification ordering across concurrent mutations is not
-            // guaranteed by this type regardless, so this is not corrected here
             if (updated)
                 OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Replace, key, newValue, oldValue));
             else
@@ -368,7 +364,7 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
     {
         ArgumentNullException.ThrowIfNull(updateValueFactory);
         var updated = false;
-        TValue oldValue = default!; // this is only ever forwarded if it has been set
+        TValue oldValue = default!;
         var newValue = cd.AddOrUpdate(key, addValue, (k, v) =>
         {
             updated = true;
@@ -399,7 +395,7 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
         ArgumentNullException.ThrowIfNull(addValueFactory);
         ArgumentNullException.ThrowIfNull(updateValueFactory);
         var updated = false;
-        TValue oldValue = default!; // this is only ever forwarded if it has been set
+        TValue oldValue = default!;
         var newValue = cd.AddOrUpdate(key, addValueFactory, (k, v) =>
         {
             updated = true;
@@ -432,7 +428,7 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
         ArgumentNullException.ThrowIfNull(addValueFactory);
         ArgumentNullException.ThrowIfNull(updateValueFactory);
         var updated = false;
-        TValue oldValue = default!; // this is only ever forwarded if it has been set
+        TValue oldValue = default!;
         var newValue = cd.AddOrUpdate(key, addValueFactory, (k, v, a) =>
         {
             updated = true;
@@ -751,7 +747,7 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
     {
         try
         {
-            TValue oldValue = default!; // this is only ever forwarded if it has been set
+            TValue oldValue = default!;
             cd.AddOrUpdate(key, k => throw new KeyNotFoundException(), (k, v) =>
             {
                 if (EqualityComparer<TValue>.Default.Equals(v, comparisonValue))

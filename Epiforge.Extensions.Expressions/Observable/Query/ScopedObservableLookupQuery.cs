@@ -1,9 +1,5 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-// A lookup is both a collection of groupings and a dictionary keyed by grouping key, so this scopes
-// the collection half by inheritance and forwards the dictionary half. Note that IObservableLookupQuery
-// inherits Count from both of its bases, which is ambiguous at any call site typed as that interface;
-// that is a pre-existing property of the interface and is neither introduced nor fixed here.
 sealed class ScopedObservableLookupQuery<TKey, TElement> :
     ScopedObservableCollectionQuery<IObservableGrouping<TKey, TElement>>,
     IObservableLookupQuery<TKey, TElement>

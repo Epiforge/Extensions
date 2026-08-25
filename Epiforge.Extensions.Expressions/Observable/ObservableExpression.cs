@@ -152,12 +152,8 @@ abstract class ObservableExpression :
     }
 }
 
-// What callers of IExpressionObserver.Observe receive. Unlike the ObservableExpression nodes
-// beneath them, these are NOT cached: every call to Observe produces a new one holding exactly
-// one reference to the shared node. Identity is therefore per-caller, so disposing one cannot
-// release another caller's claim on the same node, and Dispose can be idempotent
-// without becoming a no-op for a second legitimate owner.
-abstract class ScopedObservableExpression
+abstract class ScopedObservableExpression :
+    INotifyDisposalOverridden
 {
     protected ScopedObservableExpression(ExpressionObserver observer, Expression expression, ObservableExpression observableExpression, IReadOnlyList<object?> arguments)
     {
@@ -195,9 +191,11 @@ abstract class ScopedObservableExpression
 
     public event EventHandler<DisposalNotificationEventArgs>? Disposing;
 
-#pragma warning disable CS0067 // disposal here is never overridden: releasing this scope's single claim on the node always succeeds
-    public event EventHandler<DisposalNotificationEventArgs>? DisposalOverridden;
-#pragma warning restore CS0067
+    event EventHandler<DisposalNotificationEventArgs>? INotifyDisposalOverridden.DisposalOverridden
+    {
+        add { }
+        remove { }
+    }
 
     public void Dispose()
     {

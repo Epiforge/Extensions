@@ -4,6 +4,9 @@ namespace Epiforge.Extensions.Expressions.Observable;
 /// Represents an observable lambda expression
 /// </summary>
 /// <typeparam name="TResult">The type of the value returned by the lambda expression upon which this observable lambda expression</typeparam>
+/// <remarks>
+/// Each call which produces one of these returns a distinct instance, even when the observed expression is shared; disposing it releases only that observation
+/// </remarks>
 public interface IObservableExpression<TResult> :
     IDisposable,
     IDisposalStatus,

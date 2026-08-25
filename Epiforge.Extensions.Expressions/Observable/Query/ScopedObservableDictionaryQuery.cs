@@ -1,9 +1,5 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-// Queries are cached and reference counted, so what a caller receives has to be scoped to that
-// caller rather than the shared query itself; otherwise one caller's Dispose releases another's
-// claim. Every member here forwards to that shared query; only disposal and the events are its own.
-// Same pattern as ScopedObservableExpression, ScopedObservableScalarQuery and ScopedObservableCollectionQuery.
 class ScopedObservableDictionaryQuery<TKey, TValue> :
     IObservableDictionaryQuery<TKey, TValue>
     where TKey : notnull
@@ -51,9 +47,11 @@ class ScopedObservableDictionaryQuery<TKey, TValue> :
 
     public event EventHandler<DisposalNotificationEventArgs>? Disposing;
 
-#pragma warning disable CS0067 // disposal here is never overridden: releasing this scope's single claim on the query always succeeds
-    public event EventHandler<DisposalNotificationEventArgs>? DisposalOverridden;
-#pragma warning restore CS0067
+    event EventHandler<DisposalNotificationEventArgs>? INotifyDisposalOverridden.DisposalOverridden
+    {
+        add { }
+        remove { }
+    }
 
     public void Dispose()
     {

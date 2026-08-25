@@ -127,6 +127,7 @@ public sealed class NullableKeySortedDictionary<TKey, TValue> :
     /// </summary>
     /// <param name="key">The key of the value to get or set</param>
     /// <returns>The value associated with the specified key</returns>
+    /// <exception cref="KeyNotFoundException">The property is retrieved and <paramref name="key"/> does not exist in the collection</exception>
     public TValue this[TKey key]
     {
         get => key is null ? hasNullKeyedValue ? nullKeyedValue : throw new KeyNotFoundException() : dict[key];

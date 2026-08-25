@@ -627,7 +627,6 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     public IObservableCollectionQuery<TElement> ObserveConcat(IObservableCollectionQuery<TElement> second)
     {
         ArgumentNullException.ThrowIfNull(second);
-        // unwrap: keying the cache on a scoped instance would defeat dedup, and concat does not own second
         if (second is ScopedObservableCollectionQuery<TElement> scopedSecond)
             second = scopedSecond.query;
         ObservableCollectionConcatQuery<TElement> concatQuery;

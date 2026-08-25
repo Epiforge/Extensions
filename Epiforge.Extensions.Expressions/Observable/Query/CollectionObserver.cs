@@ -149,8 +149,6 @@ public class CollectionObserver :
         return listObservableCollection.AsScoped();
     }
 
-    // internal callers that need the query itself, rather than a scoped instance they would then
-    // have to keep and dispose, go through this; the public entry point below scopes it for callers
     internal ObservableCollectionQueryReadOnlyList<TElement> GetObservableCollectionQuery<TElement>(IReadOnlyList<TElement> readOnlyList)
     {
         ArgumentNullException.ThrowIfNull(readOnlyList);

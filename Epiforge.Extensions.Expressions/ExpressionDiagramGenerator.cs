@@ -2,14 +2,55 @@ namespace Epiforge.Extensions.Expressions;
 
 static class ExpressionDiagramGenerator
 {
+    sealed class ObservedArgument
+    {
+        internal ObservedArgument(object? value) =>
+            this.value = value;
+
+        readonly object? value;
+
+        public override bool Equals(object? obj) =>
+            obj is ObservedArgument other && ReferenceEquals(other.value, value);
+
+        public override int GetHashCode() =>
+            value is null ? 0 : RuntimeHelpers.GetHashCode(value);
+    }
+
     class IterationState
     {
         public Dictionary<ParameterExpression, (int set, int index)> Parameters { get; } = [];
         public int ParameterSet { get; set; } = -1;
     }
 
+    static readonly ConditionalWeakTable<ConstantExpression, object> constantsSubstitutedForArguments = [];
+    static readonly object constantSubstitutedForArgument = new();
+
+    internal static void NoteConstantSubstitutedForArgument(ConstantExpression constantExpression) =>
+        constantsSubstitutedForArguments.AddOrUpdate(constantExpression, constantSubstitutedForArgument);
+
     public static IEnumerable<object?> GenerateDiagram(Expression? node) =>
         GenerateDiagram(node, new IterationState());
+
+    static IEnumerable<object?> GenerateDiagram(MemberBinding binding, IterationState iterationState)
+    {
+        yield return binding.BindingType;
+        yield return binding.Member;
+        if (binding is MemberAssignment memberAssignment)
+            foreach (var element in GenerateDiagram(memberAssignment.Expression, iterationState))
+                yield return element;
+        else if (binding is MemberListBinding memberListBinding)
+            foreach (var initializer in memberListBinding.Initializers)
+            {
+                yield return initializer.AddMethod;
+                foreach (var argument in initializer.Arguments)
+                    foreach (var element in GenerateDiagram(argument, iterationState))
+                        yield return element;
+            }
+        else if (binding is MemberMemberBinding memberMemberBinding)
+            foreach (var nestedBinding in memberMemberBinding.Bindings)
+                foreach (var element in GenerateDiagram(nestedBinding, iterationState))
+                    yield return element;
+    }
 
     [SuppressMessage("Maintainability", "CA1502: Avoid excessive complexity")]
     [SuppressMessage("Code Analysis", "CA1506: Avoid excessive class coupling")]
@@ -39,7 +80,7 @@ static class ExpressionDiagramGenerator
             ++iterationState.ParameterSet;
             var blockVariables = block.Variables;
             for (int i = 0, ii = blockVariables.Count; i < ii; ++i)
-                iterationState.Parameters.Add(blockVariables[i], (iterationState.ParameterSet, i));
+                iterationState.Parameters[blockVariables[i]] = (iterationState.ParameterSet, i);
             foreach (var expression in block.Expressions)
                 foreach (var element in GenerateDiagram(expression, iterationState))
                     yield return element;
@@ -59,7 +100,10 @@ static class ExpressionDiagramGenerator
         }
         if (node is ConstantExpression constant)
         {
-            yield return constant.Value;
+            if (constantsSubstitutedForArguments.TryGetValue(constant, out _))
+                yield return new ObservedArgument(constant.Value);
+            else
+                yield return constant.Value;
             yield break;
         }
         if (node is DebugInfoExpression debugInfo)
@@ -125,7 +169,7 @@ static class ExpressionDiagramGenerator
             ++iterationState.ParameterSet;
             var lambdaParameters = lambda.Parameters;
             for (int i = 0, ii = lambdaParameters.Count; i < ii; ++i)
-                iterationState.Parameters.Add(lambdaParameters[i], (iterationState.ParameterSet, i));
+                iterationState.Parameters[lambdaParameters[i]] = (iterationState.ParameterSet, i);
             yield return lambda.Name;
             yield return lambda.ReturnType;
             yield return lambda.TailCall;
@@ -171,10 +215,8 @@ static class ExpressionDiagramGenerator
             foreach (var element in GenerateDiagram(memberInit.NewExpression, iterationState))
                 yield return element;
             foreach (var binding in memberInit.Bindings)
-            {
-                yield return binding.BindingType;
-                yield return binding.Member;
-            }
+                foreach (var element in GenerateDiagram(binding, iterationState))
+                    yield return element;
             yield break;
         }
         if (node is MethodCallExpression methodCall)
@@ -207,9 +249,13 @@ static class ExpressionDiagramGenerator
         }
         if (node is ParameterExpression parameter)
         {
-            var (set, parameterIndex) = iterationState.Parameters[parameter];
-            yield return set;
-            yield return parameterIndex;
+            if (iterationState.Parameters.TryGetValue(parameter, out var parameterPosition))
+            {
+                yield return parameterPosition.set;
+                yield return parameterPosition.index;
+            }
+            else
+                yield return parameter;
             yield break;
         }
         if (node is RuntimeVariablesExpression runtimeVariables)
@@ -217,7 +263,7 @@ static class ExpressionDiagramGenerator
             ++iterationState.ParameterSet;
             var runtimeVariablesVariables = runtimeVariables.Variables;
             for (int i = 0, ii = runtimeVariablesVariables.Count; i < ii; ++i)
-                iterationState.Parameters.Add(runtimeVariablesVariables[i], (iterationState.ParameterSet, i));
+                iterationState.Parameters[runtimeVariablesVariables[i]] = (iterationState.ParameterSet, i);
             foreach (var variable in runtimeVariables.Variables)
                 foreach (var element in GenerateDiagram(variable, iterationState))
                     yield return element;

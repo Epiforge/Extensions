@@ -76,6 +76,7 @@ public class ExpressionObserver :
         {
             var parameter = lambdaExpression.Parameters[i];
             var constant = Expression.Constant(arguments[i], parameter.Type);
+            ExpressionDiagramGenerator.NoteConstantSubstitutedForArgument(constant);
             parameterTranslation.Add(parameter, constant);
         }
         return ReplaceParameters(parameterTranslation, lambdaExpression.Body);
@@ -747,7 +748,6 @@ public class ExpressionObserver :
         return IsMethodReturnValueDisposed(getMethod);
     }
 
-    // these are not cached: each observation gets its own, holding one reference to the shared node
     ScopedObservableExpression<TResult> Observe<TResult>(object?[] arguments, Expression? parameterReplacedExpression) =>
         new(this, parameterReplacedExpression!, GetObservableExpression(parameterReplacedExpression!, false), arguments);
 

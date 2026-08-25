@@ -3,6 +3,9 @@ namespace Epiforge.Extensions.Expressions.Observable.Query;
 /// <summary>
 /// Represents the result of an observable query
 /// </summary>
+/// <remarks>
+/// Each call which produces one of these returns a distinct instance, even when the query itself is shared; disposing it releases only that observation
+/// </remarks>
 public interface IObservableQuery :
     IDisposable,
     IDisposalStatus,

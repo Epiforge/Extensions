@@ -5,7 +5,6 @@ public class ArgumentIdentity
 {
     #region TestMethod Classes
 
-    // an entity compared by identity value, as line-of-business types commonly are
     public class IdentifiedTestPerson :
         PropertyChangeNotifier
     {
@@ -45,11 +44,9 @@ public class ArgumentIdentity
         using var observingSecond = observer.Observe(p => p.Name!.Length, second);
         Assert.AreEqual(4, observingSecond.Evaluation.Result);
 
-        // a change to the object actually being observed must be seen
         second.Name = "Johnathan";
         Assert.AreEqual(9, observingSecond.Evaluation.Result);
 
-        // and a change to the other object must not be
         first.Name = "Jo";
         Assert.AreEqual(9, observingSecond.Evaluation.Result);
         Assert.AreEqual(2, observingFirst.Evaluation.Result);
