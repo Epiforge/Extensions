@@ -444,6 +444,7 @@ public interface IObservableCollectionQuery<TElement> :
     /// <typeparam name="TKey">The type of the key returned by <paramref name="keySelector"/></typeparam>
     /// <param name="keySelector">A function to extract the key for each element</param>
     /// <returns>A dictionary where each value is an <see cref="IObservableGrouping{TKey, TElement}"/> object which contains a sequence of objects and a key</returns>
+    /// <remarks>Groupings are retained once created, including for a key which is requested but not present, so a grouping may be empty</remarks>
     [return: DisposeWhenDiscarded]
     IObservableLookupQuery<TKey, TElement> ObserveToLookup<TKey>(Expression<Func<TElement, TKey>> keySelector)
         where TKey : notnull;
@@ -455,6 +456,7 @@ public interface IObservableCollectionQuery<TElement> :
     /// <param name="keySelector">A function to extract the key for each element</param>
     /// <param name="keyEqualityComparer">An <see cref="IEqualityComparer{T}"/> to compare keys</param>
     /// <returns>A dictionary where each value is an <see cref="IObservableGrouping{TKey, TElement}"/> object which contains a sequence of objects and a key</returns>
+    /// <remarks>Groupings are retained once created, including for a key which is requested but not present, so a grouping may be empty</remarks>
     [return: DisposeWhenDiscarded]
     IObservableLookupQuery<TKey, TElement> ObserveToLookup<TKey>(Expression<Func<TElement, TKey>> keySelector, IEqualityComparer<TKey> keyEqualityComparer)
         where TKey : notnull;
