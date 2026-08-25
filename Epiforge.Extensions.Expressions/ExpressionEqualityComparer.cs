@@ -7,7 +7,7 @@ public sealed class ExpressionEqualityComparer :
     IEqualityComparer<Expression>
 {
     static readonly ConditionalWeakTable<Expression, IReadOnlyList<object?>> cachedDiagrams = [];
-    static readonly ConditionalWeakTable<Expression, int> cachedHashCodes = [];
+    static readonly ConditionalWeakTable<Expression, object> cachedHashCodes = [];
 
     /// <summary>
     /// Gets the default instance of <see cref="ExpressionEqualityComparer"/>
