@@ -21,7 +21,7 @@ public class CollectionCount
                 source[12].Name = "Jack";
                 Assert.AreEqual(2, countQuery.Evaluation.Result);
                 using var countQuery2 = sourceQuery.ObserveCount(p => p.Name!.Length == 4);
-                Assert.AreSame(countQuery, countQuery2);
+                Assert.AreNotSame(countQuery, countQuery2);
                 Assert.AreEqual(2, sourceQuery.CachedObservableQueries);
             }
             Assert.AreEqual(0, sourceQuery.CachedObservableQueries);
@@ -55,7 +55,7 @@ public class CollectionCount
                 source[14] = new TestPerson("Tony");
                 Assert.AreEqual(6, countQuery.Evaluation.Result);
                 using var countQuery2 = sourceQuery.ObserveCount(p => p.Name!.Length == 4);
-                Assert.AreSame(countQuery, countQuery2);
+                Assert.AreNotSame(countQuery, countQuery2);
                 Assert.AreEqual(2, sourceQuery.CachedObservableQueries);
             }
             Assert.AreEqual(0, sourceQuery.CachedObservableQueries);
@@ -85,7 +85,7 @@ public class CollectionCount
                 source.RemoveRange(8, 2);
                 Assert.AreEqual(2, countQuery.Evaluation.Result);
                 using var countQuery2 = sourceQuery.ObserveCount(p => p.Name!.Length == 5);
-                Assert.AreSame(countQuery, countQuery2);
+                Assert.AreNotSame(countQuery, countQuery2);
                 Assert.AreEqual(2, sourceQuery.CachedObservableQueries);
             }
             Assert.AreEqual(0, sourceQuery.CachedObservableQueries);

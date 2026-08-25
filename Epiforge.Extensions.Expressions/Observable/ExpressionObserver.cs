@@ -111,12 +111,10 @@ public class ExpressionObserver :
         Logger = options.Logger;
     }
 
-    readonly Dictionary<Expression, IDisposable> cachedDoubleArgumentObservableExpressions = new(ExpressionEqualityComparer.Default);
     readonly Dictionary<BinaryExpression, ObservableBinaryExpression> cachedObservableBinaryExpressions = new(ExpressionEqualityComparer.Default);
     readonly Dictionary<ConditionalExpression, ObservableConditionalExpression> cachedObservableConditionalExpressions = new(ExpressionEqualityComparer.Default);
     readonly Dictionary<ConstantExpression, ObservableConstantExpression> cachedObservableConstantExpressionExpressions = new(ConstantExpressionExpressionEqualityComparer.Default);
     readonly Dictionary<ConstantExpression, ObservableConstantExpression> cachedObservableConstantExpressions = new(ExpressionEqualityComparer.Default);
-    readonly Dictionary<Expression, IDisposable> cachedObservableExpressions = new(ExpressionEqualityComparer.Default);
     readonly Dictionary<IndexExpression, ObservableIndexExpression> cachedObservableIndexExpressions = new(ExpressionEqualityComparer.Default);
     readonly Dictionary<InvocationExpression, ObservableInvocationExpression> cachedObservableInvocationExpressions = new(ExpressionEqualityComparer.Default);
     readonly Dictionary<MemberExpression, ObservableMemberExpression> cachedObservableMemberExpressions = new(ExpressionEqualityComparer.Default);
@@ -125,15 +123,11 @@ public class ExpressionObserver :
     readonly Dictionary<NewArrayExpression, ObservableNewArrayInitExpression> cachedObservableNewArrayInitExpressions = new(ExpressionEqualityComparer.Default);
     readonly Dictionary<NewExpression, ObservableNewExpression> cachedObservableNewExpressions = new(ExpressionEqualityComparer.Default);
     readonly Dictionary<TypeBinaryExpression, ObservableTypeBinaryExpression> cachedObservableTypeBinaryExpressions = new(ExpressionEqualityComparer.Default);
-    readonly Dictionary<Expression, IDisposable> cachedSingleArgumentObservableExpressions = new(ExpressionEqualityComparer.Default);
-    readonly Dictionary<Expression, IDisposable> cachedTripleArgumentObservableExpressions = new(ExpressionEqualityComparer.Default);
     readonly Dictionary<UnaryExpression, ObservableUnaryExpression> cachedObservableUnaryExpressions = new(ExpressionEqualityComparer.Default);
 #if IS_NET_9_0_OR_GREATER
-    readonly Lock cachedDoubleArgumentObservableExpressionsAccess = new();
     readonly Lock cachedObservableBinaryExpressionsAccess = new();
     readonly Lock cachedObservableConditionalExpressionsAccess = new();
     readonly Lock cachedObservableConstantExpressionsAccess = new();
-    readonly Lock cachedObservableExpressionsAccess = new();
     readonly Lock cachedObservableIndexExpressionsAccess = new();
     readonly Lock cachedObservableInvocationExpressionsAccess = new();
     readonly Lock cachedObservableMemberExpressionsAccess = new();
@@ -142,15 +136,11 @@ public class ExpressionObserver :
     readonly Lock cachedObservableNewArrayInitExpressionsAccess = new();
     readonly Lock cachedObservableNewExpressionsAccess = new();
     readonly Lock cachedObservableTypeBinaryExpressionsAccess = new();
-    readonly Lock cachedSingleArgumentObservableExpressionsAccess = new();
-    readonly Lock cachedTripleArgumentObservableExpressionsAccess = new();
     readonly Lock cachedObservableUnaryExpressionsAccess = new();
 #else
-    readonly object cachedDoubleArgumentObservableExpressionsAccess = new();
     readonly object cachedObservableBinaryExpressionsAccess = new();
     readonly object cachedObservableConditionalExpressionsAccess = new();
     readonly object cachedObservableConstantExpressionsAccess = new();
-    readonly object cachedObservableExpressionsAccess = new();
     readonly object cachedObservableIndexExpressionsAccess = new();
     readonly object cachedObservableInvocationExpressionsAccess = new();
     readonly object cachedObservableMemberExpressionsAccess = new();
@@ -159,8 +149,6 @@ public class ExpressionObserver :
     readonly object cachedObservableNewArrayInitExpressionsAccess = new();
     readonly object cachedObservableNewExpressionsAccess = new();
     readonly object cachedObservableTypeBinaryExpressionsAccess = new();
-    readonly object cachedSingleArgumentObservableExpressionsAccess = new();
-    readonly object cachedTripleArgumentObservableExpressionsAccess = new();
     readonly object cachedObservableUnaryExpressionsAccess = new();
 #endif
     readonly ImmutableHashSet<(Type type, EquatableList<Type> constuctorParameterTypes)> disposeConstructedTypes;
@@ -176,8 +164,6 @@ public class ExpressionObserver :
         get
         {
             var count = 0;
-            lock (cachedDoubleArgumentObservableExpressionsAccess)
-                count += cachedDoubleArgumentObservableExpressions.Count;
             lock (cachedObservableBinaryExpressionsAccess)
                 count += cachedObservableBinaryExpressions.Count;
             lock (cachedObservableConditionalExpressionsAccess)
@@ -187,8 +173,6 @@ public class ExpressionObserver :
                 count += cachedObservableConstantExpressionExpressions.Count;
                 count += cachedObservableConstantExpressions.Count;
             }
-            lock (cachedObservableExpressionsAccess)
-                count += cachedObservableExpressions.Count;
             lock (cachedObservableIndexExpressionsAccess)
                 count += cachedObservableIndexExpressions.Count;
             lock (cachedObservableInvocationExpressionsAccess)
@@ -205,10 +189,6 @@ public class ExpressionObserver :
                 count += cachedObservableNewExpressions.Count;
             lock (cachedObservableTypeBinaryExpressionsAccess)
                 count += cachedObservableTypeBinaryExpressions.Count;
-            lock (cachedSingleArgumentObservableExpressionsAccess)
-                count += cachedSingleArgumentObservableExpressions.Count;
-            lock (cachedTripleArgumentObservableExpressionsAccess)
-                count += cachedTripleArgumentObservableExpressions.Count;
             lock (cachedObservableUnaryExpressionsAccess)
                 count += cachedObservableUnaryExpressions.Count;
             return count;
@@ -303,7 +283,10 @@ public class ExpressionObserver :
     {
         lock (cachedObservableBinaryExpressionsAccess)
         {
-            if (--observableBinaryExpression.Observations == 0)
+            var remaining = --observableBinaryExpression.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException($"an observation of {observableBinaryExpression.Expression} was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedObservableBinaryExpressions.Remove(observableBinaryExpression.BinaryExpression);
                 return true;
@@ -316,7 +299,10 @@ public class ExpressionObserver :
     {
         lock (cachedObservableConditionalExpressionsAccess)
         {
-            if (--observableConditionalExpression.Observations == 0)
+            var remaining = --observableConditionalExpression.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException($"an observation of {observableConditionalExpression.Expression} was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedObservableConditionalExpressions.Remove(observableConditionalExpression.ConditionalExpression);
                 return true;
@@ -330,22 +316,12 @@ public class ExpressionObserver :
         var cachedExpressions = typeof(Expression).IsAssignableFrom(observableConstantExpression.ConstantExpression.Type) ? cachedObservableConstantExpressionExpressions : cachedObservableConstantExpressions;
         lock (cachedObservableConstantExpressionsAccess)
         {
-            if (--observableConstantExpression.Observations == 0)
+            var remaining = --observableConstantExpression.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException($"an observation of {observableConstantExpression.Expression} was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedExpressions.Remove(observableConstantExpression.ConstantExpression);
-                return true;
-            }
-        }
-        return false;
-    }
-
-    internal bool ExpressionDisposed<TResult>(ObservableExpression<TResult> observableExpression)
-    {
-        lock (cachedObservableExpressionsAccess)
-        {
-            if (--observableExpression.Observations == 0)
-            {
-                cachedObservableExpressions.Remove(observableExpression.Expression);
                 return true;
             }
         }
@@ -356,7 +332,10 @@ public class ExpressionObserver :
     {
         lock (cachedObservableIndexExpressionsAccess)
         {
-            if (--observableIndexExpression.Observations == 0)
+            var remaining = --observableIndexExpression.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException($"an observation of {observableIndexExpression.Expression} was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedObservableIndexExpressions.Remove(observableIndexExpression.IndexExpression);
                 return true;
@@ -369,7 +348,10 @@ public class ExpressionObserver :
     {
         lock (cachedObservableInvocationExpressionsAccess)
         {
-            if (--observableInvocationExpression.Observations == 0)
+            var remaining = --observableInvocationExpression.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException($"an observation of {observableInvocationExpression.Expression} was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedObservableInvocationExpressions.Remove(observableInvocationExpression.InvocationExpression);
                 return true;
@@ -382,7 +364,10 @@ public class ExpressionObserver :
     {
         lock (cachedObservableMemberExpressionsAccess)
         {
-            if (--observableMemberExpression.Observations == 0)
+            var remaining = --observableMemberExpression.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException($"an observation of {observableMemberExpression.Expression} was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedObservableMemberExpressions.Remove(observableMemberExpression.MemberExpression);
                 return true;
@@ -395,7 +380,10 @@ public class ExpressionObserver :
     {
         lock (cachedObservableMemberInitExpressionsAccess)
         {
-            if (--observableMemberInitExpression.Observations == 0)
+            var remaining = --observableMemberInitExpression.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException($"an observation of {observableMemberInitExpression.Expression} was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedObservableMemberInitExpressions.Remove(observableMemberInitExpression.MemberInitExpression);
                 return true;
@@ -408,7 +396,10 @@ public class ExpressionObserver :
     {
         lock (cachedObservableMethodCallExpressionsAccess)
         {
-            if (--observableMethodCallExpression.Observations == 0)
+            var remaining = --observableMethodCallExpression.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException($"an observation of {observableMethodCallExpression.Expression} was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedObservableMethodCallExpressions.Remove(observableMethodCallExpression.MethodCallExpression);
                 return true;
@@ -421,7 +412,10 @@ public class ExpressionObserver :
     {
         lock (cachedObservableNewArrayInitExpressionsAccess)
         {
-            if (--observableNewArrayInitExpression.Observations == 0)
+            var remaining = --observableNewArrayInitExpression.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException($"an observation of {observableNewArrayInitExpression.Expression} was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedObservableNewArrayInitExpressions.Remove(observableNewArrayInitExpression.NewArrayExpression);
                 return true;
@@ -434,7 +428,10 @@ public class ExpressionObserver :
     {
         lock (cachedObservableNewExpressionsAccess)
         {
-            if (--observableNewExpression.Observations == 0)
+            var remaining = --observableNewExpression.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException($"an observation of {observableNewExpression.Expression} was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedObservableNewExpressions.Remove(observableNewExpression.NewExpression);
                 return true;
@@ -447,7 +444,10 @@ public class ExpressionObserver :
     {
         lock (cachedObservableTypeBinaryExpressionsAccess)
         {
-            if (--observableTypeBinaryExpression.Observations == 0)
+            var remaining = --observableTypeBinaryExpression.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException($"an observation of {observableTypeBinaryExpression.Expression} was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedObservableTypeBinaryExpressions.Remove(observableTypeBinaryExpression.TypeBinaryExpression);
                 return true;
@@ -460,48 +460,12 @@ public class ExpressionObserver :
     {
         lock (cachedObservableUnaryExpressionsAccess)
         {
-            if (--observableUnaryExpression.Observations == 0)
+            var remaining = --observableUnaryExpression.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException($"an observation of {observableUnaryExpression.Expression} was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedObservableUnaryExpressions.Remove(observableUnaryExpression.UnaryExpression);
-                return true;
-            }
-        }
-        return false;
-    }
-
-    internal bool ExpressionDisposed<TArgument, TResult>(ObservableExpression<TArgument, TResult> observableExpression)
-    {
-        lock (cachedSingleArgumentObservableExpressionsAccess)
-        {
-            if (--observableExpression.Observations == 0)
-            {
-                cachedSingleArgumentObservableExpressions.Remove(observableExpression.Expression);
-                return true;
-            }
-        }
-        return false;
-    }
-
-    internal bool ExpressionDisposed<TArgument1, TArgument2, TResult>(ObservableExpression<TArgument1, TArgument2, TResult> observableExpression)
-    {
-        lock (cachedDoubleArgumentObservableExpressionsAccess)
-        {
-            if (--observableExpression.Observations == 0)
-            {
-                cachedDoubleArgumentObservableExpressions.Remove(observableExpression.Expression);
-                return true;
-            }
-        }
-        return false;
-    }
-
-    internal bool ExpressionDisposed<TArgument1, TArgument2, TArgument3, TResult>(ObservableExpression<TArgument1, TArgument2, TArgument3, TResult> observableExpression)
-    {
-        lock (cachedTripleArgumentObservableExpressionsAccess)
-        {
-            if (--observableExpression.Observations == 0)
-            {
-                cachedTripleArgumentObservableExpressions.Remove(observableExpression.Expression);
                 return true;
             }
         }
@@ -783,22 +747,9 @@ public class ExpressionObserver :
         return IsMethodReturnValueDisposed(getMethod);
     }
 
-    ObservableExpression<TResult> Observe<TResult>(object?[] arguments, Expression? parameterReplacedExpression)
-    {
-        lock (cachedObservableExpressionsAccess)
-        {
-            ObservableExpression<TResult> typedInstance;
-            if (cachedObservableExpressions.TryGetValue(parameterReplacedExpression!, out var instance))
-                typedInstance = (ObservableExpression<TResult>)instance;
-            else
-            {
-                typedInstance = new ObservableExpression<TResult>(this, parameterReplacedExpression!, GetObservableExpression(parameterReplacedExpression!, false), arguments);
-                cachedObservableExpressions.Add(parameterReplacedExpression!, typedInstance);
-            }
-            ++typedInstance.Observations;
-            return typedInstance;
-        }
-    }
+    // these are not cached: each observation gets its own, holding one reference to the shared node
+    ScopedObservableExpression<TResult> Observe<TResult>(object?[] arguments, Expression? parameterReplacedExpression) =>
+        new(this, parameterReplacedExpression!, GetObservableExpression(parameterReplacedExpression!, false), arguments);
 
     /// <inheritdoc/>
     [return: DisposeWhenDiscarded]
@@ -830,22 +781,8 @@ public class ExpressionObserver :
     public IObservableExpression<TResult> ObserveWithoutOptimization<TResult>(Expression<Func<TResult>> expression) =>
         ObserveWithoutOptimization<TResult>((LambdaExpression)expression);
 
-    ObservableExpression<TArgument, TResult> Observe<TArgument, TResult>(TArgument argument, Expression? parameterReplacedExpression)
-    {
-        lock (cachedSingleArgumentObservableExpressionsAccess)
-        {
-            ObservableExpression<TArgument, TResult> typedInstance;
-            if (cachedSingleArgumentObservableExpressions.TryGetValue(parameterReplacedExpression!, out var instance))
-                typedInstance = (ObservableExpression<TArgument, TResult>)instance;
-            else
-            {
-                typedInstance = new ObservableExpression<TArgument, TResult>(this, parameterReplacedExpression!, GetObservableExpression(parameterReplacedExpression!, false), argument);
-                cachedSingleArgumentObservableExpressions.Add(parameterReplacedExpression!, typedInstance);
-            }
-            ++typedInstance.Observations;
-            return typedInstance;
-        }
-    }
+    ScopedObservableExpression<TArgument, TResult> Observe<TArgument, TResult>(TArgument argument, Expression? parameterReplacedExpression) =>
+        new(this, parameterReplacedExpression!, GetObservableExpression(parameterReplacedExpression!, false), argument);
 
     /// <inheritdoc/>
     [return: DisposeWhenDiscarded]
@@ -865,22 +802,8 @@ public class ExpressionObserver :
         return Observe<TArgument, TResult>(argument, parameterReplacedExpression);
     }
 
-    ObservableExpression<TArgument1, TArgument2, TResult> Observe<TArgument1, TArgument2, TResult>(TArgument1 argument1, TArgument2 argument2, Expression? parameterReplacedExpression)
-    {
-        lock (cachedDoubleArgumentObservableExpressionsAccess)
-        {
-            ObservableExpression<TArgument1, TArgument2, TResult> typedInstance;
-            if (cachedDoubleArgumentObservableExpressions.TryGetValue(parameterReplacedExpression!, out var instance))
-                typedInstance = (ObservableExpression<TArgument1, TArgument2, TResult>)instance;
-            else
-            {
-                typedInstance = new ObservableExpression<TArgument1, TArgument2, TResult>(this, parameterReplacedExpression!, GetObservableExpression(parameterReplacedExpression!, false), argument1, argument2);
-                cachedDoubleArgumentObservableExpressions.Add(parameterReplacedExpression!, typedInstance);
-            }
-            ++typedInstance.Observations;
-            return typedInstance;
-        }
-    }
+    ScopedObservableExpression<TArgument1, TArgument2, TResult> Observe<TArgument1, TArgument2, TResult>(TArgument1 argument1, TArgument2 argument2, Expression? parameterReplacedExpression) =>
+        new(this, parameterReplacedExpression!, GetObservableExpression(parameterReplacedExpression!, false), argument1, argument2);
 
     /// <inheritdoc/>
     [return: DisposeWhenDiscarded]
@@ -900,22 +823,8 @@ public class ExpressionObserver :
         return Observe<TArgument1, TArgument2, TResult>(argument1, argument2, parameterReplacedExpression);
     }
 
-    ObservableExpression<TArgument1, TArgument2, TArgument3, TResult> Observe<TArgument1, TArgument2, TArgument3, TResult>(TArgument1 argument1, TArgument2 argument2, TArgument3 argument3, Expression? parameterReplacedExpression)
-    {
-        lock (cachedTripleArgumentObservableExpressionsAccess)
-        {
-            ObservableExpression<TArgument1, TArgument2, TArgument3, TResult> typedInstance;
-            if (cachedTripleArgumentObservableExpressions.TryGetValue(parameterReplacedExpression!, out var instance))
-                typedInstance = (ObservableExpression<TArgument1, TArgument2, TArgument3, TResult>)instance;
-            else
-            {
-                typedInstance = new ObservableExpression<TArgument1, TArgument2, TArgument3, TResult>(this, parameterReplacedExpression!, GetObservableExpression(parameterReplacedExpression!, false), argument1, argument2, argument3);
-                cachedTripleArgumentObservableExpressions.Add(parameterReplacedExpression!, typedInstance);
-            }
-            ++typedInstance.Observations;
-            return typedInstance;
-        }
-    }
+    ScopedObservableExpression<TArgument1, TArgument2, TArgument3, TResult> Observe<TArgument1, TArgument2, TArgument3, TResult>(TArgument1 argument1, TArgument2 argument2, TArgument3 argument3, Expression? parameterReplacedExpression) =>
+        new(this, parameterReplacedExpression!, GetObservableExpression(parameterReplacedExpression!, false), argument1, argument2, argument3);
 
     /// <inheritdoc/>
     [return: DisposeWhenDiscarded]

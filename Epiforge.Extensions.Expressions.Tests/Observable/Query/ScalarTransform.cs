@@ -23,7 +23,7 @@ public class ScalarTransform
                     source[12].Name = "Jack";
                     Assert.AreEqual(2, transformQuery.Evaluation.Result);
                     using var transformQuery2 = countQuery.ObserveTransform(count => (long)count);
-                    Assert.AreSame(transformQuery, transformQuery2);
+                    Assert.AreNotSame(transformQuery, transformQuery2);
                     Assert.AreEqual(1, countQuery.CachedObservableQueries);
                 }
                 Assert.AreEqual(2, sourceQuery.CachedObservableQueries);

@@ -288,6 +288,9 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     public virtual object SyncRoot =>
         null!;
 
+    internal IObservableCollectionQuery<TElement> AsScoped() =>
+        new ScopedObservableCollectionQuery<TElement>(this);
+
     bool IList.IsFixedSize =>
         false;
 
@@ -485,7 +488,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
             ++aggregateQuery.Observations;
         }
         aggregateQuery.Initialize();
-        return aggregateQuery;
+        return aggregateQuery.AsScoped();
     }
 
     [return: DisposeWhenDiscarded]
@@ -506,7 +509,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
             ++allQuery.Observations;
         }
         allQuery.Initialize();
-        return allQuery;
+        return allQuery.AsScoped();
     }
 
     [return: DisposeWhenDiscarded]
@@ -523,7 +526,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
             ++anyQuery.Observations;
         }
         anyQuery.Initialize();
-        return anyQuery;
+        return anyQuery.AsScoped();
     }
 
     [return: DisposeWhenDiscarded]
@@ -544,7 +547,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
             ++anyQuery.Observations;
         }
         anyQuery.Initialize();
-        return anyQuery;
+        return anyQuery.AsScoped();
     }
 
     [return: DisposeWhenDiscarded]
@@ -565,7 +568,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
             ++appendQuery.Observations;
         }
         appendQuery.Initialize();
-        return appendQuery;
+        return appendQuery.AsScoped();
     }
 
     [return: DisposeWhenDiscarded]
@@ -586,7 +589,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
             ++averageQuery.Observations;
         }
         averageQuery.Initialize();
-        return (ObservableCollectionAverageQuery<TElement, TResult>)averageQuery;
+        return ((ObservableCollectionAverageQuery<TElement, TResult>)averageQuery).AsScoped();
     }
 
     [return: DisposeWhenDiscarded]
@@ -607,7 +610,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
             ++comparisonQuery.Observations;
         }
         comparisonQuery.Initialize();
-        return comparisonQuery;
+        return comparisonQuery.AsScoped();
     }
 
     [return: DisposeWhenDiscarded]
@@ -615,7 +618,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         ArgumentNullException.ThrowIfNull(selector);
         var select = ObserveSelect(selector);
-        var comparison = ((ObservableCollectionQuery<TResult>)select).ObserveComparison(soughtComparison);
+        var comparison = ((ScopedObservableCollectionQuery<TResult>)select).query.ObserveComparison(soughtComparison);
         comparison.Disposed += (_, _) => select.Dispose();
         return comparison;
     }
@@ -624,6 +627,9 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     public IObservableCollectionQuery<TElement> ObserveConcat(IObservableCollectionQuery<TElement> second)
     {
         ArgumentNullException.ThrowIfNull(second);
+        // unwrap: keying the cache on a scoped instance would defeat dedup, and concat does not own second
+        if (second is ScopedObservableCollectionQuery<TElement> scopedSecond)
+            second = scopedSecond.query;
         ObservableCollectionConcatQuery<TElement> concatQuery;
         lock (cachedConcatQueriesAccess)
         {
@@ -635,7 +641,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
             ++concatQuery.Observations;
         }
         concatQuery.Initialize();
-        return concatQuery;
+        return concatQuery.AsScoped();
     }
 
     [return: DisposeWhenDiscarded]
@@ -647,7 +653,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
             ++cachedCountQuery.Observations;
         }
         cachedCountQuery.Initialize();
-        return cachedCountQuery;
+        return cachedCountQuery.AsScoped();
     }
 
     [return: DisposeWhenDiscarded]
@@ -710,7 +716,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         return firstOrDefault;
     }
 
-    ObservableCollectionIndexQuery<TElement> ObserveIndex(Index? index, bool outOfRangeIsDefault)
+    IObservableScalarQuery<TElement> ObserveIndex(Index? index, bool outOfRangeIsDefault)
     {
         ObservableCollectionIndexQuery<TElement> indexQuery;
         lock (cachedIndexQueriesAccess)
@@ -725,7 +731,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
             ++indexQuery.Observations;
         }
         indexQuery.Initialize();
-        return indexQuery;
+        return indexQuery.AsScoped();
     }
 
     [return: DisposeWhenDiscarded]
@@ -737,7 +743,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
             ++cachedIndividualChangeQuery.Observations;
         }
         cachedIndividualChangeQuery.Initialize();
-        return cachedIndividualChangeQuery;
+        return cachedIndividualChangeQuery.AsScoped();
     }
 
     [return: DisposeWhenDiscarded]
@@ -764,7 +770,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
             ++groupByQuery.Observations;
         }
         groupByQuery.Initialize();
-        return (ObservableCollectionGroupByQuery<TKey, TElement>)groupByQuery;
+        return ((ObservableCollectionGroupByQuery<TKey, TElement>)groupByQuery).AsScoped();
     }
 
     [return: DisposeWhenDiscarded]
@@ -846,7 +852,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
             ++orderByQuery.Observations;
         }
         orderByQuery.Initialize();
-        return orderByQuery;
+        return orderByQuery.AsScoped();
     }
 
     [return: DisposeWhenDiscarded]
@@ -863,7 +869,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
             ++prependQuery.Observations;
         }
         prependQuery.Initialize();
-        return prependQuery;
+        return prependQuery.AsScoped();
     }
 
     [return: DisposeWhenDiscarded]
@@ -884,7 +890,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
             ++selectQuery.Observations;
         }
         selectQuery.Initialize();
-        return (ObservableCollectionSelectQuery<TElement, TResult>)selectQuery;
+        return ((ObservableCollectionSelectQuery<TElement, TResult>)selectQuery).AsScoped();
     }
 
     [return: DisposeWhenDiscarded]
@@ -905,7 +911,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
             ++selectManyQuery.Observations;
         }
         selectManyQuery.Initialize();
-        return (ObservableCollectionSelectManyQuery<TElement, TResult>)selectManyQuery;
+        return ((ObservableCollectionSelectManyQuery<TElement, TResult>)selectManyQuery).AsScoped();
     }
 
     [return: DisposeWhenDiscarded]
@@ -954,7 +960,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
             ++sliceQuery.Observations;
         }
         sliceQuery.Initialize();
-        return sliceQuery;
+        return sliceQuery.AsScoped();
     }
 
     [return: DisposeWhenDiscarded]
@@ -979,7 +985,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
             ++sumQuery.Observations;
         }
         sumQuery.Initialize();
-        return (ObservableCollectionSumQuery<TElement, TResult>)sumQuery;
+        return ((ObservableCollectionSumQuery<TElement, TResult>)sumQuery).AsScoped();
     }
 
     [return: DisposeWhenDiscarded]
@@ -1022,7 +1028,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
             ++toDictionaryQuery.Observations;
         }
         toDictionaryQuery.Initialize();
-        return (ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>)toDictionaryQuery;
+        return ((ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>)toDictionaryQuery).AsScoped();
     }
 
     [return: DisposeWhenDiscarded]
@@ -1051,7 +1057,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
             ++lookupQuery.Observations;
         }
         lookupQuery.Initialize();
-        return (ObservableCollectionLookupQuery<TKey, TElement>)lookupQuery;
+        return ((ObservableCollectionLookupQuery<TKey, TElement>)lookupQuery).AsScoped();
     }
 
     [return: DisposeWhenDiscarded]
@@ -1071,7 +1077,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
             ++usingSynchronizationCallbackQuery.Observations;
         }
         usingSynchronizationCallbackQuery.Initialize();
-        return usingSynchronizationCallbackQuery;
+        return usingSynchronizationCallbackQuery.AsScoped();
     }
 
     [return: DisposeWhenDiscarded]
@@ -1091,7 +1097,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
             ++usingSynchronizationCallbackEventuallyQuery.Observations;
         }
         usingSynchronizationCallbackEventuallyQuery.Initialize();
-        return usingSynchronizationCallbackEventuallyQuery;
+        return usingSynchronizationCallbackEventuallyQuery.AsScoped();
     }
 
     [return: DisposeWhenDiscarded]
@@ -1109,7 +1115,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
             ++usingSynchronizationContextQuery.Observations;
         }
         usingSynchronizationContextQuery.Initialize();
-        return usingSynchronizationContextQuery;
+        return usingSynchronizationContextQuery.AsScoped();
     }
 
     [return: DisposeWhenDiscarded]
@@ -1127,7 +1133,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
             ++usingSynchronizationContextEventuallyQuery.Observations;
         }
         usingSynchronizationContextEventuallyQuery.Initialize();
-        return usingSynchronizationContextEventuallyQuery;
+        return usingSynchronizationContextEventuallyQuery.AsScoped();
     }
 
     [return: DisposeWhenDiscarded]
@@ -1145,7 +1151,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
             ++usingSyncRootQuery.Observations;
         }
         usingSyncRootQuery.Initialize();
-        return usingSyncRootQuery;
+        return usingSyncRootQuery.AsScoped();
     }
 
     [return: DisposeWhenDiscarded]
@@ -1163,7 +1169,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
             ++usingSyncRootEventuallyQuery.Observations;
         }
         usingSyncRootEventuallyQuery.Initialize();
-        return usingSyncRootEventuallyQuery;
+        return usingSyncRootEventuallyQuery.AsScoped();
     }
 
     [return: DisposeWhenDiscarded]
@@ -1184,7 +1190,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
             ++whereQuery.Observations;
         }
         whereQuery.Initialize();
-        return whereQuery;
+        return whereQuery.AsScoped();
     }
 
     #endregion Observation Methods
@@ -1195,7 +1201,10 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         lock (cachedAggregateQueriesAccess)
         {
-            if (--aggregateQuery.Observations == 0)
+            var remaining = --aggregateQuery.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedAggregateQueries.Remove((aggregateQuery.SeedFactory, aggregateQuery.Func, aggregateQuery.ResultSelector));
                 return true;
@@ -1208,7 +1217,10 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         lock (cachedAllQueriesAccess)
         {
-            if (--allQuery.Observations == 0)
+            var remaining = --allQuery.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedAllQueries.Remove(allQuery.Predicate);
                 return true;
@@ -1221,7 +1233,10 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         lock (cachedAnyQueriesAccess)
         {
-            if (--anyQuery.Observations == 0)
+            var remaining = --anyQuery.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedAnyQueries.Remove(anyQuery.Predicate);
                 return true;
@@ -1234,7 +1249,10 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         lock (cachedAppendQueriesAccess)
         {
-            if (--appendQuery.Observations == 0)
+            var remaining = --appendQuery.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedAppendQueries.Remove(appendQuery.Appended);
                 return true;
@@ -1247,7 +1265,10 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         lock (cachedAverageQueriesAccess)
         {
-            if (--averageQuery.Observations == 0)
+            var remaining = --averageQuery.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedAverageQueries.Remove(averageQuery.Selector);
                 return true;
@@ -1260,7 +1281,10 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         lock (cachedComparisonQueriesAccess)
         {
-            if (--comparisonQuery.Observations == 0)
+            var remaining = --comparisonQuery.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedComparisonQueries.Remove(comparisonQuery.SoughtComparison);
                 return true;
@@ -1273,7 +1297,10 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         lock (cachedConcatQueriesAccess)
         {
-            if (--concatQuery.Observations == 0)
+            var remaining = --concatQuery.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedConcatQueries.Remove(concatQuery.Second);
                 return true;
@@ -1286,7 +1313,10 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         lock (cachedGroupByQueriesAccess)
         {
-            if (--groupByQuery.Observations == 0)
+            var remaining = --groupByQuery.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedGroupByQueries.Remove((groupByQuery.KeySelector, groupByQuery.KeyEqualityComparer));
                 return true;
@@ -1299,7 +1329,10 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         lock (cachedCountQueryAccess)
         {
-            if (--countQuery.Observations == 0)
+            var remaining = --countQuery.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedCountQuery = null;
                 return true;
@@ -1312,7 +1345,10 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         lock (cachedIndexQueriesAccess)
         {
-            if (--indexQuery.Observations == 0)
+            var remaining = --indexQuery.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedIndexQueries.Remove((indexQuery.Index, indexQuery.OutOfRangeIsDefault));
                 return true;
@@ -1325,7 +1361,10 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         lock (cachedIndividualChangeQueryAccess)
         {
-            if (--individualChangesQuery.Observations == 0)
+            var remaining = --individualChangesQuery.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedIndividualChangeQuery = null;
                 return true;
@@ -1339,7 +1378,10 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         lock (cachedToLookupQueriesAccess)
         {
-            if (--lookupQuery.Observations == 0)
+            var remaining = --lookupQuery.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedToLookupQueries.Remove((lookupQuery.KeySelector, lookupQuery.KeyEqualityComparer));
                 return true;
@@ -1352,7 +1394,10 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         lock (cachedOrderByQueriesAccess)
         {
-            if (--orderByQuery.Observations == 0)
+            var remaining = --orderByQuery.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedOrderByQueries.Remove(orderByQuery.SelectorsAndDirections);
                 return true;
@@ -1365,7 +1410,10 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         lock (cachedPrependQueriesAccess)
         {
-            if (--prependQuery.Observations == 0)
+            var remaining = --prependQuery.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedPrependQueries.Remove(prependQuery.Prepended);
                 return true;
@@ -1378,7 +1426,10 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         lock (cachedSelectQueriesAccess)
         {
-            if (--selectQuery.Observations == 0)
+            var remaining = --selectQuery.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedSelectQueries.Remove(selectQuery.Selector);
                 return true;
@@ -1391,7 +1442,10 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         lock (cachedSelectManyQueriesAccess)
         {
-            if (--selectManyQuery.Observations == 0)
+            var remaining = --selectManyQuery.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedSelectManyQueries.Remove(selectManyQuery.Selector);
                 return true;
@@ -1404,7 +1458,10 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         lock (cachedSliceQueriesAccess)
         {
-            if (--sliceQuery.Observations == 0)
+            var remaining = --sliceQuery.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedSliceQueries.Remove(sliceQuery.Range);
                 return true;
@@ -1417,7 +1474,10 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         lock (cachedSumQueriesAccess)
         {
-            if (--sumQuery.Observations == 0)
+            var remaining = --sumQuery.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedSumQueries.Remove(sumQuery.Selector);
                 return true;
@@ -1431,7 +1491,10 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         lock (cachedToDictionaryQueriesAccess)
         {
-            if (--toDictionaryQuery.Observations == 0)
+            var remaining = --toDictionaryQuery.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedToDictionaryQueries.Remove((toDictionaryQuery.KeySelector, toDictionaryQuery.ValueSelector, toDictionaryQuery.EqualityComparer));
                 return true;
@@ -1444,7 +1507,10 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         lock (cachedUsingSynchronizationCallbackEventuallyQueriesAccess)
         {
-            if (--usingSynchronizationCallbackEventuallyQuery.Observations == 0)
+            var remaining = --usingSynchronizationCallbackEventuallyQuery.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedUsingSynchronizationCallbackEventuallyQueries.Remove((usingSynchronizationCallbackEventuallyQuery.Context, usingSynchronizationCallbackEventuallyQuery.SynchronizationCallback));
                 return true;
@@ -1457,7 +1523,10 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         lock (cachedUsingSynchronizationCallbackQueriesAccess)
         {
-            if (--usingSynchronizationCallbackQuery.Observations == 0)
+            var remaining = --usingSynchronizationCallbackQuery.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedUsingSynchronizationCallbackQueries.Remove((usingSynchronizationCallbackQuery.Context, usingSynchronizationCallbackQuery.SynchronizationCallback));
                 return true;
@@ -1470,7 +1539,10 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         lock (cachedUsingSynchronizationContextEventuallyQueriesAccess)
         {
-            if (--usingSynchronizationContextEventuallyQuery.Observations == 0)
+            var remaining = --usingSynchronizationContextEventuallyQuery.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedUsingSynchronizationContextEventuallyQueries.Remove(usingSynchronizationContextEventuallyQuery.SynchronizationContext);
                 return true;
@@ -1483,7 +1555,10 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         lock (cachedUsingSynchronizationContextQueriesAccess)
         {
-            if (--usingSynchronizationContextQuery.Observations == 0)
+            var remaining = --usingSynchronizationContextQuery.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedUsingSynchronizationContextQueries.Remove(usingSynchronizationContextQuery.SynchronizationContext);
                 return true;
@@ -1496,7 +1571,10 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         lock (cachedUsingSyncRootEventuallyQueriesAccess)
         {
-            if (--usingSyncRootEventuallyQuery.Observations == 0)
+            var remaining = --usingSyncRootEventuallyQuery.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedUsingSyncRootEventuallyQueries.Remove(usingSyncRootEventuallyQuery.SyncRoot);
                 return true;
@@ -1509,7 +1587,10 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         lock (cachedUsingSyncRootQueriesAccess)
         {
-            if (--usingSyncRootQuery.Observations == 0)
+            var remaining = --usingSyncRootQuery.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedUsingSyncRootQueries.Remove(usingSyncRootQuery.SyncRoot);
                 return true;
@@ -1522,7 +1603,10 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         lock (cachedWhereQueriesAccess)
         {
-            if (--whereQuery.Observations == 0)
+            var remaining = --whereQuery.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedWhereQueries.Remove(whereQuery.Predicate);
                 return true;

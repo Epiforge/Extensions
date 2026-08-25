@@ -86,7 +86,7 @@ public class CollectionObserver :
             ++enumerableObservableCollection.Observations;
         }
         enumerableObservableCollection.Initialize();
-        return enumerableObservableCollection;
+        return enumerableObservableCollection.AsScoped();
     }
 
     /// <inheritdoc/>
@@ -106,7 +106,7 @@ public class CollectionObserver :
             ++listObservableCollection.Observations;
         }
         listObservableCollection.Initialize();
-        return listObservableCollection;
+        return listObservableCollection.AsScoped();
     }
 
     /// <inheritdoc/>
@@ -126,7 +126,7 @@ public class CollectionObserver :
             ++enumerableObservableCollection.Observations;
         }
         enumerableObservableCollection.Initialize();
-        return enumerableObservableCollection;
+        return enumerableObservableCollection.AsScoped();
     }
 
     /// <inheritdoc/>
@@ -146,11 +146,12 @@ public class CollectionObserver :
             ++listObservableCollection.Observations;
         }
         listObservableCollection.Initialize();
-        return listObservableCollection;
+        return listObservableCollection.AsScoped();
     }
 
-    /// <inheritdoc/>
-    public IObservableCollectionQuery<TElement> ObserveReadOnlyList<TElement>(IReadOnlyList<TElement> readOnlyList)
+    // internal callers that need the query itself, rather than a scoped instance they would then
+    // have to keep and dispose, go through this; the public entry point below scopes it for callers
+    internal ObservableCollectionQueryReadOnlyList<TElement> GetObservableCollectionQuery<TElement>(IReadOnlyList<TElement> readOnlyList)
     {
         ArgumentNullException.ThrowIfNull(readOnlyList);
         ObservableCollectionQueryReadOnlyList<TElement> readOnlyListObservableCollection;
@@ -170,6 +171,10 @@ public class CollectionObserver :
     }
 
     /// <inheritdoc/>
+    public IObservableCollectionQuery<TElement> ObserveReadOnlyList<TElement>(IReadOnlyList<TElement> readOnlyList) =>
+        GetObservableCollectionQuery(readOnlyList).AsScoped();
+
+    /// <inheritdoc/>
     public IObservableDictionaryQuery<TKey, TValue> ObserveReadOnlyDictionary<TKey, TValue>(IReadOnlyDictionary<TKey, TValue> dictionary)
         where TKey : notnull
     {
@@ -187,14 +192,17 @@ public class CollectionObserver :
             ++readOnlyDictionaryObservableDictionary.Observations;
         }
         readOnlyDictionaryObservableDictionary.Initialize();
-        return readOnlyDictionaryObservableDictionary;
+        return readOnlyDictionaryObservableDictionary.AsScoped();
     }
 
     internal bool QueryDisposed(ObservableCollectionQueryEnumerable enumerableObservableCollection)
     {
         lock (cachedEnumerableObservableCollectionsAccess)
         {
-            if (--enumerableObservableCollection.Observations == 0)
+            var remaining = --enumerableObservableCollection.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedEnumerableObservableCollections.Remove(enumerableObservableCollection.Enumerable);
                 return true;
@@ -207,7 +215,10 @@ public class CollectionObserver :
     {
         lock (cachedListObservableCollectionsAccess)
         {
-            if (--listObservableCollection.Observations == 0)
+            var remaining = --listObservableCollection.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedListObservableCollections.Remove(listObservableCollection.List);
                 return true;
@@ -220,7 +231,10 @@ public class CollectionObserver :
     {
         lock (cachedGenericEnumerableObservableCollectionsAccess)
         {
-            if (--enumerableObservableCollection.Observations == 0)
+            var remaining = --enumerableObservableCollection.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedGenericEnumerableObservableCollections.Remove(enumerableObservableCollection.Enumerable);
                 return true;
@@ -233,7 +247,10 @@ public class CollectionObserver :
     {
         lock (cachedGenericListObservableCollectionsAccess)
         {
-            if (--listObservableCollection.Observations == 0)
+            var remaining = --listObservableCollection.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedGenericListObservableCollections.Remove(listObservableCollection.List);
                 return true;
@@ -246,7 +263,10 @@ public class CollectionObserver :
     {
         lock (cachedReadOnlyListObservableCollectionsAccess)
         {
-            if (--readOnlyListObservableCollection.Observations == 0)
+            var remaining = --readOnlyListObservableCollection.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedReadOnlyListObservableCollections.Remove(readOnlyListObservableCollection.ReadOnlyList);
                 return true;
@@ -260,7 +280,10 @@ public class CollectionObserver :
     {
         lock (cachedReadOnlyDictionaryObservableDictionariesAccess)
         {
-            if (--readOnlyDictionaryObservableDictionary.Observations == 0)
+            var remaining = --readOnlyDictionaryObservableDictionary.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedReadOnlyDictionaryObservableDictionaries.Remove(readOnlyDictionaryObservableDictionary.ReadOnlyDictionary);
                 return true;

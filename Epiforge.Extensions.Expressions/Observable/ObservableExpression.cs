@@ -152,11 +152,14 @@ abstract class ObservableExpression :
     }
 }
 
-class ObservableExpression<TResult> :
-    SyncDisposable,
-    IObservableExpression<TResult>
+// What callers of IExpressionObserver.Observe receive. Unlike the ObservableExpression nodes
+// beneath them, these are NOT cached: every call to Observe produces a new one holding exactly
+// one reference to the shared node. Identity is therefore per-caller, so disposing one cannot
+// release another caller's claim on the same node, and Dispose can be idempotent
+// without becoming a no-op for a second legitimate owner.
+abstract class ScopedObservableExpression
 {
-    public ObservableExpression(ExpressionObserver observer, Expression expression, ObservableExpression observableExpression, IReadOnlyList<object?> arguments)
+    protected ScopedObservableExpression(ExpressionObserver observer, Expression expression, ObservableExpression observableExpression, IReadOnlyList<object?> arguments)
     {
         ArgumentNullException.ThrowIfNull(observer);
         ArgumentNullException.ThrowIfNull(expression);
@@ -170,13 +173,62 @@ class ObservableExpression<TResult> :
         Arguments = arguments;
     }
 
-    readonly ObservableExpression observableExpression;
+    private protected readonly ObservableExpression observableExpression;
     readonly ExpressionObserver observer;
+    int disposed;
 
-    internal int Observations;
     internal readonly Expression Expression;
 
     public IReadOnlyList<object?> Arguments { get; }
+
+    public bool IsDisposed =>
+        disposed != 0;
+
+    public IExpressionObserver Observer =>
+        observer;
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    public event PropertyChangingEventHandler? PropertyChanging;
+
+    public event EventHandler<DisposalNotificationEventArgs>? Disposed;
+
+    public event EventHandler<DisposalNotificationEventArgs>? Disposing;
+
+#pragma warning disable CS0067 // disposal here is never overridden: releasing this scope's single claim on the node always succeeds
+    public event EventHandler<DisposalNotificationEventArgs>? DisposalOverridden;
+#pragma warning restore CS0067
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref disposed, 1) != 0)
+            return;
+        var e = DisposalNotificationEventArgs.ByCallingDispose;
+        Disposing?.Invoke(this, e);
+        observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
+        observableExpression.PropertyChanging -= ObservableExpressionPropertyChanging;
+        observableExpression.Dispose();
+        Disposed?.Invoke(this, e);
+    }
+
+    void ObservableExpressionPropertyChanged(object? sender, PropertyChangedEventArgs e) =>
+        PropertyChanged?.Invoke(this, e);
+
+    void ObservableExpressionPropertyChanging(object? sender, PropertyChangingEventArgs e) =>
+        PropertyChanging?.Invoke(this, e);
+
+    public override string ToString() =>
+        Expression.ToString();
+}
+
+class ScopedObservableExpression<TResult> :
+    ScopedObservableExpression,
+    IObservableExpression<TResult>
+{
+    public ScopedObservableExpression(ExpressionObserver observer, Expression expression, ObservableExpression observableExpression, IReadOnlyList<object?> arguments) :
+        base(observer, expression, observableExpression, arguments)
+    {
+    }
 
     public (Exception? Fault, TResult Result) Evaluation
     {
@@ -186,239 +238,50 @@ class ObservableExpression<TResult> :
             return (fault, (TResult)result!);
         }
     }
-
-    public IExpressionObserver Observer =>
-        observer;
-
-    protected override bool Dispose(bool disposing)
-    {
-        if (disposing)
-        {
-            var removedFromCache = observer.ExpressionDisposed(this);
-            if (removedFromCache)
-            {
-                observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
-                observableExpression.PropertyChanging -= ObservableExpressionPropertyChanging;
-                observableExpression.Dispose();
-            }
-            return removedFromCache;
-        }
-        return true;
-    }
-
-    void ObservableExpressionPropertyChanged(object? sender, PropertyChangedEventArgs e) =>
-        OnPropertyChanged(e);
-
-    void ObservableExpressionPropertyChanging(object? sender, PropertyChangingEventArgs e) =>
-        OnPropertyChanging(e);
-
-    public override string ToString() =>
-        Expression.ToString();
 }
 
-class ObservableExpression<TArgument, TResult> :
-    SyncDisposable,
+class ScopedObservableExpression<TArgument, TResult> :
+    ScopedObservableExpression<TResult>,
     IObservableExpression<TArgument, TResult>
 {
-    public ObservableExpression(ExpressionObserver observer, Expression expression, ObservableExpression observableExpression, TArgument argument)
-    {
-        ArgumentNullException.ThrowIfNull(observer);
-        ArgumentNullException.ThrowIfNull(expression);
-        ArgumentNullException.ThrowIfNull(observableExpression);
-        this.observer = observer;
-        Expression = expression;
-        this.observableExpression = observableExpression;
-        this.observableExpression.PropertyChanged += ObservableExpressionPropertyChanged;
-        this.observableExpression.PropertyChanging += ObservableExpressionPropertyChanging;
+    public ScopedObservableExpression(ExpressionObserver observer, Expression expression, ObservableExpression observableExpression, TArgument argument) :
+        base(observer, expression, observableExpression, [argument]) =>
         Argument = argument;
-        Arguments = [argument];
-    }
-
-    readonly ObservableExpression observableExpression;
-    readonly ExpressionObserver observer;
-
-    internal int Observations;
-    internal readonly Expression Expression;
-
-    public IReadOnlyList<object?> Arguments { get; }
 
     public TArgument Argument { get; }
-
-    public (Exception? Fault, TResult Result) Evaluation
-    {
-        get
-        {
-            var (fault, result) = observableExpression.Evaluation;
-            return (fault, (TResult)result!);
-        }
-    }
-
-    public IExpressionObserver Observer =>
-        observer;
-
-    protected override bool Dispose(bool disposing)
-    {
-        if (disposing)
-        {
-            var removedFromCache = observer.ExpressionDisposed(this);
-            if (removedFromCache)
-            {
-                observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
-                observableExpression.PropertyChanging -= ObservableExpressionPropertyChanging;
-                observableExpression.Dispose();
-            }
-            return removedFromCache;
-        }
-        return true;
-    }
-
-    void ObservableExpressionPropertyChanged(object? sender, PropertyChangedEventArgs e) =>
-        OnPropertyChanged(e);
-
-    void ObservableExpressionPropertyChanging(object? sender, PropertyChangingEventArgs e) =>
-        OnPropertyChanging(e);
-
-    public override string ToString() =>
-        Expression.ToString();
 }
 
-class ObservableExpression<TArgument1, TArgument2, TResult> :
-    SyncDisposable,
+class ScopedObservableExpression<TArgument1, TArgument2, TResult> :
+    ScopedObservableExpression<TResult>,
     IObservableExpression<TArgument1, TArgument2, TResult>
 {
-    public ObservableExpression(ExpressionObserver observer, Expression expression, ObservableExpression observableExpression, TArgument1 argument1, TArgument2 argument2)
+    public ScopedObservableExpression(ExpressionObserver observer, Expression expression, ObservableExpression observableExpression, TArgument1 argument1, TArgument2 argument2) :
+        base(observer, expression, observableExpression, [argument1, argument2])
     {
-        ArgumentNullException.ThrowIfNull(observer);
-        ArgumentNullException.ThrowIfNull(expression);
-        ArgumentNullException.ThrowIfNull(observableExpression);
-        this.observer = observer;
-        Expression = expression;
-        this.observableExpression = observableExpression;
-        this.observableExpression.PropertyChanged += ObservableExpressionPropertyChanged;
-        this.observableExpression.PropertyChanging += ObservableExpressionPropertyChanging;
         Argument1 = argument1;
         Argument2 = argument2;
-        Arguments = [argument1, argument2];
     }
-
-    readonly ObservableExpression observableExpression;
-    readonly ExpressionObserver observer;
-
-    internal int Observations;
-    internal readonly Expression Expression;
-
-    public IReadOnlyList<object?> Arguments { get; }
 
     public TArgument1 Argument1 { get; }
 
     public TArgument2 Argument2 { get; }
-
-    public (Exception? Fault, TResult Result) Evaluation
-    {
-        get
-        {
-            var (fault, result) = observableExpression.Evaluation;
-            return (fault, (TResult)result!);
-        }
-    }
-
-    public IExpressionObserver Observer =>
-        observer;
-
-    protected override bool Dispose(bool disposing)
-    {
-        if (disposing)
-        {
-            var removedFromCache = observer.ExpressionDisposed(this);
-            if (removedFromCache)
-            {
-                observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
-                observableExpression.PropertyChanging -= ObservableExpressionPropertyChanging;
-                observableExpression.Dispose();
-            }
-            return removedFromCache;
-        }
-        return true;
-    }
-
-    void ObservableExpressionPropertyChanged(object? sender, PropertyChangedEventArgs e) =>
-        OnPropertyChanged(e);
-
-    void ObservableExpressionPropertyChanging(object? sender, PropertyChangingEventArgs e) =>
-        OnPropertyChanging(e);
-
-    public override string ToString() =>
-        Expression.ToString();
 }
 
-class ObservableExpression<TArgument1, TArgument2, TArgument3, TResult> :
-    SyncDisposable,
+class ScopedObservableExpression<TArgument1, TArgument2, TArgument3, TResult> :
+    ScopedObservableExpression<TResult>,
     IObservableExpression<TArgument1, TArgument2, TArgument3, TResult>
 {
-    public ObservableExpression(ExpressionObserver observer, Expression expression, ObservableExpression observableExpression, TArgument1 argument1, TArgument2 argument2, TArgument3 argument3)
+    public ScopedObservableExpression(ExpressionObserver observer, Expression expression, ObservableExpression observableExpression, TArgument1 argument1, TArgument2 argument2, TArgument3 argument3) :
+        base(observer, expression, observableExpression, [argument1, argument2, argument3])
     {
-        ArgumentNullException.ThrowIfNull(observer);
-        ArgumentNullException.ThrowIfNull(expression);
-        ArgumentNullException.ThrowIfNull(observableExpression);
-        this.observer = observer;
-        Expression = expression;
-        this.observableExpression = observableExpression;
-        this.observableExpression.PropertyChanged += ObservableExpressionPropertyChanged;
-        this.observableExpression.PropertyChanging += ObservableExpressionPropertyChanging;
         Argument1 = argument1;
         Argument2 = argument2;
         Argument3 = argument3;
-        Arguments = [argument1, argument2, argument3];
     }
-
-    readonly ObservableExpression observableExpression;
-    readonly ExpressionObserver observer;
-
-    internal int Observations;
-    internal readonly Expression Expression;
-
-    public IReadOnlyList<object?> Arguments { get; }
 
     public TArgument1 Argument1 { get; }
 
     public TArgument2 Argument2 { get; }
 
     public TArgument3 Argument3 { get; }
-
-    public (Exception? Fault, TResult Result) Evaluation
-    {
-        get
-        {
-            var (fault, result) = observableExpression.Evaluation;
-            return (fault, (TResult)result!);
-        }
-    }
-
-    public IExpressionObserver Observer =>
-        observer;
-
-    protected override bool Dispose(bool disposing)
-    {
-        if (disposing)
-        {
-            var removedFromCache = observer.ExpressionDisposed(this);
-            if (removedFromCache)
-            {
-                observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
-                observableExpression.PropertyChanging -= ObservableExpressionPropertyChanging;
-                observableExpression.Dispose();
-            }
-            return removedFromCache;
-        }
-        return true;
-    }
-
-    void ObservableExpressionPropertyChanged(object? sender, PropertyChangedEventArgs e) =>
-        OnPropertyChanged(e);
-
-    void ObservableExpressionPropertyChanging(object? sender, PropertyChangingEventArgs e) =>
-        OnPropertyChanging(e);
-
-    public override string ToString() =>
-        Expression.ToString();
 }

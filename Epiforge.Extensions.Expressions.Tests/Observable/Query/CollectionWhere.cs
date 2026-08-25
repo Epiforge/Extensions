@@ -21,7 +21,7 @@ public class CollectionWhere
                 source[12].Name = "Jack";
                 Assert.IsTrue(new string[] { "Erin", "Jack" }.SequenceEqual(whereQuery.Select(person => person.Name)));
                 using var whereQuery2 = sourceQuery.ObserveWhere(p => p.Name!.Length == 4);
-                Assert.AreSame(whereQuery, whereQuery2);
+                Assert.AreNotSame(whereQuery, whereQuery2);
                 Assert.AreEqual(1, sourceQuery.CachedObservableQueries);
             }
             Assert.AreEqual(0, sourceQuery.CachedObservableQueries);
@@ -55,7 +55,7 @@ public class CollectionWhere
                 source[14] = new TestPerson("Tony");
                 Assert.IsTrue(new string[] { "John", "Erin", "Tony", "Jill", "Nick", "Dana" }.SequenceEqual(whereQuery.Select(person => person.Name)));
                 using var whereQuery2 = sourceQuery.ObserveWhere(p => p.Name!.Length == 4);
-                Assert.AreSame(whereQuery, whereQuery2);
+                Assert.AreNotSame(whereQuery, whereQuery2);
                 Assert.AreEqual(1, sourceQuery.CachedObservableQueries);
             }
             Assert.AreEqual(0, sourceQuery.CachedObservableQueries);
@@ -85,7 +85,7 @@ public class CollectionWhere
                 source.RemoveRange(8, 2);
                 Assert.IsTrue(new string[] { "Cliff", "Craig" }.SequenceEqual(whereQuery.Select(person => person.Name)));
                 using var whereQuery2 = sourceQuery.ObserveWhere(p => p.Name!.Length == 5);
-                Assert.AreSame(whereQuery, whereQuery2);
+                Assert.AreNotSame(whereQuery, whereQuery2);
                 Assert.AreEqual(1, sourceQuery.CachedObservableQueries);
             }
             Assert.AreEqual(0, sourceQuery.CachedObservableQueries);

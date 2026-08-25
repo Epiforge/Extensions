@@ -23,7 +23,7 @@ public class DictionaryAggregate
                 Assert.AreEqual(2.5, aggregateQuery.Evaluation.Result);
                 Assert.AreEqual(1, sourceQuery.CachedObservableQueries);
                 using var aggregateQuery2 = sourceQuery.ObserveAggregate(seedFactory, func, resultSelector);
-                Assert.AreSame(aggregateQuery, aggregateQuery2);
+                Assert.AreNotSame(aggregateQuery, aggregateQuery2);
                 Assert.AreEqual(1, sourceQuery.CachedObservableQueries);
             }
             Assert.AreEqual(0, sourceQuery.CachedObservableQueries);

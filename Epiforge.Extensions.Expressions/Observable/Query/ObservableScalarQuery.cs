@@ -38,6 +38,9 @@ abstract class ObservableScalarQuery<TResult>(CollectionObserver collectionObser
         }
     }
 
+    internal IObservableScalarQuery<TResult> AsScoped() =>
+        new ScopedObservableScalarQuery<TResult>(this);
+
     public IObservableScalarQuery<TTransform> ObserveTransform<TTransform>(Expression<Func<TResult, TTransform>> transform)
     {
         ArgumentNullException.ThrowIfNull(transform);
@@ -52,14 +55,17 @@ abstract class ObservableScalarQuery<TResult>(CollectionObserver collectionObser
             ++transformQuery.Observations;
         }
         transformQuery.Initialize();
-        return (IObservableScalarQuery<TTransform>)transformQuery;
+        return ((ObservableScalarQuery<TTransform>)transformQuery).AsScoped();
     }
 
     internal bool QueryDisposed<TTransform>(ObservableScalarTransformQuery<TResult, TTransform> query)
     {
         lock (cachedTransformQueriesAccess)
         {
-            if (--query.Observations == 0)
+            var remaining = --query.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedTransformQueries.Remove(query.Transform);
                 return true;

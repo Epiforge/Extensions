@@ -140,6 +140,9 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
         protected set => SetBackedProperty(ref operationFault, in value, operationFaultPropertyChangingEventArgs, operationFaultPropertyChangedEventArgs);
     }
 
+    internal IObservableDictionaryQuery<TKey, TValue> AsScoped() =>
+        new ScopedObservableDictionaryQuery<TKey, TValue>(this);
+
     public virtual object SyncRoot =>
         null!;
 
@@ -295,7 +298,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
             ++aggregateQuery.Observations;
         }
         aggregateQuery.Initialize();
-        return aggregateQuery;
+        return aggregateQuery.AsScoped();
     }
 
     [return: DisposeWhenDiscarded]
@@ -316,7 +319,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
             ++allQuery.Observations;
         }
         allQuery.Initialize();
-        return allQuery;
+        return allQuery.AsScoped();
     }
 
     [return: DisposeWhenDiscarded]
@@ -333,7 +336,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
             ++anyQuery.Observations;
         }
         anyQuery.Initialize();
-        return anyQuery;
+        return anyQuery.AsScoped();
     }
 
     [return: DisposeWhenDiscarded]
@@ -354,7 +357,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
             ++anyQuery.Observations;
         }
         anyQuery.Initialize();
-        return anyQuery;
+        return anyQuery.AsScoped();
     }
 
     [return: DisposeWhenDiscarded]
@@ -383,7 +386,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
             ++cachedConcurrentQuery.Observations;
         }
         cachedConcurrentQuery.Initialize();
-        return cachedConcurrentQuery;
+        return cachedConcurrentQuery.AsScoped();
     }
 
     [return: DisposeWhenDiscarded]
@@ -395,7 +398,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
             ++cachedCountQuery.Observations;
         }
         cachedCountQuery.Initialize();
-        return cachedCountQuery;
+        return cachedCountQuery.AsScoped();
     }
 
     [return: DisposeWhenDiscarded]
@@ -451,7 +454,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     }
 
     [return: DisposeWhenDiscarded]
-    ObservableDictionaryKeyedQuery<TKey, TValue> ObserveKeyed(IComparer<TKey>? keyComparer, bool notFoundIsDefault)
+    IObservableScalarQuery<KeyValuePair<TKey, TValue>> ObserveKeyed(IComparer<TKey>? keyComparer, bool notFoundIsDefault)
     {
         ObservableDictionaryKeyedQuery<TKey, TValue> keyedQuery;
         lock (cachedKeyedQueriesAccess)
@@ -465,7 +468,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
             ++keyedQuery.Observations;
         }
         keyedQuery.Initialize();
-        return keyedQuery;
+        return keyedQuery.AsScoped();
     }
 
     [return: DisposeWhenDiscarded]
@@ -579,7 +582,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
             ++selectQuery.Observations;
         }
         selectQuery.Initialize();
-        return (ObservableDictionarySelectQuery<TResultKey, TResultValue, TKey, TValue>)selectQuery;
+        return ((ObservableDictionarySelectQuery<TResultKey, TResultValue, TKey, TValue>)selectQuery).AsScoped();
     }
 
     [return: DisposeWhenDiscarded]
@@ -647,7 +650,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
             ++toCollectionQuery.Observations;
         }
         toCollectionQuery.Initialize();
-        return (ObservableDictionaryToCollectionQuery<TElement, TKey, TValue>)toCollectionQuery;
+        return ((ObservableDictionaryToCollectionQuery<TElement, TKey, TValue>)toCollectionQuery).AsScoped();
     }
 
     [return: DisposeWhenDiscarded]
@@ -665,7 +668,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
             ++usingSynchronizationContextEventuallyQuery.Observations;
         }
         usingSynchronizationContextEventuallyQuery.Initialize();
-        return usingSynchronizationContextEventuallyQuery;
+        return usingSynchronizationContextEventuallyQuery.AsScoped();
     }
 
     [return: DisposeWhenDiscarded]
@@ -683,7 +686,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
             ++usingSynchronizationContextQuery.Observations;
         }
         usingSynchronizationContextQuery.Initialize();
-        return usingSynchronizationContextQuery;
+        return usingSynchronizationContextQuery.AsScoped();
     }
 
     [return: DisposeWhenDiscarded]
@@ -695,7 +698,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
         ObserveValueFor(key, true);
 
     [return: DisposeWhenDiscarded]
-    ObservableDictionaryValueForQuery<TKey, TValue> ObserveValueFor(TKey key, bool notFoundIsDefault)
+    IObservableScalarQuery<TValue> ObserveValueFor(TKey key, bool notFoundIsDefault)
     {
         ArgumentNullException.ThrowIfNull(key);
         ObservableDictionaryValueForQuery<TKey, TValue> valueForQuery;
@@ -710,7 +713,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
             ++valueForQuery.Observations;
         }
         valueForQuery.Initialize();
-        return valueForQuery;
+        return valueForQuery.AsScoped();
     }
 
     [return: DisposeWhenDiscarded]
@@ -735,7 +738,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
             ++whereQuery.Observations;
         }
         whereQuery.Initialize();
-        return (ObservableDictionaryWhereQuery<TKey, TValue>)whereQuery;
+        return ((ObservableDictionaryWhereQuery<TKey, TValue>)whereQuery).AsScoped();
     }
 
     #endregion Observation Methods
@@ -746,7 +749,10 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     {
         lock (cachedAggregateQueriesAccess)
         {
-            if (--aggregateQuery.Observations == 0)
+            var remaining = --aggregateQuery.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedAggregateQueries.Remove((aggregateQuery.SeedFactory, aggregateQuery.Func, aggregateQuery.ResultSelector));
                 return true;
@@ -759,7 +765,10 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     {
         lock (cachedAllQueriesAccess)
         {
-            if (--query.Observations == 0)
+            var remaining = --query.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedAllQueries.Remove(query.Predicate);
                 return true;
@@ -772,7 +781,10 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     {
         lock (cachedAnyQueriesAccess)
         {
-            if (--query.Observations == 0)
+            var remaining = --query.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedAnyQueries.Remove(query.Predicate);
                 return true;
@@ -785,7 +797,10 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     {
         lock (cachedConcurrentQueryAccess)
         {
-            if (--query.Observations == 0)
+            var remaining = --query.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedConcurrentQuery = null;
                 return true;
@@ -798,7 +813,10 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     {
         lock (cachedCountQueryAccess)
         {
-            if (--query.Observations == 0)
+            var remaining = --query.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedCountQuery = null;
                 return true;
@@ -811,7 +829,10 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     {
         lock (cachedKeyedQueriesAccess)
         {
-            if (--query.Observations == 0)
+            var remaining = --query.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedKeyedQueries.Remove((query.KeyComparer, query.NotFoundIsDefault));
                 return true;
@@ -825,7 +846,10 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     {
         lock (cachedSelectQueriesAccess)
         {
-            if (--query.Observations == 0)
+            var remaining = --query.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedSelectQueries.Remove((query.KeyValuePairSelector, query.EqualityComparer));
                 return true;
@@ -838,7 +862,10 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     {
         lock (cachedToCollectionQueriesAccess)
         {
-            if (--query.Observations == 0)
+            var remaining = --query.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedToCollectionQueries.Remove(query.Selector);
                 return true;
@@ -851,7 +878,10 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     {
         lock (cachedUsingSynchronizationContextEventuallyQueriesAccess)
         {
-            if (--usingSynchronizationContextEventuallyQuery.Observations == 0)
+            var remaining = --usingSynchronizationContextEventuallyQuery.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedUsingSynchronizationContextEventuallyQueries.Remove(usingSynchronizationContextEventuallyQuery.SynchronizationContext);
                 return true;
@@ -864,7 +894,10 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     {
         lock (cachedUsingSynchronizationContextQueriesAccess)
         {
-            if (--usingSynchronizationContextQuery.Observations == 0)
+            var remaining = --usingSynchronizationContextQuery.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedUsingSynchronizationContextQueries.Remove(usingSynchronizationContextQuery.SynchronizationContext);
                 return true;
@@ -877,7 +910,10 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     {
         lock (cachedValueForQueriesAccess)
         {
-            if (--query.Observations == 0)
+            var remaining = --query.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedValueForQueries.Remove((query.Key, query.NotFoundIsDefault));
                 return true;
@@ -890,7 +926,10 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     {
         lock (cachedWhereQueriesAccess)
         {
-            if (--query.Observations == 0)
+            var remaining = --query.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
             {
                 cachedWhereQueries.Remove(query.Predicate);
                 return true;

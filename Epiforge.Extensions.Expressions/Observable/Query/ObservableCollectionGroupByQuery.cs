@@ -56,7 +56,7 @@ sealed class ObservableCollectionGroupByQuery<TKey, TElement> :
         if (!collectionAndGroupingByKey.TryGetValue(key, out var collectionAndGrouping))
         {
             collection = collectionObserver.ExpressionObserver.Logger is { } logger ? new(logger) : new();
-            var grouping = new ObservableGrouping<TKey, TElement>(collectionObserver, key, (ObservableCollectionQuery<TElement>)collectionObserver.ObserveReadOnlyList(collection));
+            var grouping = new ObservableGrouping<TKey, TElement>(collectionObserver, key, collectionObserver.GetObservableCollectionQuery(collection));
             grouping.Initialize();
             collectionAndGrouping = (collection, grouping);
             collectionAndGroupingByKey.Add(key, collectionAndGrouping);

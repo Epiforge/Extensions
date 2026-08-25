@@ -58,7 +58,7 @@ sealed class ObservableCollectionLookupQuery<TKey, TElement> :
                 if (groupingByKey.TryGetValue(key, out var existingGrouping))
                     return existingGrouping;
                 var collection = collectionObserver.ExpressionObserver.Logger is { } logger ? new ObservableRangeCollection<TElement>(logger) : new ObservableRangeCollection<TElement>();
-                var grouping = new ObservableGrouping<TKey, TElement>(collectionObserver, key, (ObservableCollectionQuery<TElement>)collectionObserver.ObserveReadOnlyList(collection));
+                var grouping = new ObservableGrouping<TKey, TElement>(collectionObserver, key, collectionObserver.GetObservableCollectionQuery(collection));
                 grouping.Initialize();
                 var collectionAndGrouping = (collection, grouping);
                 collectionAndGroupingByKey.Add(key, collectionAndGrouping);
@@ -138,7 +138,7 @@ sealed class ObservableCollectionLookupQuery<TKey, TElement> :
         if (!collectionAndGroupingByKey.TryGetValue(key, out var collectionAndGrouping))
         {
             collection = collectionObserver.ExpressionObserver.Logger is { } logger ? new(logger) : new();
-            var grouping = new ObservableGrouping<TKey, TElement>(collectionObserver, key, (ObservableCollectionQuery<TElement>)collectionObserver.ObserveReadOnlyList(collection));
+            var grouping = new ObservableGrouping<TKey, TElement>(collectionObserver, key, collectionObserver.GetObservableCollectionQuery(collection));
             grouping.Initialize();
             collectionAndGrouping = (collection, grouping);
             collectionAndGroupingByKey.Add(key, collectionAndGrouping);
@@ -160,6 +160,9 @@ sealed class ObservableCollectionLookupQuery<TKey, TElement> :
 
     bool ICollection<KeyValuePair<TKey, IObservableGrouping<TKey, TElement>>>.Contains(KeyValuePair<TKey, IObservableGrouping<TKey, TElement>> item) =>
         throw new NotSupportedException();
+
+    internal new IObservableLookupQuery<TKey, TElement> AsScoped() =>
+        new ScopedObservableLookupQuery<TKey, TElement>(this);
 
     public bool ContainsKey(TKey key)
     {
