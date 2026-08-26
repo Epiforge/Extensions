@@ -94,8 +94,7 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue>(CollectionObserver col
     public override IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator()
     {
         lock (access)
-            foreach (var keyValuePair in result)
-                yield return keyValuePair;
+            return result.ToList().AsReadOnly().GetEnumerator();
     }
 
     public override IReadOnlyList<KeyValuePair<TKey, TValue>> GetRange(IEnumerable<TKey> keys)

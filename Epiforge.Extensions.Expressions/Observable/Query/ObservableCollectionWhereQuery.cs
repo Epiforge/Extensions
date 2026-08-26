@@ -61,9 +61,7 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
     public override IEnumerator<TElement> GetEnumerator()
     {
         lock (access)
-            foreach (var observableExpression in observableExpressions!)
-                if (observableExpression.Evaluation.Result)
-                    yield return observableExpression.Argument;
+            return observableExpressions.Where(observableExpression => observableExpression.Evaluation.Result).Select(observableExpression => observableExpression.Argument).ToList().AsReadOnly().GetEnumerator();
     }
 
     void ObservableExpressionPropertyChanged(object? sender, PropertyChangedEventArgs e)

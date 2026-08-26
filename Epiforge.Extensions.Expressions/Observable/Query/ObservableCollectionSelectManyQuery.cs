@@ -97,11 +97,10 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
 
     public override IEnumerator<TResult> GetEnumerator()
     {
+        List<IEnumerable<TResult>> enumerables;
         lock (access)
-            foreach (var enumerable in select!)
-                if (enumerable is not null)
-                    foreach (var element in enumerable)
-                        yield return element;
+            enumerables = select!.ToList();
+        return enumerables.Where(enumerable => enumerable is not null).SelectMany(enumerable => enumerable).ToList().AsReadOnly().GetEnumerator();
     }
 
     int GetReducedStartingIndex(int mapIndex)

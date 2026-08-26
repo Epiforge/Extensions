@@ -53,8 +53,7 @@ sealed class ObservableCollectionIndividualChangesQuery<TElement> :
     public override IEnumerator<TElement> GetEnumerator()
     {
         lock (access)
-            foreach (var element in elements)
-                yield return element;
+            return elements.ToList().AsReadOnly().GetEnumerator();
     }
 
     protected override void OnInitialization()

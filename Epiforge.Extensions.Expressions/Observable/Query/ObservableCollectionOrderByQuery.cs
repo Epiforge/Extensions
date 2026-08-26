@@ -76,9 +76,8 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
 
     public override IEnumerator<TElement> GetEnumerator()
     {
-        lock(access)
-            foreach (var element in results)
-                yield return element;
+        lock (access)
+            return results.ToList().AsReadOnly().GetEnumerator();
     }
 
     protected override void OnInitialization()

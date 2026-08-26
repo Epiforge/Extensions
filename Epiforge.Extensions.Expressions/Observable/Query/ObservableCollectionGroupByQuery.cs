@@ -93,8 +93,7 @@ sealed class ObservableCollectionGroupByQuery<TKey, TElement> :
     public override IEnumerator<IObservableGrouping<TKey, TElement>> GetEnumerator()
     {
         lock (access)
-            foreach (var grouping in groupings)
-                yield return grouping;
+            return groupings.ToList().AsReadOnly().GetEnumerator();
     }
 
     void GroupingsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>

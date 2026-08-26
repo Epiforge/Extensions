@@ -61,8 +61,7 @@ sealed class ObservableDictionaryToCollectionQuery<TElement, TKey, TValue>(Colle
     public override IEnumerator<TElement> GetEnumerator()
     {
         lock (access)
-            foreach (var element in elements)
-                yield return element;
+            return elements.ToList().AsReadOnly().GetEnumerator();
     }
 
     void ObservableExpressionPropertyChanged(object? sender, PropertyChangedEventArgs e)

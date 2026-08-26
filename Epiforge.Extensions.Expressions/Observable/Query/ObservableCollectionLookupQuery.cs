@@ -201,15 +201,13 @@ sealed class ObservableCollectionLookupQuery<TKey, TElement> :
     public override IEnumerator<IObservableGrouping<TKey, TElement>> GetEnumerator()
     {
         lock (access)
-            foreach (var grouping in groupings)
-                yield return grouping;
+            return groupings.ToList().AsReadOnly().GetEnumerator();
     }
 
     IEnumerator<KeyValuePair<TKey, IObservableGrouping<TKey, TElement>>> IEnumerable<KeyValuePair<TKey, IObservableGrouping<TKey, TElement>>>.GetEnumerator()
     {
         lock (access)
-            foreach (var kv in groupingByKey)
-                yield return kv;
+            return groupingByKey.ToList().AsReadOnly().GetEnumerator();
     }
 
     public IReadOnlyList<KeyValuePair<TKey, IObservableGrouping<TKey, TElement>>> GetRange(IEnumerable<TKey> keys)

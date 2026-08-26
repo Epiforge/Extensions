@@ -1178,6 +1178,8 @@ public class ObservableConcurrentDictionary
             Assert.AreEqual(1, args!.NewItems!.Count);
             Assert.AreEqual("key", ((KeyValuePair<string, string>)args!.NewItems[0]!).Key);
             Assert.AreEqual("new value", ((KeyValuePair<string, string>)args!.NewItems[0]!).Value);
+            Assert.AreEqual(1, args!.OldItems!.Count);
+            Assert.AreEqual("value", ((KeyValuePair<string, string>)args!.OldItems[0]!).Value);
         }
         observableDictionary.CollectionChanged += collectionChangedHandler;
         void dictionaryChangedHandler(object? sender, NotifyDictionaryChangedEventArgs<string, string> args)
@@ -1187,6 +1189,8 @@ public class ObservableConcurrentDictionary
             Assert.AreEqual(1, args!.NewItems!.Count);
             Assert.AreEqual("key", args!.NewItems[0]!.Key);
             Assert.AreEqual("new value", args!.NewItems[0]!.Value);
+            Assert.AreEqual(1, args!.OldItems!.Count);
+            Assert.AreEqual("value", args!.OldItems[0]!.Value);
         }
         observableDictionary.DictionaryChanged += dictionaryChangedHandler;
         void nonGenericDictionaryChangedHandler(object? sender, NotifyDictionaryChangedEventArgs<object?, object?> args)
@@ -1196,6 +1200,8 @@ public class ObservableConcurrentDictionary
             Assert.AreEqual(1, args!.NewItems!.Count);
             Assert.AreEqual("key", args!.NewItems[0]!.Key);
             Assert.AreEqual("new value", args!.NewItems[0]!.Value);
+            Assert.AreEqual(1, args!.OldItems!.Count);
+            Assert.AreEqual("value", args!.OldItems[0]!.Value);
         }
         ((INotifyDictionaryChanged)observableDictionary).DictionaryChanged += nonGenericDictionaryChangedHandler;
         Assert.IsTrue(observableDictionary.TryUpdate("key", "new value", "value"));

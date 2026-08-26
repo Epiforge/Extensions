@@ -453,7 +453,7 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
     /// </summary>
     public virtual void Clear()
     {
-
+        // somewhere, George is clutching his chest like Yoda during Attack of the Clones
         var currentCd = Interlocked.Exchange(ref cd, comparer is not null ? concurrencyLevel is { } comparerCl ? capacity is { } comparerC ? new ConcurrentDictionary<TKey, TValue>(comparerCl, comparerC, comparer) : new ConcurrentDictionary<TKey, TValue>(comparerCl, [], comparer) : new ConcurrentDictionary<TKey, TValue>(comparer) : concurrencyLevel is { } cl && capacity is { } c ? new ConcurrentDictionary<TKey, TValue>(cl, c) : new ConcurrentDictionary<TKey, TValue>());
         NotifyCountChanged();
         OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Remove, [..currentCd]));
@@ -747,28 +747,17 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
     /// <returns>true if the value with key was equal to comparisonValue and was replaced with</returns>
     public virtual bool TryUpdate(TKey key, TValue newValue, TValue comparisonValue)
     {
-        try
+        var currentCd = Cd;
+        while (currentCd.TryGetValue(key, out var oldValue))
         {
-            TValue oldValue = default!;
-            Cd.AddOrUpdate(key, k => throw new KeyNotFoundException(), (k, v) =>
+            if (!EqualityComparer<TValue>.Default.Equals(oldValue, comparisonValue))
+                return false;
+            if (currentCd.TryUpdate(key, newValue, oldValue))
             {
-                if (EqualityComparer<TValue>.Default.Equals(v, comparisonValue))
-                {
-                    oldValue = v;
-                    return newValue;
-                }
-                throw new ValueComparisonUnequalException();
-            });
-            OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Replace, key, newValue, oldValue));
-            return true;
+                OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Replace, key, newValue, oldValue));
+                return true;
+            }
         }
-        catch (KeyNotFoundException)
-        {
-            return false;
-        }
-        catch (ValueComparisonUnequalException)
-        {
-            return false;
-        }
+        return false;
     }
 }
