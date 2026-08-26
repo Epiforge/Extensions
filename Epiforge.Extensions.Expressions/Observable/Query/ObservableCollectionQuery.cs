@@ -570,9 +570,17 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         ArgumentNullException.ThrowIfNull(selector);
         var select = ObserveSelect(selector);
-        var comparison = ((ScopedObservableCollectionQuery<TResult>)select).query.ObserveComparison(soughtComparison);
-        comparison.Disposed += (_, _) => select.Dispose();
-        return comparison;
+        try
+        {
+            var comparison = ((ScopedObservableCollectionQuery<TResult>)select).query.ObserveComparison(soughtComparison);
+            comparison.Disposed += (_, _) => select.Dispose();
+            return comparison;
+        }
+        catch
+        {
+            select.Dispose();
+            throw;
+        }
     }
 
     [return: DisposeWhenDiscarded]
@@ -612,9 +620,17 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         ArgumentNullException.ThrowIfNull(predicate);
         var where = ObserveWhere(predicate);
-        var count = where.ObserveCount();
-        count.Disposed += (_, _) => where.Dispose();
-        return count;
+        try
+        {
+            var count = where.ObserveCount();
+            count.Disposed += (_, _) => where.Dispose();
+            return count;
+        }
+        catch
+        {
+            where.Dispose();
+            throw;
+        }
     }
 
     [return: DisposeWhenDiscarded]
@@ -626,9 +642,17 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         ArgumentNullException.ThrowIfNull(comparer);
         var groupBy = ObserveGroupBy(element => element, comparer);
-        var select = groupBy.ObserveSelect(group => group.Key);
-        select.Disposed += (_, _) => groupBy.Dispose();
-        return select;
+        try
+        {
+            var select = groupBy.ObserveSelect(group => group.Key);
+            select.Disposed += (_, _) => groupBy.Dispose();
+            return select;
+        }
+        catch
+        {
+            groupBy.Dispose();
+            throw;
+        }
     }
 
     [return: DisposeWhenDiscarded]
@@ -648,9 +672,17 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         ArgumentNullException.ThrowIfNull(predicate);
         var where = ObserveWhere(predicate);
-        var first = where.ObserveFirst();
-        first.Disposed += (_, _) => where.Dispose();
-        return first;
+        try
+        {
+            var first = where.ObserveFirst();
+            first.Disposed += (_, _) => where.Dispose();
+            return first;
+        }
+        catch
+        {
+            where.Dispose();
+            throw;
+        }
     }
 
     [return: DisposeWhenDiscarded]
@@ -662,9 +694,17 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         ArgumentNullException.ThrowIfNull(predicate);
         var where = ObserveWhere(predicate);
-        var firstOrDefault = where.ObserveFirstOrDefault();
-        firstOrDefault.Disposed += (_, _) => where.Dispose();
-        return firstOrDefault;
+        try
+        {
+            var firstOrDefault = where.ObserveFirstOrDefault();
+            firstOrDefault.Disposed += (_, _) => where.Dispose();
+            return firstOrDefault;
+        }
+        catch
+        {
+            where.Dispose();
+            throw;
+        }
     }
 
     IObservableScalarQuery<TElement> ObserveIndex(Index? index, bool outOfRangeIsDefault)
@@ -733,9 +773,17 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         ArgumentNullException.ThrowIfNull(predicate);
         var where = ObserveWhere(predicate);
-        var last = where.ObserveLast();
-        last.Disposed += (_, _) => where.Dispose();
-        return last;
+        try
+        {
+            var last = where.ObserveLast();
+            last.Disposed += (_, _) => where.Dispose();
+            return last;
+        }
+        catch
+        {
+            where.Dispose();
+            throw;
+        }
     }
 
     [return: DisposeWhenDiscarded]
@@ -747,9 +795,17 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         ArgumentNullException.ThrowIfNull(predicate);
         var where = ObserveWhere(predicate);
-        var lastOrDefault = where.ObserveLastOrDefault();
-        lastOrDefault.Disposed += (_, _) => where.Dispose();
-        return lastOrDefault;
+        try
+        {
+            var lastOrDefault = where.ObserveLastOrDefault();
+            lastOrDefault.Disposed += (_, _) => where.Dispose();
+            return lastOrDefault;
+        }
+        catch
+        {
+            where.Dispose();
+            throw;
+        }
     }
 
     [return: DisposeWhenDiscarded]
@@ -772,9 +828,17 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     public IObservableCollectionQuery<TResult> ObserveOfType<TResult>()
     {
         var where = ObserveWhere(element => element is TResult);
-        var cast = where.ObserveCast<TResult>();
-        cast.Disposed += (_, _) => where.Dispose();
-        return cast;
+        try
+        {
+            var cast = where.ObserveCast<TResult>();
+            cast.Disposed += (_, _) => where.Dispose();
+            return cast;
+        }
+        catch
+        {
+            where.Dispose();
+            throw;
+        }
     }
 
     [return: DisposeWhenDiscarded]
@@ -874,9 +938,17 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         ArgumentNullException.ThrowIfNull(predicate);
         var where = ObserveWhere(predicate);
-        var single = where.ObserveSingle();
-        single.Disposed += (_, _) => where.Dispose();
-        return single;
+        try
+        {
+            var single = where.ObserveSingle();
+            single.Disposed += (_, _) => where.Dispose();
+            return single;
+        }
+        catch
+        {
+            where.Dispose();
+            throw;
+        }
     }
 
     [return: DisposeWhenDiscarded]
@@ -888,9 +960,17 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         ArgumentNullException.ThrowIfNull(predicate);
         var where = ObserveWhere(predicate);
-        var singleOrDefault = where.ObserveSingleOrDefault();
-        singleOrDefault.Disposed += (_, _) => where.Dispose();
-        return singleOrDefault;
+        try
+        {
+            var singleOrDefault = where.ObserveSingleOrDefault();
+            singleOrDefault.Disposed += (_, _) => where.Dispose();
+            return singleOrDefault;
+        }
+        catch
+        {
+            where.Dispose();
+            throw;
+        }
     }
 
     [return: DisposeWhenDiscarded]

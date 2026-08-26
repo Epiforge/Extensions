@@ -338,9 +338,17 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     public IObservableScalarQuery<TResult> ObserveAverage<TResult>(Expression<Func<TKey, TValue, TResult>> selector)
     {
         var toCollectionQuery = ObserveToCollection(selector);
-        var averageQuery = toCollectionQuery.ObserveAverage();
-        averageQuery.Disposed += (_, _) => toCollectionQuery.Dispose();
-        return averageQuery;
+        try
+        {
+            var averageQuery = toCollectionQuery.ObserveAverage();
+            averageQuery.Disposed += (_, _) => toCollectionQuery.Dispose();
+            return averageQuery;
+        }
+        catch
+        {
+            toCollectionQuery.Dispose();
+            throw;
+        }
     }
 
     [return: DisposeWhenDiscarded]
@@ -376,9 +384,17 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     {
         ArgumentNullException.ThrowIfNull(predicate);
         var where = ObserveWhere(predicate);
-        var count = where.ObserveCount();
-        count.Disposed += (_, _) => where.Dispose();
-        return count;
+        try
+        {
+            var count = where.ObserveCount();
+            count.Disposed += (_, _) => where.Dispose();
+            return count;
+        }
+        catch
+        {
+            where.Dispose();
+            throw;
+        }
     }
 
     [return: DisposeWhenDiscarded]
@@ -397,9 +413,17 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     public IObservableScalarQuery<KeyValuePair<TKey, TValue>> ObserveFirst(Expression<Func<TKey, TValue, bool>> predicate, IComparer<TKey> comparer)
     {
         var where = ObserveWhere(predicate);
-        var first = where.ObserveFirst(comparer);
-        first.Disposed += (_, _) => where.Dispose();
-        return first;
+        try
+        {
+            var first = where.ObserveFirst(comparer);
+            first.Disposed += (_, _) => where.Dispose();
+            return first;
+        }
+        catch
+        {
+            where.Dispose();
+            throw;
+        }
     }
 
     [return: DisposeWhenDiscarded]
@@ -418,9 +442,17 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     public IObservableScalarQuery<KeyValuePair<TKey, TValue>> ObserveFirstOrDefault(Expression<Func<TKey, TValue, bool>> predicate, IComparer<TKey> comparer)
     {
         var where = ObserveWhere(predicate);
-        var firstOrDefault = where.ObserveFirstOrDefault(comparer);
-        firstOrDefault.Disposed += (_, _) => where.Dispose();
-        return firstOrDefault;
+        try
+        {
+            var firstOrDefault = where.ObserveFirstOrDefault(comparer);
+            firstOrDefault.Disposed += (_, _) => where.Dispose();
+            return firstOrDefault;
+        }
+        catch
+        {
+            where.Dispose();
+            throw;
+        }
     }
 
     [return: DisposeWhenDiscarded]
@@ -457,9 +489,17 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     public IObservableScalarQuery<KeyValuePair<TKey, TValue>> ObserveLast(Expression<Func<TKey, TValue, bool>> predicate, IComparer<TKey> comparer)
     {
         var where = ObserveWhere(predicate);
-        var last = where.ObserveLast(comparer);
-        last.Disposed += (_, _) => where.Dispose();
-        return last;
+        try
+        {
+            var last = where.ObserveLast(comparer);
+            last.Disposed += (_, _) => where.Dispose();
+            return last;
+        }
+        catch
+        {
+            where.Dispose();
+            throw;
+        }
     }
 
     [return: DisposeWhenDiscarded]
@@ -478,9 +518,17 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     public IObservableScalarQuery<KeyValuePair<TKey, TValue>> ObserveLastOrDefault(Expression<Func<TKey, TValue, bool>> predicate, IComparer<TKey> comparer)
     {
         var where = ObserveWhere(predicate);
-        var lastOrDefault = where.ObserveLastOrDefault(comparer);
-        lastOrDefault.Disposed += (_, _) => where.Dispose();
-        return lastOrDefault;
+        try
+        {
+            var lastOrDefault = where.ObserveLastOrDefault(comparer);
+            lastOrDefault.Disposed += (_, _) => where.Dispose();
+            return lastOrDefault;
+        }
+        catch
+        {
+            where.Dispose();
+            throw;
+        }
     }
 
     [return: DisposeWhenDiscarded]
@@ -491,9 +539,17 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     public IObservableScalarQuery<TResult> ObserveMax<TResult>(Expression<Func<TKey, TValue, TResult>> selector)
     {
         var toCollectionQuery = ObserveToCollection(selector);
-        var maxQuery = toCollectionQuery.ObserveMax();
-        maxQuery.Disposed += (_, _) => toCollectionQuery.Dispose();
-        return maxQuery;
+        try
+        {
+            var maxQuery = toCollectionQuery.ObserveMax();
+            maxQuery.Disposed += (_, _) => toCollectionQuery.Dispose();
+            return maxQuery;
+        }
+        catch
+        {
+            toCollectionQuery.Dispose();
+            throw;
+        }
     }
 
     [return: DisposeWhenDiscarded]
@@ -504,18 +560,34 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     public IObservableScalarQuery<TResult> ObserveMin<TResult>(Expression<Func<TKey, TValue, TResult>> selector)
     {
         var toCollectionQuery = ObserveToCollection(selector);
-        var minQuery = toCollectionQuery.ObserveMin();
-        minQuery.Disposed += (_, _) => toCollectionQuery.Dispose();
-        return minQuery;
+        try
+        {
+            var minQuery = toCollectionQuery.ObserveMin();
+            minQuery.Disposed += (_, _) => toCollectionQuery.Dispose();
+            return minQuery;
+        }
+        catch
+        {
+            toCollectionQuery.Dispose();
+            throw;
+        }
     }
 
     [return: DisposeWhenDiscarded]
     public IObservableDictionaryQuery<TKey, TResult> ObserveOfType<TResult>()
     {
         var where = ObserveWhere((key, value) => value is TResult);
-        var cast = where.ObserveCast<TResult>();
-        cast.Disposed += (_, _) => where.Dispose();
-        return cast;
+        try
+        {
+            var cast = where.ObserveCast<TResult>();
+            cast.Disposed += (_, _) => where.Dispose();
+            return cast;
+        }
+        catch
+        {
+            where.Dispose();
+            throw;
+        }
     }
 
     [return: DisposeWhenDiscarded]
@@ -563,9 +635,17 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     public IObservableScalarQuery<KeyValuePair<TKey, TValue>> ObserveSingle(Expression<Func<TKey, TValue, bool>> predicate)
     {
         var where = ObserveWhere(predicate);
-        var single = where.ObserveSingle();
-        single.Disposed += (_, _) => where.Dispose();
-        return single;
+        try
+        {
+            var single = where.ObserveSingle();
+            single.Disposed += (_, _) => where.Dispose();
+            return single;
+        }
+        catch
+        {
+            where.Dispose();
+            throw;
+        }
     }
 
     [return: DisposeWhenDiscarded]
@@ -576,9 +656,17 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     public IObservableScalarQuery<KeyValuePair<TKey, TValue>> ObserveSingleOrDefault(Expression<Func<TKey, TValue, bool>> predicate)
     {
         var where = ObserveWhere(predicate);
-        var singleOrDefault = where.ObserveSingleOrDefault();
-        singleOrDefault.Disposed += (_, _) => where.Dispose();
-        return singleOrDefault;
+        try
+        {
+            var singleOrDefault = where.ObserveSingleOrDefault();
+            singleOrDefault.Disposed += (_, _) => where.Dispose();
+            return singleOrDefault;
+        }
+        catch
+        {
+            where.Dispose();
+            throw;
+        }
     }
 
     [return: DisposeWhenDiscarded]
@@ -589,9 +677,17 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     public IObservableScalarQuery<TResult> ObserveSum<TResult>(Expression<Func<TKey, TValue, TResult>> selector)
     {
         var toCollectionQuery = ObserveToCollection(selector);
-        var sumQuery = toCollectionQuery.ObserveSum();
-        sumQuery.Disposed += (_, _) => toCollectionQuery.Dispose();
-        return sumQuery;
+        try
+        {
+            var sumQuery = toCollectionQuery.ObserveSum();
+            sumQuery.Disposed += (_, _) => toCollectionQuery.Dispose();
+            return sumQuery;
+        }
+        catch
+        {
+            toCollectionQuery.Dispose();
+            throw;
+        }
     }
 
     [return: DisposeWhenDiscarded]
