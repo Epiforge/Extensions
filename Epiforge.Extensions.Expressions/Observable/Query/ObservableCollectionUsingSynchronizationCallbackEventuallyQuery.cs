@@ -20,12 +20,6 @@ sealed class ObservableCollectionUsingSynchronizationCallbackEventuallyQuery<TEl
     public override int Count =>
         elements!.Count;
 
-    public override Exception? OperationFault
-    {
-        get => source.OperationFault;
-        protected set => throw new NotImplementedException();
-    }
-
     protected override bool Dispose(bool disposing)
     {
         if (disposing)
@@ -38,6 +32,7 @@ sealed class ObservableCollectionUsingSynchronizationCallbackEventuallyQuery<TEl
                 while (resetCancellationTokenSources.TryDequeue(out var resetCancellationTokenSource))
                     resetCancellationTokenSource.Dispose();
                 source.CollectionChanged -= SourceCollectionChanged;
+                source.PropertyChanged -= SourcePropertyChanged;
                 elements!.CollectionChanged -= ElementsCollectionChanged;
                 ((INotifyPropertyChanged)elements!).PropertyChanged -= ElementsPropertyChanged;
                 RemovedFromCache();
@@ -58,6 +53,8 @@ sealed class ObservableCollectionUsingSynchronizationCallbackEventuallyQuery<TEl
         resetCancellationTokenSources.Enqueue(currentResetCancellationTokenSource);
         elements = new(source);
         source.CollectionChanged += SourceCollectionChanged;
+        source.PropertyChanged += SourcePropertyChanged;
+        OperationFault = source.OperationFault;
         elements.CollectionChanged += ElementsCollectionChanged;
         ((INotifyPropertyChanged)elements).PropertyChanged += ElementsPropertyChanged;
         Task.Run(SynchronizationAsync);
@@ -82,6 +79,12 @@ sealed class ObservableCollectionUsingSynchronizationCallbackEventuallyQuery<TEl
         }
         else
             currentPendingCollectionChangedEvents!.Enqueue(e);
+    }
+
+    void SourcePropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(OperationFault))
+            OperationFault = source.OperationFault;
     }
 
     async Task SynchronizationAsync()

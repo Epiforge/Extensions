@@ -66,7 +66,12 @@ sealed class ObservableCollectionLookupQuery<TKey, TElement> :
         }
     }
 
-    IObservableGrouping<TKey, TElement> IDictionary<TKey, IObservableGrouping<TKey, TElement>>.this[TKey key] { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+    IObservableGrouping<TKey, TElement> IDictionary<TKey, IObservableGrouping<TKey, TElement>>.this[TKey key]
+    {
+        get => this[key];
+        set => throw new NotSupportedException();
+    }
+
     public override int Count
     {
         get

@@ -4,6 +4,31 @@ namespace Epiforge.Extensions.Expressions.Tests.Observable.Query;
 public class CollectionToLookup
 {
     [TestMethod]
+    public void DictionaryIndexerGetter()
+    {
+        var collectionObserver = CollectionObserverHelpers.Create();
+        using (var sourceQuery = collectionObserver.ObserveReadOnlyList(new ObservableRangeCollection<TestPerson>()))
+        using (var lookupQuery = sourceQuery.ObserveToLookup(person => person.Name!.Length))
+        {
+            Assert.HasCount(0, lookupQuery.Keys);
+            var threeLength = ((IDictionary<int, IObservableGrouping<int, TestPerson>>)lookupQuery)[3];
+            Assert.AreEqual(3, threeLength.Key);
+            Assert.HasCount(1, lookupQuery.Keys);
+        }
+        Assert.AreEqual(0, collectionObserver.CachedObservableQueries);
+    }
+
+    [TestMethod]
+    [ExpectedException(typeof(NotSupportedException))]
+    public void DictionaryIndexerSetter()
+    {
+        var collectionObserver = CollectionObserverHelpers.Create();
+        using var sourceQuery = collectionObserver.ObserveReadOnlyList(new ObservableRangeCollection<TestPerson>());
+        using var lookupQuery = sourceQuery.ObserveToLookup(person => person.Name!.Length);
+        ((IDictionary<int, IObservableGrouping<int, TestPerson>>)lookupQuery)[3] = null!;
+    }
+
+    [TestMethod]
     public void SourceManipulation()
     {
         var source = new ObservableRangeCollection<TestPerson>();

@@ -15,12 +15,6 @@ sealed class ObservableCollectionUsingSynchronizationContextQuery<TElement>(Coll
     public override bool IsSynchronized =>
         true;
 
-    public override Exception? OperationFault
-    {
-        get => SynchronizationContext.Send(() => source.OperationFault);
-        protected set => throw new NotImplementedException();
-    }
-
     protected override bool Dispose(bool disposing)
     {
         if (disposing)
@@ -29,6 +23,7 @@ sealed class ObservableCollectionUsingSynchronizationContextQuery<TElement>(Coll
             if (removedFromCache)
             {
                 source.CollectionChanged -= SourceCollectionChanged;
+                source.PropertyChanged -= SourcePropertyChanged;
                 elements!.CollectionChanged -= ElementsCollectionChanged;
                 ((INotifyPropertyChanged)elements!).PropertyChanged -= ElementsPropertyChanged;
                 RemovedFromCache();
@@ -45,6 +40,8 @@ sealed class ObservableCollectionUsingSynchronizationContextQuery<TElement>(Coll
     {
         elements = new(source);
         source.CollectionChanged += SourceCollectionChanged;
+        source.PropertyChanged += SourcePropertyChanged;
+        OperationFault = source.OperationFault;
         elements.CollectionChanged += ElementsCollectionChanged;
         ((INotifyPropertyChanged)elements).PropertyChanged += ElementsPropertyChanged;
     }
@@ -82,6 +79,12 @@ sealed class ObservableCollectionUsingSynchronizationContextQuery<TElement>(Coll
             handleEventArgs();
         else
             SynchronizationContext.Send(handleEventArgs);
+    }
+
+    void SourcePropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(OperationFault))
+            SynchronizationContext.Send(() => OperationFault = source.OperationFault);
     }
 
     public override string ToString() =>

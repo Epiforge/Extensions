@@ -4,6 +4,48 @@ namespace Epiforge.Extensions.Expressions.Tests.Observable.Query;
 public class CollectionUsingSynchronizationCallbackEventually
 {
     [TestMethod]
+    public void OperationFaultFlowsFromSource()
+    {
+        var source = TestPerson.CreatePeopleCollection();
+        var collectionObserver = CollectionObserverHelpers.Create();
+        using (var sourceQuery = collectionObserver.ObserveReadOnlyList(source))
+        {
+            using (var whereQuery = sourceQuery.ObserveWhere(person => person.Name!.Length == 4))
+            {
+                var context = new object();
+                void synchronizationCallback(IEnumerable enumerable, object context, Action accessMethod, bool writeAccess) =>
+                    accessMethod();
+                using (var usingSynchronizationCallbackQuery = whereQuery.ObserveUsingSynchronizationCallbackEventually(context, synchronizationCallback))
+                {
+                    var operationFaultChanging = 0;
+                    var operationFaultChanged = 0;
+                    usingSynchronizationCallbackQuery.PropertyChanging += (sender, e) =>
+                    {
+                        if (e.PropertyName == nameof(usingSynchronizationCallbackQuery.OperationFault))
+                        {
+                            Assert.IsNull(usingSynchronizationCallbackQuery.OperationFault);
+                            ++operationFaultChanging;
+                        }
+                    };
+                    usingSynchronizationCallbackQuery.PropertyChanged += (sender, e) =>
+                    {
+                        if (e.PropertyName == nameof(usingSynchronizationCallbackQuery.OperationFault))
+                            ++operationFaultChanged;
+                    };
+                    Assert.IsNull(usingSynchronizationCallbackQuery.OperationFault);
+                    source.Add(new TestPerson());
+                    Assert.IsNotNull(usingSynchronizationCallbackQuery.OperationFault);
+                    Assert.IsTrue(operationFaultChanging > 0);
+                    Assert.IsTrue(operationFaultChanged > 0);
+                }
+            }
+            Assert.AreEqual(0, sourceQuery.CachedObservableQueries);
+        }
+        Assert.AreEqual(0, collectionObserver.CachedObservableQueries);
+        Assert.AreEqual(0, collectionObserver.ExpressionObserver.CachedObservableExpressions);
+    }
+
+    [TestMethod]
     public async Task SourceManipulationAsync()
     {
         var source = new ObservableRangeCollection<int>();

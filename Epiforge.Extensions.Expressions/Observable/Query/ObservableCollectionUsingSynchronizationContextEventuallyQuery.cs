@@ -34,12 +34,6 @@ sealed class ObservableCollectionUsingSynchronizationContextEventuallyQuery<TEle
     public override bool IsSynchronized =>
         true;
 
-    public override Exception? OperationFault
-    {
-        get => MarshalForFunc(SynchronizationContext, () => source.OperationFault);
-        protected set => throw new NotImplementedException();
-    }
-
     protected override bool Dispose(bool disposing)
     {
         if (disposing)
@@ -48,6 +42,7 @@ sealed class ObservableCollectionUsingSynchronizationContextEventuallyQuery<TEle
             if (removedFromCache)
             {
                 source.CollectionChanged -= SourceCollectionChanged;
+                source.PropertyChanged -= SourcePropertyChanged;
                 elements!.CollectionChanged -= ElementsCollectionChanged;
                 ((INotifyPropertyChanged)elements!).PropertyChanged -= ElementsPropertyChanged;
                 RemovedFromCache();
@@ -64,6 +59,8 @@ sealed class ObservableCollectionUsingSynchronizationContextEventuallyQuery<TEle
     {
         elements = new(source);
         source.CollectionChanged += SourceCollectionChanged;
+        source.PropertyChanged += SourcePropertyChanged;
+        OperationFault = source.OperationFault;
         elements.CollectionChanged += ElementsCollectionChanged;
         ((INotifyPropertyChanged)elements).PropertyChanged += ElementsPropertyChanged;
     }
@@ -96,6 +93,12 @@ sealed class ObservableCollectionUsingSynchronizationContextEventuallyQuery<TEle
                     break;
             }
         }, null);
+
+    void SourcePropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(OperationFault))
+            SynchronizationContext.Post(_ => OperationFault = source.OperationFault, null);
+    }
 
     public override string ToString() =>
         $"synchronizing {source} using {SynchronizationContext} eventually";

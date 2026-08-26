@@ -11,12 +11,6 @@ sealed class ObservableCollectionUsingSyncRootQuery<TElement>(CollectionObserver
     public override int Count =>
         elements!.Count;
 
-    public override Exception? OperationFault
-    {
-        get => source.OperationFault;
-        protected set => throw new NotImplementedException();
-    }
-
     public override object SyncRoot { get; } = syncRoot;
 
     protected override bool Dispose(bool disposing)
@@ -27,6 +21,7 @@ sealed class ObservableCollectionUsingSyncRootQuery<TElement>(CollectionObserver
             if (removedFromCache)
             {
                 source.CollectionChanged -= SourceCollectionChanged;
+                source.PropertyChanged -= SourcePropertyChanged;
                 elements!.CollectionChanged -= ElementsCollectionChanged;
                 ((INotifyPropertyChanged)elements!).PropertyChanged -= ElementsPropertyChanged;
                 RemovedFromCache();
@@ -43,6 +38,8 @@ sealed class ObservableCollectionUsingSyncRootQuery<TElement>(CollectionObserver
     {
         elements = new(source);
         source.CollectionChanged += SourceCollectionChanged;
+        source.PropertyChanged += SourcePropertyChanged;
+        OperationFault = source.OperationFault;
         elements.CollectionChanged += ElementsCollectionChanged;
         ((INotifyPropertyChanged)elements).PropertyChanged += ElementsPropertyChanged;
     }
@@ -78,6 +75,13 @@ sealed class ObservableCollectionUsingSyncRootQuery<TElement>(CollectionObserver
         }
     }
 
+    void SourcePropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(OperationFault))
+            lock (SyncRoot!)
+                OperationFault = source.OperationFault;
+    }
+
     public override string ToString() =>
-        $"synchronizing {source} using {SyncRoot} eventually";
+        $"synchronizing {source} using {SyncRoot}";
 }

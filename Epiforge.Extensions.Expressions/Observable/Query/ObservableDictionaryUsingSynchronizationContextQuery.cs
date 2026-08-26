@@ -19,12 +19,6 @@ sealed class ObservableDictionaryUsingSynchronizationContextQuery<TKey, TValue>(
     public override IEnumerable<TKey> Keys =>
         SynchronizationContext.Send(() => dictionary!.Keys.ToList().AsReadOnly());
 
-    public override Exception? OperationFault
-    {
-        get => SynchronizationContext.Send(() => source.OperationFault);
-        protected set => throw new NotImplementedException();
-    }
-
     public override IEnumerable<TValue> Values =>
         SynchronizationContext.Send(() => dictionary!.Values.ToList().AsReadOnly());
 
@@ -57,6 +51,7 @@ sealed class ObservableDictionaryUsingSynchronizationContextQuery<TKey, TValue>(
             if (removedFromCache)
             {
                 source.DictionaryChanged -= SourceDictionaryChanged;
+                source.PropertyChanged -= SourcePropertyChanged;
                 dictionary!.CollectionChanged -= DictionaryCollectionChanged;
                 ((INotifyDictionaryChanged)dictionary).DictionaryChanged -= DictionaryDictionaryChangedBoxed;
                 dictionary.DictionaryChanged -= DictionaryDictionaryChanged;
@@ -81,6 +76,8 @@ sealed class ObservableDictionaryUsingSynchronizationContextQuery<TKey, TValue>(
 #pragma warning restore IDE0028 // Simplify collection initialization
         dictionary.AddRange(source);
         source.DictionaryChanged += SourceDictionaryChanged;
+        source.PropertyChanged += SourcePropertyChanged;
+        OperationFault = source.OperationFault;
         dictionary.CollectionChanged += DictionaryCollectionChanged;
         ((INotifyDictionaryChanged)dictionary).DictionaryChanged += DictionaryDictionaryChangedBoxed;
         dictionary.DictionaryChanged += DictionaryDictionaryChanged;
@@ -106,6 +103,12 @@ sealed class ObservableDictionaryUsingSynchronizationContextQuery<TKey, TValue>(
                     break;
             }
         });
+
+    void SourcePropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(OperationFault))
+            SynchronizationContext.Send(() => OperationFault = source.OperationFault);
+    }
 
     public override string ToString() =>
         $"synchronizing {source} using {SynchronizationContext}";

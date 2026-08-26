@@ -21,6 +21,7 @@ sealed class ObservableCollectionUsingSynchronizationCallbackQuery<TElement>(Col
             if (removedFromCache)
             {
                 source.CollectionChanged -= SourceCollectionChanged;
+                source.PropertyChanged -= SourcePropertyChanged;
                 elements!.CollectionChanged -= ElementsCollectionChanged;
                 ((INotifyPropertyChanged)elements!).PropertyChanged -= ElementsPropertyChanged;
                 RemovedFromCache();
@@ -37,6 +38,8 @@ sealed class ObservableCollectionUsingSynchronizationCallbackQuery<TElement>(Col
     {
         elements = new(source);
         source.CollectionChanged += SourceCollectionChanged;
+        source.PropertyChanged += SourcePropertyChanged;
+        OperationFault = source.OperationFault;
         elements.CollectionChanged += ElementsCollectionChanged;
         ((INotifyPropertyChanged)elements).PropertyChanged += ElementsPropertyChanged;
     }
@@ -69,6 +72,12 @@ sealed class ObservableCollectionUsingSynchronizationCallbackQuery<TElement>(Col
                     break;
             }
         }, true);
+
+    void SourcePropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(OperationFault))
+            SynchronizationCallback(this, Context, () => OperationFault = source.OperationFault, false);
+    }
 
     public override string ToString() =>
         $"synchronizing {source} using callback";
