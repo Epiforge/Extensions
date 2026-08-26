@@ -350,6 +350,7 @@ public interface IObservableCollectionQuery<TElement> :
     /// </summary>
     /// <param name="count">The number of elements to skip before returning the remaining elements</param>
     /// <returns>An collection that contains the elements that occur after the specified index in the input sequence</returns>
+    /// <remarks>A negative <paramref name="count"/> counts back from the end of the collection, so -1 yields only the last element</remarks>
     [return: DisposeWhenDiscarded]
     IObservableCollectionQuery<TElement> ObserveSkip(int count);
 
@@ -358,6 +359,7 @@ public interface IObservableCollectionQuery<TElement> :
     /// </summary>
     /// <param name="range">The range of elements to return</param>
     /// <returns>An collection that contains the range of elements that occur in the specified range</returns>
+    /// <remarks><paramref name="range"/> is clamped to the bounds of the collection, which may change over the life of the query</remarks>
     [return: DisposeWhenDiscarded]
     IObservableCollectionQuery<TElement> ObserveSlice(Range range);
 
@@ -382,6 +384,7 @@ public interface IObservableCollectionQuery<TElement> :
     /// </summary>
     /// <param name="count">The number of elements to return</param>
     /// <returns>An collection that contains the specified number of elements from the start of the input sequence</returns>
+    /// <remarks>A negative <paramref name="count"/> counts back from the end of the collection, so -1 yields all but the last element; a <paramref name="count"/> which exceeds the number of elements in the collection yields all of them</remarks>
     [return: DisposeWhenDiscarded]
     IObservableCollectionQuery<TElement> ObserveTake(int count);
 

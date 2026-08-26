@@ -895,7 +895,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
 
     [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<TElement> ObserveSkip(int count) =>
-        ObserveSlice(count..^0);
+        ObserveSlice(new Index(Math.Abs(count), count < 0)..^0);
 
     [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<TElement> ObserveSlice(Range range)
@@ -941,7 +941,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
 
     [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<TElement> ObserveTake(int count) =>
-        ObserveSlice(0..count);
+        ObserveSlice(0..new Index(Math.Abs(count), count < 0));
 
     [return: DisposeWhenDiscarded]
     public IObservableDictionaryQuery<TKey, TElement> ObserveToDictionary<TKey>(Expression<Func<TElement, TKey>> keySelector)
