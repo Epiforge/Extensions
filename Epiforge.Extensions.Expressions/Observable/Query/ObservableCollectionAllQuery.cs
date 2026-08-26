@@ -4,8 +4,7 @@ sealed class ObservableCollectionAllQuery<TElement>(CollectionObserver collectio
     ObservableCollectionScalarQuery<TElement, bool>(collectionObserver, observableCollectionQuery)
 {
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
-    IObservableCollectionQuery<TElement>? where;
-    int observableCollectionQueryCount;
+    IObservableCollectionQuery<TElement>? unmatched;
 
     internal readonly Expression<Func<TElement, bool>> Predicate = predicate;
 
@@ -16,10 +15,9 @@ sealed class ObservableCollectionAllQuery<TElement>(CollectionObserver collectio
             var removedFromCache = observableCollectionQuery.QueryDisposed(this);
             if (removedFromCache)
             {
-                observableCollectionQuery.CollectionChanged -= ObservableCollectionQueryCollectionChanged;
-                observableCollectionQuery.PropertyChanged -= ObservableCollectionQueryPropertyChanged;
-                where!.CollectionChanged -= WhereCollectionChanged;
-                where.Dispose();
+                unmatched!.CollectionChanged -= UnmatchedCollectionChanged;
+                unmatched.PropertyChanged -= UnmatchedPropertyChanged;
+                unmatched.Dispose();
                 RemovedFromCache();
             }
             return removedFromCache;
@@ -28,33 +26,25 @@ sealed class ObservableCollectionAllQuery<TElement>(CollectionObserver collectio
     }
 
     void Evaluate() =>
-        Evaluation = where!.OperationFault is { } whereFault ? (whereFault, default) : (null, observableCollectionQueryCount == where.Count);
-
-    void ObservableCollectionQueryCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
-    {
-        observableCollectionQueryCount = e.Action is NotifyCollectionChangedAction.Reset ? observableCollectionQuery.Count : observableCollectionQueryCount + (e.NewItems?.Count ?? 0) - (e.OldItems?.Count ?? 0);
-        Evaluate();
-    }
-
-    void ObservableCollectionQueryPropertyChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName == nameof(ObservableCollectionQuery<>.OperationFault))
-            Evaluate();
-    }
+        Evaluation = unmatched!.OperationFault is { } unmatchedFault ? (unmatchedFault, default) : (null, unmatched.Count == 0);
 
     protected override void OnInitialization()
     {
-        observableCollectionQueryCount = observableCollectionQuery.Count;
-        where = observableCollectionQuery.ObserveWhere(Predicate);
-        where.CollectionChanged += WhereCollectionChanged;
-        observableCollectionQuery.CollectionChanged += ObservableCollectionQueryCollectionChanged;
-        observableCollectionQuery.PropertyChanged += ObservableCollectionQueryPropertyChanged;
+        unmatched = observableCollectionQuery.ObserveWhere(Expression.Lambda<Func<TElement, bool>>(Expression.Not(Predicate.Body), Predicate.Parameters));
+        unmatched.CollectionChanged += UnmatchedCollectionChanged;
+        unmatched.PropertyChanged += UnmatchedPropertyChanged;
         Evaluate();
     }
 
     public override string ToString() =>
         $"all {observableCollectionQuery} matching {Predicate}";
 
-    void WhereCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
+    void UnmatchedCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
         Evaluate();
+
+    void UnmatchedPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(IObservableCollectionQuery<>.OperationFault))
+            Evaluate();
+    }
 }
