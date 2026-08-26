@@ -4,6 +4,26 @@ namespace Epiforge.Extensions.Expressions.Tests.Observable.Query;
 public class CollectionOrderBy
 {
     [TestMethod]
+    public void EqualKeysPreserveSourceOrder()
+    {
+        var people = Enumerable.Range(0, 40).Select(index => new TestPerson($"P{index:D3}")).ToList();
+        var source = new ObservableRangeCollection<TestPerson>(people);
+        var collectionObserver = CollectionObserverHelpers.Create();
+        using (var sourceQuery = collectionObserver.ObserveReadOnlyList(source))
+        {
+            using (var orderByQuery = sourceQuery.ObserveOrderBy(person => person.Name!.Length))
+            {
+                CollectionAssert.AreEqual(people, orderByQuery.ToList());
+                source.Reset(people);
+                CollectionAssert.AreEqual(people, orderByQuery.ToList());
+            }
+            Assert.AreEqual(0, sourceQuery.CachedObservableQueries);
+        }
+        Assert.AreEqual(0, collectionObserver.CachedObservableQueries);
+        Assert.AreEqual(0, collectionObserver.ExpressionObserver.CachedObservableExpressions);
+    }
+
+    [TestMethod]
     public void NoSelectors()
     {
         var source = TestPerson.CreatePeopleCollection();
