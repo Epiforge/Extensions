@@ -8,5 +8,5 @@ public interface INotifyDisposalOverridden
     /// <summary>
     /// Occurs when this object's disposal has been overridden
     /// </summary>
-    event EventHandler<DisposalNotificationEventArgs>? DisposalOverridden;
+    event EventHandler? DisposalOverridden;
 }

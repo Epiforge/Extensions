@@ -14,7 +14,10 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Epiforge.Extensions.Components" Version="2.0.1" />
+        <ProjectReference Include="..\Epiforge.Extensions.Components\Epiforge.Extensions.Components.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
         <PackageReference Include="System.Management" Version="8.0.0" />
         <PackageReference Include="System.ValueTuple" Version="4.6.1" />
     </ItemGroup>

@@ -13,7 +13,7 @@ public class AsyncDisposableTestPerson :
     string? name;
     long nameGets;
 
-    protected override ValueTask<bool> DisposeAsync(bool disposing) =>
+    protected override ValueTask<bool> DisposeAsyncCore() =>
         new(true);
 
     public override string ToString() =>

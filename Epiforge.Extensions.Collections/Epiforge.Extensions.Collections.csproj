@@ -13,7 +13,10 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Epiforge.Extensions.Components" Version="3.0.0" />
+        <ProjectReference Include="..\Epiforge.Extensions.Components\Epiforge.Extensions.Components.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
         <PackageReference Include="System.Collections.Immutable" Version="8.0.0" />
     </ItemGroup>
 

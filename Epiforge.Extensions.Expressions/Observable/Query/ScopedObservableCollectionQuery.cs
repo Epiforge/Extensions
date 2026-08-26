@@ -30,11 +30,11 @@ class ScopedObservableCollectionQuery<TElement> :
 
     public event NotifyCollectionChangedEventHandler? CollectionChanged;
 
-    public event EventHandler<DisposalNotificationEventArgs>? Disposed;
+    public event EventHandler? Disposed;
 
-    public event EventHandler<DisposalNotificationEventArgs>? Disposing;
+    public event EventHandler? Disposing;
 
-    event EventHandler<DisposalNotificationEventArgs>? INotifyDisposalOverridden.DisposalOverridden
+    event EventHandler? INotifyDisposalOverridden.DisposalOverridden
     {
         add { }
         remove { }
@@ -44,7 +44,7 @@ class ScopedObservableCollectionQuery<TElement> :
     {
         if (Interlocked.Exchange(ref disposed, 1) != 0)
             return;
-        var e = DisposalNotificationEventArgs.ByCallingDispose;
+        var e = EventArgs.Empty;
         Disposing?.Invoke(this, e);
         query.PropertyChanged -= QueryPropertyChanged;
         query.PropertyChanging -= QueryPropertyChanging;

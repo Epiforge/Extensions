@@ -31,7 +31,7 @@ public class DisposableTestPerson :
     protected override bool Dispose(bool disposing) =>
         true;
 
-    protected override ValueTask<bool> DisposeAsync(bool disposing) =>
+    protected override ValueTask<bool> DisposeAsyncCore() =>
         new(true);
 
     public override string ToString() =>

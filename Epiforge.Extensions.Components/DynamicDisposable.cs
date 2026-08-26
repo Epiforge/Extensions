@@ -26,7 +26,7 @@ public abstract class DynamicDisposable :
         isDisposed = true;
     }
 
-    readonly AsyncLock disposalAccess = new();
+    int disposalClaim;
     bool isDisposed;
     string? loggerSetStackTrace;
 
@@ -42,17 +42,17 @@ public abstract class DynamicDisposable :
     /// <summary>
     /// Occurs when this object's disposal has been overridden
     /// </summary>
-    public event EventHandler<DisposalNotificationEventArgs>? DisposalOverridden;
+    public event EventHandler? DisposalOverridden;
 
     /// <summary>
     /// Occurs when this object has been disposed
     /// </summary>
-    public event EventHandler<DisposalNotificationEventArgs>? Disposed;
+    public event EventHandler? Disposed;
 
     /// <summary>
     /// Occurs when this object is being disposed
     /// </summary>
-    public event EventHandler<DisposalNotificationEventArgs>? Disposing;
+    public event EventHandler? Disposing;
 
     /// <summary>
     /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources
@@ -60,26 +60,34 @@ public abstract class DynamicDisposable :
     public void Dispose()
     {
         Logger?.LogTrace(EventIds.Epiforge_Extensions_Components_DisposeCalled, "Dispose called");
-        using (disposalAccess.Lock())
-            if (!IsDisposed)
-            {
-                var e = DisposalNotificationEventArgs.ByCallingDispose;
-                OnDisposing(e);
-                if (IsDisposed = Dispose(true))
-                {
-                    OnDisposed(e);
-                    GC.SuppressFinalize(this);
-                }
-                else
-                    OnDisposalOverridden(e);
-            }
+        if (Interlocked.CompareExchange(ref disposalClaim, 1, 0) != 0)
+            return;
+        var e = EventArgs.Empty;
+        var disposed = false;
+        try
+        {
+            OnDisposing(e);
+            disposed = IsDisposed = Dispose(true);
+        }
+        finally
+        {
+            if (!disposed)
+                Interlocked.Exchange(ref disposalClaim, 0);
+        }
+        if (disposed)
+        {
+            OnDisposed(e);
+            GC.SuppressFinalize(this);
+        }
+        else
+            OnDisposalOverridden(e);
     }
 
     /// <summary>
     /// Frees, releases, or resets unmanaged resources
     /// </summary>
     /// <param name="disposing">false if invoked by the finalizer because the object is being garbage collected; otherwise, true</param>
-    /// <returns>true if disposal completed; otherwise, false</returns>
+    /// <returns>true if this object was disposed; false to override disposal</returns>
     protected abstract bool Dispose(bool disposing);
 
     /// <summary>
@@ -88,25 +96,33 @@ public abstract class DynamicDisposable :
     public async ValueTask DisposeAsync()
     {
         Logger?.LogTrace(EventIds.Epiforge_Extensions_Components_DisposeCalled, "DisposeAsync called");
-        using (await disposalAccess.LockAsync().ConfigureAwait(false))
-            if (!IsDisposed)
-            {
-                var e = DisposalNotificationEventArgs.ByCallingDispose;
-                OnDisposing(e);
-                if (IsDisposed = await DisposeAsyncCore().ConfigureAwait(false))
-                {
-                    OnDisposed(e);
-                    GC.SuppressFinalize(this);
-                }
-                else
-                    OnDisposalOverridden(e);
-            }
+        if (Interlocked.CompareExchange(ref disposalClaim, 1, 0) != 0)
+            return;
+        var e = EventArgs.Empty;
+        var disposed = false;
+        try
+        {
+            OnDisposing(e);
+            disposed = IsDisposed = await DisposeAsyncCore().ConfigureAwait(false);
+        }
+        finally
+        {
+            if (!disposed)
+                Interlocked.Exchange(ref disposalClaim, 0);
+        }
+        if (disposed)
+        {
+            OnDisposed(e);
+            GC.SuppressFinalize(this);
+        }
+        else
+            OnDisposalOverridden(e);
     }
 
     /// <summary>
     /// Frees, releases, or resets resources
     /// </summary>
-    /// <returns>true if disposal completed; otherwise, false</returns>
+    /// <returns>true if this object was disposed; false to override disposal</returns>
     protected abstract ValueTask<bool> DisposeAsyncCore();
 
     /// <inheritdoc/>
@@ -116,21 +132,21 @@ public abstract class DynamicDisposable :
             loggerSetStackTrace = Environment.StackTrace;
     }
 
-    void OnDisposalOverridden(DisposalNotificationEventArgs e)
+    void OnDisposalOverridden(EventArgs e)
     {
         Logger?.LogTrace(EventIds.Epiforge_Extensions_Components_RaisingDisposalOverridden, "Raising DisposalOverridden event");
         DisposalOverridden?.Invoke(this, e);
         Logger?.LogTrace(EventIds.Epiforge_Extensions_Components_RaisedDisposalOverridden, "Raised DisposalOverridden event");
     }
 
-    void OnDisposed(DisposalNotificationEventArgs e)
+    void OnDisposed(EventArgs e)
     {
         Logger?.LogTrace(EventIds.Epiforge_Extensions_Components_RaisingDisposed, "Raising Disposed event");
         Disposed?.Invoke(this, e);
         Logger?.LogTrace(EventIds.Epiforge_Extensions_Components_RaisedDisposed, "Raised Disposed event");
     }
 
-    void OnDisposing(DisposalNotificationEventArgs e)
+    void OnDisposing(EventArgs e)
     {
         Logger?.LogTrace(EventIds.Epiforge_Extensions_Components_RaisingDisposing, "Raising Disposing event");
         Disposing?.Invoke(this, e);

@@ -31,7 +31,7 @@ public class Disposable
     [TestMethod]
     public void Dispose()
     {
-        var disposalNotificationEvents = new List<(string name, DisposalNotificationEventArgs args)>();
+        var disposalNotificationEvents = new List<(string name, EventArgs args)>();
         var logger = Substitute.For<MockLogger<Derivation>>();
         logger.IsEnabled(default).ReturnsForAnyArgs(true);
         Derivation derivation;
@@ -65,7 +65,7 @@ public class Disposable
     [TestMethod]
     public async Task DisposeAsync()
     {
-        var disposalNotificationEvents = new List<(string name, DisposalNotificationEventArgs args)>();
+        var disposalNotificationEvents = new List<(string name, EventArgs args)>();
         var logger = Substitute.For<MockLogger<Derivation>>();
         logger.IsEnabled(default).ReturnsForAnyArgs(true);
         Derivation derivation;

@@ -8,5 +8,5 @@ public interface INotifyDisposing
     /// <summary>
     /// Occurs when this object is being disposed
     /// </summary>
-    event EventHandler<DisposalNotificationEventArgs>? Disposing;
+    event EventHandler? Disposing;
 }
