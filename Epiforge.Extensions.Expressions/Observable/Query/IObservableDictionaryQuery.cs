@@ -7,13 +7,8 @@ namespace Epiforge.Extensions.Expressions.Observable.Query;
 /// <typeparam name="TValue">The type of values in the dictionary</typeparam>
 public interface IObservableDictionaryQuery<TKey, TValue> :
     IObservableQuery,
-    IObservableRangeDictionary<TKey, TValue>
+    IReadOnlyObservableRangeDictionary<TKey, TValue>
 {
-    /// <summary>
-    /// Gets the number of key/value pairs in the dictionary
-    /// </summary>
-    new int Count { get; }
-
     /// <summary>
     /// Gets the exception encountered while performing the operation
     /// </summary>

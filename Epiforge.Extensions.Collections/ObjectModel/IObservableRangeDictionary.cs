@@ -6,10 +6,8 @@ namespace Epiforge.Extensions.Collections.ObjectModel;
 /// <typeparam name="TKey">The type of keys in the dictionary</typeparam>
 /// <typeparam name="TValue">The type of values in the dictionary</typeparam>
 public interface IObservableRangeDictionary<TKey, TValue> :
-    INotifyCollectionChanged,
-    INotifyDictionaryChanged,
-    INotifyDictionaryChanged<TKey, TValue>,
-    IRangeDictionary<TKey, TValue>
+    IRangeDictionary<TKey, TValue>,
+    IReadOnlyObservableRangeDictionary<TKey, TValue>
 {
     /// <summary>
     /// Gets the value for the specified key

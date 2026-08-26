@@ -67,8 +67,6 @@ sealed class ObservableCollectionLookupQuery<TKey, TElement> :
     }
 
     IObservableGrouping<TKey, TElement> IDictionary<TKey, IObservableGrouping<TKey, TElement>>.this[TKey key] { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
-    IObservableGrouping<TKey, TElement> IRangeDictionary<TKey, IObservableGrouping<TKey, TElement>>.this[TKey key] { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
-
     public override int Count
     {
         get
@@ -90,7 +88,7 @@ sealed class ObservableCollectionLookupQuery<TKey, TElement> :
         }
     }
 
-    IEnumerable<TKey> IRangeDictionary<TKey, IObservableGrouping<TKey, TElement>>.Keys =>
+    IEnumerable<TKey> IReadOnlyRangeDictionary<TKey, IObservableGrouping<TKey, TElement>>.Keys =>
         Keys;
 
     IEnumerable<TKey> IReadOnlyDictionary<TKey, IObservableGrouping<TKey, TElement>>.Keys =>
@@ -106,7 +104,7 @@ sealed class ObservableCollectionLookupQuery<TKey, TElement> :
         }
     }
 
-    IEnumerable<IObservableGrouping<TKey, TElement>> IRangeDictionary<TKey, IObservableGrouping<TKey, TElement>>.Values =>
+    IEnumerable<IObservableGrouping<TKey, TElement>> IReadOnlyRangeDictionary<TKey, IObservableGrouping<TKey, TElement>>.Values =>
         Values;
 
     IEnumerable<IObservableGrouping<TKey, TElement>> IReadOnlyDictionary<TKey, IObservableGrouping<TKey, TElement>>.Values =>
@@ -146,12 +144,6 @@ sealed class ObservableCollectionLookupQuery<TKey, TElement> :
             collection = collectionAndGrouping.collection;
         collection.Add(element);
     }
-
-    void IRangeDictionary<TKey, IObservableGrouping<TKey, TElement>>.AddRange(IEnumerable<KeyValuePair<TKey, IObservableGrouping<TKey, TElement>>> keyValuePairs) =>
-        throw new NotSupportedException();
-
-    void IRangeDictionary<TKey, IObservableGrouping<TKey, TElement>>.AddRange(IReadOnlyList<KeyValuePair<TKey, IObservableGrouping<TKey, TElement>>> keyValuePairs) =>
-        throw new NotSupportedException();
 
     void ICollection<KeyValuePair<TKey, IObservableGrouping<TKey, TElement>>>.Clear() =>
         throw new NotSupportedException();
@@ -241,9 +233,6 @@ sealed class ObservableCollectionLookupQuery<TKey, TElement> :
     bool IDictionary<TKey, IObservableGrouping<TKey, TElement>>.Remove(TKey key) =>
         throw new NotSupportedException();
 
-    IReadOnlyList<KeyValuePair<TKey, IObservableGrouping<TKey, TElement>>> IRangeDictionary<TKey, IObservableGrouping<TKey, TElement>>.RemoveAll(Func<TKey, IObservableGrouping<TKey, TElement>, bool> predicate) =>
-        throw new NotSupportedException();
-
     void RemoveElement(TElement element, TKey key)
     {
         if (collectionAndGroupingByKey.TryGetValue(key, out var collectionAndGrouping))
@@ -252,21 +241,6 @@ sealed class ObservableCollectionLookupQuery<TKey, TElement> :
             collection.Remove(element);
         }
     }
-
-    IReadOnlyList<TKey> IRangeDictionary<TKey, IObservableGrouping<TKey, TElement>>.RemoveRange(IEnumerable<TKey> keys) =>
-        throw new NotSupportedException();
-
-    void IRangeDictionary<TKey, IObservableGrouping<TKey, TElement>>.ReplaceRange(IEnumerable<KeyValuePair<TKey, IObservableGrouping<TKey, TElement>>> keyValuePairs) =>
-        throw new NotSupportedException();
-
-    IReadOnlyList<TKey> IRangeDictionary<TKey, IObservableGrouping<TKey, TElement>>.ReplaceRange(IEnumerable<TKey> removeKeys, IEnumerable<KeyValuePair<TKey, IObservableGrouping<TKey, TElement>>> newKeyValuePairs) =>
-        throw new NotSupportedException();
-
-    void IRangeDictionary<TKey, IObservableGrouping<TKey, TElement>>.Reset() =>
-        throw new NotSupportedException();
-
-    void IRangeDictionary<TKey, IObservableGrouping<TKey, TElement>>.Reset(IDictionary<TKey, IObservableGrouping<TKey, TElement>> dictionary) =>
-        throw new NotSupportedException();
 
     void SelectCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {

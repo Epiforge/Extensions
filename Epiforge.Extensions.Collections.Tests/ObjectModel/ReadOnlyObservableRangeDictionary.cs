@@ -43,6 +43,10 @@ public class ReadOnlyObservableRangeDictionary
     }
 
     [TestMethod]
+    public void IsNotAnObservableRangeDictionary() =>
+        Assert.IsFalse(new ReadOnlyObservableRangeDictionary<string, string>(new ObservableDictionary<string, string>()) is IObservableRangeDictionary<string, string>);
+
+    [TestMethod]
     public void NonGenericDictionaryChanged()
     {
         var dictionary = new ObservableDictionary<string, string>();
@@ -54,5 +58,18 @@ public class ReadOnlyObservableRangeDictionary
         dictionary.Add("key", "value");
         Assert.IsTrue(dictionaryChanged);
         ((INotifyDictionaryChanged)readOnlyDictionary).DictionaryChanged -= handler;
+    }
+
+    [TestMethod]
+    public void WrapsAReadOnlyObservableRangeDictionary()
+    {
+        var dictionary = new ObservableDictionary<string, string>();
+        using var inner = new ReadOnlyObservableRangeDictionary<string, string>(dictionary);
+        using var outer = new ReadOnlyObservableRangeDictionary<string, string>(inner);
+        var collectionChanged = false;
+        outer.CollectionChanged += (sender, e) => collectionChanged = true;
+        dictionary.Add("key", "value");
+        Assert.IsTrue(collectionChanged);
+        Assert.AreEqual("value", outer["key"]);
     }
 }

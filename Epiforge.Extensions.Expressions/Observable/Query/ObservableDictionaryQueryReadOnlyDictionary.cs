@@ -69,7 +69,7 @@ sealed class ObservableDictionaryQueryReadOnlyDictionary<TKey, TValue>(Collectio
 
     public override IReadOnlyList<KeyValuePair<TKey, TValue>> GetRange(IEnumerable<TKey> keys)
     {
-        if (ReadOnlyDictionary is IRangeDictionary<TKey, TValue> rangeDictionary)
+        if (ReadOnlyDictionary is IReadOnlyRangeDictionary<TKey, TValue> rangeDictionary)
             return rangeDictionary.GetRange(keys);
         else
             throw new NotSupportedException();

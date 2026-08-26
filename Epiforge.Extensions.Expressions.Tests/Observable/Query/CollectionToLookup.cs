@@ -16,7 +16,7 @@ public class CollectionToLookup
                 void checkMergedNames(string against) =>
                     Assert.AreEqual(against, string.Join(";", lookupQuery.Values.OrderBy(group => group.Key).Select(group => $"{group!.Key}:{string.Join(",", group.OrderBy(person => person.Name).Select(person => person.Name))}")));
                 Assert.HasCount(0, lookupQuery.Keys);
-                var threeLength = ((IObservableRangeDictionary<int, IObservableGrouping<int, TestPerson>>)lookupQuery)[3];
+                var threeLength = ((IReadOnlyObservableRangeDictionary<int, IObservableGrouping<int, TestPerson>>)lookupQuery)[3];
                 Assert.HasCount(1, lookupQuery.Keys);
                 Assert.HasCount(0, threeLength);
                 source.AddRange(TestPerson.CreatePeopleCollection());

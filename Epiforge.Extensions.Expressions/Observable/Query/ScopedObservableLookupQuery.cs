@@ -52,20 +52,14 @@ sealed class ScopedObservableLookupQuery<TKey, TElement> :
         set => ((IDictionary<TKey, IObservableGrouping<TKey, TElement>>)lookup)[key] = value;
     }
 
-    IObservableGrouping<TKey, TElement> IRangeDictionary<TKey, IObservableGrouping<TKey, TElement>>.this[TKey key]
-    {
-        get => ((IRangeDictionary<TKey, IObservableGrouping<TKey, TElement>>)lookup)[key];
-        set => ((IRangeDictionary<TKey, IObservableGrouping<TKey, TElement>>)lookup)[key] = value;
-    }
-
     public bool IsReadOnly =>
         lookup.IsReadOnly;
 
     public ICollection<TKey> Keys =>
         lookup.Keys;
 
-    IEnumerable<TKey> IRangeDictionary<TKey, IObservableGrouping<TKey, TElement>>.Keys =>
-        ((IRangeDictionary<TKey, IObservableGrouping<TKey, TElement>>)lookup).Keys;
+    IEnumerable<TKey> IReadOnlyRangeDictionary<TKey, IObservableGrouping<TKey, TElement>>.Keys =>
+        ((IReadOnlyRangeDictionary<TKey, IObservableGrouping<TKey, TElement>>)lookup).Keys;
 
     IEnumerable<TKey> IReadOnlyDictionary<TKey, IObservableGrouping<TKey, TElement>>.Keys =>
         ((IReadOnlyDictionary<TKey, IObservableGrouping<TKey, TElement>>)lookup).Keys;
@@ -73,8 +67,8 @@ sealed class ScopedObservableLookupQuery<TKey, TElement> :
     public ICollection<IObservableGrouping<TKey, TElement>> Values =>
         lookup.Values;
 
-    IEnumerable<IObservableGrouping<TKey, TElement>> IRangeDictionary<TKey, IObservableGrouping<TKey, TElement>>.Values =>
-        ((IRangeDictionary<TKey, IObservableGrouping<TKey, TElement>>)lookup).Values;
+    IEnumerable<IObservableGrouping<TKey, TElement>> IReadOnlyRangeDictionary<TKey, IObservableGrouping<TKey, TElement>>.Values =>
+        ((IReadOnlyRangeDictionary<TKey, IObservableGrouping<TKey, TElement>>)lookup).Values;
 
     IEnumerable<IObservableGrouping<TKey, TElement>> IReadOnlyDictionary<TKey, IObservableGrouping<TKey, TElement>>.Values =>
         ((IReadOnlyDictionary<TKey, IObservableGrouping<TKey, TElement>>)lookup).Values;
@@ -112,27 +106,4 @@ sealed class ScopedObservableLookupQuery<TKey, TElement> :
     bool ICollection<KeyValuePair<TKey, IObservableGrouping<TKey, TElement>>>.Remove(KeyValuePair<TKey, IObservableGrouping<TKey, TElement>> item) =>
         ((ICollection<KeyValuePair<TKey, IObservableGrouping<TKey, TElement>>>)lookup).Remove(item);
 
-    void IRangeDictionary<TKey, IObservableGrouping<TKey, TElement>>.AddRange(IEnumerable<KeyValuePair<TKey, IObservableGrouping<TKey, TElement>>> keyValuePairs) =>
-        ((IRangeDictionary<TKey, IObservableGrouping<TKey, TElement>>)lookup).AddRange(keyValuePairs);
-
-    void IRangeDictionary<TKey, IObservableGrouping<TKey, TElement>>.AddRange(IReadOnlyList<KeyValuePair<TKey, IObservableGrouping<TKey, TElement>>> keyValuePairs) =>
-        ((IRangeDictionary<TKey, IObservableGrouping<TKey, TElement>>)lookup).AddRange(keyValuePairs);
-
-    IReadOnlyList<KeyValuePair<TKey, IObservableGrouping<TKey, TElement>>> IRangeDictionary<TKey, IObservableGrouping<TKey, TElement>>.RemoveAll(Func<TKey, IObservableGrouping<TKey, TElement>, bool> predicate) =>
-        ((IRangeDictionary<TKey, IObservableGrouping<TKey, TElement>>)lookup).RemoveAll(predicate);
-
-    IReadOnlyList<TKey> IRangeDictionary<TKey, IObservableGrouping<TKey, TElement>>.RemoveRange(IEnumerable<TKey> keys) =>
-        ((IRangeDictionary<TKey, IObservableGrouping<TKey, TElement>>)lookup).RemoveRange(keys);
-
-    void IRangeDictionary<TKey, IObservableGrouping<TKey, TElement>>.ReplaceRange(IEnumerable<KeyValuePair<TKey, IObservableGrouping<TKey, TElement>>> keyValuePairs) =>
-        ((IRangeDictionary<TKey, IObservableGrouping<TKey, TElement>>)lookup).ReplaceRange(keyValuePairs);
-
-    IReadOnlyList<TKey> IRangeDictionary<TKey, IObservableGrouping<TKey, TElement>>.ReplaceRange(IEnumerable<TKey> removeKeys, IEnumerable<KeyValuePair<TKey, IObservableGrouping<TKey, TElement>>> newKeyValuePairs) =>
-        ((IRangeDictionary<TKey, IObservableGrouping<TKey, TElement>>)lookup).ReplaceRange(removeKeys, newKeyValuePairs);
-
-    void IRangeDictionary<TKey, IObservableGrouping<TKey, TElement>>.Reset() =>
-        ((IRangeDictionary<TKey, IObservableGrouping<TKey, TElement>>)lookup).Reset();
-
-    void IRangeDictionary<TKey, IObservableGrouping<TKey, TElement>>.Reset(IDictionary<TKey, IObservableGrouping<TKey, TElement>> dictionary) =>
-        ((IRangeDictionary<TKey, IObservableGrouping<TKey, TElement>>)lookup).Reset(dictionary);
 }

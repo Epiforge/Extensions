@@ -911,7 +911,7 @@ public class ObservableDictionary<TKey, TValue> :
     ICollection<TKey> IDictionary<TKey, TValue>.Keys =>
         KeysGenericCollection;
 
-    IEnumerable<TKey> IRangeDictionary<TKey, TValue>.Keys =>
+    IEnumerable<TKey> IReadOnlyRangeDictionary<TKey, TValue>.Keys =>
         KeysGenericEnumerable;
 
     IEnumerable<TKey> IReadOnlyDictionary<TKey, TValue>.Keys =>
@@ -956,7 +956,7 @@ public class ObservableDictionary<TKey, TValue> :
     ICollection<TValue> IDictionary<TKey, TValue>.Values =>
         ValuesGenericCollection;
 
-    IEnumerable<TValue> IRangeDictionary<TKey, TValue>.Values =>
+    IEnumerable<TValue> IReadOnlyRangeDictionary<TKey, TValue>.Values =>
         ValuesGenericEnumerable;
 
     IEnumerable<TValue> IReadOnlyDictionary<TKey, TValue>.Values =>

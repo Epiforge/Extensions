@@ -5,28 +5,8 @@ namespace Epiforge.Extensions.Collections.ObjectModel;
 /// </summary>
 /// <typeparam name="T">The type of elements in the collection</typeparam>
 public interface IObservableRangeCollection<T> :
-    ICollection,
-    ICollection<T>,
-    IEnumerable,
-    IEnumerable<T>,
-    IList,
-    IList<T>,
-    INotifyCollectionChanged,
-    INotifyPropertyChanged,
-    IReadOnlyCollection<T>,
-    IReadOnlyList<T>
+    IReadOnlyObservableRangeCollection<T>
 {
-    /// <summary>
-    /// Gets the element at the specified index
-    /// </summary>
-    /// <param name="index">The index</param>
-    new T this[int index] { get; }
-
-    /// <summary>
-    /// Gets the number of elements contained in the <see cref="IObservableRangeCollection{T}"/>
-    /// </summary>
-    new int Count { get; }
-
     /// <summary>
     /// Adds objects to the end of the <see cref="IObservableRangeCollection{T}"/>
     /// </summary>
@@ -52,14 +32,6 @@ public interface IObservableRangeCollection<T> :
     /// <param name="index">The zero-based index of the element</param>
     /// <returns>The element at the specified index</returns>
     T GetAndRemoveAt(int index);
-
-    /// <summary>
-    /// Gets the elements in the range starting at the specified index and of the specified length
-    /// </summary>
-    /// <param name="index">The index of the element at the start of the range</param>
-    /// <param name="count">The number of elements in the range</param>
-    /// <returns>The elements in the range</returns>
-    IReadOnlyList<T> GetRange(int index, int count);
 
     /// <summary>
     /// Inserts elements into the <see cref="IObservableRangeCollection{T}"/> at the specified index

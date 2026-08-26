@@ -82,12 +82,6 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
         set => throw new NotSupportedException();
     }
 
-    TValue IRangeDictionary<TKey, TValue>.this[TKey key]
-    {
-        get => this[key];
-        set => throw new NotSupportedException();
-    }
-
     public override int CachedObservableQueries
     {
         get
@@ -244,34 +238,10 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     void ICollection<KeyValuePair<TKey, TValue>>.Clear() =>
         throw new NotSupportedException();
 
-    void IRangeDictionary<TKey, TValue>.AddRange(IEnumerable<KeyValuePair<TKey, TValue>> keyValuePairs) =>
-        throw new NotSupportedException();
-
-    void IRangeDictionary<TKey, TValue>.AddRange(IReadOnlyList<KeyValuePair<TKey, TValue>> keyValuePairs) =>
-        throw new NotSupportedException();
-
     bool IDictionary<TKey, TValue>.Remove(TKey key) =>
         throw new NotSupportedException();
 
     bool ICollection<KeyValuePair<TKey, TValue>>.Remove(KeyValuePair<TKey, TValue> item) =>
-        throw new NotSupportedException();
-
-    IReadOnlyList<KeyValuePair<TKey, TValue>> IRangeDictionary<TKey, TValue>.RemoveAll(Func<TKey, TValue, bool> predicate) =>
-        throw new NotSupportedException();
-
-    IReadOnlyList<TKey> IRangeDictionary<TKey, TValue>.RemoveRange(IEnumerable<TKey> keys) =>
-        throw new NotSupportedException();
-
-    void IRangeDictionary<TKey, TValue>.ReplaceRange(IEnumerable<KeyValuePair<TKey, TValue>> keyValuePairs) =>
-        throw new NotSupportedException();
-
-    IReadOnlyList<TKey> IRangeDictionary<TKey, TValue>.ReplaceRange(IEnumerable<TKey> removeKeys, IEnumerable<KeyValuePair<TKey, TValue>> newKeyValuePairs) =>
-        throw new NotSupportedException();
-
-    void IRangeDictionary<TKey, TValue>.Reset() =>
-        throw new NotSupportedException();
-
-    void IRangeDictionary<TKey, TValue>.Reset(IDictionary<TKey, TValue> dictionary) =>
         throw new NotSupportedException();
 
     #endregion Unsupported Operations

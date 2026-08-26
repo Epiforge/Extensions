@@ -1,22 +1,22 @@
 namespace Epiforge.Extensions.Collections.ObjectModel;
 
 /// <summary>
-/// Read-only wrapper around an <see cref="IObservableRangeDictionary{TKey, TValue}"/>
+/// Read-only wrapper around an <see cref="IReadOnlyObservableRangeDictionary{TKey, TValue}"/>
 /// </summary>
 /// <typeparam name="TKey">The type of keys in the read-only dictionary</typeparam>
 /// <typeparam name="TValue">The type of values in the read-only dictionary</typeparam>
 public class ReadOnlyObservableRangeDictionary<TKey, TValue> :
     ReadOnlyRangeDictionary<TKey, TValue>,
     IDisposable,
-    IObservableRangeDictionary<TKey, TValue>
+    IReadOnlyObservableRangeDictionary<TKey, TValue>
     where TKey : notnull
 {
     /// <summary>
     /// Initializes a new instance of the <see cref="ReadOnlyObservableRangeDictionary{TKey, TValue}"/> class
     /// </summary>
-    /// <param name="observableRangeDictionary">The <see cref="IObservableRangeDictionary{TKey, TValue}"/> around which to wrap</param>
+    /// <param name="observableRangeDictionary">The <see cref="IReadOnlyObservableRangeDictionary{TKey, TValue}"/> around which to wrap</param>
     [SuppressMessage("Design", "CA1062: Validate arguments of public methods", Justification = "The base class constructor will.")]
-    public ReadOnlyObservableRangeDictionary(IObservableRangeDictionary<TKey, TValue> observableRangeDictionary) :
+    public ReadOnlyObservableRangeDictionary(IReadOnlyObservableRangeDictionary<TKey, TValue> observableRangeDictionary) :
         base(observableRangeDictionary)
     {
         this.observableRangeDictionary = observableRangeDictionary;
@@ -29,7 +29,7 @@ public class ReadOnlyObservableRangeDictionary<TKey, TValue> :
         Dispose(false);
 
     bool isDisposed;
-    readonly IObservableRangeDictionary<TKey, TValue> observableRangeDictionary;
+    readonly IReadOnlyObservableRangeDictionary<TKey, TValue> observableRangeDictionary;
 
     /// <summary>
     /// Occurs when the dictionary changes

@@ -69,16 +69,6 @@ public class ReadOnlyRangeDictionary
     }
 
     [TestMethod]
-    [ExpectedException(typeof(NotSupportedException))]
-    public void IRangeDictionaryAddRangeWithIEnumerable() =>
-        ((IRangeDictionary<string, string>)new ReadOnlyRangeDictionary<string, string>(new ObservableDictionary<string, string> { { "key", "value" } })).AddRange((IEnumerable<KeyValuePair<string, string>>)new[] { new KeyValuePair<string, string>("other", "value") });
-
-    [TestMethod]
-    [ExpectedException(typeof(NotSupportedException))]
-    public void IRangeDictionaryAddRangeWithIReadOnlyList() =>
-        ((IRangeDictionary<string, string>)new ReadOnlyRangeDictionary<string, string>(new ObservableDictionary<string, string> { { "key", "value" } })).AddRange(new[] { new KeyValuePair<string, string>("other", "value") });
-
-    [TestMethod]
     public void IDictionaryIndexerGetter() =>
         Assert.AreEqual("value", ((IDictionary<string, string>)new ReadOnlyRangeDictionary<string, string>(new ObservableDictionary<string, string> { { "key", "value" } }))["key"]);
 
@@ -88,41 +78,18 @@ public class ReadOnlyRangeDictionary
         ((IDictionary<string, string>)new ReadOnlyRangeDictionary<string, string>(new ObservableDictionary<string, string> { { "key", "value" } }))["key"] = "other";
 
     [TestMethod]
-    public void IRangeDictionaryIndexerGetter() =>
-        Assert.AreEqual("value", ((IRangeDictionary<string, string>)new ReadOnlyRangeDictionary<string, string>(new ObservableDictionary<string, string> { { "key", "value" } }))["key"]);
+    public void IReadOnlyRangeDictionaryIndexerGetter() =>
+        Assert.AreEqual("value", ((IReadOnlyRangeDictionary<string, string>)new ReadOnlyRangeDictionary<string, string>(new ObservableDictionary<string, string> { { "key", "value" } }))["key"]);
 
     [TestMethod]
-    [ExpectedException(typeof(NotSupportedException))]
-    public void IRangeDictionaryIndexerSetter() =>
-        ((IRangeDictionary<string, string>)new ReadOnlyRangeDictionary<string, string>(new ObservableDictionary<string, string> { { "key", "value" } }))["key"] = "other";
+    public void IsNotARangeDictionary() =>
+        Assert.IsFalse(new ReadOnlyRangeDictionary<string, string>(new ObservableDictionary<string, string> { { "key", "value" } }) is IRangeDictionary<string, string>);
 
     [TestMethod]
-    [ExpectedException(typeof(NotSupportedException))]
-    public void IRangeDictionaryRemoveAll() =>
-        ((IRangeDictionary<string, string>)new ReadOnlyRangeDictionary<string, string>(new ObservableDictionary<string, string> { { "key", "value" } })).RemoveAll((k, v) => true);
-
-    [TestMethod]
-    [ExpectedException(typeof(NotSupportedException))]
-    public void IRangeDictionaryRemoveRange() =>
-        ((IRangeDictionary<string, string>)new ReadOnlyRangeDictionary<string, string>(new ObservableDictionary<string, string> { { "key", "value" } })).RemoveRange(new string[] { "key" });
-
-    [TestMethod]
-    [ExpectedException(typeof(NotSupportedException))]
-    public void IRangeDictionaryReplaceRangeWithKeyValuePairs() =>
-        ((IRangeDictionary<string, string>)new ReadOnlyRangeDictionary<string, string>(new ObservableDictionary<string, string> { { "key", "value" } })).ReplaceRange(new[] { new KeyValuePair<string, string>("other", "value") });
-
-    [TestMethod]
-    [ExpectedException(typeof(NotSupportedException))]
-    public void IRangeDictionaryReplaceRangeWithKeysAndKeyValuePairs() =>
-        ((IRangeDictionary<string, string>)new ReadOnlyRangeDictionary<string, string>(new ObservableDictionary<string, string> { { "key", "value" } })).ReplaceRange(new string[] { "key" }, new[] { new KeyValuePair<string, string>("other", "value") });
-
-    [TestMethod]
-    [ExpectedException(typeof(NotSupportedException))]
-    public void IRangeDictionaryReset() =>
-        ((IRangeDictionary<string, string>)new ReadOnlyRangeDictionary<string, string>(new ObservableDictionary<string, string> { { "key", "value" } })).Reset();
-
-    [TestMethod]
-    [ExpectedException(typeof(NotSupportedException))]
-    public void IRangeDictionaryResetWithDictionary() =>
-        ((IRangeDictionary<string, string>)new ReadOnlyRangeDictionary<string, string>(new ObservableDictionary<string, string> { { "key", "value" } })).Reset(new ObservableDictionary<string, string> { { "other", "value" } });
+    public void WrapsAReadOnlyRangeDictionary()
+    {
+        var wrapper = new ReadOnlyRangeDictionary<string, string>(new ReadOnlyRangeDictionary<string, string>(new ObservableDictionary<string, string> { { "key", "value" } }));
+        Assert.AreEqual("value", wrapper["key"]);
+        Assert.AreEqual(1, wrapper.GetRange(new string[] { "key" }).Count);
+    }
 }

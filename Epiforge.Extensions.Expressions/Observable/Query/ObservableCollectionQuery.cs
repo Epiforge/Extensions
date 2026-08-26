@@ -392,22 +392,10 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     void ICollection<TElement>.Add(TElement item) =>
         throw new NotSupportedException();
 
-    void IObservableRangeCollection<TElement>.AddRange(IEnumerable<TElement> items) =>
-        throw new NotSupportedException();
-
-    void IObservableRangeCollection<TElement>.AddRange(IList<TElement> items) =>
-        throw new NotSupportedException();
-
     void IList.Clear() =>
         throw new NotSupportedException();
 
     void ICollection<TElement>.Clear() =>
-        throw new NotSupportedException();
-
-    IReadOnlyList<TElement> IObservableRangeCollection<TElement>.GetAndRemoveAll(Func<TElement, bool> predicate) =>
-        throw new NotSupportedException();
-
-    TElement IObservableRangeCollection<TElement>.GetAndRemoveAt(int index) =>
         throw new NotSupportedException();
 
     void IList.Insert(int index, object? value) =>
@@ -416,52 +404,16 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     void IList<TElement>.Insert(int index, TElement item) =>
         throw new NotSupportedException();
 
-    void IObservableRangeCollection<TElement>.InsertRange(int index, IEnumerable<TElement> items) =>
-        throw new NotSupportedException();
-
-    void IObservableRangeCollection<TElement>.InsertRange(int index, IList<TElement> items) =>
-        throw new NotSupportedException();
-
-    void IObservableRangeCollection<TElement>.MoveRange(int oldStartIndex, int newStartIndex, int count) =>
-        throw new NotSupportedException();
-
     void IList.Remove(object? value) =>
         throw new NotSupportedException();
 
     bool ICollection<TElement>.Remove(TElement item) =>
         throw new NotSupportedException();
 
-    int IObservableRangeCollection<TElement>.RemoveAll(Func<TElement, bool> predicate) =>
-        throw new NotSupportedException();
-
     void IList.RemoveAt(int index) =>
         throw new NotSupportedException();
 
     void IList<TElement>.RemoveAt(int index) =>
-        throw new NotSupportedException();
-
-    void IObservableRangeCollection<TElement>.RemoveRange(IEnumerable<TElement> items) =>
-        throw new NotSupportedException();
-
-    void IObservableRangeCollection<TElement>.RemoveRange(IList<TElement> items) =>
-        throw new NotSupportedException();
-
-    void IObservableRangeCollection<TElement>.RemoveRange(int index, int count) =>
-        throw new NotSupportedException();
-
-    void IObservableRangeCollection<TElement>.ReplaceAll(IEnumerable<TElement> items) =>
-        throw new NotSupportedException();
-
-    void IObservableRangeCollection<TElement>.ReplaceAll(IList<TElement> items) =>
-        throw new NotSupportedException();
-
-    IReadOnlyList<TElement> IObservableRangeCollection<TElement>.ReplaceRange(int index, int count, IEnumerable<TElement>? collection) =>
-        throw new NotSupportedException();
-
-    IReadOnlyList<TElement> IObservableRangeCollection<TElement>.ReplaceRange(int index, int count, IList<TElement> list) =>
-        throw new NotSupportedException();
-
-    void IObservableRangeCollection<TElement>.Reset(IEnumerable<TElement> newCollection) =>
         throw new NotSupportedException();
 
     #endregion Unsupported Operations

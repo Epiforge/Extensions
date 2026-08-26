@@ -338,54 +338,7 @@ class ScopedObservableCollectionQuery<TElement> :
     public Exception? OperationFault =>
         query.OperationFault;
 
-    void IObservableRangeCollection<TElement>.AddRange(IEnumerable<TElement> items) =>
-        ((IObservableRangeCollection<TElement>)query).AddRange(items);
-
-    void IObservableRangeCollection<TElement>.AddRange(IList<TElement> items) =>
-        ((IObservableRangeCollection<TElement>)query).AddRange(items);
-
-    IReadOnlyList<TElement> IObservableRangeCollection<TElement>.GetAndRemoveAll(Func<TElement, bool> predicate) =>
-        ((IObservableRangeCollection<TElement>)query).GetAndRemoveAll(predicate);
-
-    TElement IObservableRangeCollection<TElement>.GetAndRemoveAt(int index) =>
-        ((IObservableRangeCollection<TElement>)query).GetAndRemoveAt(index);
-
     public IReadOnlyList<TElement> GetRange(int index, int count) =>
         query.GetRange(index, count);
 
-    void IObservableRangeCollection<TElement>.InsertRange(int index, IEnumerable<TElement> items) =>
-        ((IObservableRangeCollection<TElement>)query).InsertRange(index, items);
-
-    void IObservableRangeCollection<TElement>.InsertRange(int index, IList<TElement> items) =>
-        ((IObservableRangeCollection<TElement>)query).InsertRange(index, items);
-
-    void IObservableRangeCollection<TElement>.MoveRange(int oldStartIndex, int newStartIndex, int count) =>
-        ((IObservableRangeCollection<TElement>)query).MoveRange(oldStartIndex, newStartIndex, count);
-
-    int IObservableRangeCollection<TElement>.RemoveAll(Func<TElement, bool> predicate) =>
-        ((IObservableRangeCollection<TElement>)query).RemoveAll(predicate);
-
-    void IObservableRangeCollection<TElement>.RemoveRange(IEnumerable<TElement> items) =>
-        ((IObservableRangeCollection<TElement>)query).RemoveRange(items);
-
-    void IObservableRangeCollection<TElement>.RemoveRange(IList<TElement> items) =>
-        ((IObservableRangeCollection<TElement>)query).RemoveRange(items);
-
-    void IObservableRangeCollection<TElement>.RemoveRange(int index, int count) =>
-        ((IObservableRangeCollection<TElement>)query).RemoveRange(index, count);
-
-    void IObservableRangeCollection<TElement>.ReplaceAll(IEnumerable<TElement> items) =>
-        ((IObservableRangeCollection<TElement>)query).ReplaceAll(items);
-
-    void IObservableRangeCollection<TElement>.ReplaceAll(IList<TElement> items) =>
-        ((IObservableRangeCollection<TElement>)query).ReplaceAll(items);
-
-    IReadOnlyList<TElement> IObservableRangeCollection<TElement>.ReplaceRange(int index, int count, IEnumerable<TElement>? collection) =>
-        ((IObservableRangeCollection<TElement>)query).ReplaceRange(index, count, collection);
-
-    IReadOnlyList<TElement> IObservableRangeCollection<TElement>.ReplaceRange(int index, int count, IList<TElement> list) =>
-        ((IObservableRangeCollection<TElement>)query).ReplaceRange(index, count, list);
-
-    void IObservableRangeCollection<TElement>.Reset(IEnumerable<TElement> newCollection) =>
-        ((IObservableRangeCollection<TElement>)query).Reset(newCollection);
 }

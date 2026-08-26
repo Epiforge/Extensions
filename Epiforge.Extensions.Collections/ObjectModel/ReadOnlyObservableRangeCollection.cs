@@ -1,18 +1,18 @@
 namespace Epiforge.Extensions.Collections.ObjectModel;
 
 /// <summary>
-/// Read-only wrapper around an <see cref="IObservableRangeCollection{T}"/>
+/// Read-only wrapper around an <see cref="IReadOnlyObservableRangeCollection{T}"/>
 /// </summary>
 /// <typeparam name="T">The type of elements in the read-only collection</typeparam>
 public sealed class ReadOnlyObservableRangeCollection<T> :
     SyncDisposable,
-    IObservableRangeCollection<T>
+    IReadOnlyObservableRangeCollection<T>
 {
     /// <summary>
     /// Initializes a new instance of <see cref="ReadOnlyObservableRangeCollection{T}"/>
     /// </summary>
-    /// <param name="rangeObservableCollection">The <see cref="IObservableRangeCollection{T}"/> around which to wrap</param>
-    public ReadOnlyObservableRangeCollection(IObservableRangeCollection<T> rangeObservableCollection)
+    /// <param name="rangeObservableCollection">The <see cref="IReadOnlyObservableRangeCollection{T}"/> around which to wrap</param>
+    public ReadOnlyObservableRangeCollection(IReadOnlyObservableRangeCollection<T> rangeObservableCollection)
     {
         ArgumentNullException.ThrowIfNull(rangeObservableCollection);
         this.rangeObservableCollection = rangeObservableCollection;
@@ -20,7 +20,7 @@ public sealed class ReadOnlyObservableRangeCollection<T> :
         this.rangeObservableCollection.PropertyChanged += RangeObservableCollectionPropertyChanged;
     }
 
-    readonly IObservableRangeCollection<T> rangeObservableCollection;
+    readonly IReadOnlyObservableRangeCollection<T> rangeObservableCollection;
 
     /// <inheritdoc/>
     public T this[int index] => ((IReadOnlyList<T>)rangeObservableCollection)[index];
@@ -66,12 +66,6 @@ public sealed class ReadOnlyObservableRangeCollection<T> :
     void ICollection<T>.Add(T item) =>
         throw new NotSupportedException();
 
-    void IObservableRangeCollection<T>.AddRange(IEnumerable<T> items) =>
-        throw new NotSupportedException();
-
-    void IObservableRangeCollection<T>.AddRange(IList<T> items) =>
-        throw new NotSupportedException();
-
     void IList.Clear() =>
         throw new NotSupportedException();
 
@@ -102,12 +96,6 @@ public sealed class ReadOnlyObservableRangeCollection<T> :
         return true;
     }
 
-    IReadOnlyList<T> IObservableRangeCollection<T>.GetAndRemoveAll(Func<T, bool> predicate) =>
-        throw new NotSupportedException();
-
-    T IObservableRangeCollection<T>.GetAndRemoveAt(int index) =>
-        throw new NotSupportedException();
-
     /// <inheritdoc/>
     public IEnumerator<T> GetEnumerator() =>
         rangeObservableCollection.GetEnumerator();
@@ -132,15 +120,6 @@ public sealed class ReadOnlyObservableRangeCollection<T> :
     void IList<T>.Insert(int index, T item) =>
         throw new NotSupportedException();
 
-    void IObservableRangeCollection<T>.InsertRange(int index, IEnumerable<T> items) =>
-        throw new NotSupportedException();
-
-    void IObservableRangeCollection<T>.InsertRange(int index, IList<T> items) =>
-        throw new NotSupportedException();
-
-    void IObservableRangeCollection<T>.MoveRange(int oldStartIndex, int newStartIndex, int count) =>
-        throw new NotSupportedException();
-
     void OnCollectionChanged(NotifyCollectionChangedEventArgs e) =>
         CollectionChanged?.Invoke(this, e);
 
@@ -156,38 +135,9 @@ public sealed class ReadOnlyObservableRangeCollection<T> :
     bool ICollection<T>.Remove(T item) =>
         throw new NotSupportedException();
 
-    int IObservableRangeCollection<T>.RemoveAll(Func<T, bool> predicate) =>
-        throw new NotSupportedException();
-
     void IList.RemoveAt(int index) =>
         throw new NotSupportedException();
 
     void IList<T>.RemoveAt(int index) =>
-        throw new NotSupportedException();
-
-    void IObservableRangeCollection<T>.RemoveRange(IEnumerable<T> items) =>
-        throw new NotSupportedException();
-
-    void IObservableRangeCollection<T>.RemoveRange(IList<T> items) =>
-        throw new NotSupportedException();
-
-    void IObservableRangeCollection<T>.RemoveRange(int index, int count) =>
-        throw new NotSupportedException();
-
-    void IObservableRangeCollection<T>.ReplaceAll(IEnumerable<T> items) =>
-        throw new NotSupportedException();
-
-    void IObservableRangeCollection<T>.ReplaceAll(IList<T> items) =>
-        throw new NotSupportedException();
-
-#pragma warning disable CS1066 // The default value specified will have no effect because it applies to a member that is used in contexts that do not allow optional arguments
-    IReadOnlyList<T> IObservableRangeCollection<T>.ReplaceRange(int index, int count, IEnumerable<T>? collection = null) =>
-        throw new NotSupportedException();
-#pragma warning restore CS1066 // The default value specified will have no effect because it applies to a member that is used in contexts that do not allow optional arguments
-
-    IReadOnlyList<T> IObservableRangeCollection<T>.ReplaceRange(int index, int count, IList<T> list) =>
-        throw new NotSupportedException();
-
-    void IObservableRangeCollection<T>.Reset(IEnumerable<T> newCollection) =>
         throw new NotSupportedException();
 }

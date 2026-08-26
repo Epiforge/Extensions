@@ -125,12 +125,6 @@ class ScopedObservableDictionaryQuery<TKey, TValue> :
         set => ((IDictionary<TKey, TValue>)query)[key] = value;
     }
 
-    TValue IRangeDictionary<TKey, TValue>.this[TKey key]
-    {
-        get => ((IRangeDictionary<TKey, TValue>)query)[key];
-        set => ((IRangeDictionary<TKey, TValue>)query)[key] = value;
-    }
-
     ICollection<TKey> IDictionary<TKey, TValue>.Keys =>
         ((IDictionary<TKey, TValue>)query).Keys;
 
@@ -157,30 +151,6 @@ class ScopedObservableDictionaryQuery<TKey, TValue> :
 
     bool ICollection<KeyValuePair<TKey, TValue>>.Remove(KeyValuePair<TKey, TValue> item) =>
         ((ICollection<KeyValuePair<TKey, TValue>>)query).Remove(item);
-
-    void IRangeDictionary<TKey, TValue>.AddRange(IEnumerable<KeyValuePair<TKey, TValue>> keyValuePairs) =>
-        ((IRangeDictionary<TKey, TValue>)query).AddRange(keyValuePairs);
-
-    void IRangeDictionary<TKey, TValue>.AddRange(IReadOnlyList<KeyValuePair<TKey, TValue>> keyValuePairs) =>
-        ((IRangeDictionary<TKey, TValue>)query).AddRange(keyValuePairs);
-
-    IReadOnlyList<KeyValuePair<TKey, TValue>> IRangeDictionary<TKey, TValue>.RemoveAll(Func<TKey, TValue, bool> predicate) =>
-        ((IRangeDictionary<TKey, TValue>)query).RemoveAll(predicate);
-
-    IReadOnlyList<TKey> IRangeDictionary<TKey, TValue>.RemoveRange(IEnumerable<TKey> keys) =>
-        ((IRangeDictionary<TKey, TValue>)query).RemoveRange(keys);
-
-    void IRangeDictionary<TKey, TValue>.ReplaceRange(IEnumerable<KeyValuePair<TKey, TValue>> keyValuePairs) =>
-        ((IRangeDictionary<TKey, TValue>)query).ReplaceRange(keyValuePairs);
-
-    IReadOnlyList<TKey> IRangeDictionary<TKey, TValue>.ReplaceRange(IEnumerable<TKey> removeKeys, IEnumerable<KeyValuePair<TKey, TValue>> newKeyValuePairs) =>
-        ((IRangeDictionary<TKey, TValue>)query).ReplaceRange(removeKeys, newKeyValuePairs);
-
-    void IRangeDictionary<TKey, TValue>.Reset() =>
-        ((IRangeDictionary<TKey, TValue>)query).Reset();
-
-    void IRangeDictionary<TKey, TValue>.Reset(IDictionary<TKey, TValue> dictionary) =>
-        ((IRangeDictionary<TKey, TValue>)query).Reset(dictionary);
 
     public IObservableScalarQuery<TResult> ObserveAggregate<TAccumulate, TResult>(Func<TAccumulate> seedFactory, Func<TAccumulate, TKey, TValue, TAccumulate> func, Func<TAccumulate, TResult> resultSelector) =>
         query.ObserveAggregate<TAccumulate, TResult>(seedFactory, func, resultSelector);
