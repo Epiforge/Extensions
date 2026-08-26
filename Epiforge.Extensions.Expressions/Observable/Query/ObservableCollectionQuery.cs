@@ -286,7 +286,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     }
 
     public virtual object SyncRoot =>
-        null!;
+        throw new NotSupportedException("The SyncRoot property may not be used for the synchronization of observable queries; use ObserveUsingSyncRoot instead.");
 
     internal IObservableCollectionQuery<TElement> AsScoped() =>
         new ScopedObservableCollectionQuery<TElement>(this);

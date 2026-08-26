@@ -138,7 +138,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
         new ScopedObservableDictionaryQuery<TKey, TValue>(this);
 
     public virtual object SyncRoot =>
-        null!;
+        throw new NotSupportedException("The SyncRoot property may not be used for the synchronization of observable queries.");
 
     public abstract IEnumerable<TValue> Values { get; }
 

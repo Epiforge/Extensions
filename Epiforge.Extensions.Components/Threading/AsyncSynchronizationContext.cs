@@ -40,9 +40,11 @@ public sealed class AsyncSynchronizationContext :
     bool isDisposed;
     readonly AsyncProducerConsumerQueue<QueuedCallback> queuedCallbacks;
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Returns this <see cref="AsyncSynchronizationContext"/>, since a copy would share its queue of callbacks
+    /// </summary>
     public override SynchronizationContext CreateCopy() =>
-        new AsyncSynchronizationContext();
+        this;
 
     /// <inheritdoc/>
     public void Dispose()
@@ -97,6 +99,11 @@ public sealed class AsyncSynchronizationContext :
     {
         ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(d);
+        if (Current == this)
+        {
+            d(state);
+            return;
+        }
         using var signal = new ManualResetEventSlim(false);
         var queuedCallback = new QueuedCallback(d, state, signal);
         queuedCallbacks.Enqueue(queuedCallback);
