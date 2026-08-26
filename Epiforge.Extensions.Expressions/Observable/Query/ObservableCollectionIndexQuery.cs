@@ -36,8 +36,6 @@ sealed class ObservableCollectionIndexQuery<TElement>(CollectionObserver collect
                     {
                         if (index.IsFromEnd)
                             Evaluation = (null, OutOfRangeIsDefault ? observableCollectionQuery.LastOrDefault() : observableCollectionQuery.Last())!;
-                        else if (index.Value == 1)
-                            Evaluation = (null, OutOfRangeIsDefault ? observableCollectionQuery.FirstOrDefault() : observableCollectionQuery.First())!;
                         else
                             Evaluation = (null, OutOfRangeIsDefault ? observableCollectionQuery.ElementAtOrDefault(index.Value) : observableCollectionQuery.ElementAt(index.Value))!;
                     }
