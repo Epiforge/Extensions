@@ -194,6 +194,9 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
     readonly IEqualityComparer<TKey>? comparer;
     readonly int? concurrencyLevel;
 
+    ConcurrentDictionary<TKey, TValue> Cd =>
+        Volatile.Read(ref cd);
+
     /// <summary>
     /// Gets or sets the value associated with the specified key
     /// </summary>
@@ -202,12 +205,12 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
     /// <exception cref="KeyNotFoundException">The property is retrieved and <paramref name="key"/> does not exist in the collection</exception>
     public virtual TValue this[TKey key]
     {
-        get => cd[key];
+        get => Cd[key];
         set
         {
             var updated = false;
             TValue oldValue = default!;
-            var newValue = cd.AddOrUpdate(key, value, (k, v) =>
+            var newValue = Cd.AddOrUpdate(key, value, (k, v) =>
             {
                 updated = true;
                 oldValue = v;
@@ -225,7 +228,7 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
 
     object? IDictionary.this[object key]
     {
-        get => ((IDictionary)cd)[key];
+        get => ((IDictionary)Cd)[key];
         set
         {
             ArgumentNullException.ThrowIfNull(key);
@@ -257,52 +260,52 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
     /// Gets the number of key/value pairs contained in the <see cref="ObservableConcurrentDictionary{TKey, TValue}"/>
     /// </summary>
     public virtual int Count =>
-        cd.Count;
+        Cd.Count;
 
     /// <summary>
     /// Gets a value that indicates whether the <see cref="ObservableConcurrentDictionary{TKey, TValue}"/> is empty
     /// </summary>
     public virtual bool IsEmpty =>
-        cd.IsEmpty;
+        Cd.IsEmpty;
 
     bool IDictionary.IsFixedSize =>
-        ((IDictionary)cd).IsFixedSize;
+        ((IDictionary)Cd).IsFixedSize;
 
     bool ICollection<KeyValuePair<TKey, TValue>>.IsReadOnly =>
-        ((ICollection<KeyValuePair<TKey, TValue>>)cd).IsReadOnly;
+        ((ICollection<KeyValuePair<TKey, TValue>>)Cd).IsReadOnly;
 
     bool IDictionary.IsReadOnly =>
-        ((IDictionary)cd).IsReadOnly;
+        ((IDictionary)Cd).IsReadOnly;
 
     bool ICollection.IsSynchronized =>
-        ((ICollection)cd).IsSynchronized;
+        ((ICollection)Cd).IsSynchronized;
 
     /// <summary>
     /// Gets a collection containing the keys in the <see cref="ObservableConcurrentDictionary{TKey, TValue}"/>
     /// </summary>
     public virtual ICollection<TKey> Keys =>
-        cd.Keys;
+        Cd.Keys;
 
     ICollection IDictionary.Keys =>
-        ((IDictionary)cd).Keys;
+        ((IDictionary)Cd).Keys;
 
     IEnumerable<TKey> IReadOnlyDictionary<TKey, TValue>.Keys =>
-        ((IReadOnlyDictionary<TKey, TValue>)cd).Keys;
+        ((IReadOnlyDictionary<TKey, TValue>)Cd).Keys;
 
     object ICollection.SyncRoot =>
-        ((ICollection)cd).SyncRoot;
+        ((ICollection)Cd).SyncRoot;
 
     /// <summary>
     /// Gets a collection that contains the values in the <see cref="ObservableConcurrentDictionary{TKey, TValue}"/>
     /// </summary>
     public virtual ICollection<TValue> Values =>
-        cd.Values;
+        Cd.Values;
 
     ICollection IDictionary.Values =>
-        ((IDictionary)cd).Values;
+        ((IDictionary)Cd).Values;
 
     IEnumerable<TValue> IReadOnlyDictionary<TKey, TValue>.Values =>
-        ((IReadOnlyDictionary<TKey, TValue>)cd).Values;
+        ((IReadOnlyDictionary<TKey, TValue>)Cd).Values;
 
     /// <summary>
     /// Occurs when the collection changes
@@ -365,7 +368,7 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
         ArgumentNullException.ThrowIfNull(updateValueFactory);
         var updated = false;
         TValue oldValue = default!;
-        var newValue = cd.AddOrUpdate(key, addValue, (k, v) =>
+        var newValue = Cd.AddOrUpdate(key, addValue, (k, v) =>
         {
             updated = true;
             oldValue = v;
@@ -396,7 +399,7 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
         ArgumentNullException.ThrowIfNull(updateValueFactory);
         var updated = false;
         TValue oldValue = default!;
-        var newValue = cd.AddOrUpdate(key, addValueFactory, (k, v) =>
+        var newValue = Cd.AddOrUpdate(key, addValueFactory, (k, v) =>
         {
             updated = true;
             oldValue = v;
@@ -429,7 +432,7 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
         ArgumentNullException.ThrowIfNull(updateValueFactory);
         var updated = false;
         TValue oldValue = default!;
-        var newValue = cd.AddOrUpdate(key, addValueFactory, (k, v, a) =>
+        var newValue = Cd.AddOrUpdate(key, addValueFactory, (k, v, a) =>
         {
             updated = true;
             oldValue = v;
@@ -450,18 +453,17 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
     /// </summary>
     public virtual void Clear()
     {
-        var currentCd = cd;
-        // somewhere, George is clutching his chest like Yoda during Attack of the Clones
-        cd = comparer is not null ? concurrencyLevel is { } comparerCl ? capacity is { } comparerC ? new ConcurrentDictionary<TKey, TValue>(comparerCl, comparerC, comparer) : new ConcurrentDictionary<TKey, TValue>(comparerCl, [], comparer) : new ConcurrentDictionary<TKey, TValue>(comparer) : concurrencyLevel is { } cl && capacity is { } c ? new ConcurrentDictionary<TKey, TValue>(cl, c) : new ConcurrentDictionary<TKey, TValue>();
+
+        var currentCd = Interlocked.Exchange(ref cd, comparer is not null ? concurrencyLevel is { } comparerCl ? capacity is { } comparerC ? new ConcurrentDictionary<TKey, TValue>(comparerCl, comparerC, comparer) : new ConcurrentDictionary<TKey, TValue>(comparerCl, [], comparer) : new ConcurrentDictionary<TKey, TValue>(comparer) : concurrencyLevel is { } cl && capacity is { } c ? new ConcurrentDictionary<TKey, TValue>(cl, c) : new ConcurrentDictionary<TKey, TValue>());
         NotifyCountChanged();
         OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Remove, [..currentCd]));
     }
 
     bool ICollection<KeyValuePair<TKey, TValue>>.Contains(KeyValuePair<TKey, TValue> item) =>
-        ((ICollection<KeyValuePair<TKey, TValue>>)cd).Contains(item);
+        ((ICollection<KeyValuePair<TKey, TValue>>)Cd).Contains(item);
 
     bool IDictionary.Contains(object key) =>
-        ((IDictionary)cd).Contains(key);
+        ((IDictionary)Cd).Contains(key);
 
     /// <summary>
     /// Determines whether the <see cref="ObservableConcurrentDictionary{TKey, TValue}"/> contains the specified key
@@ -470,26 +472,26 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
     /// <returns><c>true</c> if the <see cref="ObservableConcurrentDictionary{TKey, TValue}"/> contains an element with the specified key; otherwise, <c>false</c></returns>
     /// <exception cref="ArgumentNullException"><paramref name="key"/> is <c>null</c></exception>
     public virtual bool ContainsKey(TKey key) =>
-        cd.ContainsKey(key);
+        Cd.ContainsKey(key);
 
     void ICollection<KeyValuePair<TKey, TValue>>.CopyTo(KeyValuePair<TKey, TValue>[] array, int arrayIndex) =>
-        ((ICollection<KeyValuePair<TKey, TValue>>)cd).CopyTo(array, arrayIndex);
+        ((ICollection<KeyValuePair<TKey, TValue>>)Cd).CopyTo(array, arrayIndex);
 
     void ICollection.CopyTo(Array array, int index) =>
-        ((ICollection)cd).CopyTo(array, index);
+        ((ICollection)Cd).CopyTo(array, index);
 
     /// <summary>
     /// Returns an enumerator that iterates through the <see cref="ObservableConcurrentDictionary{TKey, TValue}"/>
     /// </summary>
     /// <returns>An enumerator for the <see cref="ObservableConcurrentDictionary{TKey, TValue}"/></returns>
     public virtual IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator() =>
-        cd.GetEnumerator();
+        Cd.GetEnumerator();
 
     IEnumerator IEnumerable.GetEnumerator() =>
-        ((IEnumerable)cd).GetEnumerator();
+        ((IEnumerable)Cd).GetEnumerator();
 
     IDictionaryEnumerator IDictionary.GetEnumerator() =>
-        ((IDictionary)cd).GetEnumerator();
+        ((IDictionary)Cd).GetEnumerator();
 
     /// <summary>
     /// Adds a key/value pair to the <see cref="ObservableConcurrentDictionary{TKey, TValue}"/> if the key does not already exist (returns the new value, or the existing value if the key exists)
@@ -502,7 +504,7 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
     public virtual TValue GetOrAdd(TKey key, TValue value)
     {
         var added = false;
-        var retrievedOrAddedValue = cd.GetOrAdd(key, k =>
+        var retrievedOrAddedValue = Cd.GetOrAdd(key, k =>
         {
             added = true;
             return value;
@@ -527,7 +529,7 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
     {
         ArgumentNullException.ThrowIfNull(valueFactory);
         var added = false;
-        var retrievedOrAddedValue = cd.GetOrAdd(key, k =>
+        var retrievedOrAddedValue = Cd.GetOrAdd(key, k =>
         {
             added = true;
             return valueFactory(k);
@@ -554,7 +556,7 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
     {
         ArgumentNullException.ThrowIfNull(valueFactory);
         var added = false;
-        var retrievedOrAddedValue = cd.GetOrAdd(key, (k, a) =>
+        var retrievedOrAddedValue = Cd.GetOrAdd(key, (k, a) =>
         {
             added = true;
             return valueFactory(k, a);
@@ -666,7 +668,7 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
     /// </summary>
     public virtual void Reset()
     {
-        cd = comparer is not null ? concurrencyLevel is { } comparerCl ? capacity is { } comparerC ? new ConcurrentDictionary<TKey, TValue>(comparerCl, comparerC, comparer) : new ConcurrentDictionary<TKey, TValue>(comparerCl, [], comparer) : new ConcurrentDictionary<TKey, TValue>(comparer) : concurrencyLevel is { } cl && capacity is { } c ? new ConcurrentDictionary<TKey, TValue>(cl, c) : new ConcurrentDictionary<TKey, TValue>();
+        Interlocked.Exchange(ref cd, comparer is not null ? concurrencyLevel is { } comparerCl ? capacity is { } comparerC ? new ConcurrentDictionary<TKey, TValue>(comparerCl, comparerC, comparer) : new ConcurrentDictionary<TKey, TValue>(comparerCl, [], comparer) : new ConcurrentDictionary<TKey, TValue>(comparer) : concurrencyLevel is { } cl && capacity is { } c ? new ConcurrentDictionary<TKey, TValue>(cl, c) : new ConcurrentDictionary<TKey, TValue>());
         NotifyCountChanged();
         OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Reset));
     }
@@ -677,7 +679,7 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
     /// <param name="keyValuePairs">The elements with which to reinitialize the dictionary</param>
     public virtual void Reset(IEnumerable<KeyValuePair<TKey, TValue>> keyValuePairs)
     {
-        cd = comparer is { } c ? concurrencyLevel is { } cl ? new ConcurrentDictionary<TKey, TValue>(cl, keyValuePairs, c) : new ConcurrentDictionary<TKey, TValue>(keyValuePairs, c) : new ConcurrentDictionary<TKey, TValue>(keyValuePairs);
+        Interlocked.Exchange(ref cd, comparer is { } c ? concurrencyLevel is { } cl ? new ConcurrentDictionary<TKey, TValue>(cl, keyValuePairs, c) : new ConcurrentDictionary<TKey, TValue>(keyValuePairs, c) : new ConcurrentDictionary<TKey, TValue>(keyValuePairs));
         NotifyCountChanged();
         OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Reset));
     }
@@ -687,7 +689,7 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
     /// </summary>
     /// <returns>A new array containing a snapshot of key and value pairs copied from the <see cref="ObservableConcurrentDictionary{TKey, TValue}"/></returns>
     public virtual KeyValuePair<TKey, TValue>[] ToArray() =>
-        [..cd];
+        [..Cd];
 
     /// <summary>
     /// Attempts to add the specified key and value to the <see cref="ObservableConcurrentDictionary{TKey, TValue}"/>
@@ -699,7 +701,7 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
     /// <exception cref="OverflowException">The dictionary already contains the maximum number of elements (<see cref="int.MaxValue"/>)</exception>
     public virtual bool TryAdd(TKey key, TValue value)
     {
-        if (cd.TryAdd(key, value))
+        if (Cd.TryAdd(key, value))
         {
             NotifyCountChanged();
             OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, key, value));
@@ -716,7 +718,7 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
     /// <returns><c>true</c> if the key was found in the <see cref="ObservableConcurrentDictionary{TKey, TValue}"/>; otherwise, <c>false</c></returns>
     /// <exception cref="ArgumentNullException"><paramref name="key"/> is <c>null</c></exception>
     public virtual bool TryGetValue(TKey key, out TValue value) =>
-        cd.TryGetValue(key, out value!);
+        Cd.TryGetValue(key, out value!);
 
     /// <summary>
     /// Attempts to remove and return the value that has the specified key from the <see cref="ObservableConcurrentDictionary{TKey, TValue}"/>
@@ -727,7 +729,7 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
     /// <exception cref="ArgumentNullException"><paramref name="key"/> is <c>null</c></exception>
     public virtual bool TryRemove(TKey key, out TValue value)
     {
-        if (cd.TryRemove(key, out value!))
+        if (Cd.TryRemove(key, out value!))
         {
             NotifyCountChanged();
             OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Remove, key, value));
@@ -748,7 +750,7 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
         try
         {
             TValue oldValue = default!;
-            cd.AddOrUpdate(key, k => throw new KeyNotFoundException(), (k, v) =>
+            Cd.AddOrUpdate(key, k => throw new KeyNotFoundException(), (k, v) =>
             {
                 if (EqualityComparer<TValue>.Default.Equals(v, comparisonValue))
                 {
