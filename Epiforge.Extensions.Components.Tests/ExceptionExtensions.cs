@@ -136,6 +136,25 @@ public class ExceptionExtensions
     }
 
     [TestMethod]
+    [Timeout(5000)]
+    public void GetFullDetailsInPlainTextOfAggregateExceptionWithMultipleInnerExceptions()
+    {
+        var fullDetails = new AggregateException(new Exception("First"), new Exception("Second")).GetFullDetails();
+        Assert.IsTrue(fullDetails.Contains("First", StringComparison.Ordinal));
+        Assert.IsTrue(fullDetails.Contains("Second", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    [Timeout(5000)]
+    public void GetFullDetailsInPlainTextOfExceptionReachableByTwoPaths()
+    {
+        var shared = new Exception("Shared");
+        var fullDetails = new AggregateException(shared, new Exception("Wrapper", shared)).GetFullDetails();
+        Assert.IsTrue(fullDetails.Contains("Shared", StringComparison.Ordinal));
+        Assert.IsTrue(fullDetails.Contains("Wrapper", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
     public void GetFullDetailsInPlainTextOfReflectionTypeLoadException()
     {
         string fullDetails;

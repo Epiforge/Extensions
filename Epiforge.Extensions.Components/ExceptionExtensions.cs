@@ -261,12 +261,12 @@ public static class ExceptionExtensions
         json.WriteEndObject();
     }
 
-    static string GetFullDetailsInPlainText(Exception? ex, int indent, HashSet<Exception?>? visitedExs = null)
+    static string GetFullDetailsInPlainText(Exception ex, int indent, HashSet<Exception>? visitedExs = null)
     {
         visitedExs ??= [ex];
         var exceptionDetails = new List<string>();
         var top = true;
-        while (ex is not null)
+        while (true)
         {
             var indentation = new string(' ', indent * 3);
             var additionalLineIndentation = new string(' ', (indent + 1) * 3);
@@ -308,8 +308,10 @@ public static class ExceptionExtensions
                         exceptionDetails.Add(GetFullDetailsInPlainText(inner, indent + 1, visitedExs));
                 break;
             }
-            else if (visitedExs.Add(ex.InnerException))
-                ex = ex.InnerException;
+            else if (ex.InnerException is { } inner && visitedExs.Add(inner))
+                ex = inner;
+            else
+                break;
             top = false;
         }
         return string.Join($"{Environment.NewLine}{Environment.NewLine}", exceptionDetails);
