@@ -25,6 +25,9 @@ public class ReadOnlyObservableRangeDictionary<TKey, TValue> :
         ((INotifyDictionaryChanged<TKey, TValue>)this.observableRangeDictionary).DictionaryChanged += HandleDictionaryChanged;
     }
 
+    /// <summary>
+    /// Finalizes this object
+    /// </summary>
     ~ReadOnlyObservableRangeDictionary() =>
         Dispose(false);
 
@@ -52,12 +55,19 @@ public class ReadOnlyObservableRangeDictionary<TKey, TValue> :
         remove => NonGenericDictionaryChanged -= value;
     }
 
+    /// <summary>
+    /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources
+    /// </summary>
     public void Dispose()
     {
         Dispose(true);
         GC.SuppressFinalize(this);
     }
 
+    /// <summary>
+    /// Frees, releases, or resets unmanaged resources
+    /// </summary>
+    /// <param name="disposing">false if invoked by the finalizer because the object is being garbage collected; otherwise, true</param>
     protected virtual void Dispose(bool disposing)
     {
         if (isDisposed)

@@ -86,6 +86,7 @@ public sealed class ReadOnlyObservableRangeCollection<T> :
     void ICollection.CopyTo(Array array, int index) =>
         rangeObservableCollection.CopyTo(array, index);
 
+    /// <inheritdoc/>
     protected override bool Dispose(bool disposing)
     {
         if (disposing)

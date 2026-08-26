@@ -215,6 +215,7 @@ public sealed class ReadOnlyObservableConcurrentDictionary<TKey, TValue> :
     void ICollection.CopyTo(Array array, int index) =>
         ((ICollection)ocd).CopyTo(array, index);
 
+    /// <inheritdoc/>
     protected override bool Dispose(bool disposing)
     {
         if (disposing)

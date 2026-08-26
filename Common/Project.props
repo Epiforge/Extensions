@@ -10,7 +10,7 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <IncludeSymbols>true</IncludeSymbols>
         <LangVersion>latest</LangVersion>
-        <NoWarn>CS1591;CA1014;CA1043;CA1502;CA1506;CA1721;CA2252;IDE0032;IDE0079</NoWarn>
+        <NoWarn>CA2252;IDE0032;IDE0079</NoWarn>
         <NeutralResourcesLanguage>en</NeutralResourcesLanguage>
         <Nullable>enable</Nullable>
         <WarningsAsErrors>CS8600;CS8602;CS8603</WarningsAsErrors>
