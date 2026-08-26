@@ -20,7 +20,8 @@ sealed class ObservableCollectionSliceQuery<TElement>(CollectionObserver collect
             {
                 if (index < 0 || index >= count)
                     throw ExceptionHelper.IndexArgumentWasOutOfRange;
-                return source[Range.Start.GetOffset(sourceCount) + index];
+                var (offset, _) = GetOffsetAndLength();
+                return source[offset + index];
             }
         }
     }
@@ -51,18 +52,17 @@ sealed class ObservableCollectionSliceQuery<TElement>(CollectionObserver collect
 
     public override IEnumerator<TElement> GetEnumerator()
     {
+        int offset, length;
         lock (access)
-        {
-            var (offset, length) = Range.GetOffsetAndLength(source.Count);
-            return source.Skip(offset).Take(length).GetEnumerator();
-        }
+            (offset, length) = GetOffsetAndLength();
+        return source.Skip(offset).Take(length).GetEnumerator();
     }
 
     (int offset, int length) GetOffsetAndLength()
     {
-        var lowerOffset = Range.Start.GetOffset(sourceCount);
-        var upperOffset = Range.End.GetOffset(sourceCount);
-        return (lowerOffset, upperOffset - lowerOffset);
+        var lowerOffset = Math.Clamp(Range.Start.GetOffset(sourceCount), 0, sourceCount);
+        var upperOffset = Math.Clamp(Range.End.GetOffset(sourceCount), 0, sourceCount);
+        return (lowerOffset, Math.Max(0, upperOffset - lowerOffset));
     }
 
     protected override void OnInitialization()
@@ -77,8 +77,8 @@ sealed class ObservableCollectionSliceQuery<TElement>(CollectionObserver collect
     void ResetCount()
     {
         sourceCount = source.Count;
-        var (offset, length) = GetOffsetAndLength();
-        SetBackedProperty(ref count, Math.Max(0, Math.Min(length, sourceCount - offset)), countPropertyChangingEventArgs, countPropertyChangedEventArgs);
+        var (_, length) = GetOffsetAndLength();
+        SetBackedProperty(ref count, in length, countPropertyChangingEventArgs, countPropertyChangedEventArgs);
     }
 
     void SourceCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
