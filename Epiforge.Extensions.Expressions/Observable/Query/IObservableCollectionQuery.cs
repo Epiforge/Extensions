@@ -60,6 +60,7 @@ public interface IObservableCollectionQuery<TElement> :
     /// Continuously computes the average of the values in the collection
     /// </summary>
     /// <returns>The average value of the collection</returns>
+    /// <remarks>The average is of the same type as the elements, so a collection of an integral type yields an integral average</remarks>
     [return: DisposeWhenDiscarded]
     IObservableScalarQuery<TElement> ObserveAverage();
 
@@ -69,6 +70,7 @@ public interface IObservableCollectionQuery<TElement> :
     /// <typeparam name="TResult">The type of the values being averaged</typeparam>
     /// <param name="selector">A transform function to apply to each element</param>
     /// <returns>The average value of the collection</returns>
+    /// <remarks>The average is of type <typeparamref name="TResult"/>, so select a fractional type if a fractional average is wanted</remarks>
     [return: DisposeWhenDiscarded]
     IObservableScalarQuery<TResult> ObserveAverage<TResult>(Expression<Func<TElement, TResult>> selector);
 
@@ -123,6 +125,7 @@ public interface IObservableCollectionQuery<TElement> :
     /// </summary>
     /// <param name="index">The zero-based index of the element to retrieve</param>
     /// <returns>>The element at the specified position in the collection</returns>
+    /// <remarks>A negative index counts back from the end of the collection, so -1 is the last element</remarks>
     [return: DisposeWhenDiscarded]
     IObservableScalarQuery<TElement> ObserveElementAt(int index);
 
@@ -131,6 +134,7 @@ public interface IObservableCollectionQuery<TElement> :
     /// </summary>
     /// <param name="index">The zero-based index of the element to retrieve</param>
     /// <returns><c>default</c>(<typeparamref name="TElement"/>) if the index is outside the bounds of the collection; otherwise, the element at the specified position in the collection</returns>
+    /// <remarks>A negative index counts back from the end of the collection, so -1 is the last element</remarks>
     [return: DisposeWhenDiscarded]
     IObservableScalarQuery<TElement> ObserveElementAtOrDefault(int index);
 

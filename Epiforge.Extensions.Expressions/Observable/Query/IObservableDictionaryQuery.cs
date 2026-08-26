@@ -53,6 +53,7 @@ public interface IObservableDictionaryQuery<TKey, TValue> :
     /// Continuously computes the average of the values in the dictionary
     /// </summary>
     /// <returns>The average value of the dictionary</returns>
+    /// <remarks>The average is of the same type as the values, so a dictionary of an integral type yields an integral average</remarks>
     [return: DisposeWhenDiscarded]
     IObservableScalarQuery<TValue> ObserveAverage();
 
@@ -62,6 +63,7 @@ public interface IObservableDictionaryQuery<TKey, TValue> :
     /// <typeparam name="TResult">The type of the values being averaged</typeparam>
     /// <param name="selector">A transform function to apply to each key/value pair</param>
     /// <returns>The average value of the dictionary</returns>
+    /// <remarks>The average is of type <typeparamref name="TResult"/>, so select a fractional type if a fractional average is wanted</remarks>
     [return: DisposeWhenDiscarded]
     IObservableScalarQuery<TResult> ObserveAverage<TResult>(Expression<Func<TKey, TValue, TResult>> selector);
 
