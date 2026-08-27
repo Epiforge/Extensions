@@ -18,9 +18,38 @@ static class ExpressionDiagramGenerator
 
     class IterationState
     {
-        public Dictionary<ParameterExpression, (int set, int index)> Parameters { get; } = [];
+        Dictionary<ParameterExpression, (int set, int index)>? parameters;
+
+        public bool HasParameters =>
+            parameters is not null;
+
+        public Dictionary<ParameterExpression, (int set, int index)> Parameters =>
+            parameters ??= [];
+
         public int ParameterSet { get; set; } = -1;
     }
+
+    static readonly object boxedFalse = false;
+    static readonly object boxedTrue = true;
+    static readonly object[] boxedNodeTypes = CreateBoxedNodeTypes();
+
+    static object[] CreateBoxedNodeTypes()
+    {
+        var nodeTypes = (ExpressionType[])Enum.GetValues(typeof(ExpressionType));
+        var largest = 0;
+        for (int i = 0, ii = nodeTypes.Length; i < ii; ++i)
+            largest = Math.Max(largest, (int)nodeTypes[i]);
+        var boxes = new object[largest + 1];
+        for (int i = 0, ii = nodeTypes.Length; i < ii; ++i)
+            boxes[(int)nodeTypes[i]] = nodeTypes[i];
+        return boxes;
+    }
+
+    static object Box(bool value) =>
+        value ? boxedTrue : boxedFalse;
+
+    static object Box(ExpressionType nodeType) =>
+        boxedNodeTypes[(int)nodeType];
 
     static readonly ConditionalWeakTable<ConstantExpression, object> constantsSubstitutedForArguments = [];
     static readonly object constantSubstitutedForArgument = new();
@@ -28,52 +57,51 @@ static class ExpressionDiagramGenerator
     internal static void NoteConstantSubstitutedForArgument(ConstantExpression constantExpression) =>
         constantsSubstitutedForArguments.AddOrUpdate(constantExpression, constantSubstitutedForArgument);
 
-    public static IEnumerable<object?> GenerateDiagram(Expression? node) =>
-        GenerateDiagram(node, new IterationState());
-
-    static IEnumerable<object?> GenerateDiagram(MemberBinding binding, IterationState iterationState)
+    public static IReadOnlyList<object?> GenerateDiagram(Expression? node)
     {
-        yield return binding.BindingType;
-        yield return binding.Member;
+        var diagram = new List<object?>();
+        GenerateDiagram(node, new IterationState(), diagram);
+        return diagram;
+    }
+
+    static void GenerateDiagram(MemberBinding binding, IterationState iterationState, List<object?> diagram)
+    {
+        diagram.Add(binding.BindingType);
+        diagram.Add(binding.Member);
         if (binding is MemberAssignment memberAssignment)
-            foreach (var element in GenerateDiagram(memberAssignment.Expression, iterationState))
-                yield return element;
+            GenerateDiagram(memberAssignment.Expression, iterationState, diagram);
         else if (binding is MemberListBinding memberListBinding)
             foreach (var initializer in memberListBinding.Initializers)
             {
-                yield return initializer.AddMethod;
+                diagram.Add(initializer.AddMethod);
                 foreach (var argument in initializer.Arguments)
-                    foreach (var element in GenerateDiagram(argument, iterationState))
-                        yield return element;
+                    GenerateDiagram(argument, iterationState, diagram);
             }
         else if (binding is MemberMemberBinding memberMemberBinding)
             foreach (var nestedBinding in memberMemberBinding.Bindings)
-                foreach (var element in GenerateDiagram(nestedBinding, iterationState))
-                    yield return element;
+                GenerateDiagram(nestedBinding, iterationState, diagram);
     }
 
     [SuppressMessage("Maintainability", "CA1502: Avoid excessive complexity")]
     [SuppressMessage("Code Analysis", "CA1506: Avoid excessive class coupling")]
-    static IEnumerable<object?> GenerateDiagram(Expression? node, IterationState iterationState)
+    static void GenerateDiagram(Expression? node, IterationState iterationState, List<object?> diagram)
     {
         if (node is null)
         {
-            yield return null;
-            yield break;
+            diagram.Add(null);
+            return;
         }
-        yield return node.CanReduce;
-        yield return node.NodeType;
-        yield return node.Type;
+        diagram.Add(Box(node.CanReduce));
+        diagram.Add(Box(node.NodeType));
+        diagram.Add(node.Type);
         if (node is BinaryExpression binary)
         {
-            yield return binary.IsLifted;
-            yield return binary.IsLiftedToNull;
-            yield return binary.Method;
-            foreach (var element in GenerateDiagram(binary.Left, iterationState))
-                yield return element;
-            foreach (var element in GenerateDiagram(binary.Right, iterationState))
-                yield return element;
-            yield break;
+            diagram.Add(Box(binary.IsLifted));
+            diagram.Add(Box(binary.IsLiftedToNull));
+            diagram.Add(binary.Method);
+            GenerateDiagram(binary.Left, iterationState, diagram);
+            GenerateDiagram(binary.Right, iterationState, diagram);
+            return;
         }
         if (node is BlockExpression block)
         {
@@ -82,87 +110,75 @@ static class ExpressionDiagramGenerator
             for (int i = 0, ii = blockVariables.Count; i < ii; ++i)
                 iterationState.Parameters[blockVariables[i]] = (iterationState.ParameterSet, i);
             foreach (var expression in block.Expressions)
-                foreach (var element in GenerateDiagram(expression, iterationState))
-                    yield return element;
+                GenerateDiagram(expression, iterationState, diagram);
             foreach (var variable in block.Variables)
-                foreach (var element in GenerateDiagram(variable, iterationState))
-                    yield return element;
+                GenerateDiagram(variable, iterationState, diagram);
         }
         if (node is ConditionalExpression conditional)
         {
-            foreach (var element in GenerateDiagram(conditional.Test, iterationState))
-                yield return element;
-            foreach (var element in GenerateDiagram(conditional.IfTrue, iterationState))
-                yield return element;
-            foreach (var element in GenerateDiagram(conditional.IfFalse, iterationState))
-                yield return element;
-            yield break;
+            GenerateDiagram(conditional.Test, iterationState, diagram);
+            GenerateDiagram(conditional.IfTrue, iterationState, diagram);
+            GenerateDiagram(conditional.IfFalse, iterationState, diagram);
+            return;
         }
         if (node is ConstantExpression constant)
         {
             if (constantsSubstitutedForArguments.TryGetValue(constant, out _))
-                yield return new ObservedArgument(constant.Value);
+                diagram.Add(new ObservedArgument(constant.Value));
             else
-                yield return constant.Value;
-            yield break;
+                diagram.Add(constant.Value);
+            return;
         }
         if (node is DebugInfoExpression debugInfo)
         {
-            yield return debugInfo.Document.DocumentType;
-            yield return debugInfo.Document.FileName;
-            yield return debugInfo.Document.Language;
-            yield return debugInfo.Document.LanguageVendor;
-            yield return debugInfo.EndColumn;
-            yield return debugInfo.EndLine;
-            yield return debugInfo.IsClear;
-            yield return debugInfo.StartColumn;
-            yield return debugInfo.StartLine;
-            yield break;
+            diagram.Add(debugInfo.Document.DocumentType);
+            diagram.Add(debugInfo.Document.FileName);
+            diagram.Add(debugInfo.Document.Language);
+            diagram.Add(debugInfo.Document.LanguageVendor);
+            diagram.Add(debugInfo.EndColumn);
+            diagram.Add(debugInfo.EndLine);
+            diagram.Add(Box(debugInfo.IsClear));
+            diagram.Add(debugInfo.StartColumn);
+            diagram.Add(debugInfo.StartLine);
+            return;
         }
         if (node is DynamicExpression dynamic)
         {
-            yield return dynamic.Binder;
-            yield return dynamic.DelegateType;
+            diagram.Add(dynamic.Binder);
+            diagram.Add(dynamic.DelegateType);
             foreach (var argument in dynamic.Arguments)
-                foreach (var element in GenerateDiagram(argument, iterationState))
-                    yield return element;
-            yield break;
+                GenerateDiagram(argument, iterationState, diagram);
+            return;
         }
         if (node is GotoExpression @goto)
         {
-            yield return @goto.Kind;
-            yield return @goto.Target.Name;
-            yield return @goto.Target.Type;
-            foreach (var element in GenerateDiagram(@goto.Value, iterationState))
-                yield return element;
-            yield break;
+            diagram.Add(@goto.Kind);
+            diagram.Add(@goto.Target.Name);
+            diagram.Add(@goto.Target.Type);
+            GenerateDiagram(@goto.Value, iterationState, diagram);
+            return;
         }
         if (node is IndexExpression index)
         {
-            foreach (var element in GenerateDiagram(index.Object, iterationState))
-                yield return element;
-            yield return index.Indexer;
+            GenerateDiagram(index.Object, iterationState, diagram);
+            diagram.Add(index.Indexer);
             foreach (var argument in index.Arguments)
-                foreach (var element in GenerateDiagram(argument, iterationState))
-                    yield return element;
-            yield break;
+                GenerateDiagram(argument, iterationState, diagram);
+            return;
         }
         if (node is InvocationExpression invocation)
         {
-            foreach (var element in GenerateDiagram(invocation.Expression, iterationState))
-                yield return element;
+            GenerateDiagram(invocation.Expression, iterationState, diagram);
             foreach (var argument in invocation.Arguments)
-                foreach (var element in GenerateDiagram(argument, iterationState))
-                    yield return element;
-            yield break;
+                GenerateDiagram(argument, iterationState, diagram);
+            return;
         }
         if (node is LabelExpression label)
         {
-            yield return label.Target.Name;
-            yield return label.Target.Type;
-            foreach (var element in GenerateDiagram(label.DefaultValue, iterationState))
-                yield return element;
-            yield break;
+            diagram.Add(label.Target.Name);
+            diagram.Add(label.Target.Type);
+            GenerateDiagram(label.DefaultValue, iterationState, diagram);
+            return;
         }
         if (node is LambdaExpression lambda)
         {
@@ -170,93 +186,81 @@ static class ExpressionDiagramGenerator
             var lambdaParameters = lambda.Parameters;
             for (int i = 0, ii = lambdaParameters.Count; i < ii; ++i)
                 iterationState.Parameters[lambdaParameters[i]] = (iterationState.ParameterSet, i);
-            yield return lambda.Name;
-            yield return lambda.ReturnType;
-            yield return lambda.TailCall;
-            foreach (var element in GenerateDiagram(lambda.Body, iterationState))
-                yield return element;
+            diagram.Add(lambda.Name);
+            diagram.Add(lambda.ReturnType);
+            diagram.Add(Box(lambda.TailCall));
+            GenerateDiagram(lambda.Body, iterationState, diagram);
             foreach (var lambdaParameter in lambdaParameters)
-                foreach (var element in GenerateDiagram(lambdaParameter, iterationState))
-                    yield return element;
-            yield break;
+                GenerateDiagram(lambdaParameter, iterationState, diagram);
+            return;
         }
         if (node is ListInitExpression listInit)
         {
-            foreach (var element in GenerateDiagram(listInit.NewExpression, iterationState))
-                yield return element;
+            GenerateDiagram(listInit.NewExpression, iterationState, diagram);
             foreach (var initializer in listInit.Initializers)
             {
-                yield return initializer.AddMethod;
+                diagram.Add(initializer.AddMethod);
                 foreach (var argument in initializer.Arguments)
-                    foreach (var element in GenerateDiagram(argument, iterationState))
-                        yield return element;
+                    GenerateDiagram(argument, iterationState, diagram);
             }
-            yield break;
+            return;
         }
         if (node is LoopExpression loop)
         {
-            yield return loop.BreakLabel?.Name;
-            yield return loop.BreakLabel?.Type;
-            yield return loop.ContinueLabel?.Name;
-            yield return loop.ContinueLabel?.Type;
-            foreach (var element in GenerateDiagram(loop.Body, iterationState))
-                yield return element;
-            yield break;
+            diagram.Add(loop.BreakLabel?.Name);
+            diagram.Add(loop.BreakLabel?.Type);
+            diagram.Add(loop.ContinueLabel?.Name);
+            diagram.Add(loop.ContinueLabel?.Type);
+            GenerateDiagram(loop.Body, iterationState, diagram);
+            return;
         }
         if (node is MemberExpression member)
         {
-            foreach (var element in GenerateDiagram(member.Expression, iterationState))
-                yield return element;
-            yield return member.Member;
-            yield break;
+            GenerateDiagram(member.Expression, iterationState, diagram);
+            diagram.Add(member.Member);
+            return;
         }
         if (node is MemberInitExpression memberInit)
         {
-            foreach (var element in GenerateDiagram(memberInit.NewExpression, iterationState))
-                yield return element;
+            GenerateDiagram(memberInit.NewExpression, iterationState, diagram);
             foreach (var binding in memberInit.Bindings)
-                foreach (var element in GenerateDiagram(binding, iterationState))
-                    yield return element;
-            yield break;
+                GenerateDiagram(binding, iterationState, diagram);
+            return;
         }
         if (node is MethodCallExpression methodCall)
         {
-            foreach (var element in GenerateDiagram(methodCall.Object, iterationState))
-                yield return element;
-            yield return methodCall.Method;
+            GenerateDiagram(methodCall.Object, iterationState, diagram);
+            diagram.Add(methodCall.Method);
             foreach (var argument in methodCall.Arguments)
-                foreach (var element in GenerateDiagram(argument, iterationState))
-                    yield return element;
-            yield break;
+                GenerateDiagram(argument, iterationState, diagram);
+            return;
         }
         if (node is NewArrayExpression newArray)
         {
             foreach (var expression in newArray.Expressions)
-                foreach (var element in GenerateDiagram(expression, iterationState))
-                    yield return element;
-            yield break;
+                GenerateDiagram(expression, iterationState, diagram);
+            return;
         }
         if (node is NewExpression @new)
         {
-            yield return @new.Constructor;
+            diagram.Add(@new.Constructor);
             foreach (var argument in @new.Arguments)
-                foreach (var element in GenerateDiagram(argument, iterationState))
-                    yield return element;
+                GenerateDiagram(argument, iterationState, diagram);
             if (@new.Members is { } members)
                 foreach (var newMember in members) // this line is not covered by tests
-                    yield return newMember; // this line is not covered by tests
-            yield break;
+                    diagram.Add(newMember); // this line is not covered by tests
+            return;
         }
         if (node is ParameterExpression parameter)
         {
-            if (iterationState.Parameters.TryGetValue(parameter, out var parameterPosition))
+            if (iterationState.HasParameters && iterationState.Parameters.TryGetValue(parameter, out var parameterPosition))
             {
-                yield return parameterPosition.set;
-                yield return parameterPosition.index;
+                diagram.Add(parameterPosition.set);
+                diagram.Add(parameterPosition.index);
             }
             else
-                yield return parameter;
-            yield break;
+                diagram.Add(parameter);
+            return;
         }
         if (node is RuntimeVariablesExpression runtimeVariables)
         {
@@ -265,60 +269,48 @@ static class ExpressionDiagramGenerator
             for (int i = 0, ii = runtimeVariablesVariables.Count; i < ii; ++i)
                 iterationState.Parameters[runtimeVariablesVariables[i]] = (iterationState.ParameterSet, i);
             foreach (var variable in runtimeVariables.Variables)
-                foreach (var element in GenerateDiagram(variable, iterationState))
-                    yield return element;
-            yield break;
+                GenerateDiagram(variable, iterationState, diagram);
+            return;
         }
         if (node is SwitchExpression @switch)
         {
-            yield return @switch.Comparison;
+            diagram.Add(@switch.Comparison);
             foreach (var switchCase in @switch.Cases)
             {
                 foreach (var testValue in switchCase.TestValues)
-                    foreach (var element in GenerateDiagram(testValue, iterationState))
-                        yield return element;
-                foreach (var element in GenerateDiagram(switchCase.Body, iterationState))
-                    yield return element;
+                    GenerateDiagram(testValue, iterationState, diagram);
+                GenerateDiagram(switchCase.Body, iterationState, diagram);
             }
-            foreach (var element in GenerateDiagram(@switch.DefaultBody, iterationState))
-                yield return element;
-            yield break;
+            GenerateDiagram(@switch.DefaultBody, iterationState, diagram);
+            return;
         }
         if (node is TryExpression @try)
         {
-            foreach (var element in GenerateDiagram(@try.Body, iterationState))
-                yield return element;
+            GenerateDiagram(@try.Body, iterationState, diagram);
             foreach (var handler in @try.Handlers)
             {
-                yield return handler.Test;
-                foreach (var element in GenerateDiagram(handler.Filter, iterationState))
-                    yield return element;
-                foreach (var element in GenerateDiagram(handler.Variable, iterationState))
-                    yield return element;
-                foreach (var element in GenerateDiagram(handler.Body, iterationState))
-                    yield return element;
+                diagram.Add(handler.Test);
+                GenerateDiagram(handler.Filter, iterationState, diagram);
+                GenerateDiagram(handler.Variable, iterationState, diagram);
+                GenerateDiagram(handler.Body, iterationState, diagram);
             }
-            foreach (var element in GenerateDiagram(@try.Fault, iterationState))
-                yield return element;
-            foreach (var element in GenerateDiagram(@try.Finally, iterationState))
-                yield return element;
-            yield break;
+            GenerateDiagram(@try.Fault, iterationState, diagram);
+            GenerateDiagram(@try.Finally, iterationState, diagram);
+            return;
         }
         if (node is TypeBinaryExpression typeBinary)
         {
-            foreach (var element in GenerateDiagram(typeBinary.Expression, iterationState))
-                yield return element;
-            yield return typeBinary.TypeOperand;
-            yield break;
+            GenerateDiagram(typeBinary.Expression, iterationState, diagram);
+            diagram.Add(typeBinary.TypeOperand);
+            return;
         }
         if (node is UnaryExpression unary)
         {
-            yield return unary.IsLifted;
-            yield return unary.IsLiftedToNull;
-            yield return unary.Method;
-            foreach (var element in GenerateDiagram(unary.Operand, iterationState))
-                yield return element;
-            yield break;
+            diagram.Add(Box(unary.IsLifted));
+            diagram.Add(Box(unary.IsLiftedToNull));
+            diagram.Add(unary.Method);
+            GenerateDiagram(unary.Operand, iterationState, diagram);
+            return;
         }
     }
 }
