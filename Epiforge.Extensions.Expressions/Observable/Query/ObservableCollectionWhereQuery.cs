@@ -3,10 +3,52 @@ namespace Epiforge.Extensions.Expressions.Observable.Query;
 sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> source, Expression<Func<TElement, bool>> predicate) :
     ObservableCollectionQuery<TElement>(collectionObserver)
 {
+    sealed class SnapshotEnumerator :
+        IEnumerator<TElement>
+    {
+        internal SnapshotEnumerator(ObservableCollectionWhereQuery<TElement> query, List<TElement> snapshot)
+        {
+            this.query = query;
+            this.snapshot = snapshot;
+            enumerator = snapshot.GetEnumerator();
+        }
+
+        List<TElement>.Enumerator enumerator;
+        bool isDisposed;
+        readonly ObservableCollectionWhereQuery<TElement> query;
+        readonly List<TElement> snapshot;
+
+        public TElement Current =>
+            enumerator.Current;
+
+        object? IEnumerator.Current =>
+            enumerator.Current;
+
+        public void Dispose()
+        {
+            if (isDisposed)
+                return;
+            isDisposed = true;
+            enumerator.Dispose();
+            query.EnumerationEnded();
+        }
+
+        public bool MoveNext() =>
+            enumerator.MoveNext();
+
+        public void Reset() =>
+            enumerator = snapshot.GetEnumerator();
+    }
+
+    const int maximumEnumerationSnapshotPatches = 128;
+
     readonly object access = new();
     int count;
     readonly IEqualityComparer<TElement> elementComparer = EqualityComparer<TElement>.Default;
     List<TElement>? enumerationSnapshot;
+    int enumerationSnapshotPatches;
+    bool enumerationSnapshotShared;
+    int liveEnumerations;
     readonly PrefixWeightedSequence<IObservableExpression<TElement, bool>> memberships = new();
     readonly Dictionary<IObservableExpression<TElement, bool>, (List<PrefixWeightedSequenceNode<IObservableExpression<TElement, bool>>> Nodes, Exception? Fault)> observableExpressionStates = [];
     internal readonly Expression<Func<TElement, bool>> Predicate = predicate;
@@ -45,12 +87,16 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
                 }
                 source.CollectionChanged -= SourceCollectionChanged;
                 enumerationSnapshot = null;
+                enumerationSnapshotShared = false;
                 RemovedFromCache();
             }
             return removedFromCache;
         }
         return true;
     }
+
+    void EnumerationEnded() =>
+        Interlocked.Decrement(ref liveEnumerations);
 
     void FlipMembershipWithAccess(PrefixWeightedSequenceNode<IObservableExpression<TElement, bool>> node, bool newResult)
     {
@@ -59,7 +105,13 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
             return;
         var translatedIndex = memberships.PrefixWeightBefore(memberships.IndexOf(node));
         memberships.SetWeight(node, newWeight);
-        enumerationSnapshot = null;
+        if (TryBeginEnumerationSnapshotPatchWithAccess(out var snapshot))
+        {
+            if (newResult)
+                snapshot.Insert(translatedIndex, node.Item.Argument);
+            else
+                snapshot.RemoveAt(translatedIndex);
+        }
         SetCount(count + (newResult ? 1 : -1));
         OnCollectionChanged(new NotifyCollectionChangedEventArgs(newResult ? NotifyCollectionChangedAction.Add : NotifyCollectionChangedAction.Remove, node.Item.Argument, translatedIndex));
     }
@@ -76,7 +128,10 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
                         elements.Add(node.Item.Argument);
                 enumerationSnapshot = elements;
             }
-            return enumerationSnapshot.GetEnumerator();
+            enumerationSnapshotPatches = 0;
+            enumerationSnapshotShared = true;
+            Interlocked.Increment(ref liveEnumerations);
+            return new SnapshotEnumerator(this, enumerationSnapshot);
         }
     }
 
@@ -157,6 +212,28 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
         }
     }
 
+    bool TryBeginEnumerationSnapshotPatchWithAccess([NotNullWhen(true)] out List<TElement>? snapshot)
+    {
+        if (enumerationSnapshot is { } existing && ++enumerationSnapshotPatches <= maximumEnumerationSnapshotPatches)
+        {
+            if (enumerationSnapshotShared)
+            {
+                if (Volatile.Read(ref liveEnumerations) > 0)
+                {
+                    existing = new List<TElement>(existing);
+                    enumerationSnapshot = existing;
+                }
+                enumerationSnapshotShared = false;
+            }
+            snapshot = existing;
+            return true;
+        }
+        enumerationSnapshot = null;
+        enumerationSnapshotShared = false;
+        snapshot = null;
+        return false;
+    }
+
     void SetCount(int value) =>
         SetBackedProperty(ref count, in value, countPropertyChangingEventArgs, countPropertyChangedEventArgs);
 
@@ -166,7 +243,6 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
         using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
         lock (access)
         {
-            enumerationSnapshot = null;
             FaultList? faultList = null;
             NotifyCollectionChangedEventArgs? eventArgs = null;
             var newCount = 0;
@@ -218,13 +294,25 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
                         }
                     if (newItems.Count > 0)
                     {
+                        var translatedIndex = memberships.PrefixWeightBefore(e.NewStartingIndex);
                         if (oldItems.Count > 0)
-                            eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, newItems.AsReadOnly(), oldItems.AsReadOnly(), memberships.PrefixWeightBefore(e.NewStartingIndex));
+                            eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, newItems.AsReadOnly(), oldItems.AsReadOnly(), translatedIndex);
                         else
-                            eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, newItems.AsReadOnly(), memberships.PrefixWeightBefore(e.NewStartingIndex));
+                            eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, newItems.AsReadOnly(), translatedIndex);
+                        if (TryBeginEnumerationSnapshotPatchWithAccess(out var snapshot))
+                        {
+                            if (oldItems.Count > 0)
+                                snapshot.RemoveRange(translatedIndex, oldItems.Count);
+                            snapshot.InsertRange(translatedIndex, newItems);
+                        }
                     }
                     else if (oldItems.Count > 0)
-                        eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, oldItems.AsReadOnly(), memberships.PrefixWeightBefore(e.OldStartingIndex));
+                    {
+                        var translatedIndex = memberships.PrefixWeightBefore(e.OldStartingIndex);
+                        eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, oldItems.AsReadOnly(), translatedIndex);
+                        if (TryBeginEnumerationSnapshotPatchWithAccess(out var snapshot))
+                            snapshot.RemoveRange(translatedIndex, oldItems.Count);
+                    }
                     newCount = count + newItems.Count - oldItems.Count;
                     break;
                 case NotifyCollectionChangedAction.Move:
@@ -242,7 +330,14 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
                         memberships.MoveRange(e.OldStartingIndex, e.NewStartingIndex, e.OldItems.Count);
                         var newStartingIndex = memberships.PrefixWeightBefore(e.NewStartingIndex);
                         if (oldStartingIndex != newStartingIndex && movedItems.Count > 0)
+                        {
                             eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Move, movedItems.AsReadOnly(), newStartingIndex, oldStartingIndex);
+                            if (TryBeginEnumerationSnapshotPatchWithAccess(out var snapshot))
+                            {
+                                snapshot.RemoveRange(oldStartingIndex, movedItems.Count);
+                                snapshot.InsertRange(newStartingIndex, movedItems);
+                            }
+                        }
                     }
                     break;
                 case NotifyCollectionChangedAction.Reset:
@@ -255,6 +350,8 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
                     }
                     memberships.Clear();
                     observableExpressionStates.Clear();
+                    enumerationSnapshot = null;
+                    enumerationSnapshotShared = false;
                     if (!source.HasIndexerPenalty)
                         for (int i = 0, ii = source.Count; i < ii; ++i)
                             ObserveElementWithAccess(source[i], faultList, ref newCount);

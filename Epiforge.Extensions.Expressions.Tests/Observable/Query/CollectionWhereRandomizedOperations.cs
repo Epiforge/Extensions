@@ -99,7 +99,23 @@ public class CollectionWhereRandomizedOperations
                 whereQuery.CollectionChanged += collectionChanged;
                 for (var step = 0; step < 200; ++step)
                 {
-                    var operation = MutateSource(random, source);
+                    string operation;
+                    if (random.Next(4) == 0)
+                    {
+                        var expectedBeforeMutating = source.Where(person => person.Name!.Length == 4).ToList();
+                        var drained = new List<TestPerson>();
+                        using (var live = whereQuery.GetEnumerator())
+                        {
+                            if (live.MoveNext())
+                                drained.Add(live.Current);
+                            operation = MutateSource(random, source);
+                            while (live.MoveNext())
+                                drained.Add(live.Current);
+                        }
+                        CollectionAssert.AreEqual(expectedBeforeMutating, drained, $"seed {seed}, step {step}, after {operation}: an enumerator begun before the mutation did not yield the collection as it was");
+                    }
+                    else
+                        operation = MutateSource(random, source);
                     var context = $"seed {seed}, step {step}, after {operation}";
                     var expected = source.Where(person => person.Name!.Length == 4).ToList();
                     CollectionAssert.AreEqual(expected, whereQuery.ToList(), $"{context}: contents diverged");
