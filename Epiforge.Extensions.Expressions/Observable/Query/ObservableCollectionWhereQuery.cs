@@ -87,15 +87,20 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
                 OperationFault = newOperationFault;
             }
             var translatedIndex = 0;
-            for (int i = 0, ii = memberships.Count; i < ii; ++i)
+            var remainingPositions = state.Positions;
+            for (int i = 0, ii = memberships.Count; i < ii && remainingPositions > 0; ++i)
             {
                 var (iObservableExpression, isIncluded) = memberships[i];
-                if (isIncluded != newResult && ReferenceEquals(iObservableExpression, observableExpression))
+                if (ReferenceEquals(iObservableExpression, observableExpression))
                 {
-                    memberships[i] = (iObservableExpression, newResult);
-                    isIncluded = newResult;
-                    SetCount(count + (newResult ? 1 : -1));
-                    OnCollectionChanged(new NotifyCollectionChangedEventArgs(newResult ? NotifyCollectionChangedAction.Add : NotifyCollectionChangedAction.Remove, iObservableExpression.Argument, translatedIndex));
+                    --remainingPositions;
+                    if (isIncluded != newResult)
+                    {
+                        memberships[i] = (iObservableExpression, newResult);
+                        isIncluded = newResult;
+                        SetCount(count + (newResult ? 1 : -1));
+                        OnCollectionChanged(new NotifyCollectionChangedEventArgs(newResult ? NotifyCollectionChangedAction.Add : NotifyCollectionChangedAction.Remove, iObservableExpression.Argument, translatedIndex));
+                    }
                 }
                 if (isIncluded)
                     ++translatedIndex;
@@ -281,6 +286,12 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
     public override string ToString() =>
         $"{source} matching {Predicate}";
 
-    int TranslateIndex(int index) =>
-        index - memberships.Take(index).Count(membership => !membership.IsIncluded);
+    int TranslateIndex(int index)
+    {
+        var excluded = 0;
+        for (int i = 0, ii = Math.Min(index, memberships.Count); i < ii; ++i)
+            if (!memberships[i].IsIncluded)
+                ++excluded;
+        return index - excluded;
+    }
 }
