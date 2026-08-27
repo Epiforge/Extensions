@@ -5,6 +5,14 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     IObservableDictionaryQuery<TKey, TValue>
     where TKey : notnull
 {
+    /// <summary>
+    /// Distinguishes deferred boxed dictionary change notifications from unboxed ones, whose runtime types coincide when the key and value are both <see cref="object"/>
+    /// </summary>
+    sealed class DeferredDictionaryChangedBoxed(NotifyDictionaryChangedEventArgs<object?, object?> eventArguments)
+    {
+        internal readonly NotifyDictionaryChangedEventArgs<object?, object?> EventArguments = eventArguments;
+    }
+
     #region Cache Comparers
 
     class CachedSelectQueryEqualityComparer :
@@ -209,21 +217,51 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     protected virtual void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        if (!DeferNotification(e))
+            RaiseCollectionChanged(e);
+    }
+
+    protected virtual void OnDictionaryChanged(NotifyDictionaryChangedEventArgs<TKey, TValue> e)
+    {
+        if (!DeferNotification(e))
+            RaiseDictionaryChanged(e);
+    }
+
+    protected virtual void OnDictionaryChangedBoxed(NotifyDictionaryChangedEventArgs<object?, object?> e)
+    {
+        if (!DeferNotification(new DeferredDictionaryChangedBoxed(e)))
+            RaiseDictionaryChangedBoxed(e);
+    }
+
+    void RaiseCollectionChanged(NotifyCollectionChangedEventArgs e)
+    {
         var eventArgs = Logger?.IsEnabled(LogLevel.Trace) ?? false ? e.ToStringForLogging() : null;
         Logger?.LogTrace(Collections.EventIds.Epiforge_Extensions_Collections_RaisingCollectionChanged, "Raising CollectionChanged: {EventArgs}", eventArgs);
         CollectionChanged?.Invoke(this, e);
         Logger?.LogTrace(Collections.EventIds.Epiforge_Extensions_Collections_RaisedCollectionChanged, "Raised CollectionChanged: {EventArgs}", eventArgs);
     }
 
-    protected virtual void OnDictionaryChanged(NotifyDictionaryChangedEventArgs<TKey, TValue> e)
+    void RaiseDictionaryChanged(NotifyDictionaryChangedEventArgs<TKey, TValue> e)
     {
         Logger?.LogTrace(Collections.EventIds.Epiforge_Extensions_Collections_RaisingDictionaryChanged, "Raising DictionaryChanged: {EventArgs}", e);
         DictionaryChanged?.Invoke(this, e);
         Logger?.LogTrace(Collections.EventIds.Epiforge_Extensions_Collections_RaisedDictionaryChanged, "Raised DictionaryChanged: {EventArgs}", e);
     }
 
-    protected virtual void OnDictionaryChangedBoxed(NotifyDictionaryChangedEventArgs<object?, object?> e) =>
+    void RaiseDictionaryChangedBoxed(NotifyDictionaryChangedEventArgs<object?, object?> e) =>
         DictionaryChangedBoxed?.Invoke(this, e);
+
+    private protected override void RaiseNotification(object eventArguments)
+    {
+        if (eventArguments is DeferredDictionaryChangedBoxed deferredDictionaryChangedBoxed)
+            RaiseDictionaryChangedBoxed(deferredDictionaryChangedBoxed.EventArguments);
+        else if (eventArguments is NotifyDictionaryChangedEventArgs<TKey, TValue> dictionaryChangedEventArgs)
+            RaiseDictionaryChanged(dictionaryChangedEventArgs);
+        else if (eventArguments is NotifyCollectionChangedEventArgs collectionChangedEventArgs)
+            RaiseCollectionChanged(collectionChangedEventArgs);
+        else
+            base.RaiseNotification(eventArguments);
+    }
 
     public abstract bool TryGetValue(TKey key, out TValue value);
 

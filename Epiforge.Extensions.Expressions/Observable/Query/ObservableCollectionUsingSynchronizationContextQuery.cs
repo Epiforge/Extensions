@@ -12,6 +12,9 @@ sealed class ObservableCollectionUsingSynchronizationContextQuery<TElement>(Coll
     public override int Count =>
         SynchronizationContext.Send(() => elements!.Count);
 
+    internal override bool HasIndexerPenalty =>
+        true;
+
     public override bool IsSynchronized =>
         true;
 

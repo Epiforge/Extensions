@@ -16,13 +16,14 @@ sealed class ObservableCollectionSliceQuery<TElement>(CollectionObserver collect
     {
         get
         {
+            int offset;
             lock (access)
             {
                 if (index < 0 || index >= count)
                     throw ExceptionHelper.IndexArgumentWasOutOfRange;
-                var (offset, _) = GetOffsetAndLength();
-                return source[offset + index];
+                (offset, _) = GetOffsetAndLength();
             }
+            return source[offset + index];
         }
     }
 
@@ -83,6 +84,7 @@ sealed class ObservableCollectionSliceQuery<TElement>(CollectionObserver collect
 
     void SourceCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
+        using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
         lock (access)
         {
             if (e.Action != NotifyCollectionChangedAction.Move)

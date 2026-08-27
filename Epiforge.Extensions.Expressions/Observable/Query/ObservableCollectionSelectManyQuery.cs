@@ -14,18 +14,20 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
     {
         get
         {
+            List<IEnumerable<TResult>> enumerables;
             lock (access)
+                enumerables = select!.ToList();
+            for (int i = 0, ii = enumerables.Count; i < ii; ++i)
             {
-                for (int i = 0, ii = select!.Count; i < ii; ++i)
-                {
-                    var enumerable = select[i];
-                    var enumerableCount = enumerable.Count();
-                    if (index < enumerableCount)
-                        return enumerable.ElementAt(index);
-                    index -= enumerableCount;
-                }
-                throw new IndexOutOfRangeException();
+                var enumerable = enumerables[i];
+                if (enumerable is null)
+                    continue;
+                var enumerableCount = enumerable.Count();
+                if (index < enumerableCount)
+                    return enumerable.ElementAt(index);
+                index -= enumerableCount;
             }
+            throw new IndexOutOfRangeException();
         }
     }
 
@@ -34,6 +36,7 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
 
     void CollectionChangedNotifierCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
+        using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
         if (sender is IEnumerable<TResult> enumerable)
             lock (access)
             {
@@ -63,7 +66,7 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
                                 reducedIndex += reducedCount;
                             }
                             else
-                                reducedIndex += selectEnumerable.Count();
+                                reducedIndex += selectEnumerable?.Count() ?? 0;
                         }
                         SetCount(newCount);
                     }
@@ -110,7 +113,7 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
         {
             if (i == mapIndex)
                 return reducedIndex;
-            reducedIndex += select[i].Count();
+            reducedIndex += select[i]?.Count() ?? 0;
         }
         return reducedIndex;
     }
@@ -146,6 +149,7 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
     [SuppressMessage("Maintainability", "CA1502: Avoid excessive complexity")]
     void SelectCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
+        using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
         lock (access)
         {
             NotifyCollectionChangedEventArgs? eventArgs = null;

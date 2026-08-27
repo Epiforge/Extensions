@@ -73,6 +73,7 @@ sealed class ObservableCollectionIndividualChangesQuery<TElement> :
     [SuppressMessage("Maintainability", "CA1502: Avoid excessive complexity")]
     void SourceCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
+        using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
         if (e.Action is NotifyCollectionChangedAction.Reset)
             lock (access)
                 elements.Reset(source);

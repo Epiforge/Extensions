@@ -127,6 +127,7 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
 
     void ObservableExpressionPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
         if (sender is not IObservableExpression<KeyValuePair<TSourceKey, TSourceValue>, KeyValuePair<TKey, TValue>> observableExpression || e.PropertyName != nameof(IObservableExpression<,>.Evaluation))
             return;
         lock (access)
@@ -228,6 +229,7 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
 
     void SourceDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TSourceKey, TSourceValue> e)
     {
+        using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
         lock (access)
         {
             if (e.Action is NotifyDictionaryChangedAction.Reset)

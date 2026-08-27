@@ -128,6 +128,7 @@ sealed class ObservableCollectionGroupByQuery<TKey, TElement> :
 
     void SelectCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
+        using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
         lock (access)
         {
             if (e.Action is NotifyCollectionChangedAction.Reset)

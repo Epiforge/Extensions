@@ -168,6 +168,7 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
 
     void SelectionCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
+        using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
         lock (access)
             if (e.NewItems is { } newItems && newItems.Count > 0)
                 foreach (var element in newItems.OfType<Tuple<TElement, IComparable>>().Select(t => t.Item1))
@@ -193,6 +194,7 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
 
     void SourceCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
+        using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
         lock (access)
         {
             if (e.Action is NotifyCollectionChangedAction.Reset)

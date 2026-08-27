@@ -349,8 +349,18 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
             for (int i = index, ii = Math.Min(index + count, Count); i < ii; ++i)
                 list.Add(this[i]);
         else
+        {
+            var enumerating = -1;
             foreach (var item in this)
+            {
+                ++enumerating;
+                if (enumerating < index)
+                    continue;
+                if (list.Count >= count)
+                    break;
                 list.Add(item);
+            }
+        }
         return list.AsReadOnly();
     }
 
@@ -378,10 +388,24 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
 
     protected void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
     {
+        if (!DeferNotification(e))
+            RaiseCollectionChanged(e);
+    }
+
+    void RaiseCollectionChanged(NotifyCollectionChangedEventArgs e)
+    {
         var eventArgs = Logger?.IsEnabled(LogLevel.Trace) ?? false ? e.ToStringForLogging() : null;
         Logger?.LogTrace(Collections.EventIds.Epiforge_Extensions_Collections_RaisingCollectionChanged, "Raising CollectionChanged: {EventArgs}", eventArgs);
         CollectionChanged?.Invoke(this, e);
         Logger?.LogTrace(Collections.EventIds.Epiforge_Extensions_Collections_RaisedCollectionChanged, "Raised CollectionChanged: {EventArgs}", eventArgs);
+    }
+
+    private protected override void RaiseNotification(object eventArguments)
+    {
+        if (eventArguments is NotifyCollectionChangedEventArgs collectionChangedEventArgs)
+            RaiseCollectionChanged(collectionChangedEventArgs);
+        else
+            base.RaiseNotification(eventArguments);
     }
 
     #region Unsupported Operations

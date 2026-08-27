@@ -69,6 +69,7 @@ sealed class ObservableCollectionAverageQuery<TElement, TResult>(CollectionObser
 
     void SelectCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
+        using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
         lock (access)
         {
             switch (e.Action)
@@ -91,6 +92,7 @@ sealed class ObservableCollectionAverageQuery<TElement, TResult>(CollectionObser
 
     void SelectPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
         if (e.PropertyName == nameof(IObservableCollectionQuery<>.OperationFault))
             lock (access)
                 Recompute();

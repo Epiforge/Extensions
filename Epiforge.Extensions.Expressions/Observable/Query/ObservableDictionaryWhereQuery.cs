@@ -141,6 +141,7 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue>(CollectionObserver col
 
     void ObservableExpressionPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
         if (sender is not IObservableExpression<KeyValuePair<TKey, TValue>, bool> observableExpression || e.PropertyName != nameof(IObservableExpression<,>.Evaluation))
             return;
         lock (access)
@@ -163,6 +164,7 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue>(CollectionObserver col
 
     void SourceDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e)
     {
+        using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
         lock (access)
         {
             var expressionObserver = collectionObserver.ExpressionObserver;

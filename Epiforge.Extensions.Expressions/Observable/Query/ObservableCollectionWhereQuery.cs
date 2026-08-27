@@ -73,6 +73,7 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
 
     void ObservableExpressionPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
         if (sender is not IObservableExpression<TElement, bool> observableExpression || e.PropertyName != nameof(IObservableExpression<,>.Evaluation))
             return;
         lock (access)
@@ -144,6 +145,7 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
     [SuppressMessage("Maintainability", "CA1502: Avoid excessive complexity", Justification = @"Splitting this up into more methods is ¯\_(ツ)_/¯")]
     void SourceCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
+        using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
         lock (access)
         {
             FaultList? faultList = null;

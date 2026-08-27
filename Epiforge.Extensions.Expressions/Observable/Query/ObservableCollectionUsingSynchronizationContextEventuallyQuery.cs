@@ -3,33 +3,17 @@ namespace Epiforge.Extensions.Expressions.Observable.Query;
 sealed class ObservableCollectionUsingSynchronizationContextEventuallyQuery<TElement>(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> source, SynchronizationContext synchronizationContext) :
     ObservableCollectionQuery<TElement>(collectionObserver)
 {
-    static T MarshalForFunc<T>(SynchronizationContext synchronizationContext, Func<T> func)
-    {
-        if (synchronizationContext == SynchronizationContext.Current)
-            return func();
-        var tcs = new TaskCompletionSource<T>();
-        synchronizationContext.Post(_ =>
-        {
-            try
-            {
-                tcs.SetResult(func());
-            }
-            catch (Exception ex)
-            {
-                tcs.SetException(ex);
-            }
-        }, null);
-        return tcs.Task.Result;
-    }
-
     ObservableRangeCollection<TElement>? elements;
     internal readonly SynchronizationContext SynchronizationContext = synchronizationContext;
 
     public override TElement this[int index] =>
-        MarshalForFunc(SynchronizationContext, () => elements![index]);
+        SynchronizationContext.Send(() => elements![index]);
 
     public override int Count =>
-        MarshalForFunc(SynchronizationContext, () => elements!.Count);
+        SynchronizationContext.Send(() => elements!.Count);
+
+    internal override bool HasIndexerPenalty =>
+        true;
 
     public override bool IsSynchronized =>
         true;
@@ -53,7 +37,7 @@ sealed class ObservableCollectionUsingSynchronizationContextEventuallyQuery<TEle
     }
 
     public override IEnumerator<TElement> GetEnumerator() =>
-        MarshalForFunc(SynchronizationContext, () => elements!.ToList().AsReadOnly().GetEnumerator());
+        SynchronizationContext.Send(() => elements!.ToList().AsReadOnly().GetEnumerator());
 
     protected override void OnInitialization()
     {

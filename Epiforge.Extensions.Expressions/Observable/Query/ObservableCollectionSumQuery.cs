@@ -38,6 +38,7 @@ sealed class ObservableCollectionSumQuery<TElement, TResult>(CollectionObserver 
 
     void Evaluate()
     {
+        using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
         lock (access)
             Evaluation = select!.OperationFault is { } selectFault ? (selectFault, default)! : (null, select.Aggregate(default(TResult)!, add!));
     }

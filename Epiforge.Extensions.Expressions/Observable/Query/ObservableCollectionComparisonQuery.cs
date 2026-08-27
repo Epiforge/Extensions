@@ -29,6 +29,7 @@ sealed class ObservableCollectionComparisonQuery<TResult>(CollectionObserver col
 
     void Evaluate()
     {
+        using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
         lock (access)
         {
             if (observableCollectionQuery.OperationFault is { } queryFault)
