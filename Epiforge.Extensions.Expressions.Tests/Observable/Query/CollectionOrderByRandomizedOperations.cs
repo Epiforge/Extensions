@@ -82,17 +82,27 @@ public class CollectionOrderByRandomizedOperations
     public void RandomOperationsLeaveTheOrderingSortedAndComplete()
     {
         for (var seed = 0; seed < 20; ++seed)
-            RunSeed(seed);
+            RunSeed(seed, false);
     }
 
-    static void RunSeed(int seed)
+    [TestMethod]
+    [Timeout(300000)]
+    public void RandomOperationsWithARedundantRepeatedSelectorLeaveTheOrderingSortedAndComplete()
+    {
+        for (var seed = 0; seed < 20; ++seed)
+            RunSeed(seed, true);
+    }
+
+    static void RunSeed(int seed, bool repeatTheFirstSelector)
     {
         var random = new Random(seed);
         var source = new ObservableRangeCollection<TestPerson>(Enumerable.Range(0, 12).Select(index => new TestPerson(names[index % names.Length])));
         var collectionObserver = CollectionObserverHelpers.Create();
         using (var sourceQuery = collectionObserver.ObserveReadOnlyList(source))
         {
-            using (var orderByQuery = sourceQuery.ObserveOrderBy((person => person.Name!.Length, false), (person => person.Name!, false)))
+            using (var orderByQuery = repeatTheFirstSelector
+                ? sourceQuery.ObserveOrderBy((person => person.Name!.Length, false), (person => person.Name!, false), (person => person.Name!.Length, true))
+                : sourceQuery.ObserveOrderBy((person => person.Name!.Length, false), (person => person.Name!, false)))
             {
                 var mirror = new List<TestPerson>(orderByQuery);
                 void collectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
