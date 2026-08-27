@@ -7,9 +7,8 @@ sealed class ObservableDictionaryToCollectionQuery<TElement, TKey, TValue>(Colle
     readonly object access = new();
     readonly EqualityComparer<TElement> elementComparer = EqualityComparer<TElement>.Default;
     readonly ObservableRangeCollection<TElement> elements = [];
-    readonly Dictionary<IObservableExpression<KeyValuePair<TKey, TValue>, TElement>, (Exception? fault, TElement result)> evaluationsChanging = [];
     readonly IEqualityComparer<TKey> keyComparer = EqualityComparer<TKey>.Default;
-    readonly ObservableDictionary<TKey, IObservableExpression<KeyValuePair<TKey, TValue>, TElement>> observableExpressions = [];
+    readonly ObservableDictionary<TKey, (IObservableExpression<KeyValuePair<TKey, TValue>, TElement> ObservableExpression, Exception? CommittedFault, TElement CommittedElement)> observableExpressions = [];
     internal readonly Expression<Func<KeyValuePair<TKey, TValue>, TElement>> Selector = selector;
 
     public override TElement this[int index]
@@ -37,9 +36,8 @@ sealed class ObservableDictionaryToCollectionQuery<TElement, TKey, TValue>(Colle
             var removedFromCache = source.QueryDisposed(this);
             if (removedFromCache)
             {
-                foreach (var observableExpression in observableExpressions.Values)
+                foreach (var (observableExpression, _, _) in observableExpressions.Values)
                 {
-                    observableExpression.PropertyChanging -= ObservableExpressionPropertyChanging;
                     observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
                     observableExpression.Dispose();
                 }
@@ -61,33 +59,34 @@ sealed class ObservableDictionaryToCollectionQuery<TElement, TKey, TValue>(Colle
     public override IEnumerator<TElement> GetEnumerator()
     {
         lock (access)
-            return elements.ToList().AsReadOnly().GetEnumerator();
+        {
+            var snapshot = new List<TElement>(elements.Count);
+            for (int i = 0, ii = elements.Count; i < ii; ++i)
+                snapshot.Add(elements[i]);
+            return snapshot.GetEnumerator();
+        }
     }
 
     void ObservableExpressionPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (sender is IObservableExpression<KeyValuePair<TKey, TValue>, TElement> observableExpression && e.PropertyName == nameof(IObservableExpression<,>.Evaluation))
-            lock (access)
-            {
-                var (oldFault, oldElement) = evaluationsChanging![observableExpression];
-                evaluationsChanging.Remove(observableExpression);
-                var (newFault, newElement) = observableExpression.Evaluation;
-                if (oldFault is not null && newFault is null)
-                    elements.Add(newElement);
-                else if (oldFault is null && newFault is not null)
-                    elements.Remove(oldElement);
-                else if (!elementComparer.Equals(oldElement, newElement))
-                    elements[elements.IndexOf(oldElement)] = newElement;
-                if (FaultList.ExchangeKeyFault(OperationFault, observableExpression.Argument.Key, keyComparer, oldFault, newFault, out var newOperationFault))
-                    OperationFault = newOperationFault;
-            }
-    }
-
-    void ObservableExpressionPropertyChanging(object? sender, PropertyChangingEventArgs e)
-    {
-        if (sender is IObservableExpression<KeyValuePair<TKey, TValue>, TElement> observableExpression && e.PropertyName == nameof(IObservableExpression<,>.Evaluation))
-            lock (access)
-                evaluationsChanging.Add(observableExpression, observableExpression.Evaluation);
+        if (sender is not IObservableExpression<KeyValuePair<TKey, TValue>, TElement> observableExpression || e.PropertyName != nameof(IObservableExpression<,>.Evaluation))
+            return;
+        lock (access)
+        {
+            var key = observableExpression.Argument.Key;
+            if (!observableExpressions.TryGetValue(key, out var committed) || !ReferenceEquals(committed.ObservableExpression, observableExpression))
+                return;
+            var (newFault, newElement) = observableExpression.Evaluation;
+            if (committed.CommittedFault is not null && newFault is null)
+                elements.Add(newElement);
+            else if (committed.CommittedFault is null && newFault is not null)
+                elements.Remove(committed.CommittedElement);
+            else if (newFault is null && !elementComparer.Equals(committed.CommittedElement, newElement))
+                elements[elements.IndexOf(committed.CommittedElement)] = newElement;
+            observableExpressions[key] = (observableExpression, newFault, newElement);
+            if (FaultList.ExchangeKeyFault(OperationFault, key, keyComparer, committed.CommittedFault, newFault, out var newOperationFault))
+                OperationFault = newOperationFault;
+        }
     }
 
     protected override void OnInitialization()
@@ -97,11 +96,11 @@ sealed class ObservableDictionaryToCollectionQuery<TElement, TKey, TValue>(Colle
         foreach (var keyValuePair in source)
         {
             var observableExpression = expressionObserver.ObserveWithoutOptimization(Selector, keyValuePair);
+            var (fault, element) = observableExpression.Evaluation;
             if (!faultList.Check(observableExpression))
-                elements.Add(observableExpression.Evaluation.Result);
-            observableExpression.PropertyChanging += ObservableExpressionPropertyChanging;
+                elements.Add(element);
             observableExpression.PropertyChanged += ObservableExpressionPropertyChanged;
-            observableExpressions.Add(keyValuePair.Key, observableExpression);
+            observableExpressions.Add(keyValuePair.Key, (observableExpression, fault, element));
         }
         OperationFault = faultList.Fault;
         source.DictionaryChanged += SourceDictionaryChanged;
@@ -116,24 +115,22 @@ sealed class ObservableDictionaryToCollectionQuery<TElement, TKey, TValue>(Colle
             var expressionObserver = collectionObserver.ExpressionObserver;
             if (e.Action is NotifyDictionaryChangedAction.Reset)
             {
-                foreach (var observableExpression in observableExpressions.Values)
+                foreach (var (observableExpression, _, _) in observableExpressions.Values)
                 {
-                    observableExpression.PropertyChanging -= ObservableExpressionPropertyChanging;
                     observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
                     observableExpression.Dispose();
                 }
                 observableExpressions.Clear();
-                evaluationsChanging.Clear();
                 var newElements = new List<TElement>();
                 var faultList = new FaultList();
                 foreach (var keyValuePair in source)
                 {
                     var observableExpression = expressionObserver.ObserveWithoutOptimization(Selector, keyValuePair);
+                    var (fault, element) = observableExpression.Evaluation;
                     if (!faultList.Check(observableExpression))
-                        newElements.Add(observableExpression.Evaluation.Result);
-                    observableExpression.PropertyChanging += ObservableExpressionPropertyChanging;
+                        newElements.Add(element);
                     observableExpression.PropertyChanged += ObservableExpressionPropertyChanged;
-                    observableExpressions.Add(keyValuePair.Key, observableExpression);
+                    observableExpressions.Add(keyValuePair.Key, (observableExpression, fault, element));
                 }
                 elements.Reset(newElements);
                 OperationFault = faultList.Fault;
@@ -143,18 +140,17 @@ sealed class ObservableDictionaryToCollectionQuery<TElement, TKey, TValue>(Colle
                 FaultList? faultList = null;
                 foreach (var keyValuePair in e.OldItems)
                 {
-                    var observableExpression = observableExpressions[keyValuePair.Key];
-                    var (fault, element) = observableExpression.Evaluation;
-                    if (fault is not null)
+                    if (!observableExpressions.TryGetValue(keyValuePair.Key, out var committed))
+                        continue;
+                    if (committed.CommittedFault is not null)
                     {
                         faultList ??= new FaultList(OperationFault);
-                        faultList.RemoveKey(observableExpression.Argument.Key, keyComparer);
+                        faultList.RemoveKey(keyValuePair.Key, keyComparer);
                     }
                     else
-                        elements.Remove(element);
-                    observableExpression.PropertyChanging -= ObservableExpressionPropertyChanging;
-                    observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
-                    observableExpression.Dispose();
+                        elements.Remove(committed.CommittedElement);
+                    committed.ObservableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
+                    committed.ObservableExpression.Dispose();
                     observableExpressions.Remove(keyValuePair.Key);
                 }
                 foreach (var keyValuePair in e.NewItems)
@@ -168,9 +164,8 @@ sealed class ObservableDictionaryToCollectionQuery<TElement, TKey, TValue>(Colle
                     }
                     else
                         elements.Add(element);
-                    observableExpression.PropertyChanging += ObservableExpressionPropertyChanging;
                     observableExpression.PropertyChanged += ObservableExpressionPropertyChanged;
-                    observableExpressions.Add(keyValuePair.Key, observableExpression);
+                    observableExpressions.Add(keyValuePair.Key, (observableExpression, fault, element));
                 }
                 if (faultList is not null)
                     OperationFault = faultList.Fault;

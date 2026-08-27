@@ -6,11 +6,12 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
     where TSourceKey : notnull
 {
     readonly object access = new();
-    readonly ObservableDictionary<TKey, int> duplicateKeys = [];
-    readonly Dictionary<IObservableExpression<KeyValuePair<TSourceKey, TSourceValue>, KeyValuePair<TKey, TValue>>, (Exception? fault, KeyValuePair<TKey, TValue> result)> evaluationsChanging = [];
+    readonly Dictionary<TKey, List<TSourceKey>> claimantsByProjectedKey = new(equalityComparer);
+    int duplicateClaims;
     int nullKeys;
-    readonly ObservableDictionary<TSourceKey, IObservableExpression<KeyValuePair<TSourceKey, TSourceValue>, KeyValuePair<TKey, TValue>>> observableExpressions = [];
+    readonly ObservableDictionary<TSourceKey, (IObservableExpression<KeyValuePair<TSourceKey, TSourceValue>, KeyValuePair<TKey, TValue>> ObservableExpression, Exception? CommittedFault, KeyValuePair<TKey, TValue> CommittedProjection)> observableExpressions = [];
     readonly ObservableDictionary<TKey, TValue> result = new(equalityComparer);
+    readonly IEqualityComparer<TSourceKey> sourceKeyComparer = EqualityComparer<TSourceKey>.Default;
     readonly EqualityComparer<TValue> valueEqualityComparer = EqualityComparer<TValue>.Default;
 
     internal readonly IEqualityComparer<TKey> EqualityComparer = equalityComparer;
@@ -52,6 +53,26 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
         }
     }
 
+    void ApplyProjectionWithAccess(TSourceKey sourceKey, KeyValuePair<TKey, TValue> projection, ObservableDictionary<TKey, TValue> into)
+    {
+        var key = projection.Key;
+        if (key is null)
+        {
+            ++nullKeys;
+            return;
+        }
+        if (claimantsByProjectedKey.TryGetValue(key, out var claimants))
+        {
+            claimants.Add(sourceKey);
+            ++duplicateClaims;
+        }
+        else
+        {
+            claimantsByProjectedKey.Add(key, [sourceKey]);
+            into.Add(key, projection.Value);
+        }
+    }
+
     public override bool Contains(KeyValuePair<TKey, TValue> item)
     {
         lock (access)
@@ -77,9 +98,8 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
             var removedFromCache = source.QueryDisposed(this);
             if (removedFromCache)
             {
-                foreach (var observableExpression in observableExpressions.Values)
+                foreach (var (observableExpression, _, _) in observableExpressions.Values)
                 {
-                    observableExpression.PropertyChanging -= ObservableExpressionPropertyChanging;
                     observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
                     observableExpression.Dispose();
                 }
@@ -96,7 +116,7 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
     public override IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator()
     {
         lock (access)
-            return result.ToList().AsReadOnly().GetEnumerator();
+            return result.ToList().GetEnumerator();
     }
 
     public override IReadOnlyList<KeyValuePair<TKey, TValue>> GetRange(IEnumerable<TKey> keys)
@@ -107,66 +127,51 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
 
     void ObservableExpressionPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (sender is IObservableExpression<KeyValuePair<TSourceKey, TSourceValue>, KeyValuePair<TKey, TValue>> observableExpression && e.PropertyName == nameof(IObservableExpression<,>.Evaluation))
-            lock (access)
+        if (sender is not IObservableExpression<KeyValuePair<TSourceKey, TSourceValue>, KeyValuePair<TKey, TValue>> observableExpression || e.PropertyName != nameof(IObservableExpression<,>.Evaluation))
+            return;
+        lock (access)
+        {
+            var sourceKey = observableExpression.Argument.Key;
+            if (!observableExpressions.TryGetValue(sourceKey, out var committed) || !ReferenceEquals(committed.ObservableExpression, observableExpression))
+                return;
+            var (newFault, newProjection) = observableExpression.Evaluation;
+            var committedProjection = committed.CommittedProjection;
+            var committedKey = committedProjection.Key;
+            var newKey = newProjection.Key;
+            var keyIsUnchanged = committedKey is null ? newKey is null : newKey is not null && EqualityComparer.Equals(committedKey, newKey);
+            if (keyIsUnchanged)
             {
-                var (oldFault, oldResult) = evaluationsChanging![observableExpression];
-                evaluationsChanging.Remove(observableExpression);
-                var (newFault, newResult) = observableExpression.Evaluation;
-                var addedFault = oldFault is null && newFault is not null;
-                var removedFault = oldFault is not null && newFault is null;
-                var replacedFault = oldFault is not null && newFault is not null && !ReferenceEquals(oldFault, newFault);
-                if (addedFault || removedFault || replacedFault)
-                {
-                    var elementFaults = OperationFault is AggregateException aggregateException ? aggregateException.InnerExceptions.OfType<EvaluationFaultException>().ToList() : [];
-                    if (removedFault || replacedFault)
-                        elementFaults.RemoveAll(elementFault => ReferenceEquals(elementFault.Element, observableExpression.Argument.Key));
-                    if (addedFault || replacedFault)
-                        elementFaults.Add(new EvaluationFaultException(observableExpression.Argument.Key, newFault!));
-                    var faultList = new FaultList();
-                    if (OperationFault is AggregateException aggregateException2)
-                        faultList.AddRange(aggregateException2.InnerExceptions.Where(innerEx => innerEx is not EvaluationFaultException));
-                    else if (OperationFault is { } otherEx && otherEx is not EvaluationFaultException)
-                        faultList.Add(otherEx);
-                    faultList.AddRange(elementFaults);
-                    OperationFault = faultList.Fault;
-                }
-                if (!valueEqualityComparer.Equals(oldResult.Value, newResult.Value))
-                    result[oldResult.Key] = newResult.Value;
+                observableExpressions[sourceKey] = (observableExpression, newFault, newProjection);
+                if (newKey is not null && !valueEqualityComparer.Equals(committedProjection.Value, newProjection.Value) && IsFirstClaimantWithAccess(newKey, sourceKey))
+                    result[newKey] = newProjection.Value;
             }
+            else
+            {
+                RetractProjectionWithAccess(sourceKey, committedProjection);
+                observableExpressions[sourceKey] = (observableExpression, newFault, newProjection);
+                ApplyProjectionWithAccess(sourceKey, newProjection, result);
+            }
+            if (!keyIsUnchanged || !ReferenceEquals(committed.CommittedFault, newFault))
+                SetOperationFault();
+        }
     }
 
-    void ObservableExpressionPropertyChanging(object? sender, PropertyChangingEventArgs e)
+    bool IsFirstClaimantWithAccess(TKey key, TSourceKey sourceKey) =>
+        claimantsByProjectedKey.TryGetValue(key, out var claimants) && claimants.Count > 0 && sourceKeyComparer.Equals(claimants[0], sourceKey);
+
+    void ObserveSourceKeyValuePairWithAccess(KeyValuePair<TSourceKey, TSourceValue> sourceKeyValuePair, ObservableDictionary<TKey, TValue> into)
     {
-        if (sender is IObservableExpression<KeyValuePair<TSourceKey, TSourceValue>, KeyValuePair<TKey, TValue>> observableExpression && e.PropertyName == nameof(IObservableExpression<,>.Evaluation))
-            lock(access)
-                evaluationsChanging.Add(observableExpression, observableExpression.Evaluation);
+        var observableExpression = collectionObserver.ExpressionObserver.ObserveWithoutOptimization(KeyValuePairSelector, sourceKeyValuePair);
+        var (fault, projection) = observableExpression.Evaluation;
+        ApplyProjectionWithAccess(sourceKeyValuePair.Key, projection, into);
+        observableExpression.PropertyChanged += ObservableExpressionPropertyChanged;
+        observableExpressions.Add(sourceKeyValuePair.Key, (observableExpression, fault, projection));
     }
 
     protected override void OnInitialization()
     {
-        var expressionObserver = collectionObserver.ExpressionObserver;
         foreach (var sourceKeyValuePair in source)
-        {
-            var observableExpression = expressionObserver.ObserveWithoutOptimization(KeyValuePairSelector, sourceKeyValuePair);
-            if (observableExpression.Evaluation.Result is KeyValuePair<TKey, TValue> resultKeyValuePair)
-            {
-                if (resultKeyValuePair.Key is null)
-                    ++nullKeys;
-                else if (!result.TryAdd(resultKeyValuePair.Key, resultKeyValuePair.Value))
-                {
-                    if (!duplicateKeys.TryGetValue(resultKeyValuePair.Key, out var count))
-                        duplicateKeys.Add(resultKeyValuePair.Key, 2);
-                    else
-                        duplicateKeys[resultKeyValuePair.Key] = count + 1;
-                }
-            }
-            else
-                ++nullKeys;
-            observableExpression.PropertyChanging += ObservableExpressionPropertyChanging;
-            observableExpression.PropertyChanged += ObservableExpressionPropertyChanged;
-            observableExpressions.Add(sourceKeyValuePair.Key, observableExpression);
-        }
+            ObserveSourceKeyValuePairWithAccess(sourceKeyValuePair, result);
         SetOperationFault();
         source.DictionaryChanged += SourceDictionaryChanged;
         result.CollectionChanged += ResultCollectionChanged;
@@ -183,15 +188,40 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
     void ResultDictionaryChangedBoxed(object? sender, NotifyDictionaryChangedEventArgs<object?, object?> e) =>
         OnDictionaryChangedBoxed(e);
 
+    void RetractProjectionWithAccess(TSourceKey sourceKey, KeyValuePair<TKey, TValue> projection)
+    {
+        var key = projection.Key;
+        if (key is null)
+        {
+            --nullKeys;
+            return;
+        }
+        if (!claimantsByProjectedKey.TryGetValue(key, out var claimants))
+            return;
+        var claimantIndex = claimants.FindIndex(claimant => sourceKeyComparer.Equals(claimant, sourceKey));
+        if (claimantIndex < 0)
+            return;
+        claimants.RemoveAt(claimantIndex);
+        if (claimants.Count == 0)
+        {
+            claimantsByProjectedKey.Remove(key);
+            result.Remove(key);
+            return;
+        }
+        --duplicateClaims;
+        if (claimantIndex == 0 && observableExpressions.TryGetValue(claimants[0], out var promoted))
+            result[key] = promoted.CommittedProjection.Value;
+    }
+
     void SetOperationFault()
     {
         var faultList = new FaultList();
         if (nullKeys > 0)
             faultList.AddRange(Enumerable.Range(0, nullKeys).Select(_ => ExceptionHelper.KeyNull));
-        if (duplicateKeys.Count > 0)
-            faultList.AddRange(Enumerable.Range(0, duplicateKeys.Keys.Sum(key => duplicateKeys[key] - 1)).Select(_ => ExceptionHelper.SameKeyAlreadyAdded));
+        if (duplicateClaims > 0)
+            faultList.AddRange(Enumerable.Range(0, duplicateClaims).Select(_ => ExceptionHelper.SameKeyAlreadyAdded));
         faultList.Check(source!);
-        foreach (var observableExpression in observableExpressions.Values)
+        foreach (var (observableExpression, _, _) in observableExpressions.Values)
             faultList.Check(observableExpression);
         OperationFault = faultList.Fault;
     }
@@ -200,93 +230,43 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
     {
         lock (access)
         {
-            var expressionObserver = collectionObserver.ExpressionObserver;
             if (e.Action is NotifyDictionaryChangedAction.Reset)
             {
-                duplicateKeys.Clear();
+                claimantsByProjectedKey.Clear();
+                duplicateClaims = 0;
                 nullKeys = 0;
-                foreach (var observableExpression in observableExpressions.Values)
+                foreach (var (observableExpression, _, _) in observableExpressions.Values)
                 {
-                    observableExpression.PropertyChanging -= ObservableExpressionPropertyChanging;
                     observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
                     observableExpression.Dispose();
                 }
                 observableExpressions.Clear();
 
-                var newResult = new ObservableDictionary<TKey, TValue>();
+                var newResult = new ObservableDictionary<TKey, TValue>(EqualityComparer);
                 foreach (var sourceKeyValuePair in source)
-                {
-                    var observableExpression = expressionObserver.ObserveWithoutOptimization(KeyValuePairSelector, sourceKeyValuePair);
-                    if (observableExpression.Evaluation.Result is KeyValuePair<TKey, TValue> resultKeyValuePair)
-                    {
-                        if (resultKeyValuePair.Key is null)
-                            ++nullKeys;
-                        else if (!newResult.TryAdd(resultKeyValuePair.Key, resultKeyValuePair.Value))
-                        {
-                            if (!duplicateKeys.TryGetValue(resultKeyValuePair.Key, out var count))
-                                duplicateKeys.Add(resultKeyValuePair.Key, 2);
-                            else
-                                duplicateKeys[resultKeyValuePair.Key] = count + 1;
-                        }
-                    }
-                    else
-                        ++nullKeys;
-                    observableExpression.PropertyChanging += ObservableExpressionPropertyChanging;
-                    observableExpression.PropertyChanged += ObservableExpressionPropertyChanged;
-                    observableExpressions.Add(sourceKeyValuePair.Key, observableExpression);
-                }
+                    ObserveSourceKeyValuePairWithAccess(sourceKeyValuePair, newResult);
                 result.Reset(newResult);
 
-                duplicateKeys.TrimExcess();
+                claimantsByProjectedKey.TrimExcess();
                 observableExpressions.TrimExcess();
-                SetOperationFault();
             }
             else
             {
                 if (e.OldItems is { } oldItems)
                     foreach (var keyValuePair in oldItems)
                     {
-                        var observableExpression = observableExpressions[keyValuePair.Key!];
-                        var key = observableExpression.Evaluation.Result.Key;
-                        observableExpression.PropertyChanging -= ObservableExpressionPropertyChanging;
-                        observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
-                        observableExpression.Dispose();
+                        if (!observableExpressions.TryGetValue(keyValuePair.Key!, out var committed))
+                            continue;
+                        RetractProjectionWithAccess(keyValuePair.Key!, committed.CommittedProjection);
+                        committed.ObservableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
+                        committed.ObservableExpression.Dispose();
                         observableExpressions.Remove(keyValuePair.Key!);
-                        if (key is null)
-                            --nullKeys;
-                        else if (duplicateKeys.TryGetValue(key, out var count))
-                        {
-                            if (count == 2)
-                                duplicateKeys.Remove(key);
-                            else
-                                duplicateKeys[key] = count - 1;
-                        }
-                        else
-                            result.Remove(key);
                     }
                 if (e.NewItems is { } newItems)
                     foreach (var keyValuePair in newItems)
-                    {
-                        var observableExpression = expressionObserver.ObserveWithoutOptimization(KeyValuePairSelector, keyValuePair);
-                        if (observableExpression.Evaluation.Result is KeyValuePair<TKey, TValue> resultKeyValuePair)
-                        {
-                            if (resultKeyValuePair.Key is null)
-                                ++nullKeys;
-                            else if (!result.TryAdd(resultKeyValuePair.Key, resultKeyValuePair.Value))
-                            {
-                                if (!duplicateKeys.TryGetValue(resultKeyValuePair.Key, out var count))
-                                    duplicateKeys.Add(resultKeyValuePair.Key, 2);
-                                else
-                                    duplicateKeys[resultKeyValuePair.Key] = count + 1;
-                            }
-                        }
-                        else
-                            ++nullKeys;
-                        observableExpression.PropertyChanging += ObservableExpressionPropertyChanging;
-                        observableExpression.PropertyChanged += ObservableExpressionPropertyChanged;
-                        observableExpressions.Add(keyValuePair.Key!, observableExpression);
-                    }
+                        ObserveSourceKeyValuePairWithAccess(keyValuePair, result);
             }
+            SetOperationFault();
         }
     }
 

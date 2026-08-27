@@ -5,9 +5,8 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
 {
     readonly object access = new();
     readonly IEqualityComparer<TElement> elementComparer = EqualityComparer<TElement>.Default;
-    readonly Dictionary<IObservableExpression<TElement, TResult>, (Exception? fault, TResult result)> evaluationsChanging = [];
-    readonly Dictionary<IObservableExpression<TElement, TResult>, int> observableExpressionCounts = [];
-    readonly List<IObservableExpression<TElement, TResult>> observableExpressions = [];
+    readonly Dictionary<IObservableExpression<TElement, TResult>, (int Positions, Exception? Fault)> observableExpressionStates = [];
+    readonly List<(IObservableExpression<TElement, TResult> ObservableExpression, TResult CommittedResult)> projections = [];
     readonly EqualityComparer<TResult> resultComparer = EqualityComparer<TResult>.Default;
     internal readonly Expression<Func<TElement, TResult>> Selector = selector;
 
@@ -16,7 +15,7 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
         get
         {
             lock (access)
-                return observableExpressions[index].Evaluation.Result;
+                return projections[index].CommittedResult;
         }
     }
 
@@ -25,7 +24,7 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
         get
         {
             lock (access)
-                return observableExpressions.Count;
+                return projections.Count;
         }
     }
 
@@ -36,11 +35,10 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
             var removedFromCache = source.QueryDisposed(this);
             if (removedFromCache)
             {
-                foreach (var observableExpression in observableExpressionCounts.Keys)
+                foreach (var observableExpression in observableExpressionStates.Keys)
                 {
-                    observableExpression.PropertyChanging -= ObservableExpressionPropertyChanging;
                     observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
-                    for (int i = 0, ii = observableExpressionCounts[observableExpression]; i < ii; ++i)
+                    for (int i = 0, ii = observableExpressionStates[observableExpression].Positions; i < ii; ++i)
                         observableExpression.Dispose();
                 }
                 source.CollectionChanged -= SourceCollectionChanged;
@@ -56,53 +54,66 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
     public override IEnumerator<TResult> GetEnumerator()
     {
         lock (access)
-            return observableExpressions.Select(observableExpression => observableExpression.Evaluation.Result).ToList().AsReadOnly().GetEnumerator();
+        {
+            var results = new List<TResult>(projections.Count);
+            for (int i = 0, ii = projections.Count; i < ii; ++i)
+                results.Add(projections[i].CommittedResult);
+            return results.GetEnumerator();
+        }
     }
 
     void ObservableExpressionPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (sender is IObservableExpression<TElement, TResult> observableExpression && e.PropertyName == nameof(IObservableExpression<,>.Evaluation))
-            lock (access)
+        if (sender is not IObservableExpression<TElement, TResult> observableExpression || e.PropertyName != nameof(IObservableExpression<,>.Evaluation))
+            return;
+        lock (access)
+        {
+            if (!observableExpressionStates.TryGetValue(observableExpression, out var state))
+                return;
+            var (newFault, newResult) = observableExpression.Evaluation;
+            if (FaultList.ExchangeElementFault(OperationFault, observableExpression.Argument, elementComparer, state.Fault, newFault, out var newOperationFault))
             {
-                var (oldFault, oldResult) = evaluationsChanging![observableExpression];
-                evaluationsChanging.Remove(observableExpression);
-                var (newFault, newResult) = observableExpression.Evaluation;
-                if (FaultList.ExchangeElementFault(OperationFault, observableExpression.Argument, elementComparer, oldFault, newFault, out var newOperationFault))
-                    OperationFault = newOperationFault;
-                if (!resultComparer.Equals(oldResult, newResult))
-                    for (int i = 0, ii = observableExpressions.Count; i < ii; ++i)
-                        if (ReferenceEquals(observableExpressions[i], observableExpression))
-                            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, newResult, oldResult, i));
+                observableExpressionStates[observableExpression] = (state.Positions, newFault);
+                OperationFault = newOperationFault;
             }
+            for (int i = 0, ii = projections.Count; i < ii; ++i)
+            {
+                var (iObservableExpression, committedResult) = projections[i];
+                if (ReferenceEquals(iObservableExpression, observableExpression) && !resultComparer.Equals(committedResult, newResult))
+                {
+                    projections[i] = (iObservableExpression, newResult);
+                    OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, newResult, committedResult, i));
+                }
+            }
+        }
     }
 
-    void ObservableExpressionPropertyChanging(object? sender, PropertyChangingEventArgs e)
+    IObservableExpression<TElement, TResult> ObserveElementWithAccess(TElement element, FaultList faultList)
     {
-        if (sender is IObservableExpression<TElement, TResult> observableExpression && e.PropertyName == nameof(IObservableExpression<,>.Evaluation))
-            lock (access)
-                evaluationsChanging.Add(observableExpression, observableExpression.Evaluation);
+        var observableExpression = collectionObserver.ExpressionObserver.ObserveWithoutOptimization(Selector, element);
+        var (fault, result) = observableExpression.Evaluation;
+        if (fault is not null)
+            faultList.Add(new EvaluationFaultException(element, fault));
+        if (observableExpressionStates.TryGetValue(observableExpression, out var state))
+            observableExpressionStates[observableExpression] = (state.Positions + 1, state.Fault);
+        else
+        {
+            observableExpressionStates.Add(observableExpression, (1, fault));
+            observableExpression.PropertyChanged += ObservableExpressionPropertyChanged;
+        }
+        return observableExpression;
     }
 
     protected override void OnInitialization()
     {
         lock (access)
         {
-            var evaluationFaultExceptions = new List<EvaluationFaultException>();
+            var faultList = new FaultList();
 
             void processElement(TElement element)
             {
-                var observableExpression = collectionObserver.ExpressionObserver.ObserveWithoutOptimization(Selector, element);
-                observableExpressions.Add(observableExpression);
-                if (observableExpression.Evaluation.Fault is { } fault)
-                    evaluationFaultExceptions!.Add(new EvaluationFaultException(element, fault));
-                if (observableExpressionCounts.TryGetValue(observableExpression, out var observableExpressionCount))
-                    observableExpressionCounts[observableExpression] = observableExpressionCount + 1;
-                else
-                {
-                    observableExpressionCounts.Add(observableExpression, 1);
-                    observableExpression.PropertyChanging += ObservableExpressionPropertyChanging;
-                    observableExpression.PropertyChanged += ObservableExpressionPropertyChanged;
-                }
+                var observableExpression = ObserveElementWithAccess(element, faultList!);
+                projections!.Add((observableExpression, observableExpression.Evaluation.Result));
             }
 
             if (!source.HasIndexerPenalty)
@@ -112,8 +123,7 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
                 foreach (var element in source)
                     processElement(element);
 
-            if (evaluationFaultExceptions.Count > 0)
-                OperationFault = new AggregateException(evaluationFaultExceptions);
+            OperationFault = faultList.Fault;
 
             source.CollectionChanged += SourceCollectionChanged;
             source.PropertyChanging += SourcePropertyChanging;
@@ -121,36 +131,38 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
         }
     }
 
+    void ReleaseProjectionWithAccess((IObservableExpression<TElement, TResult> ObservableExpression, TResult CommittedResult) projection)
+    {
+        var observableExpression = projection.ObservableExpression;
+        var state = observableExpressionStates[observableExpression];
+        if (state.Positions > 1)
+            observableExpressionStates[observableExpression] = (state.Positions - 1, state.Fault);
+        else
+        {
+            observableExpressionStates.Remove(observableExpression);
+            observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
+        }
+        observableExpression.Dispose();
+    }
+
     NotifyCollectionChangedEventArgs ResetWithAccess()
     {
-        foreach (var observableExpression in observableExpressionCounts.Keys)
+        foreach (var observableExpression in observableExpressionStates.Keys)
         {
-            observableExpression.PropertyChanging -= ObservableExpressionPropertyChanging;
             observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
-            for (int i = 0, ii = observableExpressionCounts[observableExpression]; i < ii; ++i)
+            for (int i = 0, ii = observableExpressionStates[observableExpression].Positions; i < ii; ++i)
                 observableExpression.Dispose();
         }
 
-        evaluationsChanging.Clear();
-        observableExpressionCounts.Clear();
-        observableExpressions.Clear();
+        observableExpressionStates.Clear();
+        projections.Clear();
 
-        var evaluationFaultExceptions = new List<EvaluationFaultException>();
+        var faultList = new FaultList();
 
         void processElement(TElement element)
         {
-            var observableExpression = collectionObserver.ExpressionObserver.ObserveWithoutOptimization(Selector, element);
-            observableExpressions.Add(observableExpression);
-            if (observableExpression.Evaluation.Fault is { } fault)
-                evaluationFaultExceptions!.Add(new EvaluationFaultException(element, fault));
-            if (observableExpressionCounts.TryGetValue(observableExpression, out var observableExpressionCount))
-                observableExpressionCounts[observableExpression] = observableExpressionCount + 1;
-            else
-            {
-                observableExpressionCounts.Add(observableExpression, 1);
-                observableExpression.PropertyChanging += ObservableExpressionPropertyChanging;
-                observableExpression.PropertyChanged += ObservableExpressionPropertyChanged;
-            }
+            var observableExpression = ObserveElementWithAccess(element, faultList!);
+            projections!.Add((observableExpression, observableExpression.Evaluation.Result));
         }
 
         if (!source.HasIndexerPenalty)
@@ -160,11 +172,12 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
             foreach (var element in source)
                 processElement(element);
 
-        OperationFault = evaluationFaultExceptions.Count == 0 ? null : new AggregateException(evaluationFaultExceptions);
+        OperationFault = faultList.Fault;
 
         return new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset);
     }
 
+    [SuppressMessage("Maintainability", "CA1502: Avoid excessive complexity", Justification = @"Splitting this up into more methods is ¯\_(ツ)_/¯")]
     void SourceCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         lock (access)
@@ -178,54 +191,39 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
                     var oldItems = new List<TResult>();
                     if (e.OldItems is not null && e.OldStartingIndex >= 0)
                     {
-                        List<IObservableExpression<TElement, TResult>>? removedObservableExpressions = null;
+                        List<(IObservableExpression<TElement, TResult> ObservableExpression, TResult CommittedResult)>? removedProjections = null;
                         try
                         {
-                            removedObservableExpressions = observableExpressions.GetRange(e.OldStartingIndex, e.OldItems.Count);
+                            removedProjections = projections.GetRange(e.OldStartingIndex, e.OldItems.Count);
                         }
                         catch (ArgumentException)
                         {
-                            var previousCount = observableExpressions.Count;
                             eventArgs = ResetWithAccess();
                             break;
                         }
-                        observableExpressions.RemoveRange(e.OldStartingIndex, e.OldItems.Count);
-                        for (int i = 0, ii = removedObservableExpressions.Count; i < ii; ++i)
+                        projections.RemoveRange(e.OldStartingIndex, e.OldItems.Count);
+                        for (int i = 0, ii = removedProjections.Count; i < ii; ++i)
                         {
-                            var removedObservableExpression = removedObservableExpressions[i];
-                            oldItems.Add(removedObservableExpression.Evaluation.Result);
-                            var observableExpressionCount = observableExpressionCounts[removedObservableExpression];
-                            if (observableExpressionCount == 1)
-                            {
-                                removedObservableExpression.PropertyChanging -= ObservableExpressionPropertyChanging;
-                                removedObservableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
-                                observableExpressionCounts.Remove(removedObservableExpression);
-                            }
-                            else
-                                observableExpressionCounts[removedObservableExpression] = observableExpressionCount - 1;
-                            removedObservableExpression.Dispose();
+                            var removedProjection = removedProjections[i];
+                            oldItems.Add(removedProjection.CommittedResult);
+                            ReleaseProjectionWithAccess(removedProjection);
                         }
                     }
                     var newItems = new List<TResult>();
                     if (e.NewItems is not null && e.NewStartingIndex >= 0)
                     {
-                        var addedObservableExpressions = new List<IObservableExpression<TElement, TResult>>();
+                        var faultList = new FaultList(OperationFault);
+                        var addedProjections = new List<(IObservableExpression<TElement, TResult> ObservableExpression, TResult CommittedResult)>();
                         for (int i = 0, ii = e.NewItems.Count; i < ii; ++i)
                         {
                             var element = (TElement)e.NewItems[i]!;
-                            var addedObservableExpression = collectionObserver.ExpressionObserver.ObserveWithoutOptimization(Selector, element);
-                            newItems.Add(addedObservableExpression.Evaluation.Result);
-                            addedObservableExpressions.Add(addedObservableExpression);
-                            if (observableExpressionCounts.TryGetValue(addedObservableExpression, out var observableExpressionCount))
-                                observableExpressionCounts[addedObservableExpression] = observableExpressionCount + 1;
-                            else
-                            {
-                                observableExpressionCounts.Add(addedObservableExpression, 1);
-                                addedObservableExpression.PropertyChanging += ObservableExpressionPropertyChanging;
-                                addedObservableExpression.PropertyChanged += ObservableExpressionPropertyChanged;
-                            }
+                            var addedObservableExpression = ObserveElementWithAccess(element, faultList);
+                            var committedResult = addedObservableExpression.Evaluation.Result;
+                            newItems.Add(committedResult);
+                            addedProjections.Add((addedObservableExpression, committedResult));
                         }
-                        observableExpressions.InsertRange(e.NewStartingIndex, addedObservableExpressions);
+                        projections.InsertRange(e.NewStartingIndex, addedProjections);
+                        OperationFault = faultList.Fault;
                     }
                     if (oldItems.Count > 0)
                     {
@@ -240,27 +238,26 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
                 case NotifyCollectionChangedAction.Move:
                     if (e.OldItems?.Count > 0 && e.OldStartingIndex != e.NewStartingIndex)
                     {
-                        List<IObservableExpression<TElement, TResult>>? movedObservableExpressions = null;
+                        List<(IObservableExpression<TElement, TResult> ObservableExpression, TResult CommittedResult)>? movedProjections = null;
                         try
                         {
-                            movedObservableExpressions = observableExpressions.GetRange(e.OldStartingIndex, e.OldItems.Count);
+                            movedProjections = projections.GetRange(e.OldStartingIndex, e.OldItems.Count);
                         }
                         catch (ArgumentException)
                         {
-                            var previousCount = observableExpressions.Count;
                             eventArgs = ResetWithAccess();
                             break;
                         }
-                        observableExpressions.RemoveRange(e.OldStartingIndex, e.OldItems.Count);
-                        observableExpressions.InsertRange(e.NewStartingIndex, movedObservableExpressions);
-                        eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Move, movedObservableExpressions.Select(oe => oe.Evaluation.Result).ToList().AsReadOnly(), e.NewStartingIndex, e.OldStartingIndex);
+                        projections.RemoveRange(e.OldStartingIndex, e.OldItems.Count);
+                        projections.InsertRange(e.NewStartingIndex, movedProjections);
+                        var movedItems = new List<TResult>(movedProjections.Count);
+                        for (int i = 0, ii = movedProjections.Count; i < ii; ++i)
+                            movedItems.Add(movedProjections[i].CommittedResult);
+                        eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Move, movedItems.AsReadOnly(), e.NewStartingIndex, e.OldStartingIndex);
                     }
                     break;
                 case NotifyCollectionChangedAction.Reset:
-                    {
-                        var previousCount = observableExpressions.Count;
-                        eventArgs = ResetWithAccess();
-                    }
+                    eventArgs = ResetWithAccess();
                     break;
             }
             if (eventArgs is not null)
