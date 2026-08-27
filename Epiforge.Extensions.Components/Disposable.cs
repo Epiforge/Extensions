@@ -120,10 +120,11 @@ public abstract class Disposable :
     }
 
     /// <summary>
-    /// Frees, releases, or resets resources
+    /// Frees, releases, or resets resources; unless overridden, this is done synchronously by way of <see cref="Dispose(bool)"/>
     /// </summary>
     /// <returns>true if this object was disposed; false to override disposal</returns>
-    protected abstract ValueTask<bool> DisposeAsyncCore();
+    protected virtual ValueTask<bool> DisposeAsyncCore() =>
+        new(Dispose(true));
 
     /// <inheritdoc/>
     protected override void LoggerSet()

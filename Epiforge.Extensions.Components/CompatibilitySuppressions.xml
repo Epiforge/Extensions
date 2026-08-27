@@ -185,21 +185,7 @@
   </Suppression>
   <Suppression>
     <DiagnosticId>CP0005</DiagnosticId>
-    <Target>M:Epiforge.Extensions.Components.Disposable.DisposeAsyncCore</Target>
-    <Left>lib/net10.0/Epiforge.Extensions.Components.dll</Left>
-    <Right>lib/net10.0/Epiforge.Extensions.Components.dll</Right>
-    <IsBaselineSuppression>true</IsBaselineSuppression>
-  </Suppression>
-  <Suppression>
-    <DiagnosticId>CP0005</DiagnosticId>
     <Target>M:Epiforge.Extensions.Components.DynamicAsyncDisposable.DisposeAsyncCore</Target>
-    <Left>lib/net10.0/Epiforge.Extensions.Components.dll</Left>
-    <Right>lib/net10.0/Epiforge.Extensions.Components.dll</Right>
-    <IsBaselineSuppression>true</IsBaselineSuppression>
-  </Suppression>
-  <Suppression>
-    <DiagnosticId>CP0005</DiagnosticId>
-    <Target>M:Epiforge.Extensions.Components.DynamicDisposable.DisposeAsyncCore</Target>
     <Left>lib/net10.0/Epiforge.Extensions.Components.dll</Left>
     <Right>lib/net10.0/Epiforge.Extensions.Components.dll</Right>
     <IsBaselineSuppression>true</IsBaselineSuppression>
@@ -213,21 +199,7 @@
   </Suppression>
   <Suppression>
     <DiagnosticId>CP0005</DiagnosticId>
-    <Target>M:Epiforge.Extensions.Components.Disposable.DisposeAsyncCore</Target>
-    <Left>lib/net6.0/Epiforge.Extensions.Components.dll</Left>
-    <Right>lib/net6.0/Epiforge.Extensions.Components.dll</Right>
-    <IsBaselineSuppression>true</IsBaselineSuppression>
-  </Suppression>
-  <Suppression>
-    <DiagnosticId>CP0005</DiagnosticId>
     <Target>M:Epiforge.Extensions.Components.DynamicAsyncDisposable.DisposeAsyncCore</Target>
-    <Left>lib/net6.0/Epiforge.Extensions.Components.dll</Left>
-    <Right>lib/net6.0/Epiforge.Extensions.Components.dll</Right>
-    <IsBaselineSuppression>true</IsBaselineSuppression>
-  </Suppression>
-  <Suppression>
-    <DiagnosticId>CP0005</DiagnosticId>
-    <Target>M:Epiforge.Extensions.Components.DynamicDisposable.DisposeAsyncCore</Target>
     <Left>lib/net6.0/Epiforge.Extensions.Components.dll</Left>
     <Right>lib/net6.0/Epiforge.Extensions.Components.dll</Right>
     <IsBaselineSuppression>true</IsBaselineSuppression>
@@ -241,21 +213,7 @@
   </Suppression>
   <Suppression>
     <DiagnosticId>CP0005</DiagnosticId>
-    <Target>M:Epiforge.Extensions.Components.Disposable.DisposeAsyncCore</Target>
-    <Left>lib/net7.0/Epiforge.Extensions.Components.dll</Left>
-    <Right>lib/net7.0/Epiforge.Extensions.Components.dll</Right>
-    <IsBaselineSuppression>true</IsBaselineSuppression>
-  </Suppression>
-  <Suppression>
-    <DiagnosticId>CP0005</DiagnosticId>
     <Target>M:Epiforge.Extensions.Components.DynamicAsyncDisposable.DisposeAsyncCore</Target>
-    <Left>lib/net7.0/Epiforge.Extensions.Components.dll</Left>
-    <Right>lib/net7.0/Epiforge.Extensions.Components.dll</Right>
-    <IsBaselineSuppression>true</IsBaselineSuppression>
-  </Suppression>
-  <Suppression>
-    <DiagnosticId>CP0005</DiagnosticId>
-    <Target>M:Epiforge.Extensions.Components.DynamicDisposable.DisposeAsyncCore</Target>
     <Left>lib/net7.0/Epiforge.Extensions.Components.dll</Left>
     <Right>lib/net7.0/Epiforge.Extensions.Components.dll</Right>
     <IsBaselineSuppression>true</IsBaselineSuppression>
@@ -269,21 +227,7 @@
   </Suppression>
   <Suppression>
     <DiagnosticId>CP0005</DiagnosticId>
-    <Target>M:Epiforge.Extensions.Components.Disposable.DisposeAsyncCore</Target>
-    <Left>lib/net8.0/Epiforge.Extensions.Components.dll</Left>
-    <Right>lib/net8.0/Epiforge.Extensions.Components.dll</Right>
-    <IsBaselineSuppression>true</IsBaselineSuppression>
-  </Suppression>
-  <Suppression>
-    <DiagnosticId>CP0005</DiagnosticId>
     <Target>M:Epiforge.Extensions.Components.DynamicAsyncDisposable.DisposeAsyncCore</Target>
-    <Left>lib/net8.0/Epiforge.Extensions.Components.dll</Left>
-    <Right>lib/net8.0/Epiforge.Extensions.Components.dll</Right>
-    <IsBaselineSuppression>true</IsBaselineSuppression>
-  </Suppression>
-  <Suppression>
-    <DiagnosticId>CP0005</DiagnosticId>
-    <Target>M:Epiforge.Extensions.Components.DynamicDisposable.DisposeAsyncCore</Target>
     <Left>lib/net8.0/Epiforge.Extensions.Components.dll</Left>
     <Right>lib/net8.0/Epiforge.Extensions.Components.dll</Right>
     <IsBaselineSuppression>true</IsBaselineSuppression>
@@ -297,21 +241,7 @@
   </Suppression>
   <Suppression>
     <DiagnosticId>CP0005</DiagnosticId>
-    <Target>M:Epiforge.Extensions.Components.Disposable.DisposeAsyncCore</Target>
-    <Left>lib/net9.0/Epiforge.Extensions.Components.dll</Left>
-    <Right>lib/net9.0/Epiforge.Extensions.Components.dll</Right>
-    <IsBaselineSuppression>true</IsBaselineSuppression>
-  </Suppression>
-  <Suppression>
-    <DiagnosticId>CP0005</DiagnosticId>
     <Target>M:Epiforge.Extensions.Components.DynamicAsyncDisposable.DisposeAsyncCore</Target>
-    <Left>lib/net9.0/Epiforge.Extensions.Components.dll</Left>
-    <Right>lib/net9.0/Epiforge.Extensions.Components.dll</Right>
-    <IsBaselineSuppression>true</IsBaselineSuppression>
-  </Suppression>
-  <Suppression>
-    <DiagnosticId>CP0005</DiagnosticId>
-    <Target>M:Epiforge.Extensions.Components.DynamicDisposable.DisposeAsyncCore</Target>
     <Left>lib/net9.0/Epiforge.Extensions.Components.dll</Left>
     <Right>lib/net9.0/Epiforge.Extensions.Components.dll</Right>
     <IsBaselineSuppression>true</IsBaselineSuppression>
