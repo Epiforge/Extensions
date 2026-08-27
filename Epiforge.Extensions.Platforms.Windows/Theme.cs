@@ -12,38 +12,23 @@ public sealed class Theme :
     public Theme()
     {
         synchronizationContext = SynchronizationContext.Current;
-        colorKey = Registry.Users.OpenSubKey(colorKeyName) ?? throw new PlatformNotSupportedException($"The DWM key (\"{colorKeyName}\") could not be found");
-        color = FetchColor();
         try
         {
-            colorKeyWatcher = new ManagementEventWatcher(new WqlEventQuery("RegistryValueChangeEvent") { Condition = $"Hive = '{Sanitize(Registry.Users.Name)}' AND KeyPath = '{Sanitize(colorKeyName)}' AND ValueName = '{Sanitize(colorValueName)}'" });
-            colorKeyWatcher.EventArrived += ColorKeyWatcherEventArrived;
-            colorKeyWatcher.Start();
+            colorKey = Registry.Users.OpenSubKey(colorKeyName) ?? throw new PlatformNotSupportedException($"The DWM key (\"{colorKeyName}\") could not be found");
+            color = FetchColor();
+            var colorWatching = WatchRegistryValue(colorKeyName, colorValueName, ColorKeyWatcherEventArrived, ColorKeyPollTimerTick);
+            colorKeyWatcher = colorWatching.watcher;
+            colorKeyPollTimer = colorWatching.pollTimer;
+            isDarkKey = Registry.Users.OpenSubKey(isDarkKeyName) ?? throw new PlatformNotSupportedException($"The Personalize key (\"{isDarkKeyName}\") could not be found");
+            isDark = FetchIsDark();
+            var isDarkWatching = WatchRegistryValue(isDarkKeyName, isDarkValueName, IsDarkKeyWatcherEventArrived, IsDarkKeyPollTimerTick);
+            isDarkKeyWatcher = isDarkWatching.watcher;
+            isDarkKeyPollTimer = isDarkWatching.pollTimer;
         }
-        catch (ManagementException)
+        catch
         {
-            colorKeyPollTimer = new Timer(ColorKeyPollTimerTick, null, pollingInterval, pollingInterval);
-        }
-        catch (TypeInitializationException)
-        {
-            colorKeyPollTimer = new Timer(ColorKeyPollTimerTick, null, pollingInterval, pollingInterval);
-        }
-
-        isDarkKey = Registry.Users.OpenSubKey(isDarkKeyName) ?? throw new PlatformNotSupportedException($"The Personalize key (\"{isDarkKeyName}\") could not be found");
-        isDark = FetchIsDark();
-        try
-        {
-            isDarkKeyWatcher = new ManagementEventWatcher(new WqlEventQuery("RegistryValueChangeEvent") { Condition = $"Hive = '{Sanitize(Registry.Users.Name)}' AND KeyPath = '{Sanitize(isDarkKeyName)}' AND ValueName = '{Sanitize(isDarkValueName)}'" });
-            isDarkKeyWatcher.EventArrived += IsDarkKeyWatcherEventArrived;
-            isDarkKeyWatcher.Start();
-        }
-        catch (ManagementException)
-        {
-            isDarkKeyPollTimer = new Timer(IsDarkKeyPollTimerTick, null, pollingInterval, pollingInterval);
-        }
-        catch (TypeInitializationException)
-        {
-            isDarkKeyPollTimer = new Timer(IsDarkKeyPollTimerTick, null, pollingInterval, pollingInterval);
+            ReleaseResources();
+            throw;
         }
     }
 
@@ -73,7 +58,7 @@ public sealed class Theme :
     public Color Color
     {
         get => color;
-        set => SetBackedProperty(ref color, in value);
+        private set => SetBackedProperty(ref color, in value);
     }
 
     /// <summary>
@@ -82,7 +67,7 @@ public sealed class Theme :
     public bool IsDark
     {
         get => isDark;
-        set => SetBackedProperty(ref isDark, in value);
+        private set => SetBackedProperty(ref isDark, in value);
     }
 
     void ColorKeyPollTimerTick(object? state) =>
@@ -119,14 +104,7 @@ public sealed class Theme :
     protected override bool Dispose(bool disposing)
     {
         if (disposing)
-        {
-            colorKeyPollTimer?.Dispose();
-            isDarkKeyPollTimer?.Dispose();
-            colorKeyWatcher?.Dispose();
-            isDarkKeyWatcher?.Dispose();
-            colorKey?.Dispose();
-            isDarkKey?.Dispose();
-        }
+            ReleaseResources();
         return true;
     }
 
@@ -162,6 +140,16 @@ public sealed class Theme :
             }
         });
 
+    void ReleaseResources()
+    {
+        colorKeyPollTimer?.Dispose();
+        isDarkKeyPollTimer?.Dispose();
+        colorKeyWatcher?.Dispose();
+        isDarkKeyWatcher?.Dispose();
+        colorKey?.Dispose();
+        isDarkKey?.Dispose();
+    }
+
     void UsingContext(Action action)
     {
         if (synchronizationContext != null)
@@ -174,4 +162,21 @@ public sealed class Theme :
 
     static string Sanitize(string value) =>
         value.Replace(@"\", @"\\", StringComparison.OrdinalIgnoreCase).Replace("'", @"\'", StringComparison.OrdinalIgnoreCase);
+
+    static (ManagementEventWatcher? watcher, Timer? pollTimer) WatchRegistryValue(string keyName, string valueName, EventArrivedEventHandler eventArrived, TimerCallback pollTimerTick)
+    {
+        ManagementEventWatcher? watcher = null;
+        try
+        {
+            watcher = new ManagementEventWatcher(new WqlEventQuery("RegistryValueChangeEvent") { Condition = $"Hive = '{Sanitize(Registry.Users.Name)}' AND KeyPath = '{Sanitize(keyName)}' AND ValueName = '{Sanitize(valueName)}'" });
+            watcher.EventArrived += eventArrived;
+            watcher.Start();
+            return (watcher, null);
+        }
+        catch (Exception ex) when (ex is ManagementException or TypeInitializationException)
+        {
+            watcher?.Dispose();
+            return (null, new Timer(pollTimerTick, null, pollingInterval, pollingInterval));
+        }
+    }
 }

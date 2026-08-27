@@ -1,13 +1,16 @@
-namespace Epiforge.Extensions.Platforms.Windows.NativeInterop;
+﻿namespace Epiforge.Extensions.Platforms.Windows.NativeInterop;
 
 static partial class NativeMethods
 {
+    public const int WtsSessionInfoEx = 25;
+    public const uint WtsCurrentSession = uint.MaxValue;
+
 #if IS_NET_7_0_OR_GREATER
-    [LibraryImport("kernel32.dll")]
+    [LibraryImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool AttachConsole(uint dwProcessId);
 
-    [LibraryImport("user32.dll")]
+    [LibraryImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool GetCursorPos(out Types.Point lpPoint);
 
@@ -32,8 +35,8 @@ static partial class NativeMethods
     [LibraryImport("user32.dll")]
     public static partial IntPtr GetShellWindow();
 
-    [DllImport("kernel32.dll")]
-    public static extern uint GetTickCount();
+    [LibraryImport("kernel32.dll")]
+    public static partial ulong GetTickCount64();
 
     [LibraryImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -46,15 +49,22 @@ static partial class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool SetCursorPos(int x, int y);
 
-    [LibraryImport("user32.dll")]
+    [LibraryImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool SetForegroundWindow(IntPtr hWnd);
+
+    [LibraryImport("wtsapi32.dll")]
+    public static partial void WTSFreeMemory(IntPtr memory);
+
+    [LibraryImport("wtsapi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool WTSQuerySessionInformationW(IntPtr server, uint sessionId, int infoClass, out IntPtr buffer, out uint bytesReturned);
 #else
-    [DllImport("kernel32.dll")]
+    [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool AttachConsole([MarshalAs(UnmanagedType.U4)] int dwProcessId);
 
-    [DllImport("user32.dll")]
+    [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool GetCursorPos(out Types.Point lpPoint);
 
@@ -80,7 +90,7 @@ static partial class NativeMethods
     public static extern IntPtr GetShellWindow();
 
     [DllImport("kernel32.dll")]
-    public static extern uint GetTickCount();
+    public static extern ulong GetTickCount64();
 
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -93,8 +103,15 @@ static partial class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool SetCursorPos(int x, int y);
 
-    [DllImport("user32.dll")]
+    [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    [DllImport("wtsapi32.dll")]
+    public static extern void WTSFreeMemory(IntPtr memory);
+
+    [DllImport("wtsapi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool WTSQuerySessionInformationW(IntPtr server, uint sessionId, int infoClass, out IntPtr buffer, out uint bytesReturned);
 #endif
 }
