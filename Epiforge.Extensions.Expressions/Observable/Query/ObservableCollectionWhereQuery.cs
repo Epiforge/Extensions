@@ -6,8 +6,9 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
     readonly object access = new();
     int count;
     readonly IEqualityComparer<TElement> elementComparer = EqualityComparer<TElement>.Default;
-    readonly List<(IObservableExpression<TElement, bool> ObservableExpression, bool IsIncluded)> memberships = [];
-    readonly Dictionary<IObservableExpression<TElement, bool>, (int Positions, Exception? Fault)> observableExpressionStates = [];
+    List<TElement>? enumerationSnapshot;
+    readonly PrefixWeightedSequence<IObservableExpression<TElement, bool>> memberships = new();
+    readonly Dictionary<IObservableExpression<TElement, bool>, (List<PrefixWeightedSequenceNode<IObservableExpression<TElement, bool>>> Nodes, Exception? Fault)> observableExpressionStates = [];
     internal readonly Expression<Func<TElement, bool>> Predicate = predicate;
 
     public override TElement this[int index]
@@ -16,15 +17,9 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
         {
             lock (access)
             {
-                for (int i = 0, ii = memberships.Count; i < ii; ++i)
-                {
-                    var (observableExpression, isIncluded) = memberships[i];
-                    if (!isIncluded)
-                        continue;
-                    if (--index == -1)
-                        return observableExpression.Argument;
-                }
-                throw ExceptionHelper.IndexArgumentWasOutOfRange;
+                if (index < 0 || index >= count)
+                    throw ExceptionHelper.IndexArgumentWasOutOfRange;
+                return memberships.NodeAtWeight(index) is { } node ? node.Item.Argument : throw ExceptionHelper.IndexArgumentWasOutOfRange;
             }
         }
     }
@@ -42,13 +37,14 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
             var removedFromCache = source.QueryDisposed(this);
             if (removedFromCache)
             {
-                foreach (var observableExpression in observableExpressionStates.Keys)
+                foreach (var (observableExpression, state) in observableExpressionStates)
                 {
                     observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
-                    for (int i = 0, ii = observableExpressionStates[observableExpression].Positions; i < ii; ++i)
+                    for (int i = 0, ii = state.Nodes.Count; i < ii; ++i)
                         observableExpression.Dispose();
                 }
                 source.CollectionChanged -= SourceCollectionChanged;
+                enumerationSnapshot = null;
                 RemovedFromCache();
             }
             return removedFromCache;
@@ -56,18 +52,31 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
         return true;
     }
 
+    void FlipMembershipWithAccess(PrefixWeightedSequenceNode<IObservableExpression<TElement, bool>> node, bool newResult)
+    {
+        var newWeight = newResult ? 1 : 0;
+        if (node.Weight == newWeight)
+            return;
+        var translatedIndex = memberships.PrefixWeightBefore(memberships.IndexOf(node));
+        memberships.SetWeight(node, newWeight);
+        enumerationSnapshot = null;
+        SetCount(count + (newResult ? 1 : -1));
+        OnCollectionChanged(new NotifyCollectionChangedEventArgs(newResult ? NotifyCollectionChangedAction.Add : NotifyCollectionChangedAction.Remove, node.Item.Argument, translatedIndex));
+    }
+
     public override IEnumerator<TElement> GetEnumerator()
     {
         lock (access)
         {
-            var elements = new List<TElement>(count);
-            for (int i = 0, ii = memberships.Count; i < ii; ++i)
+            if (enumerationSnapshot is null)
             {
-                var (observableExpression, isIncluded) = memberships[i];
-                if (isIncluded)
-                    elements.Add(observableExpression.Argument);
+                var elements = new List<TElement>(count);
+                for (var node = memberships.FirstNode; node is not null; node = memberships.Next(node))
+                    if (node.Weight == 1)
+                        elements.Add(node.Item.Argument);
+                enumerationSnapshot = elements;
             }
-            return elements.GetEnumerator();
+            return enumerationSnapshot.GetEnumerator();
         }
     }
 
@@ -83,28 +92,38 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
             var (newFault, newResult) = observableExpression.Evaluation;
             if (FaultList.ExchangeElementFault(OperationFault, observableExpression.Argument, elementComparer, state.Fault, newFault, out var newOperationFault))
             {
-                observableExpressionStates[observableExpression] = (state.Positions, newFault);
+                observableExpressionStates[observableExpression] = (state.Nodes, newFault);
                 OperationFault = newOperationFault;
             }
-            var translatedIndex = 0;
-            var remainingPositions = state.Positions;
-            for (int i = 0, ii = memberships.Count; i < ii && remainingPositions > 0; ++i)
+            var nodes = state.Nodes;
+            if (nodes.Count == 1)
+                FlipMembershipWithAccess(nodes[0], newResult);
+            else
             {
-                var (iObservableExpression, isIncluded) = memberships[i];
-                if (ReferenceEquals(iObservableExpression, observableExpression))
-                {
-                    --remainingPositions;
-                    if (isIncluded != newResult)
-                    {
-                        memberships[i] = (iObservableExpression, newResult);
-                        isIncluded = newResult;
-                        SetCount(count + (newResult ? 1 : -1));
-                        OnCollectionChanged(new NotifyCollectionChangedEventArgs(newResult ? NotifyCollectionChangedAction.Add : NotifyCollectionChangedAction.Remove, iObservableExpression.Argument, translatedIndex));
-                    }
-                }
-                if (isIncluded)
-                    ++translatedIndex;
+                var orderedNodes = new List<(int Index, PrefixWeightedSequenceNode<IObservableExpression<TElement, bool>> Node)>(nodes.Count);
+                for (int i = 0, ii = nodes.Count; i < ii; ++i)
+                    orderedNodes.Add((memberships.IndexOf(nodes[i]), nodes[i]));
+                orderedNodes.Sort((first, second) => first.Index.CompareTo(second.Index));
+                for (int i = 0, ii = orderedNodes.Count; i < ii; ++i)
+                    FlipMembershipWithAccess(orderedNodes[i].Node, newResult);
             }
+        }
+    }
+
+    void ObserveElementWithAccess(TElement element, FaultList faultList, ref int runningCount)
+    {
+        var observableExpression = collectionObserver.ExpressionObserver.ObserveWithoutOptimization(Predicate, element);
+        var (fault, result) = observableExpression.Evaluation;
+        var node = memberships.Insert(memberships.Count, observableExpression, result ? 1 : 0);
+        faultList.Check(observableExpression);
+        if (result)
+            ++runningCount;
+        if (observableExpressionStates.TryGetValue(observableExpression, out var state))
+            state.Nodes.Add(node);
+        else
+        {
+            observableExpressionStates.Add(observableExpression, ([node], fault));
+            observableExpression.PropertyChanged += ObservableExpressionPropertyChanged;
         }
     }
 
@@ -113,34 +132,28 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
         lock (access)
         {
             var faultList = new FaultList();
-
-            void processElement(TElement element)
-            {
-                var observableExpression = collectionObserver.ExpressionObserver.ObserveWithoutOptimization(Predicate, element);
-                var (fault, result) = observableExpression.Evaluation;
-                memberships!.Add((observableExpression, result));
-                faultList!.Check(observableExpression);
-                if (result)
-                    ++count;
-                if (observableExpressionStates!.TryGetValue(observableExpression, out var state))
-                    observableExpressionStates[observableExpression] = (state.Positions + 1, state.Fault);
-                else
-                {
-                    observableExpressionStates.Add(observableExpression, (1, fault));
-                    observableExpression.PropertyChanged += ObservableExpressionPropertyChanged;
-                }
-            }
-
+            var runningCount = 0;
             if (!source.HasIndexerPenalty)
                 for (int i = 0, ii = source.Count; i < ii; ++i)
-                    processElement(source[i]);
+                    ObserveElementWithAccess(source[i], faultList, ref runningCount);
             else
                 foreach (var element in source)
-                    processElement(element);
-
+                    ObserveElementWithAccess(element, faultList, ref runningCount);
+            count = runningCount;
             OperationFault = faultList.Fault;
-
             source.CollectionChanged += SourceCollectionChanged;
+        }
+    }
+
+    void ReleaseMembershipWithAccess(PrefixWeightedSequenceNode<IObservableExpression<TElement, bool>> node)
+    {
+        var observableExpression = node.Item;
+        var state = observableExpressionStates[observableExpression];
+        state.Nodes.Remove(node);
+        if (state.Nodes.Count == 0)
+        {
+            observableExpressionStates.Remove(observableExpression);
+            observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
         }
     }
 
@@ -153,6 +166,7 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
         using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
         lock (access)
         {
+            enumerationSnapshot = null;
             FaultList? faultList = null;
             NotifyCollectionChangedEventArgs? eventArgs = null;
             var newCount = 0;
@@ -166,22 +180,16 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
                         for (var i = e.OldItems.Count - 1; i >= 0; --i)
                         {
                             var element = (TElement)e.OldItems[i]!;
-                            var (observableExpression, isIncluded) = memberships[e.OldStartingIndex + i];
-                            memberships.RemoveAt(e.OldStartingIndex + i);
-                            var state = observableExpressionStates[observableExpression];
-                            if (state.Positions > 1)
-                                observableExpressionStates[observableExpression] = (state.Positions - 1, state.Fault);
-                            else
-                            {
-                                observableExpressionStates.Remove(observableExpression);
-                                observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
-                            }
-                            if (state.Fault is not null)
+                            var node = memberships.RemoveAt(e.OldStartingIndex + i);
+                            var observableExpression = node.Item;
+                            var fault = observableExpressionStates[observableExpression].Fault;
+                            ReleaseMembershipWithAccess(node);
+                            if (fault is not null)
                             {
                                 faultList ??= new FaultList(OperationFault);
                                 faultList.RemoveElement(observableExpression.Argument, elementComparer);
                             }
-                            if (isIncluded)
+                            if (node.Weight == 1)
                                 oldItems.Add(element);
                             observableExpression.Dispose();
                         }
@@ -192,12 +200,12 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
                             var element = (TElement)e.NewItems[i]!;
                             var observableExpression = collectionObserver.ExpressionObserver.ObserveWithoutOptimization(Predicate, element);
                             var (fault, result) = observableExpression.Evaluation;
-                            memberships.Insert(e.NewStartingIndex + i, (observableExpression, result));
+                            var node = memberships.Insert(e.NewStartingIndex + i, observableExpression, result ? 1 : 0);
                             if (observableExpressionStates.TryGetValue(observableExpression, out var state))
-                                observableExpressionStates[observableExpression] = (state.Positions + 1, state.Fault);
+                                state.Nodes.Add(node);
                             else
                             {
-                                observableExpressionStates.Add(observableExpression, (1, fault));
+                                observableExpressionStates.Add(observableExpression, ([node], fault));
                                 observableExpression.PropertyChanged += ObservableExpressionPropertyChanged;
                             }
                             if (fault is not null)
@@ -211,62 +219,48 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
                     if (newItems.Count > 0)
                     {
                         if (oldItems.Count > 0)
-                            eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, newItems.AsReadOnly(), oldItems.AsReadOnly(), TranslateIndex(e.NewStartingIndex));
+                            eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, newItems.AsReadOnly(), oldItems.AsReadOnly(), memberships.PrefixWeightBefore(e.NewStartingIndex));
                         else
-                            eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, newItems.AsReadOnly(), TranslateIndex(e.NewStartingIndex));
+                            eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, newItems.AsReadOnly(), memberships.PrefixWeightBefore(e.NewStartingIndex));
                     }
                     else if (oldItems.Count > 0)
-                        eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, oldItems.AsReadOnly(), TranslateIndex(e.OldStartingIndex));
+                        eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, oldItems.AsReadOnly(), memberships.PrefixWeightBefore(e.OldStartingIndex));
                     newCount = count + newItems.Count - oldItems.Count;
                     break;
                 case NotifyCollectionChangedAction.Move:
                     if (e.OldItems is not null && e.OldItems.Count > 0)
                     {
-                        var oldStartingIndex = TranslateIndex(e.OldStartingIndex);
-                        var movedMemberships = memberships.GetRange(e.OldStartingIndex, e.OldItems.Count);
-                        memberships.RemoveRange(e.OldStartingIndex, e.OldItems.Count);
-                        memberships.InsertRange(e.NewStartingIndex, movedMemberships);
-                        var newStartingIndex = TranslateIndex(e.NewStartingIndex);
-                        if (oldStartingIndex != newStartingIndex)
+                        var oldStartingIndex = memberships.PrefixWeightBefore(e.OldStartingIndex);
+                        var movedItems = new List<TElement>();
+                        var movedNode = memberships.NodeAt(e.OldStartingIndex);
+                        for (var i = 0; i < e.OldItems.Count && movedNode is not null; ++i)
                         {
-                            var movedItems = movedMemberships.Where(membership => membership.IsIncluded).Select(membership => membership.ObservableExpression.Argument).ToList().AsReadOnly();
-                            if (movedItems.Count > 0)
-                                eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Move, movedItems, newStartingIndex, oldStartingIndex);
+                            if (movedNode.Weight == 1)
+                                movedItems.Add(movedNode.Item.Argument);
+                            movedNode = memberships.Next(movedNode);
                         }
+                        memberships.MoveRange(e.OldStartingIndex, e.NewStartingIndex, e.OldItems.Count);
+                        var newStartingIndex = memberships.PrefixWeightBefore(e.NewStartingIndex);
+                        if (oldStartingIndex != newStartingIndex && movedItems.Count > 0)
+                            eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Move, movedItems.AsReadOnly(), newStartingIndex, oldStartingIndex);
                     }
                     break;
                 case NotifyCollectionChangedAction.Reset:
                     faultList = new FaultList();
-                    foreach (var observableExpression in observableExpressionStates.Keys)
+                    foreach (var (observableExpression, state) in observableExpressionStates)
                     {
                         observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
-                        for (int i = 0, ii = observableExpressionStates[observableExpression].Positions; i < ii; ++i)
+                        for (int i = 0, ii = state.Nodes.Count; i < ii; ++i)
                             observableExpression.Dispose();
                     }
                     memberships.Clear();
                     observableExpressionStates.Clear();
-                    void processElement(TElement element)
-                    {
-                        var observableExpression = collectionObserver.ExpressionObserver.ObserveWithoutOptimization(Predicate, element);
-                        var (fault, result) = observableExpression.Evaluation;
-                        memberships!.Add((observableExpression, result));
-                        faultList!.Check(observableExpression);
-                        if (result)
-                            ++newCount;
-                        if (observableExpressionStates!.TryGetValue(observableExpression, out var state))
-                            observableExpressionStates[observableExpression] = (state.Positions + 1, state.Fault);
-                        else
-                        {
-                            observableExpressionStates.Add(observableExpression, (1, fault));
-                            observableExpression.PropertyChanged += ObservableExpressionPropertyChanged;
-                        }
-                    }
                     if (!source.HasIndexerPenalty)
                         for (int i = 0, ii = source.Count; i < ii; ++i)
-                            processElement(source[i]);
+                            ObserveElementWithAccess(source[i], faultList, ref newCount);
                     else
                         foreach (var element in source)
-                            processElement(element);
+                            ObserveElementWithAccess(element, faultList, ref newCount);
                     eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset);
                     break;
                 default:
@@ -285,13 +279,4 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
 
     public override string ToString() =>
         $"{source} matching {Predicate}";
-
-    int TranslateIndex(int index)
-    {
-        var excluded = 0;
-        for (int i = 0, ii = Math.Min(index, memberships.Count); i < ii; ++i)
-            if (!memberships[i].IsIncluded)
-                ++excluded;
-        return index - excluded;
-    }
 }
