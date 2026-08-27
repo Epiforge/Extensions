@@ -139,20 +139,25 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
             var committedProjection = committed.CommittedProjection;
             var committedKey = committedProjection.Key;
             var newKey = newProjection.Key;
+            var wasApplied = committed.CommittedFault is null;
+            var isApplied = newFault is null;
             var keyIsUnchanged = committedKey is null ? newKey is null : newKey is not null && EqualityComparer.Equals(committedKey, newKey);
-            if (keyIsUnchanged)
+            var placementIsUnchanged = wasApplied == isApplied && keyIsUnchanged;
+            if (placementIsUnchanged)
             {
                 observableExpressions[sourceKey] = (observableExpression, newFault, newProjection);
-                if (newKey is not null && !valueEqualityComparer.Equals(committedProjection.Value, newProjection.Value) && IsFirstClaimantWithAccess(newKey, sourceKey))
+                if (isApplied && newKey is not null && !valueEqualityComparer.Equals(committedProjection.Value, newProjection.Value) && IsFirstClaimantWithAccess(newKey, sourceKey))
                     result[newKey] = newProjection.Value;
             }
             else
             {
-                RetractProjectionWithAccess(sourceKey, committedProjection);
+                if (wasApplied)
+                    RetractProjectionWithAccess(sourceKey, committedProjection);
                 observableExpressions[sourceKey] = (observableExpression, newFault, newProjection);
-                ApplyProjectionWithAccess(sourceKey, newProjection, result);
+                if (isApplied)
+                    ApplyProjectionWithAccess(sourceKey, newProjection, result);
             }
-            if (!keyIsUnchanged || !ReferenceEquals(committed.CommittedFault, newFault))
+            if (!placementIsUnchanged || !ReferenceEquals(committed.CommittedFault, newFault))
                 SetOperationFault();
         }
     }
@@ -164,7 +169,8 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
     {
         var observableExpression = collectionObserver.ExpressionObserver.ObserveWithoutOptimization(KeyValuePairSelector, sourceKeyValuePair);
         var (fault, projection) = observableExpression.Evaluation;
-        ApplyProjectionWithAccess(sourceKeyValuePair.Key, projection, into);
+        if (fault is null)
+            ApplyProjectionWithAccess(sourceKeyValuePair.Key, projection, into);
         observableExpression.PropertyChanged += ObservableExpressionPropertyChanged;
         observableExpressions.Add(sourceKeyValuePair.Key, (observableExpression, fault, projection));
     }
@@ -259,7 +265,8 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
                     {
                         if (!observableExpressions.TryGetValue(keyValuePair.Key!, out var committed))
                             continue;
-                        RetractProjectionWithAccess(keyValuePair.Key!, committed.CommittedProjection);
+                        if (committed.CommittedFault is null)
+                            RetractProjectionWithAccess(keyValuePair.Key!, committed.CommittedProjection);
                         committed.ObservableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
                         committed.ObservableExpression.Dispose();
                         observableExpressions.Remove(keyValuePair.Key!);
