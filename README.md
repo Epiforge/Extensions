@@ -1,4 +1,4 @@
-![Extensions Logo](Extensions.jpg) 
+﻿![Extensions Logo](Extensions.jpg) 
 
 <h1>Extensions</h1>
 
@@ -26,6 +26,7 @@ Supports `net6.0`, `net7.0`, `net8.0`, `net9.0`, and `net10.0`.
   - [ Expressions](#-expressions)
     - [Observable](#observable)
     - [Observable Queries](#observable-queries)
+      - [How Observable Queries Work and When to Use Them](#how-observable-queries-work-and-when-to-use-them)
   - [Platforms](#platforms)
     - [ Windows](#-windows)
 - [License](#license)
@@ -52,6 +53,8 @@ Want a taste of the new `IAsyncDisposable`? Then, inherit from `AsyncDisposable`
 Or, if you want to support both, there's `Disposable`.
 Additionally, if your object needs to be dynamic, you can use `DynamicSyncDisposable`, `DynamicAsyncDisposable`, or `DynamicDisposable`.
 Each of these features abstract methods to actually do your disposal.
+On `Disposable` and `DynamicDisposable`, the asynchronous one, `DisposeAsyncCore`, is virtual and defaults to the synchronous `Dispose(bool)`, so a type whose cleanup is entirely synchronous only writes it once.
+On `AsyncDisposable` and `DynamicAsyncDisposable` it stays abstract, because there is no synchronous path for it to delegate to.
 But all of the base classes feature:
 
 * proper implementation of the finalizer and use of `GC.SuppressFinalize`
@@ -115,13 +118,15 @@ This library provides a number of extension methods for collections and dictiona
 
 ### Generic
 * `ReadOnlyDictionary<TKey, TValue>` is a read-only wrapper for any classes implementing `IReadOnlyDictionary<TKey, TValue>`
-* `ReadOnlyRangeDictionary<TKey, TValue>` is a read-only wrapper for any classes implementing `IRangeDictionary<TKey, TValue>`
+* `ReadOnlyRangeDictionary<TKey, TValue>` is a read-only wrapper for any classes implementing `IReadOnlyRangeDictionary<TKey, TValue>`
 * `ReadOnlyConcurrentDictionary<TKey, TValue>` is a read-only wrapper for `ObservableConcurrentDictionary<TKey, TValue>`
 * `ReversedComparer<T>` is a comparer that reverses the comparison of another comparer (this is useful when you want to sort a list in the opposite order of the default sort order)
+* `IHashKeys<TKey>` is implemented by keyed data structures that use an `IEqualityComparer<TKey>` to decide key equality, so that a consumer can discover the comparer a dictionary is actually using rather than assume the default (the observable queries in `Epiforge.Extensions.Expressions` do exactly this)
+* `PrefixWeightedSequence<T>` is a sequence in which every position carries a weight. Insertion, removal, movement, and changing a weight are all logarithmic in the number of positions, as is finding a position by index, by the sum of the weights before it, or by which position a given offset falls within. `PrefixWeightedSequenceNode<T>` is the handle to a position and remains valid for as long as its item remains in the sequence, so you can hold onto one instead of re-finding an index after every change.
 
 ### ObjectModel
 * `ObservableDictionary<TKey, TValue>`, `ObservableSortedDictionary<TKey, TValue>`, `ObservableConcurrentDictionary<TKey, TValue>` are counterparts to the BCL's `Dictionary<TKey, TValue>`, `SortedDictionary<TKey, TValue>`, and `ConcurrentDictionary<TKey, TValue>`, respectively, that implement the also included `IRangeDictionary<TKey, TValue>` and `INotifyDictionaryChanged<TKey, TValue>`. Ever want to add multiple items to a dictionary at once... or keep an eye on what's being done to it? Now you can.
-* `RangeObservableCollection<T>` is a counterpart to the BCL's `ObservableCollection<T>` which implements:
+* `ObservableRangeCollection<T>` is a counterpart to the BCL's `ObservableCollection<T>` which implements:
   * `AddRange` - Adds objects to the end of the collection
   * `GetAndRemoveAll` - Removes all object from the collection that satisfy a predicate
   * `GetAndRemoveAt` - Gets the element at the specified index and removes it from the collection
@@ -133,8 +138,8 @@ This library provides a number of extension methods for collections and dictiona
   * `ReplaceAll` - Replace all items in the collection with the items in the specified collection
   * `ReplaceRange` - Replaces the specified range of items from the collection with the items in the specified collection
   * `Reset` - Resets the collection with the specified collection of items
-* `ReadOnlyObservableRangeDictionary<TKey, TValue>` is a read-only wrapper for any classes implementing `IObservableRangeDictionary<TKey, TValue>`.
-* `ReadOnlyObservableRangeCollection<T>` is a read-only wrapper for any classes implementing `IObservableRangeCollection<TKey, TValue>`.
+* `ReadOnlyObservableRangeDictionary<TKey, TValue>` is a read-only wrapper for any classes implementing `IReadOnlyObservableRangeDictionary<TKey, TValue>`. It subscribes to what it wraps, so dispose of it when you are done with it.
+* `ReadOnlyObservableRangeCollection<T>` is a read-only wrapper for any classes implementing `IReadOnlyObservableRangeCollection<T>`. It subscribes to what it wraps, so dispose of it when you are done with it.
 
 ### Specialized
 * `EquatableList<T>` is an immutable list of items which may be compared with other instances of the same type and produces a hash code based on the permutation of its contents
@@ -223,7 +228,7 @@ using (var expr = observer.Observe(e => e.Name.Length, elizabeth))
 
 Observable expressions will also try to automatically dispose of disposable objects they create in the course of their evaluation when and where it makes sense. Use the `ExpressionObserverOptions` class for more direct control over this behavior.
 You can use the `Optimizer` property to specify an optimization method to invoke automatically during the observable expression creation process.
-We recommend Tuomas Hietanen's [Linq.Expression.Optimizer](https://thorium.github.io/Linq.Expression.Optimizer), the utilization of which would like like so:
+We recommend Tuomas Hietanen's [Linq.Expression.Optimizer](https://thorium.github.io/Linq.Expression.Optimizer), the utilization of which would look like so:
 
 ```csharp
 var options = new ExpressionObserverOptions { Optimizer = ExpressionOptimizer.tryVisit };
@@ -249,15 +254,16 @@ var expr = observer.Observe<bool>(lambda, false, false);
 ```
 
 ### Observable Queries
-This library provides re-implementations of LINQ operations, but instead of returning `Enumerable<T>`s and simple values, these return `IObservableCollectionQuery<T>`s, `IObservableDictionaryQuery<TKey, TValue>`s, and `IObservableScalarQuery<T>`s.
+This library provides re-implementations of LINQ operations, but instead of returning `IEnumerable<T>`s and simple values, these return `IObservableCollectionQuery<T>`s, `IObservableDictionaryQuery<TKey, TValue>`s, and `IObservableScalarQuery<T>`s.
 This is because, unlike traditional LINQ operations, these implementations continuously update their results until those results are disposed.
+What they hand back is a read-only view of the source: change the source, and the query brings itself up to date. Queries do not implement the mutating range collection and dictionary interfaces, because a query result is not somewhere you put things.
 
 But... what could cause those updates?
 
 * the source is enumerable, implements `INotifyCollectionChanged`, and raises a `CollectionChanged` event
 * the source is a dictionary, implements `Epiforge.Extensions.Collections.INotifyDictionaryChanged<TKey, TValue>`, and raises a `DictionaryChanged` event
 * the elements in the enumerable (or the values in the dictionary) implement `INotifyPropertyChanged` and raise a `PropertyChanged` event
-* a reference enclosed by a selector or a predicate passed to the method implements `INotifyCollectionChanged`, `Cogs.Collections.INotifyDictionaryChanged<TKey, TValue>`, or `INotifyPropertyChanged` and raises one of their events
+* a reference enclosed by a selector or a predicate passed to the method implements `INotifyCollectionChanged`, `Epiforge.Extensions.Collections.INotifyDictionaryChanged<TKey, TValue>`, or `INotifyPropertyChanged` and raises one of their events
 
 That last one might be a little surprising, but this is because all selectors and predicates passed to Observable Query methods become Observable Expressions (see above).
 This means that you will not be able to pass one that an `ExpressionObserver` cannot observe (e.g. a lambda expression that can't be converted to an expression tree or that contains nodes that are unsupported).
@@ -292,7 +298,23 @@ For that reason, Observable Queries all have `OperationFault` properties.
 You may subscribe to their `PropertyChanging` and `PropertyChanged` events to be notified when an Observable Expression or the overall Observable Query runs into a problem.
 If there is more than one fault in play, the value of `OperationFault` will be an `AggregateException`.
 
+Dictionary queries adopt the key comparer of the dictionary they observe, discovering it through `Epiforge.Extensions.Collections.Generic.IHashKeys<TKey>` or a `Dictionary<TKey, TValue>`'s own `Comparer`, so a query over a case-insensitive dictionary is itself case-insensitive.
+
 Since the `ExpressionObserver` has a number of options governing its behavior, you may optionally pass one you've made to the constructor of `CollectionObserver` to ensure those options are obeyed when Observable Expressions are created to enable your Observable Queries.
+
+#### How Observable Queries Work and When to Use Them
+It is worth being plain about what kind of thing this is, because "LINQ, but observable" undersells it and sets the wrong expectations.
+
+A LINQ query is a description of a computation you run. Run it again and it does all of the work again. An Observable Query is not re-run. It is a small machine that holds the answer and repairs it, so when something changes, only the parts of the answer that depended on that thing are recomputed. The work is proportional to what changed rather than to how much data you have. If you want the name the literature uses for this idea, it is incremental, or self-adjusting, computation.
+
+Three things that might otherwise look like arbitrary restrictions fall straight out of that:
+1. Your selectors and predicates have to be expression trees rather than delegates because the machine has to read them to find out what they depend on. A delegate is opaque; there is nothing in it to subscribe to.
+2. You have to dispose of a query because it is holding subscriptions to everything it depends on, and those subscriptions are the entire reason the answer stays right.
+3. Faults reach you through `OperationFault` instead of being thrown, because the evaluation that failed happened later, on whatever thread raised the change. By then there is no call of yours left on the stack to throw out of.
+
+What is not free is construction. Building the machine means building an observable expression for every element the query touches, and that is proportional to the size of the collection. So build a query once and hold onto it. Do not build one per frame, per request, or per keystroke. The bargain is that you pay up front and then stop paying to read.
+
+Which is also how to decide whether you want one. If you compute a result once and move on, plain LINQ is cheaper and simpler, and you should use it. If a result has to stay correct across a long run of small changes, such as a list someone is looking at, a running total, or a filter someone is typing into, that is what these are for.
 
 ---
 
@@ -307,7 +329,9 @@ This library includes utilities for interoperation with Microsoft Windows, inclu
 * `ConsoleAssist` - provides methods for interacting with consoles
 * `Cursor` - wraps Win32 API methods dealing with the cursor
 * `Shell` - wraps methods of the WScript.Shell COM object (specifically useful for invoking its `CreateShortcut` function)
-* `Theme` - represents the current Windows theme
+* `Theme` - represents the current Windows theme (its `Color` and `IsDark` properties report what Windows says and are not settable)
+* `User` - provides properties concerning the user, including `IdleTime`; `GetIdleTime` returns the same figure along with whether it is exact, which it is except when the session could not supply an absolute last-input timestamp and the system tick count has already wrapped
+* `WindowingSystem` - provides methods for dealing with the windowing system, including reading and setting the foreground window, reading its position, and flashing windows
 
 Also provides extension methods for dealing with processes, including:
 

@@ -1,1 +1,4 @@
-We added support for .NET 10.
+Breaking: Theme.Color and Theme.IsDark are read-only, as their documentation always said they were.
+User.IdleTime is now read from the session's absolute last-input timestamp, so it is no longer wrong once the system tick count has wrapped; where the session cannot answer, it falls back to the tick count as before. The new User.GetIdleTime returns the same figure along with whether it is exact, which it is except on that fallback after a wrap.
+Cursor.GetPosition and Cursor.SetPosition throw Win32Exception when Windows reports failure, rather than returning a position indistinguishable from the origin or silently doing nothing.
+The Theme constructor now releases the registry key, the event watcher, and the polling timer it had already created if it fails partway through, where previously it left them running and unreachable.

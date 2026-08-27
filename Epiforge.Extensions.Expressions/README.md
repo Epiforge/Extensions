@@ -1,4 +1,4 @@
-This library has useful tools for dealing with expressions:
+﻿This library has useful tools for dealing with expressions:
 
 * `ExpressionEqualityComparer` - Defines methods to support the comparison of expression trees for equality
 * `ExpressionExtensions`, providing:
@@ -75,7 +75,7 @@ using (var expr = observer.Observe(e => e.Name.Length, elizabeth))
 
 Observable expressions will also try to automatically dispose of disposable objects they create in the course of their evaluation when and where it makes sense. Use the `ExpressionObserverOptions` class for more direct control over this behavior.
 You can use the `Optimizer` property to specify an optimization method to invoke automatically during the observable expression creation process.
-We recommend Tuomas Hietanen's [Linq.Expression.Optimizer](https://thorium.github.io/Linq.Expression.Optimizer), the utilization of which would like like so:
+We recommend Tuomas Hietanen's [Linq.Expression.Optimizer](https://thorium.github.io/Linq.Expression.Optimizer), the utilization of which would look like so:
 
 ```csharp
 var options = new ExpressionObserverOptions { Optimizer = ExpressionOptimizer.tryVisit };
@@ -101,15 +101,16 @@ var expr = observer.Observe<bool>(lambda, false, false);
 ```
 
 # Observable Queries
-This library provides re-implementations of LINQ operations, but instead of returning `Enumerable<T>`s and simple values, these return `IObservableCollectionQuery<T>`s, `IObservableDictionaryQuery<TKey, TValue>`s, and `IObservableScalarQuery<T>`s.
+This library provides re-implementations of LINQ operations, but instead of returning `IEnumerable<T>`s and simple values, these return `IObservableCollectionQuery<T>`s, `IObservableDictionaryQuery<TKey, TValue>`s, and `IObservableScalarQuery<T>`s.
 This is because, unlike traditional LINQ operations, these implementations continuously update their results until those results are disposed.
+What they hand back is a read-only view of the source: change the source, and the query brings itself up to date. Queries do not implement the mutating range collection and dictionary interfaces, because a query result is not somewhere you put things.
 
 But... what could cause those updates?
 
 * the source is enumerable, implements `INotifyCollectionChanged`, and raises a `CollectionChanged` event
 * the source is a dictionary, implements `Epiforge.Extensions.Collections.INotifyDictionaryChanged<TKey, TValue>`, and raises a `DictionaryChanged` event
 * the elements in the enumerable (or the values in the dictionary) implement `INotifyPropertyChanged` and raise a `PropertyChanged` event
-* a reference enclosed by a selector or a predicate passed to the method implements `INotifyCollectionChanged`, `Cogs.Collections.INotifyDictionaryChanged<TKey, TValue>`, or `INotifyPropertyChanged` and raises one of their events
+* a reference enclosed by a selector or a predicate passed to the method implements `INotifyCollectionChanged`, `Epiforge.Extensions.Collections.INotifyDictionaryChanged<TKey, TValue>`, or `INotifyPropertyChanged` and raises one of their events
 
 That last one might be a little surprising, but this is because all selectors and predicates passed to Observable Query methods become Observable Expressions (see above).
 This means that you will not be able to pass one that an `ExpressionObserver` cannot observe (e.g. a lambda expression that can't be converted to an expression tree or that contains nodes that are unsupported).
@@ -144,4 +145,20 @@ For that reason, Observable Queries all have `OperationFault` properties.
 You may subscribe to their `PropertyChanging` and `PropertyChanged` events to be notified when an Observable Expression or the overall Observable Query runs into a problem.
 If there is more than one fault in play, the value of `OperationFault` will be an `AggregateException`.
 
+Dictionary queries adopt the key comparer of the dictionary they observe, discovering it through `Epiforge.Extensions.Collections.Generic.IHashKeys<TKey>` or a `Dictionary<TKey, TValue>`'s own `Comparer`, so a query over a case-insensitive dictionary is itself case-insensitive.
+
 Since the `ExpressionObserver` has a number of options governing its behavior, you may optionally pass one you've made to the constructor of `CollectionObserver` to ensure those options are obeyed when Observable Expressions are created to enable your Observable Queries.
+
+## How Observable Queries Work and When to Use Them
+It is worth being plain about what kind of thing this is, because "LINQ, but observable" undersells it and sets the wrong expectations.
+
+A LINQ query is a description of a computation you run. Run it again and it does all of the work again. An Observable Query is not re-run. It is a small machine that holds the answer and repairs it, so when something changes, only the parts of the answer that depended on that thing are recomputed. The work is proportional to what changed rather than to how much data you have. If you want the name the literature uses for this idea, it is incremental, or self-adjusting, computation.
+
+Three things that might otherwise look like arbitrary restrictions fall straight out of that:
+1. Your selectors and predicates have to be expression trees rather than delegates because the machine has to read them to find out what they depend on. A delegate is opaque; there is nothing in it to subscribe to.
+2. You have to dispose of a query because it is holding subscriptions to everything it depends on, and those subscriptions are the entire reason the answer stays right.
+3. Faults reach you through `OperationFault` instead of being thrown, because the evaluation that failed happened later, on whatever thread raised the change. By then there is no call of yours left on the stack to throw out of.
+
+What is not free is construction. Building the machine means building an observable expression for every element the query touches, and that is proportional to the size of the collection. So build a query once and hold onto it. Do not build one per frame, per request, or per keystroke. The bargain is that you pay up front and then stop paying to read.
+
+Which is also how to decide whether you want one. If you compute a result once and move on, plain LINQ is cheaper and simpler, and you should use it. If a result has to stay correct across a long run of small changes, such as a list someone is looking at, a running total, or a filter someone is typing into, that is what these are for.

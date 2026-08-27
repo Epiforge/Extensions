@@ -1,4 +1,4 @@
-This library provides a number of extension methods for collections and dictionaries:
+﻿This library provides a number of extension methods for collections and dictionaries:
 
 * `EnumerableExtensions`, providing:
   * `FindIndex` - Finds the index of the first element in the source that satisfies the specified predicate
@@ -13,13 +13,15 @@ This library provides a number of extension methods for collections and dictiona
 
 # Generic
 * `ReadOnlyDictionary<TKey, TValue>` is a read-only wrapper for any classes implementing `IReadOnlyDictionary<TKey, TValue>`
-* `ReadOnlyRangeDictionary<TKey, TValue>` is a read-only wrapper for any classes implementing `IRangeDictionary<TKey, TValue>`
+* `ReadOnlyRangeDictionary<TKey, TValue>` is a read-only wrapper for any classes implementing `IReadOnlyRangeDictionary<TKey, TValue>`
 * `ReadOnlyConcurrentDictionary<TKey, TValue>` is a read-only wrapper for `ObservableConcurrentDictionary<TKey, TValue>`
 * `ReversedComparer<T>` is a comparer that reverses the comparison of another comparer (this is useful when you want to sort a list in the opposite order of the default sort order)
+* `IHashKeys<TKey>` is implemented by keyed data structures that use an `IEqualityComparer<TKey>` to decide key equality, so that a consumer can discover the comparer a dictionary is actually using rather than assume the default (the observable queries in `Epiforge.Extensions.Expressions` do exactly this)
+* `PrefixWeightedSequence<T>` is a sequence in which every position carries a weight. Insertion, removal, movement, and changing a weight are all logarithmic in the number of positions, as is finding a position by index, by the sum of the weights before it, or by which position a given offset falls within. `PrefixWeightedSequenceNode<T>` is the handle to a position and remains valid for as long as its item remains in the sequence, so you can hold onto one instead of re-finding an index after every change.
 
 # ObjectModel
 * `ObservableDictionary<TKey, TValue>`, `ObservableSortedDictionary<TKey, TValue>`, `ObservableConcurrentDictionary<TKey, TValue>` are counterparts to the BCL's `Dictionary<TKey, TValue>`, `SortedDictionary<TKey, TValue>`, and `ConcurrentDictionary<TKey, TValue>`, respectively, that implement the also included `IRangeDictionary<TKey, TValue>` and `INotifyDictionaryChanged<TKey, TValue>`. Ever want to add multiple items to a dictionary at once... or keep an eye on what's being done to it? Now you can.
-* `RangeObservableCollection<T>` is a counterpart to the BCL's `ObservableCollection<T>` which implements:
+* `ObservableRangeCollection<T>` is a counterpart to the BCL's `ObservableCollection<T>` which implements:
   * `AddRange` - Adds objects to the end of the collection
   * `GetAndRemoveAll` - Removes all object from the collection that satisfy a predicate
   * `GetAndRemoveAt` - Gets the element at the specified index and removes it from the collection
@@ -31,8 +33,8 @@ This library provides a number of extension methods for collections and dictiona
   * `ReplaceAll` - Replace all items in the collection with the items in the specified collection
   * `ReplaceRange` - Replaces the specified range of items from the collection with the items in the specified collection
   * `Reset` - Resets the collection with the specified collection of items
-* `ReadOnlyObservableRangeDictionary<TKey, TValue>` is a read-only wrapper for any classes implementing `IObservableRangeDictionary<TKey, TValue>`.
-* `ReadOnlyObservableRangeCollection<T>` is a read-only wrapper for any classes implementing `IObservableRangeCollection<TKey, TValue>`.
+* `ReadOnlyObservableRangeDictionary<TKey, TValue>` is a read-only wrapper for any classes implementing `IReadOnlyObservableRangeDictionary<TKey, TValue>`. It subscribes to what it wraps, so dispose of it when you are done with it.
+* `ReadOnlyObservableRangeCollection<T>` is a read-only wrapper for any classes implementing `IReadOnlyObservableRangeCollection<T>`. It subscribes to what it wraps, so dispose of it when you are done with it.
 
 # Specialized
 * `EquatableList<T>` is an immutable list of items which may be compared with other instances of the same type and produces a hash code based on the permutation of its contents.

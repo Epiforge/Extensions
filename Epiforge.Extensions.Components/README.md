@@ -1,4 +1,4 @@
-# Property Change Notification
+﻿# Property Change Notification
 This library offers the `PropertyChangeNotifier` class, which you may inherit from to quickly get all the property utilities we're all tired of copying and pasting everywhere.
 Just call the protected `OnPropertyChanged` and `OnPropertyChanging` methods at the appropriate times from setters and compiler services will figure out what property you're in.
 Or, if all you need to do is set the value of a field, `SetBackedProperty` couldn't make it any easier or convenient to handle that as efficiently as possible.
@@ -13,6 +13,8 @@ Want a taste of the new `IAsyncDisposable`? Then, inherit from `AsyncDisposable`
 Or, if you want to support both, there's `Disposable`.
 Additionally, if your object needs to be dynamic, you can use `DynamicSyncDisposable`, `DynamicAsyncDisposable`, or `DynamicDisposable`.
 Each of these features abstract methods to actually do your disposal.
+On `Disposable` and `DynamicDisposable`, the asynchronous one, `DisposeAsyncCore`, is virtual and defaults to the synchronous `Dispose(bool)`, so a type whose cleanup is entirely synchronous only writes it once.
+On `AsyncDisposable` and `DynamicAsyncDisposable` it stays abstract, because there is no synchronous path for it to delegate to.
 But all of the base classes feature:
 
 * proper implementation of the finalizer and use of `GC.SuppressFinalize`
