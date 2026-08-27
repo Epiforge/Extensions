@@ -1,13 +1,12 @@
-namespace Epiforge.Extensions.Expressions.Observable.Query;
+﻿namespace Epiforge.Extensions.Expressions.Observable.Query;
 
 sealed class ObservableDictionaryWhereQuery<TKey, TValue>(CollectionObserver collectionObserver, ObservableDictionaryQuery<TKey, TValue> source, Expression<Func<KeyValuePair<TKey, TValue>, bool>> predicate) :
     ObservableDictionaryQuery<TKey, TValue>(collectionObserver)
     where TKey : notnull
 {
     readonly object access = new();
-    readonly IEqualityComparer<TKey> keyComparer = EqualityComparer<TKey>.Default;
-    readonly Dictionary<TKey, (IObservableExpression<KeyValuePair<TKey, TValue>, bool> ObservableExpression, Exception? CommittedFault, bool IsIncluded)> observableExpressions = [];
-    readonly ObservableDictionary<TKey, TValue> result = [];
+    readonly Dictionary<TKey, (IObservableExpression<KeyValuePair<TKey, TValue>, bool> ObservableExpression, Exception? CommittedFault, bool IsIncluded)> observableExpressions = new(source.KeyComparer);
+    readonly ObservableDictionary<TKey, TValue> result = new(source.KeyComparer);
     internal readonly Expression<Func<KeyValuePair<TKey, TValue>, bool>> Predicate = predicate;
 
     public override TValue this[TKey key]
@@ -27,6 +26,9 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue>(CollectionObserver col
                 return result.Count;
         }
     }
+
+    internal override IEqualityComparer<TKey> KeyComparer =>
+        source.KeyComparer;
 
     public override IEnumerable<TKey> Keys
     {
@@ -157,7 +159,7 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue>(CollectionObserver col
             else if (committed.IsIncluded && !isIncluded)
                 result.Remove(key);
             observableExpressions[key] = (observableExpression, newFault, isIncluded);
-            if (FaultList.ExchangeKeyFault(OperationFault, key, keyComparer, committed.CommittedFault, newFault, out var newOperationFault))
+            if (FaultList.ExchangeKeyFault(OperationFault, key, source.KeyComparer, committed.CommittedFault, newFault, out var newOperationFault))
                 OperationFault = newOperationFault;
         }
     }
@@ -176,7 +178,7 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue>(CollectionObserver col
                     observableExpression.Dispose();
                 }
                 observableExpressions.Clear();
-                var newResult = new ObservableDictionary<TKey, TValue>();
+                var newResult = new ObservableDictionary<TKey, TValue>(source.KeyComparer);
                 var faultList = new FaultList();
                 foreach (var keyValuePair in source)
                 {
@@ -202,7 +204,7 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue>(CollectionObserver col
                     if (committed.CommittedFault is not null)
                     {
                         faultList ??= new FaultList(OperationFault);
-                        faultList.RemoveKey(key, keyComparer);
+                        faultList.RemoveKey(key, source.KeyComparer);
                     }
                     else if (committed.IsIncluded)
                         result.Remove(key);

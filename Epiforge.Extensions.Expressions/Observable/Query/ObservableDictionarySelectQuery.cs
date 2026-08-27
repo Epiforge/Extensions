@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Expressions.Observable.Query;
+﻿namespace Epiforge.Extensions.Expressions.Observable.Query;
 
 sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceValue>(CollectionObserver collectionObserver, ObservableDictionaryQuery<TSourceKey, TSourceValue> source, Expression<Func<KeyValuePair<TSourceKey, TSourceValue>, KeyValuePair<TKey, TValue>>> keyValuePairSelector, IEqualityComparer<TKey> equalityComparer) :
     ObservableDictionaryQuery<TKey, TValue>(collectionObserver)
@@ -9,9 +9,8 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
     readonly Dictionary<TKey, List<TSourceKey>> claimantsByProjectedKey = new(equalityComparer);
     int duplicateClaims;
     int nullKeys;
-    readonly ObservableDictionary<TSourceKey, (IObservableExpression<KeyValuePair<TSourceKey, TSourceValue>, KeyValuePair<TKey, TValue>> ObservableExpression, Exception? CommittedFault, KeyValuePair<TKey, TValue> CommittedProjection)> observableExpressions = [];
+    readonly ObservableDictionary<TSourceKey, (IObservableExpression<KeyValuePair<TSourceKey, TSourceValue>, KeyValuePair<TKey, TValue>> ObservableExpression, Exception? CommittedFault, KeyValuePair<TKey, TValue> CommittedProjection)> observableExpressions = new(source.KeyComparer);
     readonly ObservableDictionary<TKey, TValue> result = new(equalityComparer);
-    readonly IEqualityComparer<TSourceKey> sourceKeyComparer = EqualityComparer<TSourceKey>.Default;
     readonly EqualityComparer<TValue> valueEqualityComparer = EqualityComparer<TValue>.Default;
 
     internal readonly IEqualityComparer<TKey> EqualityComparer = equalityComparer;
@@ -163,7 +162,7 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
     }
 
     bool IsFirstClaimantWithAccess(TKey key, TSourceKey sourceKey) =>
-        claimantsByProjectedKey.TryGetValue(key, out var claimants) && claimants.Count > 0 && sourceKeyComparer.Equals(claimants[0], sourceKey);
+        claimantsByProjectedKey.TryGetValue(key, out var claimants) && claimants.Count > 0 && source.KeyComparer.Equals(claimants[0], sourceKey);
 
     void ObserveSourceKeyValuePairWithAccess(KeyValuePair<TSourceKey, TSourceValue> sourceKeyValuePair, ObservableDictionary<TKey, TValue> into)
     {
@@ -205,7 +204,7 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
         }
         if (!claimantsByProjectedKey.TryGetValue(key, out var claimants))
             return;
-        var claimantIndex = claimants.FindIndex(claimant => sourceKeyComparer.Equals(claimant, sourceKey));
+        var claimantIndex = claimants.FindIndex(claimant => source.KeyComparer.Equals(claimant, sourceKey));
         if (claimantIndex < 0)
             return;
         claimants.RemoveAt(claimantIndex);

@@ -12,6 +12,14 @@ sealed class ObservableDictionaryQueryReadOnlyDictionary<TKey, TValue>(Collectio
     public override int Count =>
         ReadOnlyDictionary.Count;
 
+    internal override IEqualityComparer<TKey> KeyComparer =>
+        ReadOnlyDictionary switch
+        {
+            IHashKeys<TKey> hashKeys => hashKeys.Comparer,
+            Dictionary<TKey, TValue> dictionary => dictionary.Comparer,
+            _ => EqualityComparer<TKey>.Default
+        };
+
     public override IEnumerable<TKey> Keys =>
         ReadOnlyDictionary.Keys;
 

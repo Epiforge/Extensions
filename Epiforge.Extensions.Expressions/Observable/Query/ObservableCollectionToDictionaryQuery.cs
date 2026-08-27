@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Expressions.Observable.Query;
+﻿namespace Epiforge.Extensions.Expressions.Observable.Query;
 
 sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> source, Expression<Func<TElement, TKey>> keySelector, Expression<Func<TElement, TValue>> valueSelector, IEqualityComparer<TKey> equalityComparer) :
     ObservableDictionaryQuery<TKey, TValue>(collectionObserver)
@@ -22,6 +22,9 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>(Colle
                 return dictionary[key];
         }
     }
+
+    internal override IEqualityComparer<TKey> KeyComparer =>
+        EqualityComparer;
 
     public override int Count
     {

@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Expressions.Observable.Query;
+﻿namespace Epiforge.Extensions.Expressions.Observable.Query;
 
 sealed class ObservableDictionaryConcurrentQuery<TKey, TValue>(CollectionObserver collectionObserver, ObservableDictionaryQuery<TKey, TValue> source) :
     ObservableDictionaryQuery<TKey, TValue>(collectionObserver)
@@ -8,6 +8,9 @@ sealed class ObservableDictionaryConcurrentQuery<TKey, TValue>(CollectionObserve
 
     public override TValue this[TKey key] =>
         observableConcurrentDictionary![key];
+
+    internal override IEqualityComparer<TKey> KeyComparer =>
+        source.KeyComparer;
 
     public override int Count =>
         observableConcurrentDictionary!.Count;

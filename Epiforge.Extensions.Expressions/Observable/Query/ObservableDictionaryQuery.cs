@@ -131,6 +131,9 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     public virtual bool IsSynchronized =>
         false;
 
+    internal virtual IEqualityComparer<TKey> KeyComparer =>
+        EqualityComparer<TKey>.Default;
+
     public abstract IEnumerable<TKey> Keys { get; }
 
     ICollection<TKey> IDictionary<TKey, TValue>.Keys =>

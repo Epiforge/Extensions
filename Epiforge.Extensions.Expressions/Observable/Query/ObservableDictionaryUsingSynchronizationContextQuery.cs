@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Expressions.Observable.Query;
+﻿namespace Epiforge.Extensions.Expressions.Observable.Query;
 
 sealed class ObservableDictionaryUsingSynchronizationContextQuery<TKey, TValue>(CollectionObserver collectionObserver, ObservableDictionaryQuery<TKey, TValue> source, SynchronizationContext synchronizationContext) :
     ObservableDictionaryQuery<TKey, TValue>(collectionObserver)
@@ -9,6 +9,9 @@ sealed class ObservableDictionaryUsingSynchronizationContextQuery<TKey, TValue>(
 
     public override TValue this[TKey key] =>
         SynchronizationContext.Send(() => dictionary![key]);
+
+    internal override IEqualityComparer<TKey> KeyComparer =>
+        source.KeyComparer;
 
     public override int Count =>
         SynchronizationContext.Send(() => dictionary!.Count);

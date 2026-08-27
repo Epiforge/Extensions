@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Expressions.Observable.Query;
+﻿namespace Epiforge.Extensions.Expressions.Observable.Query;
 
 sealed class ObservableDictionaryToCollectionQuery<TElement, TKey, TValue>(CollectionObserver collectionObserver, ObservableDictionaryQuery<TKey, TValue> source, Expression<Func<KeyValuePair<TKey, TValue>, TElement>> selector) :
     ObservableCollectionQuery<TElement>(collectionObserver)
@@ -7,10 +7,9 @@ sealed class ObservableDictionaryToCollectionQuery<TElement, TKey, TValue>(Colle
     readonly object access = new();
     readonly EqualityComparer<TElement> elementComparer = EqualityComparer<TElement>.Default;
     readonly ObservableRangeCollection<TElement> elements = [];
-    readonly IEqualityComparer<TKey> keyComparer = EqualityComparer<TKey>.Default;
     readonly List<TKey> keysByPosition = [];
-    readonly Dictionary<TKey, (IObservableExpression<KeyValuePair<TKey, TValue>, TElement> ObservableExpression, Exception? CommittedFault, TElement CommittedElement)> observableExpressions = [];
-    readonly Dictionary<TKey, int> positionsByKey = [];
+    readonly Dictionary<TKey, (IObservableExpression<KeyValuePair<TKey, TValue>, TElement> ObservableExpression, Exception? CommittedFault, TElement CommittedElement)> observableExpressions = new(source.KeyComparer);
+    readonly Dictionary<TKey, int> positionsByKey = new(source.KeyComparer);
     internal readonly Expression<Func<KeyValuePair<TKey, TValue>, TElement>> Selector = selector;
 
     public override TElement this[int index]
@@ -94,7 +93,7 @@ sealed class ObservableDictionaryToCollectionQuery<TElement, TKey, TValue>(Colle
             else if (newFault is null && !elementComparer.Equals(committed.CommittedElement, newElement))
                 ReplaceElementWithAccess(key, newElement);
             observableExpressions[key] = (observableExpression, newFault, newElement);
-            if (FaultList.ExchangeKeyFault(OperationFault, key, keyComparer, committed.CommittedFault, newFault, out var newOperationFault))
+            if (FaultList.ExchangeKeyFault(OperationFault, key, source.KeyComparer, committed.CommittedFault, newFault, out var newOperationFault))
                 OperationFault = newOperationFault;
         }
     }
@@ -175,7 +174,7 @@ sealed class ObservableDictionaryToCollectionQuery<TElement, TKey, TValue>(Colle
                     if (committed.CommittedFault is not null)
                     {
                         faultList ??= new FaultList(OperationFault);
-                        faultList.RemoveKey(keyValuePair.Key, keyComparer);
+                        faultList.RemoveKey(keyValuePair.Key, source.KeyComparer);
                     }
                     else
                         RemoveElementWithAccess(keyValuePair.Key);
