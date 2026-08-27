@@ -246,9 +246,13 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
                         {
                             var element = elements.Key;
                             var count = elements.Count();
+                            var alreadyPresent = startingIndiciesAndCounts.TryGetValue(element, out var presentStartingIndexAndCount);
                             var index = 0;
-                            while (index < results.Count && comparer!.Compare(element, results[index]) >= 0)
-                                ++index;
+                            if (alreadyPresent)
+                                index = presentStartingIndexAndCount.startingIndex + presentStartingIndexAndCount.count;
+                            else
+                                while (index < results.Count && comparer!.Compare(element, results[index]) >= 0)
+                                    ++index;
                             foreach (var startingIndexAndCountKv in startingIndiciesAndCounts.ToList().AsReadOnly())
                             {
                                 var otherElement = startingIndexAndCountKv.Key;
@@ -260,8 +264,8 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
                                 }
                             }
                             results.InsertRange(index, elements);
-                            if (startingIndiciesAndCounts.TryGetValue(element, out var startingIndexAndCount))
-                                startingIndiciesAndCounts[element] = (startingIndexAndCount.startingIndex, startingIndexAndCount.count + count);
+                            if (alreadyPresent)
+                                startingIndiciesAndCounts[element] = (presentStartingIndexAndCount.startingIndex, presentStartingIndexAndCount.count + count);
                             else
                                 startingIndiciesAndCounts.Add(element, (index, count));
                         }

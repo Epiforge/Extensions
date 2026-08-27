@@ -41,6 +41,14 @@ sealed class ObservableCollectionOrderingComparer<TElement> :
     readonly (IObservableCollectionQuery<Tuple<TElement, IComparable>> selection, bool isDescending) lastSelectionAndDirection;
     readonly IReadOnlyList<(IObservableCollectionQuery<Tuple<TElement, IComparable>> selection, bool isDescending)> selectionsAndDirections;
 
+    static void AssignComparable(List<IComparable> elementComparables, int selectionIndex, IComparable comparable)
+    {
+        if (elementComparables.Count == selectionIndex)
+            elementComparables.Add(comparable);
+        else if (selectionIndex < elementComparables.Count)
+            elementComparables[selectionIndex] = comparable;
+    }
+
     public int Compare(TElement? x, TElement? y)
     {
         IReadOnlyList<IComparable?> xList, yList;
@@ -106,8 +114,9 @@ sealed class ObservableCollectionOrderingComparer<TElement> :
             {
                 if (e.Action is NotifyCollectionChangedAction.Replace && (e.OldItems?.Count ?? 0) == 1 && (e.NewItems?.Count ?? 0) == 1 && e.OldItems![0] is Tuple<TElement, IComparable> oldItem && e.NewItems![0] is Tuple<TElement, IComparable> newItem && ReferenceEquals(oldItem.Item1, newItem.Item1))
                 {
-                    if (ReferenceEquals(sender, lastSelectionAndDirection.selection))
-                        comparables[oldItem.Item1] = selectionsAndDirections.Select(t => t.selection[e.OldStartingIndex]?.Item2).ToList()!;
+                    if (comparables.TryGetValue(oldItem.Item1, out var replacedComparables))
+                        foreach (var selectionIndex in selectionsAndDirections.FindIndicies(t => ReferenceEquals(t.selection, sender)))
+                            AssignComparable(replacedComparables, selectionIndex, newItem.Item2);
                     return;
                 }
                 if ((e.OldItems?.Count ?? 0) > 0 && ReferenceEquals(sender, lastSelectionAndDirection.selection))
@@ -139,19 +148,15 @@ sealed class ObservableCollectionOrderingComparer<TElement> :
                                 {
                                     elementComparablesList = [];
                                     comparables.Add(element, elementComparablesList);
-                                    elementComparablesList.Add(elementComparables.First());
                                     counts.Add(element, count);
                                 }
                                 else
                                     counts[element] += count;
+                                AssignComparable(elementComparablesList, 0, elementComparables.First());
                             }
                         else
                             foreach (var elementComparables in e.NewItems!.OfType<Tuple<TElement, IComparable>>().GroupBy(t => t.Item1, t => t.Item2))
-                            {
-                                var elementComparablesList = comparables[elementComparables.Key];
-                                if (elementComparablesList.Count == selectionIndex)
-                                    elementComparablesList.Add(elementComparables.First());
-                            }
+                                AssignComparable(comparables[elementComparables.Key], selectionIndex, elementComparables.First());
                     }
                 }
             }
