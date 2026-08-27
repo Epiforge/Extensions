@@ -41,6 +41,9 @@ abstract class ObservableExpression :
     internal bool IsInitialized;
     internal int Observations;
 
+    internal virtual bool CanChange =>
+        true;
+
     public (Exception? Fault, object? Result) Evaluation
     {
         get

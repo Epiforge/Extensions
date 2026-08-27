@@ -26,14 +26,16 @@ sealed class ObservableIndexExpression(ExpressionObserver observer, IndexExpress
                 UnsubscribeFromObjectValueNotifications();
                 if (@object is not null)
                 {
-                    @object.PropertyChanged -= ObjectPropertyChanged;
+                    if (@object.CanChange)
+                        @object.PropertyChanged -= ObjectPropertyChanged;
                     @object.Dispose();
                 }
                 if (arguments is { } nonNullArguments)
                     for (int i = 0, ii = nonNullArguments.Count; i < ii; ++i)
                     {
                         var argument = nonNullArguments[i];
-                        argument.PropertyChanged -= ArgumentPropertyChanged;
+                        if (argument.CanChange)
+                            argument.PropertyChanged -= ArgumentPropertyChanged;
                         argument.Dispose();
                     }
                 RemovedFromCache();
@@ -162,13 +164,15 @@ sealed class ObservableIndexExpression(ExpressionObserver observer, IndexExpress
             indexer = IndexExpression.Indexer;
             getMethod = indexer!.GetMethod;
             @object = observer.GetObservableExpression(IndexExpression.Object!, IsDeferringEvaluation);
-            @object.PropertyChanged += ObjectPropertyChanged;
+            if (@object.CanChange)
+                @object.PropertyChanged += ObjectPropertyChanged;
             var indexedExpressionArguments = IndexExpression.Arguments;
             for (var i = 0; i < indexedExpressionArguments.Count; ++i)
             {
                 var indexExpressionArgument = indexedExpressionArguments[i];
                 var argument = observer.GetObservableExpression(indexExpressionArgument, IsDeferringEvaluation);
-                argument.PropertyChanged += ArgumentPropertyChanged;
+                if (argument.CanChange)
+                    argument.PropertyChanged += ArgumentPropertyChanged;
                 argumentsList.Add(argument);
             }
             arguments = new EquatableList<ObservableExpression>(argumentsList);
@@ -180,13 +184,15 @@ sealed class ObservableIndexExpression(ExpressionObserver observer, IndexExpress
             UnsubscribeFromObjectValueNotifications();
             if (@object is not null)
             {
-                @object.PropertyChanged -= ObjectPropertyChanged;
+                if (@object.CanChange)
+                    @object.PropertyChanged -= ObjectPropertyChanged;
                 @object.Dispose();
             }
             for (int i = 0, ii = argumentsList.Count; i < ii; ++i)
             {
                 var argument = argumentsList[i];
-                argument.PropertyChanged -= ArgumentPropertyChanged;
+                if (argument.CanChange)
+                    argument.PropertyChanged -= ArgumentPropertyChanged;
                 argument.Dispose();
             }
             ExceptionDispatchInfo.Capture(ex).Throw();

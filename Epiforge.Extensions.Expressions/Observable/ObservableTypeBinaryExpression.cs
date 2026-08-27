@@ -33,7 +33,8 @@ sealed class ObservableTypeBinaryExpression(ExpressionObserver observer, TypeBin
             {
                 if (expression is not null)
                 {
-                    expression.PropertyChanged -= ExpressionPropertyChanged;
+                    if (expression.CanChange)
+                        expression.PropertyChanged -= ExpressionPropertyChanged;
                     expression.Dispose();
                 }
                 RemovedFromCache();
@@ -67,7 +68,8 @@ sealed class ObservableTypeBinaryExpression(ExpressionObserver observer, TypeBin
         try
         {
             expression = observer.GetObservableExpression(TypeBinaryExpression.Expression, IsDeferringEvaluation);
-            expression.PropertyChanged += ExpressionPropertyChanged;
+            if (expression.CanChange)
+                expression.PropertyChanged += ExpressionPropertyChanged;
             typeOperand = TypeBinaryExpression.TypeOperand;
             @delegate = delegates.GetOrAdd(typeOperand, CreateDelegate);
             EvaluateIfNotDeferred();
@@ -76,7 +78,8 @@ sealed class ObservableTypeBinaryExpression(ExpressionObserver observer, TypeBin
         {
             if (expression is not null)
             {
-                expression.PropertyChanged -= ExpressionPropertyChanged;
+                if (expression.CanChange)
+                    expression.PropertyChanged -= ExpressionPropertyChanged;
                 expression.Dispose();
             }
             ExceptionDispatchInfo.Capture(ex).Throw();

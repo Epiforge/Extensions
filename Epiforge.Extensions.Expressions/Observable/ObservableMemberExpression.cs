@@ -28,7 +28,8 @@ sealed class ObservableMemberExpression(ExpressionObserver observer, MemberExpre
                     UnsubscribeFromValueNotifications();
                 if (observableExpression is not null)
                 {
-                    observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
+                    if (observableExpression.CanChange)
+                        observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
                     observableExpression.Dispose();
                 }
                 RemovedFromCache();
@@ -99,7 +100,8 @@ sealed class ObservableMemberExpression(ExpressionObserver observer, MemberExpre
             if (MemberExpression.Expression is { } memberExpressionExpression)
             {
                 observableExpression = observer.GetObservableExpression(memberExpressionExpression, IsDeferringEvaluation);
-                observableExpression.PropertyChanged += ObservableExpressionPropertyChanged;
+                if (observableExpression.CanChange)
+                    observableExpression.PropertyChanged += ObservableExpressionPropertyChanged;
             }
             member = MemberExpression.Member;
             switch (member)
@@ -125,7 +127,8 @@ sealed class ObservableMemberExpression(ExpressionObserver observer, MemberExpre
                 UnsubscribeFromValueNotifications();
             if (observableExpression is not null)
             {
-                observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
+                if (observableExpression.CanChange)
+                    observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
                 observableExpression.Dispose();
             }
             ExceptionDispatchInfo.Capture(ex).Throw();

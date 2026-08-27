@@ -19,13 +19,15 @@ sealed class ObservableMemberInitExpression(ExpressionObserver observer, MemberI
                 DisposeValueIfNecessaryAndPossible();
                 if (newObservableExpression is not null)
                 {
-                    newObservableExpression.PropertyChanged -= NewObservableExpressionPropertyChanged;
+                    if (newObservableExpression.CanChange)
+                        newObservableExpression.PropertyChanged -= NewObservableExpressionPropertyChanged;
                     newObservableExpression.Dispose();
                 }
                 if (memberAssignmentObservableExpressions is not null)
                     foreach (var kv in memberAssignmentObservableExpressions)
                     {
-                        kv.Key.PropertyChanged -= MemberAssignmentObservableExpressionPropertyChanged;
+                        if (kv.Key.CanChange)
+                            kv.Key.PropertyChanged -= MemberAssignmentObservableExpressionPropertyChanged;
                         kv.Key.Dispose();
                     }
                 RemovedFromCache();
@@ -111,7 +113,8 @@ sealed class ObservableMemberInitExpression(ExpressionObserver observer, MemberI
         try
         {
             newObservableExpression = observer.GetObservableExpression(MemberInitExpression.NewExpression, IsDeferringEvaluation);
-            newObservableExpression.PropertyChanged += NewObservableExpressionPropertyChanged;
+            if (newObservableExpression.CanChange)
+                newObservableExpression.PropertyChanged += NewObservableExpressionPropertyChanged;
             var bindings = MemberInitExpression.Bindings;
             for (int i = 0, ii = bindings.Count; i < ii; ++i)
             {
@@ -120,7 +123,8 @@ sealed class ObservableMemberInitExpression(ExpressionObserver observer, MemberI
                 {
                     var memberAssignmentObservableExpression = observer.GetObservableExpression(memberAssignmentBinding.Expression, IsDeferringEvaluation);
                     memberAssignmentObservableExpressions.Add(memberAssignmentObservableExpression, memberAssignmentBinding.Member);
-                    memberAssignmentObservableExpression.PropertyChanged += MemberAssignmentObservableExpressionPropertyChanged;
+                    if (memberAssignmentObservableExpression.CanChange)
+                        memberAssignmentObservableExpression.PropertyChanged += MemberAssignmentObservableExpressionPropertyChanged;
                 }
                 else
                     throw new NotSupportedException("Only member assignment bindings are supported in member init expressions");
@@ -132,12 +136,14 @@ sealed class ObservableMemberInitExpression(ExpressionObserver observer, MemberI
         {
             if (newObservableExpression is not null)
             {
-                newObservableExpression.PropertyChanged -= NewObservableExpressionPropertyChanged;
+                if (newObservableExpression.CanChange)
+                    newObservableExpression.PropertyChanged -= NewObservableExpressionPropertyChanged;
                 newObservableExpression.Dispose();
             }
             foreach (var memberAssignmentObservableExpression in memberAssignmentObservableExpressions.Keys)
             {
-                memberAssignmentObservableExpression.PropertyChanged -= MemberAssignmentObservableExpressionPropertyChanged;
+                if (memberAssignmentObservableExpression.CanChange)
+                    memberAssignmentObservableExpression.PropertyChanged -= MemberAssignmentObservableExpressionPropertyChanged;
                 memberAssignmentObservableExpression.Dispose();
             }
             ExceptionDispatchInfo.Capture(ex).Throw();

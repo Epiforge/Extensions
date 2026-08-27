@@ -19,7 +19,8 @@ sealed class ObservableNewArrayInitExpression(ExpressionObserver observer, NewAr
                     for (int i = 0, ii = initializers.Count; i < ii; ++i)
                     {
                         var initializer = initializers[i];
-                        initializer.PropertyChanged -= InitializerPropertyChanged;
+                        if (initializer.CanChange)
+                            initializer.PropertyChanged -= InitializerPropertyChanged;
                         initializer.Dispose();
                     }
                 RemovedFromCache();
@@ -60,7 +61,8 @@ sealed class ObservableNewArrayInitExpression(ExpressionObserver observer, NewAr
             {
                 var newArrayExpressionInitializer = newArrayExpressionInitializers[i];
                 var initializer = observer.GetObservableExpression(newArrayExpressionInitializer, IsDeferringEvaluation);
-                initializer.PropertyChanged += InitializerPropertyChanged;
+                if (initializer.CanChange)
+                    initializer.PropertyChanged += InitializerPropertyChanged;
                 initializersList.Add(initializer);
             }
             initializers = initializersList.AsReadOnly();
@@ -71,7 +73,8 @@ sealed class ObservableNewArrayInitExpression(ExpressionObserver observer, NewAr
             for (int i = 0, ii = initializersList.Count; i < ii; ++i)
             {
                 var initializer = initializersList[i];
-                initializer.PropertyChanged -= InitializerPropertyChanged;
+                if (initializer.CanChange)
+                    initializer.PropertyChanged -= InitializerPropertyChanged;
                 initializer.Dispose();
             }
             ExceptionDispatchInfo.Capture(ex).Throw();

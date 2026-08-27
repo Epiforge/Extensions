@@ -40,12 +40,14 @@ class ObservableBinaryExpression(ExpressionObserver observer, BinaryExpression b
                 DisposeValueIfNecessaryAndPossible();
                 if (left is not null)
                 {
-                    left.PropertyChanged -= LeftPropertyChanged;
+                    if (left.CanChange)
+                        left.PropertyChanged -= LeftPropertyChanged;
                     left.Dispose();
                 }
                 if (right is not null)
                 {
-                    right.PropertyChanged -= RightPropertyChanged;
+                    if (right.CanChange)
+                        right.PropertyChanged -= RightPropertyChanged;
                     right.Dispose();
                 }
                 RemovedFromCache();
@@ -97,7 +99,8 @@ class ObservableBinaryExpression(ExpressionObserver observer, BinaryExpression b
         {
             var binaryExpression = BinaryExpression;
             left = observer.GetObservableExpression(binaryExpression.Left, IsDeferringEvaluation);
-            left.PropertyChanged += LeftPropertyChanged;
+            if (left.CanChange)
+                left.PropertyChanged += LeftPropertyChanged;
             switch (Expression.NodeType)
             {
                 case ExpressionType.Coalesce:
@@ -109,7 +112,8 @@ class ObservableBinaryExpression(ExpressionObserver observer, BinaryExpression b
                     @delegate = implementations.GetOrAdd(new ImplementationsKey(binaryExpression.NodeType, binaryExpression.Left.Type, binaryExpression.Right.Type, binaryExpression.Type, binaryExpression.IsLiftedToNull, binaryExpression.Method), ImplementationsValueFactory);
                     break;
             }
-            right.PropertyChanged += RightPropertyChanged;
+            if (right.CanChange)
+                right.PropertyChanged += RightPropertyChanged;
             if (Expression.NodeType is not ExpressionType.Coalesce)
                 EvaluateIfNotDeferred();
         }
@@ -118,12 +122,14 @@ class ObservableBinaryExpression(ExpressionObserver observer, BinaryExpression b
             DisposeValueIfNecessaryAndPossible();
             if (left is not null)
             {
-                left.PropertyChanged -= LeftPropertyChanged;
+                if (left.CanChange)
+                    left.PropertyChanged -= LeftPropertyChanged;
                 left.Dispose();
             }
             if (right is not null)
             {
-                right.PropertyChanged -= RightPropertyChanged;
+                if (right.CanChange)
+                    right.PropertyChanged -= RightPropertyChanged;
                 right.Dispose();
             }
             ExceptionDispatchInfo.Capture(ex).Throw();

@@ -23,14 +23,16 @@ sealed class ObservableMethodCallExpression(ExpressionObserver observer, MethodC
                 DisposeValueIfNecessaryAndPossible();
                 if (@object is not null)
                 {
-                    @object.PropertyChanged -= ObjectPropertyChanged;
+                    if (@object.CanChange)
+                        @object.PropertyChanged -= ObjectPropertyChanged;
                     @object.Dispose();
                 }
                 if (arguments is not null)
                     for (int i = 0, ii = arguments.Count; i < ii; ++i)
                     {
                         var argument = arguments[i];
-                        argument.PropertyChanged -= ArgumentPropertyChanged;
+                        if (argument.CanChange)
+                            argument.PropertyChanged -= ArgumentPropertyChanged;
                         argument.Dispose();
                     }
                 RemovedFromCache();
@@ -81,14 +83,16 @@ sealed class ObservableMethodCallExpression(ExpressionObserver observer, MethodC
             if (MethodCallExpression.Object is { } methodCallExpressionObject)
             {
                 @object = observer.GetObservableExpression(methodCallExpressionObject, IsDeferringEvaluation);
-                @object.PropertyChanged += ObjectPropertyChanged;
+                if (@object.CanChange)
+                    @object.PropertyChanged += ObjectPropertyChanged;
             }
             var methodCallExpressionArguments = MethodCallExpression.Arguments;
             for (int i = 0, ii = methodCallExpressionArguments.Count; i < ii; ++i)
             {
                 var methodCallExpressionArgument = methodCallExpressionArguments[i];
                 var argument = observer.GetObservableExpression(methodCallExpressionArgument, IsDeferringEvaluation);
-                argument.PropertyChanged += ArgumentPropertyChanged;
+                if (argument.CanChange)
+                    argument.PropertyChanged += ArgumentPropertyChanged;
                 argumentsList.Add(argument);
             }
             arguments = argumentsList.AsReadOnly();
@@ -99,13 +103,15 @@ sealed class ObservableMethodCallExpression(ExpressionObserver observer, MethodC
             DisposeValueIfNecessaryAndPossible();
             if (@object is not null)
             {
-                @object.PropertyChanged -= ObjectPropertyChanged;
+                if (@object.CanChange)
+                    @object.PropertyChanged -= ObjectPropertyChanged;
                 @object.Dispose();
             }
             for (int i = 0, ii = argumentsList.Count; i < ii; ++i)
             {
                 var argument = argumentsList[i];
-                argument.PropertyChanged -= ArgumentPropertyChanged;
+                if (argument.CanChange)
+                    argument.PropertyChanged -= ArgumentPropertyChanged;
                 argument.Dispose();
             }
             ExceptionDispatchInfo.Capture(ex).Throw();

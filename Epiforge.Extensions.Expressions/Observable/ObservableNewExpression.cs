@@ -24,7 +24,8 @@ sealed class ObservableNewExpression(ExpressionObserver observer, NewExpression 
                     for (int i = 0, ii = arguments.Count; i < ii; ++i)
                     {
                         var argument = arguments[i];
-                        argument.PropertyChanged -= ArgumentPropertyChanged;
+                        if (argument.CanChange)
+                            argument.PropertyChanged -= ArgumentPropertyChanged;
                         argument.Dispose();
                     }
                 RemovedFromCache();
@@ -71,7 +72,8 @@ sealed class ObservableNewExpression(ExpressionObserver observer, NewExpression 
             {
                 var newExpressionArgument = newExpressionArguments[i];
                 var argument = observer.GetObservableExpression(newExpressionArgument, IsDeferringEvaluation);
-                argument.PropertyChanged += ArgumentPropertyChanged;
+                if (argument.CanChange)
+                    argument.PropertyChanged += ArgumentPropertyChanged;
                 argumentsList.Add(argument);
             }
             arguments = argumentsList.AsReadOnly();
@@ -84,7 +86,8 @@ sealed class ObservableNewExpression(ExpressionObserver observer, NewExpression 
             for (int i = 0, ii = argumentsList.Count; i < ii; ++i)
             {
                 var argument = argumentsList[i];
-                argument.PropertyChanged -= ArgumentPropertyChanged;
+                if (argument.CanChange)
+                    argument.PropertyChanged -= ArgumentPropertyChanged;
                 argument.Dispose();
             }
             ExceptionDispatchInfo.Capture(ex).Throw();

@@ -21,17 +21,20 @@ sealed class ObservableConditionalExpression(ExpressionObserver observer, Condit
             {
                 if (test is not null)
                 {
-                    test.PropertyChanged -= TestPropertyChanged;
+                    if (test.CanChange)
+                        test.PropertyChanged -= TestPropertyChanged;
                     test.Dispose();
                 }
                 if (ifTrue is not null)
                 {
-                    ifTrue.PropertyChanged -= IfTruePropertyChanged;
+                    if (ifTrue.CanChange)
+                        ifTrue.PropertyChanged -= IfTruePropertyChanged;
                     ifTrue.Dispose();
                 }
                 if (ifFalse is not null)
                 {
-                    ifFalse.PropertyChanged -= IfFalsePropertyChanged;
+                    if (ifFalse.CanChange)
+                        ifFalse.PropertyChanged -= IfFalsePropertyChanged;
                     ifFalse.Dispose();
                 }
                 RemovedFromCache();
@@ -67,28 +70,34 @@ sealed class ObservableConditionalExpression(ExpressionObserver observer, Condit
         {
             var conditionalExpression = ConditionalExpression;
             test = observer.GetObservableExpression(conditionalExpression.Test, IsDeferringEvaluation);
-            test.PropertyChanged += TestPropertyChanged;
+            if (test.CanChange)
+                test.PropertyChanged += TestPropertyChanged;
             ifTrue = observer.GetObservableExpression(conditionalExpression.IfTrue, true);
-            ifTrue.PropertyChanged += IfTruePropertyChanged;
+            if (ifTrue.CanChange)
+                ifTrue.PropertyChanged += IfTruePropertyChanged;
             ifFalse = observer.GetObservableExpression(conditionalExpression.IfFalse, true);
-            ifFalse.PropertyChanged += IfFalsePropertyChanged;
+            if (ifFalse.CanChange)
+                ifFalse.PropertyChanged += IfFalsePropertyChanged;
             EvaluateIfNotDeferred();
         }
         catch (Exception ex)
         {
             if (test is not null)
             {
-                test.PropertyChanged -= TestPropertyChanged;
+                if (test.CanChange)
+                    test.PropertyChanged -= TestPropertyChanged;
                 test.Dispose();
             }
             if (ifTrue is not null)
             {
-                ifTrue.PropertyChanged -= IfTruePropertyChanged;
+                if (ifTrue.CanChange)
+                    ifTrue.PropertyChanged -= IfTruePropertyChanged;
                 ifTrue.Dispose();
             }
             if (ifFalse is not null)
             {
-                ifFalse.PropertyChanged -= IfFalsePropertyChanged;
+                if (ifFalse.CanChange)
+                    ifFalse.PropertyChanged -= IfFalsePropertyChanged;
                 ifFalse.Dispose();
             }
             ExceptionDispatchInfo.Capture(ex).Throw();

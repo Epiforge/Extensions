@@ -3,7 +3,12 @@ namespace Epiforge.Extensions.Expressions.Observable;
 sealed class ObservableConstantExpression(ExpressionObserver observer, ConstantExpression constantExpression, bool deferEvaluation) :
     ObservableExpression(observer, constantExpression, deferEvaluation)
 {
+    bool valueNotifies;
+
     internal readonly ConstantExpression ConstantExpression = constantExpression;
+
+    internal override bool CanChange =>
+        valueNotifies;
 
     protected override bool Dispose(bool disposing)
     {
@@ -29,9 +34,15 @@ sealed class ObservableConstantExpression(ExpressionObserver observer, ConstantE
         var value = ConstantExpression.Value;
         Evaluation = (null, value);
         if (observer.ConstantExpressionsListenForDictionaryChanged && value is INotifyDictionaryChanged dictionaryChanged)
+        {
             dictionaryChanged.DictionaryChanged += ValueChanged;
+            valueNotifies = true;
+        }
         else if (observer.ConstantExpressionsListenForCollectionChanged && value is INotifyCollectionChanged collectionChanged)
+        {
             collectionChanged.CollectionChanged += ValueChanged;
+            valueNotifies = true;
+        }
     }
 
     void ValueChanged(object? sender, EventArgs e) =>

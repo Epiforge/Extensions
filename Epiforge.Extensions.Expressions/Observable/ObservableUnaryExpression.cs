@@ -36,7 +36,8 @@ sealed class ObservableUnaryExpression(ExpressionObserver observer, UnaryExpress
             {
                 if (operand is not null)
                 {
-                    operand.PropertyChanged -= OperandPropertyChanged;
+                    if (operand.CanChange)
+                        operand.PropertyChanged -= OperandPropertyChanged;
                     operand.Dispose();
                     DisposeValueIfNecessaryAndPossible();
                 }
@@ -79,7 +80,8 @@ sealed class ObservableUnaryExpression(ExpressionObserver observer, UnaryExpress
         try
         {
             operand = observer.GetObservableExpression(UnaryExpression.Operand, IsDeferringEvaluation);
-            operand.PropertyChanged += OperandPropertyChanged;
+            if (operand.CanChange)
+                operand.PropertyChanged += OperandPropertyChanged;
             method = UnaryExpression.Method;
             @delegate = implementations.GetOrAdd(new(UnaryExpression.NodeType, UnaryExpression.Operand.Type, UnaryExpression.Type, UnaryExpression.Method), ImplementationsValueFactory);
             EvaluateIfNotDeferred();
@@ -89,7 +91,8 @@ sealed class ObservableUnaryExpression(ExpressionObserver observer, UnaryExpress
             DisposeValueIfNecessaryAndPossible();
             if (operand is not null)
             {
-                operand.PropertyChanged -= OperandPropertyChanged;
+                if (operand.CanChange)
+                    operand.PropertyChanged -= OperandPropertyChanged;
                 operand.Dispose();
             }
             ExceptionDispatchInfo.Capture(ex).Throw();

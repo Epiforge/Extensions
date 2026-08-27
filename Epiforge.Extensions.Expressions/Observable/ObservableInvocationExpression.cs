@@ -27,13 +27,13 @@ sealed class ObservableInvocationExpression(ExpressionObserver observer, Invocat
                 }
                 if (observableDelegateExpression.Evaluation.Result is Delegate @delegate)
                     observableExpression = observer.GetObservableExpression(@delegate.Target is { } target ? Expression.Call(Expression.Constant(target), @delegate.Method, InvocationExpression.Arguments) : Expression.Call(@delegate.Method, InvocationExpression.Arguments), IsDeferringEvaluation);
-                if (observableDelegateExpressionCreated)
+                if (observableDelegateExpressionCreated && observableDelegateExpression.CanChange)
                     observableDelegateExpression.PropertyChanged += ObservableDelegateExpressionPropertyChanged;
                 break;
             default:
                 throw new NotSupportedException($"invocation expression expression type {InvocationExpression.Expression.GetType().Name} is not supported");
         }
-        if (observableExpression is not null)
+        if (observableExpression is not null && observableExpression.CanChange)
             observableExpression.PropertyChanged += ObservableExpressionPropertyChanged;
         EvaluateIfNotDeferred();
     }
@@ -47,19 +47,22 @@ sealed class ObservableInvocationExpression(ExpressionObserver observer, Invocat
             {
                 if (observableExpression is not null)
                 {
-                    observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
+                    if (observableExpression.CanChange)
+                        observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
                     observableExpression.Dispose();
                 }
                 if (observableDelegateExpression is not null)
                 {
-                    observableDelegateExpression.PropertyChanged -= ObservableDelegateExpressionPropertyChanged;
+                    if (observableDelegateExpression.CanChange)
+                        observableDelegateExpression.PropertyChanged -= ObservableDelegateExpressionPropertyChanged;
                     observableDelegateExpression.Dispose();
                 }
                 if (observableArguments is not null)
                     for (int i = 0, ii = observableArguments.Count; i < ii; i++)
                     {
                         var obserableArgument = observableArguments[i];
-                        obserableArgument.PropertyChanged -= ObservableArgumentPropertyChanged;
+                        if (obserableArgument.CanChange)
+                            obserableArgument.PropertyChanged -= ObservableArgumentPropertyChanged;
                         obserableArgument.Dispose();
                     }
                 RemovedFromCache();
@@ -93,7 +96,8 @@ sealed class ObservableInvocationExpression(ExpressionObserver observer, Invocat
     {
         if (observableExpression is not null)
         {
-            observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
+            if (observableExpression.CanChange)
+                observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
             observableExpression.Dispose();
             observableExpression = null;
         }
@@ -107,7 +111,8 @@ sealed class ObservableInvocationExpression(ExpressionObserver observer, Invocat
     {
         if (observableExpression is not null)
         {
-            observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
+            if (observableExpression.CanChange)
+                observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
             observableExpression.Dispose();
             observableExpression = null;
         }
@@ -129,7 +134,8 @@ sealed class ObservableInvocationExpression(ExpressionObserver observer, Invocat
                 {
                     var invocationExpressionArgument = invocationExpressionArguments[i];
                     var observableArgument = observer.GetObservableExpression(invocationExpressionArgument, IsDeferringEvaluation);
-                    observableArgument.PropertyChanged += ObservableArgumentPropertyChanged;
+                    if (observableArgument.CanChange)
+                        observableArgument.PropertyChanged += ObservableArgumentPropertyChanged;
                     observableArgumentsList.Add(observableArgument);
                 }
                 observableArguments = [..observableArgumentsList];
@@ -140,18 +146,21 @@ sealed class ObservableInvocationExpression(ExpressionObserver observer, Invocat
         {
             if (observableExpression is not null)
             {
-                observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
+                if (observableExpression.CanChange)
+                    observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
                 observableExpression.Dispose();
             }
             if (observableDelegateExpression is not null)
             {
-                observableDelegateExpression.PropertyChanged -= ObservableDelegateExpressionPropertyChanged;
+                if (observableDelegateExpression.CanChange)
+                    observableDelegateExpression.PropertyChanged -= ObservableDelegateExpressionPropertyChanged;
                 observableDelegateExpression.Dispose();
             }
             for (int i = 0, ii = observableArgumentsList.Count; i < ii; ++i)
             {
                 var observableArgument = observableArgumentsList[i];
-                observableArgument.PropertyChanged -= ObservableArgumentPropertyChanged;
+                if (observableArgument.CanChange)
+                    observableArgument.PropertyChanged -= ObservableArgumentPropertyChanged;
                 observableArgument.Dispose();
             }
             ExceptionDispatchInfo.Capture(ex).Throw();
