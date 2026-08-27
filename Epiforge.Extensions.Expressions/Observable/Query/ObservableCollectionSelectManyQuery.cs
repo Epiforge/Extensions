@@ -4,30 +4,27 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
     ObservableCollectionQuery<TResult>(collectionObserver)
 {
     readonly object access = new();
+    int count;
+    readonly Dictionary<IEnumerable<TResult>, List<PrefixWeightedSequenceNode<IEnumerable<TResult>?>>> enumerableNodes = [];
+    readonly PrefixWeightedSequence<IEnumerable<TResult>?> positions = new();
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     IObservableCollectionQuery<IEnumerable<TResult>>? select;
-    int count;
-    readonly Dictionary<IEnumerable<TResult>, int> enumerableInstances = [];
     internal readonly Expression<Func<TElement, IEnumerable<TResult>>> Selector = selector;
 
     public override TResult this[int index]
     {
         get
         {
-            List<IEnumerable<TResult>> enumerables;
+            IEnumerable<TResult> enumerable;
+            int offset;
             lock (access)
-                enumerables = select!.ToList();
-            for (int i = 0, ii = enumerables.Count; i < ii; ++i)
             {
-                var enumerable = enumerables[i];
-                if (enumerable is null)
-                    continue;
-                var enumerableCount = enumerable.Count();
-                if (index < enumerableCount)
-                    return enumerable.ElementAt(index);
-                index -= enumerableCount;
+                if (index < 0 || index >= count || positions.NodeAtWeight(index) is not { } node || node.Item is not { } spanningEnumerable)
+                    throw new IndexOutOfRangeException();
+                enumerable = spanningEnumerable;
+                offset = index - positions.PrefixWeightBefore(positions.IndexOf(node));
             }
-            throw new IndexOutOfRangeException();
+            return enumerable.ElementAt(offset);
         }
     }
 
@@ -37,41 +34,34 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
     void CollectionChangedNotifierCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
-        if (sender is IEnumerable<TResult> enumerable)
-            lock (access)
+        if (sender is not IEnumerable<TResult> enumerable)
+            return;
+        lock (access)
+        {
+            if (!enumerableNodes.TryGetValue(enumerable, out var nodes))
+                return;
+            var newWeight = enumerable.Count();
+            if (e.Action is NotifyCollectionChangedAction.Reset)
             {
-                if (enumerableInstances.TryGetValue(enumerable, out var instances))
-                {
-                    if (e.Action is NotifyCollectionChangedAction.Reset)
-                        OnCollectionChanged(e);
-                    else
-                    {
-                        var newCount = count + ((e.NewItems?.Count ?? 0) - (e.OldItems?.Count ?? 0)) * instances;
-                        var reducedCount = enumerable.Count();
-                        var reducedIndex = 0;
-                        for (int i = 0, ii = select!.Count; i < ii && instances > 0; ++i)
-                        {
-                            var selectEnumerable = select[i];
-                            if (ReferenceEquals(selectEnumerable, enumerable))
-                            {
-                                --instances;
-                                OnCollectionChanged(e.Action switch
-                                {
-                                    NotifyCollectionChangedAction.Add => new NotifyCollectionChangedEventArgs(e.Action, e.NewItems, reducedIndex + e.NewStartingIndex),
-                                    NotifyCollectionChangedAction.Move => new NotifyCollectionChangedEventArgs(e.Action, e.NewItems ?? e.OldItems, reducedIndex + e.NewStartingIndex, reducedIndex + e.OldStartingIndex),
-                                    NotifyCollectionChangedAction.Remove => new NotifyCollectionChangedEventArgs(e.Action, e.OldItems, reducedIndex + e.OldStartingIndex),
-                                    NotifyCollectionChangedAction.Replace => new NotifyCollectionChangedEventArgs(e.Action, e.NewItems!, e.OldItems!, reducedIndex + e.OldStartingIndex),
-                                    _ => throw new NotSupportedException($"collection changed action {e.Action} is not supported")
-                                });
-                                reducedIndex += reducedCount;
-                            }
-                            else
-                                reducedIndex += selectEnumerable?.Count() ?? 0;
-                        }
-                        SetCount(newCount);
-                    }
-                }
+                for (int i = 0, ii = nodes.Count; i < ii; ++i)
+                    positions.SetWeight(nodes[i], newWeight);
+                SetCount(positions.TotalWeight);
+                OnCollectionChanged(e);
+                return;
             }
+            if (nodes.Count == 1)
+                TranslateInnerChangeWithAccess(nodes[0], newWeight, e);
+            else
+            {
+                var orderedNodes = new List<(int Index, PrefixWeightedSequenceNode<IEnumerable<TResult>?> Node)>(nodes.Count);
+                for (int i = 0, ii = nodes.Count; i < ii; ++i)
+                    orderedNodes.Add((positions.IndexOf(nodes[i]), nodes[i]));
+                orderedNodes.Sort((first, second) => first.Index.CompareTo(second.Index));
+                for (int i = 0, ii = orderedNodes.Count; i < ii; ++i)
+                    TranslateInnerChangeWithAccess(orderedNodes[i].Node, newWeight, e);
+            }
+            SetCount(positions.TotalWeight);
+        }
     }
 
     protected override bool Dispose(bool disposing)
@@ -80,10 +70,9 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
         {
             var removedFromCache = source.QueryDisposed(this);
             if (removedFromCache)
-            {
                 lock (access)
                 {
-                    foreach (var enumerable in enumerableInstances.Keys)
+                    foreach (var enumerable in enumerableNodes.Keys)
                         if (enumerable is INotifyCollectionChanged collectionChangedNotifier)
                             collectionChangedNotifier.CollectionChanged -= CollectionChangedNotifierCollectionChanged;
                     select!.CollectionChanged -= SelectCollectionChanged;
@@ -92,7 +81,6 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
                     select.Dispose();
                     RemovedFromCache();
                 }
-            }
             return removedFromCache;
         }
         return true;
@@ -102,20 +90,31 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
     {
         List<IEnumerable<TResult>> enumerables;
         lock (access)
-            enumerables = select!.ToList();
-        return enumerables.Where(enumerable => enumerable is not null).SelectMany(enumerable => enumerable).ToList().AsReadOnly().GetEnumerator();
+        {
+            enumerables = new List<IEnumerable<TResult>>(positions.Count);
+            for (var node = positions.FirstNode; node is not null; node = positions.Next(node))
+                if (node.Item is { } enumerable)
+                    enumerables.Add(enumerable);
+        }
+        var results = new List<TResult>(count);
+        for (int i = 0, ii = enumerables.Count; i < ii; ++i)
+            results.AddRange(enumerables[i]);
+        return results.AsReadOnly().GetEnumerator();
     }
 
-    int GetReducedStartingIndex(int mapIndex)
+    void ObserveProjectionWithAccess(int index, IEnumerable<TResult>? enumerable)
     {
-        var reducedIndex = 0;
-        for (int i = 0, ii = select!.Count; i < ii; ++i)
+        var node = positions.Insert(index, enumerable, enumerable?.Count() ?? 0);
+        if (enumerable is null)
+            return;
+        if (enumerableNodes.TryGetValue(enumerable, out var nodes))
+            nodes.Add(node);
+        else
         {
-            if (i == mapIndex)
-                return reducedIndex;
-            reducedIndex += select[i]?.Count() ?? 0;
+            enumerableNodes.Add(enumerable, [node]);
+            if (enumerable is INotifyCollectionChanged collectionChangedNotifier)
+                collectionChangedNotifier.CollectionChanged += CollectionChangedNotifierCollectionChanged;
         }
-        return reducedIndex;
     }
 
     protected override void OnInitialization()
@@ -125,135 +124,105 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
             select = source.ObserveSelect(Selector);
             OperationFault = select.OperationFault;
             for (int i = 0, ii = select.Count; i < ii; ++i)
-            {
-                var enumerable = select[i];
-                if (enumerable is not null)
-                {
-                    count += enumerable.Count();
-                    if (enumerableInstances.TryGetValue(enumerable, out var instancesOfEnumerable))
-                        enumerableInstances[enumerable] = instancesOfEnumerable + 1;
-                    else
-                    {
-                        enumerableInstances.Add(enumerable, 1);
-                        if (enumerable is INotifyCollectionChanged collectionChangedNotifier)
-                            collectionChangedNotifier.CollectionChanged += CollectionChangedNotifierCollectionChanged;
-                    }
-                }
-            }
+                ObserveProjectionWithAccess(positions.Count, select[i]);
+            count = positions.TotalWeight;
             select.CollectionChanged += SelectCollectionChanged;
             select.PropertyChanged += SelectPropertyChanged;
             select.PropertyChanging += SelectPropertyChanging;
         }
     }
 
-    [SuppressMessage("Maintainability", "CA1502: Avoid excessive complexity")]
+    void ReleaseProjectionWithAccess(PrefixWeightedSequenceNode<IEnumerable<TResult>?> node)
+    {
+        if (node.Item is not { } enumerable || !enumerableNodes.TryGetValue(enumerable, out var nodes))
+            return;
+        nodes.Remove(node);
+        if (nodes.Count == 0)
+        {
+            enumerableNodes.Remove(enumerable);
+            if (enumerable is INotifyCollectionChanged collectionChangedNotifier)
+                collectionChangedNotifier.CollectionChanged -= CollectionChangedNotifierCollectionChanged;
+        }
+    }
+
+    [SuppressMessage("Maintainability", "CA1502: Avoid excessive complexity", Justification = @"Splitting this up into more methods is ¯\_(ツ)_/¯")]
     void SelectCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
         lock (access)
         {
             NotifyCollectionChangedEventArgs? eventArgs = null;
-            var newCount = 0;
             switch (e.Action)
             {
                 case NotifyCollectionChangedAction.Add:
                 case NotifyCollectionChangedAction.Remove:
                 case NotifyCollectionChangedAction.Replace:
+                    var oldItems = new List<TResult>();
+                    if (e.OldItems is not null && e.OldStartingIndex >= 0)
+                        for (var i = 0; i < e.OldItems.Count; ++i)
+                        {
+                            var node = positions.RemoveAt(e.OldStartingIndex);
+                            if (node.Item is { } oldEnumerable)
+                                oldItems.AddRange(oldEnumerable);
+                            ReleaseProjectionWithAccess(node);
+                        }
+                    var newItems = new List<TResult>();
+                    if (e.NewItems is not null && e.NewStartingIndex >= 0)
+                        for (var i = 0; i < e.NewItems.Count; ++i)
+                        {
+                            var newEnumerable = e.NewItems[i] as IEnumerable<TResult>;
+                            ObserveProjectionWithAccess(e.NewStartingIndex + i, newEnumerable);
+                            if (newEnumerable is not null)
+                                newItems.AddRange(newEnumerable);
+                        }
+                    if (oldItems.Count > 0)
                     {
-                        var reducedNewStartingIndex = 0;
-                        var newItems = new List<TResult>();
-                        if (e.NewItems is not null && e.NewStartingIndex >= 0)
-                        {
-                            reducedNewStartingIndex = GetReducedStartingIndex(e.NewStartingIndex);
-                            for (int i = 0, ii = e.NewItems.Count; i < ii; ++i)
-                                if (e.NewItems[i] is IEnumerable<TResult> newEnumerable)
-                                {
-                                    newItems.AddRange(newEnumerable);
-                                    if (enumerableInstances!.TryGetValue(newEnumerable, out var instancesOfEnumerable))
-                                        enumerableInstances[newEnumerable] = instancesOfEnumerable + 1;
-                                    else
-                                    {
-                                        enumerableInstances.Add(newEnumerable, 1);
-                                        if (newEnumerable is INotifyCollectionChanged collectionChangedNotifier)
-                                            collectionChangedNotifier.CollectionChanged += CollectionChangedNotifierCollectionChanged;
-                                    }
-                                }
-                        }
-                        var reducedOldStartingIndex = 0;
-                        var oldItems = new List<TResult>();
-                        if (e.OldItems is not null && e.OldStartingIndex >= 0)
-                        {
-                            reducedOldStartingIndex = GetReducedStartingIndex(e.OldStartingIndex);
-                            if (e.OldStartingIndex > e.NewStartingIndex)
-                                reducedOldStartingIndex += newItems.Count;
-                            for (int i = 0, ii = e.OldItems.Count; i < ii; ++i)
-                                if (e.OldItems[i] is IEnumerable<TResult> oldEnumerable)
-                                {
-                                    oldItems.AddRange(oldEnumerable);
-                                    var instancesOfEnumerable = enumerableInstances![oldEnumerable];
-                                    if (instancesOfEnumerable == 1)
-                                    {
-                                        enumerableInstances.Remove(oldEnumerable);
-                                        if (oldEnumerable is INotifyCollectionChanged collectionChangedNotifier)
-                                            collectionChangedNotifier.CollectionChanged -= CollectionChangedNotifierCollectionChanged;
-                                    }
-                                    else
-                                        enumerableInstances[oldEnumerable] = instancesOfEnumerable - 1;
-                                }
-                        }
-                        if (oldItems.Count > 0)
-                        {
-                            if (newItems.Count > 0)
-                                eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, newItems.AsReadOnly(), oldItems.AsReadOnly(), reducedOldStartingIndex);
-                            else
-                                eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, oldItems.AsReadOnly(), reducedOldStartingIndex);
-                        }
-                        else if (newItems.Count > 0)
-                            eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, newItems.AsReadOnly(), reducedNewStartingIndex);
-                        newCount = count + newItems.Count - oldItems.Count;
+                        var reducedOldStartingIndex = positions.PrefixWeightBefore(e.OldStartingIndex);
+                        if (e.OldStartingIndex > e.NewStartingIndex)
+                            reducedOldStartingIndex += newItems.Count;
+                        if (newItems.Count > 0)
+                            eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, newItems.AsReadOnly(), oldItems.AsReadOnly(), reducedOldStartingIndex);
+                        else
+                            eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, oldItems.AsReadOnly(), reducedOldStartingIndex);
                     }
+                    else if (newItems.Count > 0)
+                        eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, newItems.AsReadOnly(), positions.PrefixWeightBefore(e.NewStartingIndex));
                     break;
                 case NotifyCollectionChangedAction.Move:
-                    if (e.OldItems!.Count > 0 && e.OldStartingIndex == e.NewStartingIndex)
+                    if (e.OldItems is not null && e.OldItems.Count > 0 && e.OldStartingIndex != e.NewStartingIndex)
                     {
-                        var reducedNewStartingIndex = GetReducedStartingIndex(e.NewStartingIndex);
-                        var reducedOldStartingIndex = GetReducedStartingIndex(e.OldStartingIndex);
-                        var movedItems = e.OldItems.Cast<IEnumerable<TResult>>().SelectMany(enumerable => enumerable ?? []).ToList().AsReadOnly();
-                        if (e.OldStartingIndex > e.NewStartingIndex)
-                            reducedOldStartingIndex += movedItems.Count;
-                        eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Move, movedItems, reducedNewStartingIndex, reducedOldStartingIndex);
+                        var reducedOldStartingIndex = positions.PrefixWeightBefore(e.OldStartingIndex);
+                        var movedItems = new List<TResult>();
+                        var movedNode = positions.NodeAt(e.OldStartingIndex);
+                        for (var i = 0; i < e.OldItems.Count && movedNode is not null; ++i)
+                        {
+                            if (movedNode.Item is { } movedEnumerable)
+                                movedItems.AddRange(movedEnumerable);
+                            movedNode = positions.Next(movedNode);
+                        }
+                        positions.MoveRange(e.OldStartingIndex, e.NewStartingIndex, e.OldItems.Count);
+                        var reducedNewStartingIndex = positions.PrefixWeightBefore(e.NewStartingIndex);
+                        if (reducedOldStartingIndex != reducedNewStartingIndex && movedItems.Count > 0)
+                            eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Move, movedItems.AsReadOnly(), reducedNewStartingIndex, reducedOldStartingIndex);
                     }
                     break;
                 case NotifyCollectionChangedAction.Reset:
-                    foreach (var enumerable in enumerableInstances.Keys)
-                    {
+                    foreach (var enumerable in enumerableNodes.Keys)
                         if (enumerable is INotifyCollectionChanged collectionChangedNotifier)
                             collectionChangedNotifier.CollectionChanged -= CollectionChangedNotifierCollectionChanged;
-                    }
-                    enumerableInstances.Clear();
+                    enumerableNodes.Clear();
+                    positions.Clear();
                     for (int i = 0, ii = select!.Count; i < ii; ++i)
-                    {
-                        var enumerable = select[i];
-                        if (enumerable is not null)
-                        {
-                            newCount += enumerable.Count();
-                            if (enumerableInstances.TryGetValue(enumerable, out var instancesOfEnumerable))
-                                enumerableInstances[enumerable] = instancesOfEnumerable + 1;
-                            else
-                            {
-                                enumerableInstances.Add(enumerable, 1);
-                                if (enumerable is INotifyCollectionChanged collectionChangedNotifier)
-                                    collectionChangedNotifier.CollectionChanged += CollectionChangedNotifierCollectionChanged;
-                            }
-                        }
-                    }
+                        ObserveProjectionWithAccess(positions.Count, select[i]);
                     eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset);
                     break;
+                default:
+                    throw new NotSupportedException($"collection changed action {e.Action} is not supported");
             }
             if (eventArgs is not null)
             {
                 if (eventArgs.Action is not NotifyCollectionChangedAction.Move)
-                    SetCount(newCount);
+                    SetCount(positions.TotalWeight);
                 OnCollectionChanged(eventArgs);
             }
         }
@@ -279,4 +248,18 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
 
     public override string ToString() =>
         $"reduction of mapping {source} with {Selector}";
+
+    void TranslateInnerChangeWithAccess(PrefixWeightedSequenceNode<IEnumerable<TResult>?> node, int newWeight, NotifyCollectionChangedEventArgs e)
+    {
+        var reducedIndex = positions.PrefixWeightBefore(positions.IndexOf(node));
+        positions.SetWeight(node, newWeight);
+        OnCollectionChanged(e.Action switch
+        {
+            NotifyCollectionChangedAction.Add => new NotifyCollectionChangedEventArgs(e.Action, e.NewItems, reducedIndex + e.NewStartingIndex),
+            NotifyCollectionChangedAction.Move => new NotifyCollectionChangedEventArgs(e.Action, e.NewItems ?? e.OldItems, reducedIndex + e.NewStartingIndex, reducedIndex + e.OldStartingIndex),
+            NotifyCollectionChangedAction.Remove => new NotifyCollectionChangedEventArgs(e.Action, e.OldItems, reducedIndex + e.OldStartingIndex),
+            NotifyCollectionChangedAction.Replace => new NotifyCollectionChangedEventArgs(e.Action, e.NewItems!, e.OldItems!, reducedIndex + e.OldStartingIndex),
+            _ => throw new NotSupportedException($"collection changed action {e.Action} is not supported")
+        });
+    }
 }
