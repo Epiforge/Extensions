@@ -5,6 +5,7 @@
     <PropertyGroup>
         <Product>Epiforge.Extensions.Components</Product>
         <Version>3.1.0</Version>
+        <PackageValidationBaselineVersion>3.1.0</PackageValidationBaselineVersion>
         <Description>This package assists in building components.</Description>
     </PropertyGroup>
 

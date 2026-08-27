@@ -3,6 +3,7 @@
     <Import Project="..\Common\Project.props" />
 
     <PropertyGroup>
+        <EnablePackageValidation>true</EnablePackageValidation>
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
         <IncludeSymbols>true</IncludeSymbols>
         <PackageIcon>NuGet.jpg</PackageIcon>

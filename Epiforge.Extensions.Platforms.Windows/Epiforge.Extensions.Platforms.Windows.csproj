@@ -5,6 +5,7 @@
     <PropertyGroup>
         <Product>Epiforge.Extensions.Platforms.Windows</Product>
         <Version>2.0.1</Version>
+        <PackageValidationBaselineVersion>2.0.1</PackageValidationBaselineVersion>
         <Description>This package assists in Windows-platform specific operations.</Description>
     </PropertyGroup>
 
