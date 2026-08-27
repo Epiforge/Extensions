@@ -85,7 +85,7 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
         lock (access)
         {
             selectionsAndDirections = SelectorsAndDirections.Select(t => (selection: source.ObserveSelect(cachedWrappedSelectors.GetOrAdd(t.keySelectorExpression, CachedWrappedSelectorsValueFactory)), t.isDescending)).ToList().AsReadOnly();
-            comparer = new(selectionsAndDirections);
+            comparer = new(access, selectionsAndDirections);
             var sortedSource = source.OrderBy(element => element, comparer).ToList();
             RebuildStartingIndiciesAndCounts(sortedSource);
             results.Reset(sortedSource);

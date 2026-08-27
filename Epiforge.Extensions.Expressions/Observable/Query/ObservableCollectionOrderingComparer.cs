@@ -4,9 +4,9 @@ sealed class ObservableCollectionOrderingComparer<TElement> :
     SyncDisposable,
     IComparer<TElement>
 {
-    public ObservableCollectionOrderingComparer(IReadOnlyList<(IObservableCollectionQuery<Tuple<TElement, IComparable>> selection, bool isDescending)> selectionsAndDirections)
+    public ObservableCollectionOrderingComparer(object access, IReadOnlyList<(IObservableCollectionQuery<Tuple<TElement, IComparable>> selection, bool isDescending)> selectionsAndDirections)
     {
-        access = new();
+        this.access = access;
         comparables = [];
         counts = [];
         this.selectionsAndDirections = selectionsAndDirections;
@@ -35,11 +35,7 @@ sealed class ObservableCollectionOrderingComparer<TElement> :
         }
     }
 
-#if IS_NET_9_0_OR_GREATER
-    readonly Lock access;
-#else
     readonly object access;
-#endif
     readonly NullableKeyDictionary<TElement, List<IComparable>> comparables;
     readonly NullableKeyDictionary<TElement, int> counts;
     readonly (IObservableCollectionQuery<Tuple<TElement, IComparable>> selection, bool isDescending) lastSelectionAndDirection;
