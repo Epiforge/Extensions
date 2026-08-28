@@ -66,7 +66,7 @@ public abstract class SyncDisposable :
         try
         {
             OnDisposing(e);
-            disposed = IsDisposed = Dispose(true);
+            disposed = Dispose(true);
         }
         finally
         {
@@ -75,8 +75,9 @@ public abstract class SyncDisposable :
         }
         if (disposed)
         {
-            OnDisposed(e);
             GC.SuppressFinalize(this);
+            IsDisposed = true;
+            OnDisposed(e);
         }
         else
             OnDisposalOverridden(e);

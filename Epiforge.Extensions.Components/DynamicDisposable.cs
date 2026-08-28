@@ -67,7 +67,7 @@ public abstract class DynamicDisposable :
         try
         {
             OnDisposing(e);
-            disposed = IsDisposed = Dispose(true);
+            disposed = Dispose(true);
         }
         finally
         {
@@ -76,8 +76,9 @@ public abstract class DynamicDisposable :
         }
         if (disposed)
         {
-            OnDisposed(e);
             GC.SuppressFinalize(this);
+            IsDisposed = true;
+            OnDisposed(e);
         }
         else
             OnDisposalOverridden(e);
@@ -103,7 +104,7 @@ public abstract class DynamicDisposable :
         try
         {
             OnDisposing(e);
-            disposed = IsDisposed = await DisposeAsyncCore().ConfigureAwait(false);
+            disposed = await DisposeAsyncCore().ConfigureAwait(false);
         }
         finally
         {
@@ -112,8 +113,9 @@ public abstract class DynamicDisposable :
         }
         if (disposed)
         {
-            OnDisposed(e);
             GC.SuppressFinalize(this);
+            IsDisposed = true;
+            OnDisposed(e);
         }
         else
             OnDisposalOverridden(e);

@@ -93,4 +93,33 @@ public class DisposalReentrancy
         Assert.AreEqual(1, derivation.disposals);
         Assert.IsTrue(derivation.IsDisposed);
     }
+
+    [TestMethod]
+    [Timeout(5000)]
+    public void DisposalIsNotRepeatedAfterADisposedHandlerThrows()
+    {
+        var derivation = new MonitoredDerivation();
+        derivation.Disposed += (sender, e) =>
+            throw new InvalidOperationException();
+        Assert.ThrowsException<InvalidOperationException>(derivation.Dispose);
+        Assert.IsTrue(derivation.IsDisposed);
+        derivation.Dispose();
+        Assert.AreEqual(1, derivation.disposals);
+    }
+
+    [TestMethod]
+    [Timeout(5000)]
+    public void DisposalIsNotRepeatedAfterAPropertyChangedHandlerThrows()
+    {
+        var derivation = new MonitoredDerivation();
+        derivation.PropertyChanged += (sender, e) =>
+        {
+            if (e.PropertyName == nameof(derivation.IsDisposed))
+                throw new InvalidOperationException();
+        };
+        Assert.ThrowsException<InvalidOperationException>(derivation.Dispose);
+        Assert.IsTrue(derivation.IsDisposed);
+        derivation.Dispose();
+        Assert.AreEqual(1, derivation.disposals);
+    }
 }

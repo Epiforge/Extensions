@@ -65,7 +65,7 @@ public abstract class AsyncDisposable :
         try
         {
             OnDisposing(e);
-            disposed = IsDisposed = await DisposeAsyncCore().ConfigureAwait(false);
+            disposed = await DisposeAsyncCore().ConfigureAwait(false);
         }
         finally
         {
@@ -74,8 +74,9 @@ public abstract class AsyncDisposable :
         }
         if (disposed)
         {
-            OnDisposed(e);
             GC.SuppressFinalize(this);
+            IsDisposed = true;
+            OnDisposed(e);
         }
         else
             OnDisposalOverridden(e);
