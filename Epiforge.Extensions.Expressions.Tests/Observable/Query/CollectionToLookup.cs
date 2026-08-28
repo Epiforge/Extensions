@@ -29,6 +29,32 @@ public class CollectionToLookup
     }
 
     [TestMethod]
+    public void RetainedGroupingsSurviveAReset()
+    {
+        var source = new ObservableRangeCollection<TestPerson>();
+        var collectionObserver = CollectionObserverHelpers.Create();
+        using (var sourceQuery = collectionObserver.ObserveReadOnlyList(source))
+        {
+            using (var lookupQuery = sourceQuery.ObserveToLookup(person => person.Name!.Length))
+            {
+                var threeLength = ((IReadOnlyObservableRangeDictionary<int, IObservableGrouping<int, TestPerson>>)lookupQuery)[3];
+                var announcements = 0;
+                void collectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
+                    ++announcements;
+                threeLength.CollectionChanged += collectionChanged;
+                source.Reset(new TestPerson[] { new("Ben") });
+                Assert.AreSame(threeLength, ((IReadOnlyObservableRangeDictionary<int, IObservableGrouping<int, TestPerson>>)lookupQuery)[3], "the grouping the caller was holding was replaced by the reset");
+                CollectionAssert.AreEqual(new string?[] { "Ben" }, threeLength.Select(person => person.Name).ToList(), "the grouping the caller was holding does not contain the element which joined it");
+                Assert.AreNotEqual(0, announcements, "the grouping the caller was holding announced nothing when its contents changed");
+                threeLength.CollectionChanged -= collectionChanged;
+            }
+            Assert.AreEqual(0, sourceQuery.CachedObservableQueries);
+        }
+        Assert.AreEqual(0, collectionObserver.CachedObservableQueries);
+        Assert.AreEqual(0, collectionObserver.ExpressionObserver.CachedObservableExpressions);
+    }
+
+    [TestMethod]
     public void SourceManipulation()
     {
         var source = new ObservableRangeCollection<TestPerson>();

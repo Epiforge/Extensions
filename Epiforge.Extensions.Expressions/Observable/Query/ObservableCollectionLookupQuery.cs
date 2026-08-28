@@ -252,15 +252,22 @@ sealed class ObservableCollectionLookupQuery<TKey, TElement> :
         {
             if (e.Action is NotifyCollectionChangedAction.Reset)
             {
-                groupings.CollectionChanged -= GroupingsCollectionChanged;
-                foreach (var (_, grouping) in collectionAndGroupingByKey.Values)
-                    ((ObservableGrouping<TKey, TElement>)grouping).InternalDispose();
-                collectionAndGroupingByKey.Clear();
-                groupings.Clear();
+                var elementsByKey = new Dictionary<TKey, List<TElement>>(KeyEqualityComparer);
                 foreach (var (element, key) in select!)
-                    AddElement(element, key);
-                OnCollectionChanged(e);
-                groupings.CollectionChanged += GroupingsCollectionChanged;
+                    if (elementsByKey.TryGetValue(key, out var keyElements))
+                        keyElements.Add(element);
+                    else
+                        elementsByKey.Add(key, [element]);
+                foreach (var (key, collectionAndGrouping) in collectionAndGroupingByKey.ToList())
+                {
+                    if (!elementsByKey.TryGetValue(key, out var retained))
+                        retained = [];
+                    collectionAndGrouping.collection.Reset(retained);
+                }
+                foreach (var (key, keyElements) in elementsByKey)
+                    if (!collectionAndGroupingByKey.ContainsKey(key))
+                        foreach (var element in keyElements)
+                            AddElement(element, key);
             }
             else if (e.Action is not NotifyCollectionChangedAction.Move)
             {

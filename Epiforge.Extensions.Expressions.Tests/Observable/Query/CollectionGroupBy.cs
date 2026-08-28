@@ -4,6 +4,33 @@ namespace Epiforge.Extensions.Expressions.Tests.Observable.Query;
 public class CollectionGroupBy
 {
     [TestMethod]
+    public void GroupingsForSurvivingKeysSurviveAReset()
+    {
+        var source = new ObservableRangeCollection<TestPerson>(new TestPerson[] { new("Ben"), new("Erin") });
+        var collectionObserver = CollectionObserverHelpers.Create();
+        using (var sourceQuery = collectionObserver.ObserveReadOnlyList(source))
+        {
+            using (var groupByQuery = sourceQuery.ObserveGroupBy(person => person.Name!.Length))
+            {
+                var threeLength = groupByQuery.Single(grouping => grouping.Key == 3);
+                var announcements = 0;
+                void collectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
+                    ++announcements;
+                threeLength.CollectionChanged += collectionChanged;
+                source.Reset(new TestPerson[] { new("Bob"), new("Amy"), new("Charles") });
+                Assert.AreSame(threeLength, groupByQuery.Single(grouping => grouping.Key == 3), "the grouping the caller was holding was replaced by the reset");
+                CollectionAssert.AreEquivalent(new string?[] { "Bob", "Amy" }, threeLength.Select(person => person.Name).ToList(), "the grouping the caller was holding does not contain the elements which joined it");
+                Assert.AreNotEqual(0, announcements, "the grouping the caller was holding announced nothing when its contents changed");
+                Assert.IsFalse(groupByQuery.Any(grouping => grouping.Key == 4), "a grouping was retained for a key which no longer has any elements");
+                threeLength.CollectionChanged -= collectionChanged;
+            }
+            Assert.AreEqual(0, sourceQuery.CachedObservableQueries);
+        }
+        Assert.AreEqual(0, collectionObserver.CachedObservableQueries);
+        Assert.AreEqual(0, collectionObserver.ExpressionObserver.CachedObservableExpressions);
+    }
+
+    [TestMethod]
     public void SourceManipulation()
     {
         var source = TestPerson.CreatePeopleCollection();
