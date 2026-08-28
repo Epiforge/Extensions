@@ -38,6 +38,17 @@ public class ObserveWhereBenchmarks :
         return sum;
     }
 
+    [Benchmark]
+    public int EnumerateThenSweepByIndexer()
+    {
+        var sum = 0;
+        foreach (var person in where)
+            sum += person.Rank;
+        for (var i = 0; i < indexerLimit; ++i)
+            sum += where[i].Rank;
+        return sum;
+    }
+
     protected override void SetupQuery()
     {
         where = SourceQuery.ObserveWhere(person => person.Rank % 2 == 0);

@@ -61,6 +61,8 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
             {
                 if (index < 0 || index >= count)
                     throw ExceptionHelper.IndexArgumentWasOutOfRange;
+                if (enumerationSnapshot is { } snapshot)
+                    return snapshot[index];
                 return memberships.NodeAtWeight(index) is { } node ? node.Item.Argument : throw ExceptionHelper.IndexArgumentWasOutOfRange;
             }
         }

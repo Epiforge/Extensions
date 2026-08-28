@@ -20,7 +20,11 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
             int offset;
             lock (access)
             {
-                if (index < 0 || index >= count || positions.NodeAtWeight(index) is not { } node || node.Item is not { } spanningEnumerable)
+                if (index < 0 || index >= count)
+                    throw new IndexOutOfRangeException();
+                if (enumerationSnapshot is { } snapshot)
+                    return snapshot[index];
+                if (positions.NodeAtWeight(index) is not { } node || node.Item is not { } spanningEnumerable)
                     throw new IndexOutOfRangeException();
                 enumerable = spanningEnumerable;
                 offset = index - positions.PrefixWeightBefore(positions.IndexOf(node));
@@ -31,6 +35,9 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
 
     public override int Count =>
         count;
+
+    internal override bool HasIndexerPenalty =>
+        true;
 
     void CollectionChangedNotifierCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {

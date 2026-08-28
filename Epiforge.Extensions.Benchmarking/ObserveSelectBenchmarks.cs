@@ -38,6 +38,17 @@ public class ObserveSelectBenchmarks :
         return sum;
     }
 
+    [Benchmark]
+    public int EnumerateThenSweepByIndexer()
+    {
+        var sum = 0;
+        foreach (var projection in select)
+            sum += projection;
+        for (var i = 0; i < indexerLimit; ++i)
+            sum += select[i];
+        return sum;
+    }
+
     protected override void SetupQuery()
     {
         select = SourceQuery.ObserveSelect(person => person.Rank * 2);

@@ -67,6 +67,8 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
             {
                 if (index < 0 || index >= positions.Count)
                     throw ExceptionHelper.IndexArgumentWasOutOfRange;
+                if (enumerationSnapshot is { } snapshot)
+                    return snapshot[index];
                 return positions.NodeAt(index).Item.CommittedResult;
             }
         }

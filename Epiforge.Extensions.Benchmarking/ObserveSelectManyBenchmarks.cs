@@ -5,6 +5,7 @@ public class ObserveSelectManyBenchmarks
 {
     BenchmarkPerson added = null!;
     int cursor;
+    int indexerLimit;
     CollectionObserver observer = null!;
     IObservableCollectionQuery<BenchmarkPerson> selectMany = null!;
     ObservableRangeCollection<BenchmarkTeam> source = null!;
@@ -30,6 +31,26 @@ public class ObserveSelectManyBenchmarks
     }
 
     [Benchmark]
+    public int EnumerateByIndexer()
+    {
+        var sum = 0;
+        for (var i = 0; i < indexerLimit; ++i)
+            sum += selectMany[i].Rank;
+        return sum;
+    }
+
+    [Benchmark]
+    public int EnumerateThenSweepByIndexer()
+    {
+        var sum = 0;
+        foreach (var person in selectMany)
+            sum += person.Rank;
+        for (var i = 0; i < indexerLimit; ++i)
+            sum += selectMany[i].Rank;
+        return sum;
+    }
+
+    [Benchmark]
     public void InnerAddAndRemove()
     {
         var people = source[cursor].People;
@@ -49,5 +70,6 @@ public class ObserveSelectManyBenchmarks
         sourceQuery = observer.ObserveReadOnlyList(source);
         selectMany = sourceQuery.ObserveSelectMany(team => team.People);
         added = new BenchmarkPerson("Added", 0);
+        indexerLimit = selectMany.Count;
     }
 }
