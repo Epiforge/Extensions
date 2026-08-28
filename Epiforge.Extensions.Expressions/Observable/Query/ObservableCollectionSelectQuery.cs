@@ -252,6 +252,7 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
         using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
         lock (access)
         {
+            FaultList? faultList = null;
             NotifyCollectionChangedEventArgs? eventArgs = null;
             switch (e.Action)
             {
@@ -270,20 +271,29 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
                         {
                             var node = positions.RemoveAt(e.OldStartingIndex + i);
                             oldItems.Insert(0, node.Item.CommittedResult);
+                            var observableExpression = node.Item.ObservableExpression;
+                            var fault = observableExpressionStates[observableExpression].Fault;
+                            var argument = observableExpression.Argument;
                             ReleaseProjectionWithAccess(node);
+                            if (fault is not null)
+                            {
+                                faultList ??= new FaultList(OperationFault);
+                                faultList.RemoveElementOccurrence(argument, elementComparer);
+                            }
                         }
                     }
                     var newItems = new List<TResult>();
                     if (e.NewItems is not null && e.NewStartingIndex >= 0)
                     {
-                        var faultList = new FaultList(OperationFault);
+                        faultList ??= new FaultList(OperationFault);
                         for (var i = 0; i < e.NewItems.Count; ++i)
                         {
                             ObserveElementWithAccess((TElement)e.NewItems[i]!, e.NewStartingIndex + i, faultList);
                             newItems.Add(positions.NodeAt(e.NewStartingIndex + i).Item.CommittedResult);
                         }
-                        OperationFault = faultList.Fault;
                     }
+                    if (faultList is not null)
+                        OperationFault = faultList.Fault;
                     if (oldItems.Count > 0)
                     {
                         if (newItems.Count > 0)

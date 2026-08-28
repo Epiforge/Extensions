@@ -263,7 +263,7 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
                             if (fault is not null)
                             {
                                 faultList ??= new FaultList(OperationFault);
-                                faultList.RemoveElement(observableExpression.Argument, elementComparer);
+                                faultList.RemoveElementOccurrence(observableExpression.Argument, elementComparer);
                             }
                             if (node.Weight == 1)
                                 oldItems.Add(element);

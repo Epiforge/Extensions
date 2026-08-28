@@ -40,6 +40,54 @@ public class CollectionWhere
     }
 
     [TestMethod]
+    public void ElementFaultsAreCountedPerOccurrence()
+    {
+        var source = TestPerson.CreatePeopleCollection();
+        var collectionObserver = CollectionObserverHelpers.Create();
+        using (var sourceQuery = collectionObserver.ObserveReadOnlyList(source))
+        {
+            using (var whereQuery = sourceQuery.ObserveWhere(p => p.Name!.Length == 4))
+            {
+                var faulting = new TestPerson();
+                source.Add(faulting);
+                source.Add(faulting);
+                Assert.AreEqual(2, ElementFaultCount(whereQuery.OperationFault));
+                source.Remove(faulting);
+                Assert.AreEqual(1, ElementFaultCount(whereQuery.OperationFault));
+                source.Remove(faulting);
+                Assert.IsNull(whereQuery.OperationFault);
+            }
+            Assert.AreEqual(0, sourceQuery.CachedObservableQueries);
+        }
+        Assert.AreEqual(0, collectionObserver.CachedObservableQueries);
+        Assert.AreEqual(0, collectionObserver.ExpressionObserver.CachedObservableExpressions);
+    }
+
+    [TestMethod]
+    public void ElementFaultsDoNotDependOnTheOrderOfChanges()
+    {
+        var source = TestPerson.CreatePeopleCollection();
+        var collectionObserver = CollectionObserverHelpers.Create();
+        using (var sourceQuery = collectionObserver.ObserveReadOnlyList(source))
+        {
+            using (var whereQuery = sourceQuery.ObserveWhere(p => p.Name!.Length == 4))
+            {
+                var faulting = new TestPerson();
+                source.Add(faulting);
+                source.Add(faulting);
+                Assert.AreEqual(2, ElementFaultCount(whereQuery.OperationFault));
+                faulting.Name = "Bill";
+                Assert.IsNull(whereQuery.OperationFault);
+                faulting.Name = null;
+                Assert.AreEqual(2, ElementFaultCount(whereQuery.OperationFault));
+            }
+            Assert.AreEqual(0, sourceQuery.CachedObservableQueries);
+        }
+        Assert.AreEqual(0, collectionObserver.CachedObservableQueries);
+        Assert.AreEqual(0, collectionObserver.ExpressionObserver.CachedObservableExpressions);
+    }
+
+    [TestMethod]
     public void ElementFaultsSurviveUnrelatedRemoval()
     {
         var source = TestPerson.CreatePeopleCollection();

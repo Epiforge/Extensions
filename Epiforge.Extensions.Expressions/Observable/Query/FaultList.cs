@@ -143,8 +143,16 @@ class FaultList
     public void Clear() =>
         exceptions.Clear();
 
-    public int RemoveElement<TElement>(TElement element, IEqualityComparer<TElement> elementComparer) =>
-        exceptions.RemoveAll(exception => exception is EvaluationFaultException elementFault && elementFault.Element is TElement faultElement && elementComparer.Equals(faultElement, element));
+    public bool RemoveElementOccurrence<TElement>(TElement element, IEqualityComparer<TElement> elementComparer)
+    {
+        for (int i = 0, ii = exceptions.Count; i < ii; ++i)
+            if (exceptions[i] is EvaluationFaultException elementFault && elementFault.Element is TElement faultElement && elementComparer.Equals(faultElement, element))
+            {
+                exceptions.RemoveAt(i);
+                return true;
+            }
+        return false;
+    }
 
     public int RemoveKey<TKey>(TKey key, IEqualityComparer<TKey> keyComparer) =>
         exceptions.RemoveAll(exception => exception is EvaluationFaultException elementFault && elementFault.Element is TKey faultKey && keyComparer.Equals(faultKey, key));
