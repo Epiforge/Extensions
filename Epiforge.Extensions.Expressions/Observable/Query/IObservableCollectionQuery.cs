@@ -109,6 +109,7 @@ public interface IObservableCollectionQuery<TElement> :
     /// Continuously returns distinct elements from the collection by using the default equality comparer to compare values
     /// </summary>
     /// <returns>The distinct elements from the collection</returns>
+    /// <remarks>An element appears when its value first occurs and is withdrawn when its last occurrence is removed, so the elements are ordered by when they appeared, which does not necessarily match the order of the collection as <see cref="Enumerable.Distinct{TSource}(IEnumerable{TSource})"/> would; use <see cref="ObserveOrderBy(Expression{Func{TElement, IComparable}})"/> where a specific order is required</remarks>
     [return: DisposeWhenDiscarded]
     IObservableCollectionQuery<TElement> ObserveDistinct();
 
@@ -117,6 +118,7 @@ public interface IObservableCollectionQuery<TElement> :
     /// </summary>
     /// <param name="comparer">An <see cref="IEqualityComparer{T}"/> to compare values</param>
     /// <returns>The distinct elements from the collection</returns>
+    /// <remarks>An element appears when its value first occurs and is withdrawn when its last occurrence is removed, so the elements are ordered by when they appeared, which does not necessarily match the order of the collection as <see cref="Enumerable.Distinct{TSource}(IEnumerable{TSource})"/> would; use <see cref="ObserveOrderBy(Expression{Func{TElement, IComparable}})"/> where a specific order is required</remarks>
     [return: DisposeWhenDiscarded]
     IObservableCollectionQuery<TElement> ObserveDistinct(IEqualityComparer<TElement> comparer);
 
@@ -181,6 +183,7 @@ public interface IObservableCollectionQuery<TElement> :
     /// <typeparam name="TKey">The type of the key returned by <paramref name="keySelector"/></typeparam>
     /// <param name="keySelector">A function to extract the key for each element</param>
     /// <returns>A collection where each element is an <see cref="IObservableGrouping{TKey, TElement}"/> object which contains a sequence of objects and a key</returns>
+    /// <remarks>A grouping is created when its key first occurs and discarded when its last element is removed, so groupings are ordered by creation and the elements of a grouping by addition, neither of which necessarily matches the order of the collection as <see cref="Enumerable.GroupBy{TSource, TKey}(IEnumerable{TSource}, Func{TSource, TKey})"/> would; use <see cref="ObserveOrderBy(Expression{Func{TElement, IComparable}})"/> where a specific order is required</remarks>
     [return: DisposeWhenDiscarded]
     IObservableCollectionQuery<IObservableGrouping<TKey, TElement>> ObserveGroupBy<TKey>(Expression<Func<TElement, TKey>> keySelector);
 
@@ -191,6 +194,7 @@ public interface IObservableCollectionQuery<TElement> :
     /// <param name="keySelector">A function to extract the key for each element</param>
     /// <param name="keyEqualityComparer">An <see cref="IEqualityComparer{T}"/> to compare keys</param>
     /// <returns>A collection where each element is an <see cref="IObservableGrouping{TKey, TElement}"/> object which contains a sequence of objects and a key</returns>
+    /// <remarks>A grouping is created when its key first occurs and discarded when its last element is removed, so groupings are ordered by creation and the elements of a grouping by addition, neither of which necessarily matches the order of the collection as <see cref="Enumerable.GroupBy{TSource, TKey}(IEnumerable{TSource}, Func{TSource, TKey})"/> would; use <see cref="ObserveOrderBy(Expression{Func{TElement, IComparable}})"/> where a specific order is required</remarks>
     [return: DisposeWhenDiscarded]
     IObservableCollectionQuery<IObservableGrouping<TKey, TElement>> ObserveGroupBy<TKey>(Expression<Func<TElement, TKey>> keySelector, IEqualityComparer<TKey> keyEqualityComparer);
 
@@ -440,7 +444,7 @@ public interface IObservableCollectionQuery<TElement> :
     /// <typeparam name="TKey">The type of the key returned by <paramref name="keySelector"/></typeparam>
     /// <param name="keySelector">A function to extract the key for each element</param>
     /// <returns>A dictionary where each value is an <see cref="IObservableGrouping{TKey, TElement}"/> object which contains a sequence of objects and a key</returns>
-    /// <remarks>Groupings are retained once created, including for a key which is requested but not present, so a grouping may be empty</remarks>
+    /// <remarks>Groupings are retained once created, including for a key which is requested but not present, so a grouping may be empty; groupings are ordered by creation and the elements of a grouping by addition, neither of which necessarily matches the order of the collection as <see cref="Enumerable.ToLookup{TSource, TKey}(IEnumerable{TSource}, Func{TSource, TKey})"/> would; use <see cref="ObserveOrderBy(Expression{Func{TElement, IComparable}})"/> where a specific order is required</remarks>
     [return: DisposeWhenDiscarded]
     IObservableLookupQuery<TKey, TElement> ObserveToLookup<TKey>(Expression<Func<TElement, TKey>> keySelector)
         where TKey : notnull;
@@ -452,7 +456,7 @@ public interface IObservableCollectionQuery<TElement> :
     /// <param name="keySelector">A function to extract the key for each element</param>
     /// <param name="keyEqualityComparer">An <see cref="IEqualityComparer{T}"/> to compare keys</param>
     /// <returns>A dictionary where each value is an <see cref="IObservableGrouping{TKey, TElement}"/> object which contains a sequence of objects and a key</returns>
-    /// <remarks>Groupings are retained once created, including for a key which is requested but not present, so a grouping may be empty</remarks>
+    /// <remarks>Groupings are retained once created, including for a key which is requested but not present, so a grouping may be empty; groupings are ordered by creation and the elements of a grouping by addition, neither of which necessarily matches the order of the collection as <see cref="Enumerable.ToLookup{TSource, TKey}(IEnumerable{TSource}, Func{TSource, TKey})"/> would; use <see cref="ObserveOrderBy(Expression{Func{TElement, IComparable}})"/> where a specific order is required</remarks>
     [return: DisposeWhenDiscarded]
     IObservableLookupQuery<TKey, TElement> ObserveToLookup<TKey>(Expression<Func<TElement, TKey>> keySelector, IEqualityComparer<TKey> keyEqualityComparer)
         where TKey : notnull;

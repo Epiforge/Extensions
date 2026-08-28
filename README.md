@@ -300,6 +300,11 @@ If there is more than one fault in play, the value of `OperationFault` will be a
 
 Dictionary queries adopt the key comparer of the dictionary they observe, discovering it through `Epiforge.Extensions.Collections.Generic.IHashKeys<TKey>` or a `Dictionary<TKey, TValue>`'s own `Comparer`, so a query over a case-insensitive dictionary is itself case-insensitive.
 
+`ObserveGroupBy`, `ObserveToLookup`, and `ObserveDistinct` do not order their results the way LINQ does.
+Groupings are ordered by when they were created and the elements of a grouping by when they were added, rather than by where they occur in the source.
+This is deliberate: holding a grouping at the position of its key's first occurrence would mean moving that grouping every time an element was inserted ahead of it, announcing a change to something whose membership did not change, which is the opposite of what an Observable Query is for.
+Call `ObserveOrderBy` on the query, or on a grouping, when you want a defined order.
+
 Since the `ExpressionObserver` has a number of options governing its behavior, you may optionally pass one you've made to the constructor of `CollectionObserver` to ensure those options are obeyed when Observable Expressions are created to enable your Observable Queries.
 
 #### How Observable Queries Work and When to Use Them
