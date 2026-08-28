@@ -6,6 +6,7 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
     readonly object access = new();
     int count;
     readonly Dictionary<IEnumerable<TResult>, List<PrefixWeightedSequenceNode<IEnumerable<TResult>?>>> enumerableNodes = [];
+    List<TResult>? enumerationSnapshot;
     readonly PrefixWeightedSequence<IEnumerable<TResult>?> positions = new();
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     IObservableCollectionQuery<IEnumerable<TResult>>? select;
@@ -40,6 +41,7 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
         {
             if (!enumerableNodes.TryGetValue(enumerable, out var nodes))
                 return;
+            enumerationSnapshot = null;
             var newWeight = enumerable.Count();
             if (e.Action is NotifyCollectionChangedAction.Reset)
             {
@@ -88,18 +90,18 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
 
     public override IEnumerator<TResult> GetEnumerator()
     {
-        List<IEnumerable<TResult>> enumerables;
         lock (access)
         {
-            enumerables = new List<IEnumerable<TResult>>(positions.Count);
-            for (var node = positions.FirstNode; node is not null; node = positions.Next(node))
-                if (node.Item is { } enumerable)
-                    enumerables.Add(enumerable);
+            if (enumerationSnapshot is null)
+            {
+                var results = new List<TResult>(count);
+                for (var node = positions.FirstNode; node is not null; node = positions.Next(node))
+                    if (node.Item is { } enumerable)
+                        results.AddRange(enumerable);
+                enumerationSnapshot = results;
+            }
+            return enumerationSnapshot.GetEnumerator();
         }
-        var results = new List<TResult>(count);
-        for (int i = 0, ii = enumerables.Count; i < ii; ++i)
-            results.AddRange(enumerables[i]);
-        return results.AsReadOnly().GetEnumerator();
     }
 
     void ObserveProjectionWithAccess(int index, IEnumerable<TResult>? enumerable)
@@ -151,6 +153,7 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
         using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
         lock (access)
         {
+            enumerationSnapshot = null;
             NotifyCollectionChangedEventArgs? eventArgs = null;
             switch (e.Action)
             {

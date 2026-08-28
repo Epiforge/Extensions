@@ -25,6 +25,7 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
     readonly object access;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     ObservableCollectionOrderingComparer<TElement>? comparer;
+    List<TElement>? enumerationSnapshot;
     readonly NullableKeyDictionary<TElement, PrefixWeightedSequenceNode<TElement>> nodesByElement;
     readonly PrefixWeightedSequence<TElement> positions;
     readonly ObservableRangeCollection<TElement> results;
@@ -129,7 +130,10 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
     public override IEnumerator<TElement> GetEnumerator()
     {
         lock (access)
-            return results.ToList().AsReadOnly().GetEnumerator();
+        {
+            enumerationSnapshot ??= results.ToList();
+            return enumerationSnapshot.GetEnumerator();
+        }
     }
 
     protected override void OnInitialization()
@@ -185,8 +189,11 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
         results.MoveRange(startingIndex, positions.PrefixWeightBefore(positions.IndexOf(node)), node.Weight);
     }
 
-    void ResultsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
+    void ResultsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        enumerationSnapshot = null;
         OnCollectionChanged(e);
+    }
 
     void ResultsPropertyChanged(object? sender, PropertyChangedEventArgs e) =>
         OnPropertyChanged(e);
