@@ -4,6 +4,38 @@ namespace Epiforge.Extensions.Expressions.Tests.Observable.Query;
 public class CollectionConcat
 {
     [TestMethod]
+    public void CountChangesAreAnnounced()
+    {
+        var left = TestPerson.CreatePeopleCollection();
+        var right = TestPerson.CreatePeopleCollection();
+        var collectionObserver = CollectionObserverHelpers.Create();
+        using (var leftQuery = collectionObserver.ObserveReadOnlyList(left))
+        using (var rightQuery = collectionObserver.ObserveReadOnlyList(right))
+        {
+            using (var concatQuery = leftQuery.ObserveConcat(rightQuery))
+            {
+                var announced = new List<int>();
+                void propertyChanged(object? sender, PropertyChangedEventArgs e)
+                {
+                    if (e.PropertyName == nameof(concatQuery.Count))
+                        announced.Add(concatQuery.Count);
+                }
+                ((INotifyPropertyChanged)concatQuery).PropertyChanged += propertyChanged;
+                left.Add(new TestPerson("Bill"));
+                right.Add(new TestPerson("Nan"));
+                left.RemoveAt(0);
+                right.RemoveAt(0);
+                ((INotifyPropertyChanged)concatQuery).PropertyChanged -= propertyChanged;
+                CollectionAssert.AreEqual(new int[] { 29, 30, 29, 28 }, announced);
+            }
+            Assert.AreEqual(0, leftQuery.CachedObservableQueries);
+            Assert.AreEqual(0, rightQuery.CachedObservableQueries);
+        }
+        Assert.AreEqual(0, collectionObserver.CachedObservableQueries);
+        Assert.AreEqual(0, collectionObserver.ExpressionObserver.CachedObservableExpressions);
+    }
+
+    [TestMethod]
     public void SourceManipulation()
     {
         var left = TestPerson.CreatePeopleCollection();
