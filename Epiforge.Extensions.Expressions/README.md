@@ -153,8 +153,9 @@ This is deliberate: holding a grouping at the position of its key's first occurr
 Call `ObserveOrderBy` on the query, or on a grouping, when you want a defined order.
 
 Reach for `foreach` rather than the indexer, because the difference between them is larger than it looks and grows with the collection.
-An enumeration takes the query's lock once and then walks a list, while the indexer takes that lock again for every element you ask for; on a large collection it must also descend a tree to find each one, because a query keeps its elements' positions in one so that a change repairs only what it touched.
-Walking ten thousand elements by index instead of by enumerator measured between sixty-seven and seventy-nine times slower; at a hundred elements it was ten to fifteen, and there the repeated locking is the whole of it.
+An enumeration takes the query's lock once and then walks a list, while the indexer takes that lock again for every element you ask for; on a large collection it must also find each one in a tree, because a query keeps its elements' positions in one so that a change repairs only what it touched.
+A query does remember the position it handed out last and searches outward from there, so asking for positions in order, or near one another, costs a fraction of asking for them at random, and what remains is mostly the repeated locking rather than the search.
+Walking ten thousand elements by index instead of by enumerator measured between thirty and fifty times slower in order, and around two hundred times out of order; at a hundred elements it was about fifteen, and there the repeated locking is the whole of it.
 Where you do need elements by position more than once, copy the query's contents and index the copy.
 
 Since the `ExpressionObserver` has a number of options governing its behavior, you may optionally pass one you've made to the constructor of `CollectionObserver` to ensure those options are obeyed when Observable Expressions are created to enable your Observable Queries.

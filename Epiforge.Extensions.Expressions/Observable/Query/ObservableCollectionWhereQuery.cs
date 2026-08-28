@@ -44,6 +44,8 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
 
     readonly object access = new();
     int count;
+    int cursorIndex = -1;
+    PrefixWeightedSequenceNode<IObservableExpression<TElement, bool>>? cursorNode;
     readonly IEqualityComparer<TElement> elementComparer = EqualityComparer<TElement>.Default;
     List<TElement>? enumerationSnapshot;
     int enumerationSnapshotPatches;
@@ -63,7 +65,12 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
                     throw ExceptionHelper.IndexArgumentWasOutOfRange;
                 if (enumerationSnapshot is { } snapshot)
                     return snapshot[index];
-                return memberships.NodeAtWeight(index) is { } node ? node.Item.Argument : throw ExceptionHelper.IndexArgumentWasOutOfRange;
+                var node = cursorNode is { } finger ? memberships.NodeAtWeightFrom(finger, cursorIndex, index) : memberships.NodeAtWeight(index);
+                if (node is null)
+                    throw ExceptionHelper.IndexArgumentWasOutOfRange;
+                cursorIndex = index;
+                cursorNode = node;
+                return node.Item.Argument;
             }
         }
     }
@@ -107,6 +114,7 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
             return;
         var translatedIndex = memberships.PrefixWeightBefore(memberships.IndexOf(node));
         memberships.SetWeight(node, newWeight);
+        cursorNode = null;
         if (TryBeginEnumerationSnapshotPatchWithAccess(out var snapshot))
         {
             if (newResult)
@@ -245,6 +253,7 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
         using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
         lock (access)
         {
+            cursorNode = null;
             FaultList? faultList = null;
             NotifyCollectionChangedEventArgs? eventArgs = null;
             var newCount = 0;

@@ -49,6 +49,8 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
     const int maximumEnumerationSnapshotPatches = 128;
 
     readonly object access = new();
+    int cursorIndex = -1;
+    PrefixWeightedSequenceNode<Projection>? cursorNode;
     readonly IEqualityComparer<TElement> elementComparer = EqualityComparer<TElement>.Default;
     List<TResult>? enumerationSnapshot;
     int enumerationSnapshotPatches;
@@ -69,7 +71,10 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
                     throw ExceptionHelper.IndexArgumentWasOutOfRange;
                 if (enumerationSnapshot is { } snapshot)
                     return snapshot[index];
-                return positions.NodeAt(index).Item.CommittedResult;
+                var node = cursorNode is { } finger ? positions.NodeAtFrom(finger, cursorIndex, index) : positions.NodeAt(index);
+                cursorIndex = index;
+                cursorNode = node;
+                return node.Item.CommittedResult;
             }
         }
     }
@@ -254,6 +259,7 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
         using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
         lock (access)
         {
+            cursorNode = null;
             FaultList? faultList = null;
             NotifyCollectionChangedEventArgs? eventArgs = null;
             switch (e.Action)

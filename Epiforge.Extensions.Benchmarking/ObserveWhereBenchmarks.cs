@@ -63,6 +63,15 @@ public class ObserveWhereBenchmarks :
     }
 
     [Benchmark]
+    public int SweepByIndexerOutOfOrder()
+    {
+        var sum = 0;
+        for (var i = 0; i < indexerLimit; ++i)
+            sum += where[(int)(Mixer.Mix((uint)i) % (uint)indexerLimit)].Rank;
+        return sum;
+    }
+
+    [Benchmark]
     public void ValueChangeFlippingMembership() =>
         Next().Rank ^= 1;
 

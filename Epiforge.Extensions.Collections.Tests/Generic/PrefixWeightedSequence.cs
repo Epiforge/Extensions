@@ -23,6 +23,12 @@ public class PrefixWeightedSequence
         Assert.AreSame(nodes[position], sequence.NodeAt(position), $"{context}: NodeAt({position}) diverged");
         Assert.AreEqual(position, sequence.IndexOf(nodes[position]), $"{context}: IndexOf diverged at {position}");
 
+        var finger = random.Next(reference.Count);
+        var fingerPrefix = 0;
+        for (var i = 0; i < finger; ++i)
+            fingerPrefix += reference[i].Weight;
+        Assert.AreSame(nodes[position], sequence.NodeAtFrom(nodes[finger], finger, position), $"{context}: NodeAtFrom({finger}, {position}) diverged");
+
         var boundary = random.Next(reference.Count + 1);
         var expectedPrefix = 0;
         for (var i = 0; i < boundary; ++i)
@@ -45,8 +51,10 @@ public class PrefixWeightedSequence
                 spanned += reference[i].Weight;
             }
             Assert.AreSame(nodes[expectedIndex], sequence.NodeAtWeight(offset), $"{context}: NodeAtWeight({offset}) diverged");
+            Assert.AreSame(nodes[expectedIndex], sequence.NodeAtWeightFrom(nodes[finger], fingerPrefix, offset), $"{context}: NodeAtWeightFrom({finger}, {offset}) diverged");
         }
         Assert.IsNull(sequence.NodeAtWeight(totalWeight), $"{context}: an offset past the total weight yielded a node");
+        Assert.IsNull(sequence.NodeAtWeightFrom(nodes[finger], fingerPrefix, totalWeight), $"{context}: an offset past the total weight yielded a node to a finger search");
     }
 
     [TestMethod]
@@ -169,5 +177,101 @@ public class PrefixWeightedSequence
             Assert.AreEqual(probe, sequence.IndexOf(nodes[probe]), $"the node at {probe} reported the wrong position");
             Assert.AreEqual(probe, sequence.PrefixWeightBefore(probe), $"the prefix weight before {probe} was wrong");
         }
+    }
+
+    [TestMethod]
+    [Timeout(300000)]
+    public void FingerSearchFromEveryStartingPointAgreesWithSearchFromTheRoot()
+    {
+        var random = new Random(31);
+        var sequence = new PrefixWeightedSequence<int>();
+        var nodes = new List<PrefixWeightedSequenceNode<int>>();
+        var prefixWeights = new List<int>();
+        var totalWeight = 0;
+        for (var i = 0; i < 400; ++i)
+        {
+            var weight = random.Next(3);
+            nodes.Add(sequence.Insert(i, i, weight));
+            prefixWeights.Add(totalWeight);
+            totalWeight += weight;
+        }
+        for (var finger = 0; finger < nodes.Count; ++finger)
+        {
+            for (var target = 0; target < nodes.Count; ++target)
+                Assert.AreSame(nodes[target], sequence.NodeAtFrom(nodes[finger], finger, target), $"the finger at {finger} found the wrong node at {target}");
+            for (var offset = 0; offset < totalWeight; ++offset)
+                Assert.AreSame(sequence.NodeAtWeight(offset), sequence.NodeAtWeightFrom(nodes[finger], prefixWeights[finger], offset), $"the finger at {finger} found the wrong node at the offset {offset}");
+            Assert.IsNull(sequence.NodeAtWeightFrom(nodes[finger], prefixWeights[finger], totalWeight), $"the finger at {finger} found a node past the total weight");
+            Assert.IsNull(sequence.NodeAtWeightFrom(nodes[finger], prefixWeights[finger], -1), $"the finger at {finger} found a node before the sequence");
+        }
+    }
+
+    [TestMethod]
+    [Timeout(300000)]
+    public void FingerSearchClimbsOverRunsOfZeroWeight()
+    {
+        var sequence = new PrefixWeightedSequence<int>();
+        var carrying = new List<PrefixWeightedSequenceNode<int>>();
+        for (var i = 0; i < 20000; ++i)
+        {
+            var node = sequence.Insert(i, i, i % 128 == 0 ? 1 : 0);
+            if (i % 128 == 0)
+                carrying.Add(node);
+        }
+        Assert.AreEqual(carrying.Count, sequence.TotalWeight);
+        PrefixWeightedSequenceNode<int>? finger = null;
+        var fingerOffset = -1;
+        for (var offset = 0; offset < carrying.Count; ++offset)
+        {
+            var found = finger is null ? sequence.NodeAtWeight(offset) : sequence.NodeAtWeightFrom(finger, fingerOffset, offset);
+            Assert.AreSame(carrying[offset], found, $"the offset {offset} landed on the wrong node");
+            finger = found;
+            fingerOffset = offset;
+        }
+        Assert.IsNull(sequence.NodeAtWeightFrom(finger!, fingerOffset, carrying.Count), "an offset past the total weight yielded a node");
+    }
+
+    [TestMethod]
+    [Timeout(300000)]
+    public void FingerSearchSurvivesMutationOfTheSequenceAroundTheFinger()
+    {
+        var random = new Random(97);
+        var sequence = new PrefixWeightedSequence<int>();
+        var nodes = new List<PrefixWeightedSequenceNode<int>>();
+        for (var i = 0; i < 600; ++i)
+            nodes.Add(sequence.Insert(i, i, 1));
+        for (var round = 0; round < 400; ++round)
+        {
+            var index = random.Next(nodes.Count);
+            if (random.Next(2) == 0)
+            {
+                sequence.RemoveAt(index);
+                nodes.RemoveAt(index);
+            }
+            else
+            {
+                nodes.Insert(index, sequence.Insert(index, 1000 + round, 1));
+            }
+            var finger = random.Next(nodes.Count);
+            var target = random.Next(nodes.Count);
+            Assert.AreSame(nodes[target], sequence.NodeAtFrom(nodes[finger], finger, target), $"round {round}: the finger at {finger} found the wrong node at {target}");
+            Assert.AreSame(nodes[target], sequence.NodeAtWeightFrom(nodes[finger], finger, target), $"round {round}: the finger at {finger} found the wrong node at the offset {target}");
+        }
+    }
+
+    [TestMethod]
+    [Timeout(300000)]
+    public void FingerSearchValidatesItsArguments()
+    {
+        var sequence = new PrefixWeightedSequence<int>();
+        var only = sequence.Insert(0, 42, 1);
+        Assert.ThrowsException<ArgumentNullException>(() => _ = sequence.NodeAtFrom(null!, 0, 0));
+        Assert.ThrowsException<ArgumentNullException>(() => _ = sequence.NodeAtWeightFrom(null!, 0, 0));
+        Assert.ThrowsException<ArgumentOutOfRangeException>(() => _ = sequence.NodeAtFrom(only, 0, -1));
+        Assert.ThrowsException<ArgumentOutOfRangeException>(() => _ = sequence.NodeAtFrom(only, 0, 1));
+        Assert.AreSame(only, sequence.NodeAtFrom(only, 0, 0));
+        Assert.AreSame(only, sequence.NodeAtWeightFrom(only, 0, 0));
+        Assert.IsNull(sequence.NodeAtWeightFrom(only, 0, -1));
+        Assert.IsNull(sequence.NodeAtWeightFrom(only, 0, 1));
     }
 }

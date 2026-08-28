@@ -39,6 +39,30 @@ public class ObserveSelectBenchmarks :
     }
 
     [Benchmark]
+    public int EnumerateByIndexerBackward()
+    {
+        var sum = 0;
+        for (var i = indexerLimit - 1; i >= 0; --i)
+            sum += select[i];
+        return sum;
+    }
+
+    [Benchmark]
+    public int EnumerateByIndexerInterleaved()
+    {
+        var sum = 0;
+        var half = (indexerLimit + 1) / 2;
+        for (var i = 0; i < half; ++i)
+        {
+            sum += select[i];
+            var paired = i + half;
+            if (paired < indexerLimit)
+                sum += select[paired];
+        }
+        return sum;
+    }
+
+    [Benchmark]
     public int EnumerateThenSweepByIndexer()
     {
         var sum = 0;
@@ -60,6 +84,15 @@ public class ObserveSelectBenchmarks :
     {
         Source.Add(Added);
         Source.RemoveAt(Source.Count - 1);
+    }
+
+    [Benchmark]
+    public int SweepByIndexerOutOfOrder()
+    {
+        var sum = 0;
+        for (var i = 0; i < indexerLimit; ++i)
+            sum += select[(int)(Mixer.Mix((uint)i) % (uint)indexerLimit)];
+        return sum;
     }
 
     [Benchmark]

@@ -9,6 +9,16 @@ public sealed class PrefixWeightedSequence<T>
     static int CountOf(PrefixWeightedSequenceNode<T>? node) =>
         node is null ? 0 : node.SubtreeCount;
 
+    static bool IsFingerCloser(long distance, int itemCount)
+    {
+        if (distance <= 1)
+            return true;
+        if (distance > int.MaxValue)
+            return false;
+        var reach = distance * distance;
+        return reach <= int.MaxValue && reach * reach <= itemCount;
+    }
+
     static uint MixPriority(uint value)
     {
         unchecked
@@ -226,6 +236,56 @@ public sealed class PrefixWeightedSequence<T>
     }
 
     /// <summary>
+    /// Gets the node at the specified position, searching outward from a node the caller already has in hand
+    /// </summary>
+    /// <param name="finger">A node belonging to this sequence</param>
+    /// <param name="fingerIndex">The zero-based position of <paramref name="finger"/></param>
+    /// <param name="index">The zero-based position of the node to get</param>
+    /// <returns>The node at <paramref name="index"/></returns>
+    /// <remarks>Searching outward from <paramref name="finger"/> costs the logarithm of the distance rather than the logarithm of the number of items, so this method does that when the distance is small enough to be worth it and searches from the root when it is not; the caller is responsible for the accuracy of <paramref name="fingerIndex"/>, and an inaccurate one yields an inaccurate result</remarks>
+    public PrefixWeightedSequenceNode<T> NodeAtFrom(PrefixWeightedSequenceNode<T> finger, int fingerIndex, int index)
+    {
+        ArgumentNullException.ThrowIfNull(finger);
+        if (index < 0 || index >= Count)
+            throw new ArgumentOutOfRangeException(nameof(index));
+        if (index == fingerIndex)
+            return finger;
+        if (index == fingerIndex + 1 && Next(finger) is { } successor)
+            return successor;
+        var distance = (long)index - fingerIndex;
+        if (distance < 0)
+            distance = -distance;
+        if (!IsFingerCloser(distance, Count))
+            return NodeAt(index);
+        var subtree = finger;
+        var start = fingerIndex - CountOf(finger.Left);
+        while (index < start || index >= start + subtree.SubtreeCount)
+        {
+            if (subtree.Parent is not { } parent)
+                throw new ArgumentOutOfRangeException(nameof(fingerIndex));
+            if (ReferenceEquals(subtree, parent.Right))
+                start -= CountOf(parent.Left) + 1;
+            subtree = parent;
+        }
+        index -= start;
+        var current = subtree;
+        while (current is not null)
+        {
+            var leftCount = CountOf(current.Left);
+            if (index < leftCount)
+                current = current.Left;
+            else if (index == leftCount)
+                return current;
+            else
+            {
+                index -= leftCount + 1;
+                current = current.Right;
+            }
+        }
+        throw new ArgumentOutOfRangeException(nameof(fingerIndex));
+    }
+
+    /// <summary>
     /// Gets the node which spans the specified offset into the total weight, or <c>null</c> when the offset lies beyond it
     /// </summary>
     /// <param name="weightOffset">The zero-based offset into the total weight</param>
@@ -235,6 +295,54 @@ public sealed class PrefixWeightedSequence<T>
         if (weightOffset < 0)
             return null;
         var current = root;
+        while (current is not null)
+        {
+            var leftWeight = WeightOf(current.Left);
+            if (weightOffset < leftWeight)
+                current = current.Left;
+            else
+            {
+                weightOffset -= leftWeight;
+                if (weightOffset < current.Weight)
+                    return current;
+                weightOffset -= current.Weight;
+                current = current.Right;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Gets the node which spans the specified offset into the total weight, searching outward from a node the caller already has in hand, or <c>null</c> when the offset lies beyond the total weight
+    /// </summary>
+    /// <param name="finger">A node belonging to this sequence</param>
+    /// <param name="fingerWeightOffset">The sum of the weights of the items preceding <paramref name="finger"/></param>
+    /// <param name="weightOffset">The zero-based offset into the total weight</param>
+    /// <returns>The node spanning <paramref name="weightOffset"/>, or <c>null</c></returns>
+    /// <remarks>Searching outward from <paramref name="finger"/> costs the logarithm of the distance rather than the logarithm of the number of items, and climbs over runs of zero-weight items rather than visiting them, so this method does that when the distance is small enough to be worth it and searches from the root when it is not; the caller is responsible for the accuracy of <paramref name="fingerWeightOffset"/>, and an inaccurate one yields an inaccurate result</remarks>
+    public PrefixWeightedSequenceNode<T>? NodeAtWeightFrom(PrefixWeightedSequenceNode<T> finger, int fingerWeightOffset, int weightOffset)
+    {
+        ArgumentNullException.ThrowIfNull(finger);
+        if (weightOffset < 0)
+            return null;
+        var span = TotalWeight;
+        var distance = (long)weightOffset - fingerWeightOffset;
+        if (distance < 0)
+            distance = -distance;
+        if (span <= 0 || !IsFingerCloser(distance * Count / span, Count))
+            return NodeAtWeight(weightOffset);
+        var subtree = finger;
+        var start = fingerWeightOffset - WeightOf(finger.Left);
+        while (weightOffset < start || weightOffset >= start + subtree.SubtreeWeight)
+        {
+            if (subtree.Parent is not { } parent)
+                return null;
+            if (ReferenceEquals(subtree, parent.Right))
+                start -= WeightOf(parent.Left) + parent.Weight;
+            subtree = parent;
+        }
+        weightOffset -= start;
+        var current = subtree;
         while (current is not null)
         {
             var leftWeight = WeightOf(current.Left);
