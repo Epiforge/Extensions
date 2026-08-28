@@ -1,12 +1,13 @@
-﻿namespace Epiforge.Extensions.Expressions.Observable.Query;
+namespace Epiforge.Extensions.Expressions.Observable.Query;
 
 sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> source, Expression<Func<TElement, TKey>> keySelector, Expression<Func<TElement, TValue>> valueSelector, IEqualityComparer<TKey> equalityComparer) :
     ObservableDictionaryQuery<TKey, TValue>(collectionObserver)
     where TKey : notnull
 {
     readonly object access = new();
+    readonly PrefixWeightedSequence<KeyValuePair<TKey, TValue>> claims = new();
+    readonly Dictionary<TKey, List<PrefixWeightedSequenceNode<KeyValuePair<TKey, TValue>>>> claimantsByKey = new(equalityComparer);
     readonly ObservableDictionary<TKey, TValue> dictionary = new(equalityComparer);
-    readonly Dictionary<TKey, int> duplicateKeys = [];
     int nullKeys;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     IObservableCollectionQuery<KeyValuePair<TKey, TValue>>? select;
@@ -51,6 +52,31 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>(Colle
             lock(access)
                 return dictionary.Values.ToList().AsReadOnly();
         }
+    }
+
+    void BuildClaimsWithAccess()
+    {
+        claims.Clear();
+        claimantsByKey.Clear();
+        nullKeys = 0;
+        var index = 0;
+        foreach (var keyValuePair in select!)
+        {
+            var node = claims.Insert(index++, keyValuePair, 1);
+            var key = keyValuePair.Key;
+            if (key is null)
+                ++nullKeys;
+            else
+                ClaimWithAccess(key, node);
+        }
+    }
+
+    void ClaimWithAccess(TKey key, PrefixWeightedSequenceNode<KeyValuePair<TKey, TValue>> node)
+    {
+        if (claimantsByKey.TryGetValue(key, out var claimants))
+            claimants.Add(node);
+        else
+            claimantsByKey.Add(key, [node]);
     }
 
     public override bool Contains(KeyValuePair<TKey, TValue> item)
@@ -124,20 +150,13 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>(Colle
     {
         var elementParameter = Expression.Parameter(typeof(TElement));
         select = source.ObserveSelect(Expression.Lambda<Func<TElement, KeyValuePair<TKey, TValue>>>(Expression.New(typeof(KeyValuePair<TKey, TValue>).GetConstructor([typeof(TKey), typeof(TValue)])!, Expression.Invoke(KeySelector, elementParameter), Expression.Invoke(ValueSelector, elementParameter)), elementParameter));
-        foreach (var keyValuePair in select)
+        lock (access)
         {
-            var key = keyValuePair.Key;
-            if (key is null)
-                ++nullKeys;
-            else if (!dictionary.TryAdd(key, keyValuePair.Value))
-            {
-                if (duplicateKeys.TryGetValue(key, out var count))
-                    duplicateKeys[key] = count + 1;
-                else
-                    duplicateKeys.Add(key, 2);
-            }
+            BuildClaimsWithAccess();
+            foreach (var (key, claimants) in claimantsByKey)
+                dictionary.Add(key, WinningValueWithAccess(claimants));
+            SetOperationFault();
         }
-        SetOperationFault();
         dictionary.CollectionChanged += DictionaryCollectionChanged;
         ((INotifyDictionaryChanged)dictionary).DictionaryChanged += DictionaryDictionaryChangedBoxed;
         dictionary.DictionaryChanged += DictionaryDictionaryChanged;
@@ -147,6 +166,24 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>(Colle
         select.PropertyChanged += SelectPropertyChanged;
     }
 
+    void ReconcileWithAccess(IEnumerable<TKey> keys)
+    {
+        foreach (var key in keys)
+            if (claimantsByKey.TryGetValue(key, out var claimants))
+                dictionary[key] = WinningValueWithAccess(claimants);
+            else
+                dictionary.Remove(key);
+    }
+
+    void RelinquishWithAccess(TKey key, PrefixWeightedSequenceNode<KeyValuePair<TKey, TValue>> node)
+    {
+        if (!claimantsByKey.TryGetValue(key, out var claimants))
+            return;
+        claimants.Remove(node);
+        if (claimants.Count == 0)
+            claimantsByKey.Remove(key);
+    }
+
     void SelectCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
@@ -154,66 +191,55 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>(Colle
         {
             if (e.Action is NotifyCollectionChangedAction.Reset)
             {
-                var newDictionary = new ObservableDictionary<TKey, TValue>(EqualityComparer);
-                duplicateKeys.Clear();
-                nullKeys = 0;
-                foreach (var keyValuePair in select!)
-                {
-                    var key = keyValuePair.Key;
-                    if (key is null)
-                        ++nullKeys;
-                    else if (!newDictionary.TryAdd(key, keyValuePair.Value))
-                    {
-                        if (duplicateKeys.TryGetValue(key, out var count))
-                            duplicateKeys[key] = count + 1;
-                        else
-                            duplicateKeys.Add(key, 2);
-                    }
-                }
-                dictionary.Reset(newDictionary);
+                BuildClaimsWithAccess();
+                var replacement = new ObservableDictionary<TKey, TValue>(EqualityComparer);
+                foreach (var (key, claimants) in claimantsByKey)
+                    replacement.Add(key, WinningValueWithAccess(claimants));
+                dictionary.Reset(replacement);
             }
-            else if (e.Action is not NotifyCollectionChangedAction.Move)
+            else if (e.Action is NotifyCollectionChangedAction.Move)
             {
-                var newKeyValuePairs = e.NewItems?.Cast<KeyValuePair<TKey, TValue>>().ToList() ?? [];
-                if (e.OldItems is { } oldItems && oldItems.Count > 0 && e.OldStartingIndex >= 0)
-                    foreach (var oldKeyValuePair in oldItems.Cast<KeyValuePair<TKey, TValue>>())
-                    {
-                        var oldKey = oldKeyValuePair.Key;
-                        if (oldKey is null)
-                        {
-                            --nullKeys;
-                            continue;
-                        }
-                        var newKeyValuePairIndex = newKeyValuePairs.FindIndex(keyValuePair => EqualityComparer.Equals(keyValuePair.Key, oldKey));
-                        if (newKeyValuePairIndex >= 0)
-                        {
-                            var newKeyValuePair = newKeyValuePairs[newKeyValuePairIndex];
-                            newKeyValuePairs.RemoveAt(newKeyValuePairIndex);
-                            dictionary[oldKey] = newKeyValuePair.Value;
-                        }
-                        else if (duplicateKeys.TryGetValue(oldKey, out var count))
-                        {
-                            if (count == 2)
-                                duplicateKeys.Remove(oldKey);
-                            else
-                                duplicateKeys[oldKey] = count - 1;
-                        }
-                        else
-                            dictionary.Remove(oldKey);
-                    }
-                foreach (var newKeyValuePair in newKeyValuePairs)
+                if (e.OldItems is { } movedItems && movedItems.Count > 0 && e.OldStartingIndex >= 0 && e.NewStartingIndex >= 0 && e.OldStartingIndex != e.NewStartingIndex)
                 {
-                    var newKey = newKeyValuePair.Key;
-                    if (newKey is null)
-                        ++nullKeys;
-                    else if (!dictionary.TryAdd(newKey, newKeyValuePair.Value))
-                    {
-                        if (duplicateKeys.TryGetValue(newKey, out var count))
-                            duplicateKeys[newKey] = count + 1;
-                        else
-                            duplicateKeys.Add(newKey, 2);
-                    }
+                    claims.MoveRange(e.OldStartingIndex, e.NewStartingIndex, movedItems.Count);
+                    var contested = new List<TKey>();
+                    foreach (var (key, claimants) in claimantsByKey)
+                        if (claimants.Count > 1)
+                            contested.Add(key);
+                    ReconcileWithAccess(contested);
                 }
+            }
+            else
+            {
+                var touched = new HashSet<TKey>(EqualityComparer);
+                if (e.OldItems is { } oldItems && oldItems.Count > 0 && e.OldStartingIndex >= 0)
+                    for (var i = oldItems.Count - 1; i >= 0; --i)
+                    {
+                        var node = claims.RemoveAt(e.OldStartingIndex + i);
+                        var key = node.Item.Key;
+                        if (key is null)
+                            --nullKeys;
+                        else
+                        {
+                            RelinquishWithAccess(key, node);
+                            touched.Add(key);
+                        }
+                    }
+                if (e.NewItems is { } newItems && newItems.Count > 0 && e.NewStartingIndex >= 0)
+                    for (var i = 0; i < newItems.Count; ++i)
+                    {
+                        var keyValuePair = (KeyValuePair<TKey, TValue>)newItems[i]!;
+                        var node = claims.Insert(e.NewStartingIndex + i, keyValuePair, 1);
+                        var key = keyValuePair.Key;
+                        if (key is null)
+                            ++nullKeys;
+                        else
+                        {
+                            ClaimWithAccess(key, node);
+                            touched.Add(key);
+                        }
+                    }
+                ReconcileWithAccess(touched);
             }
             SetOperationFault();
         }
@@ -230,8 +256,9 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>(Colle
         var faultList = new FaultList();
         if (nullKeys > 0)
             faultList.AddRange(Enumerable.Range(0, nullKeys).Select(_ => ExceptionHelper.KeyNull));
-        if (duplicateKeys.Count > 0)
-            faultList.AddRange(Enumerable.Range(0, duplicateKeys.Keys.Sum(key => duplicateKeys[key] - 1)).Select(_ => ExceptionHelper.SameKeyAlreadyAdded));
+        var duplicateClaims = claims.Count - nullKeys - claimantsByKey.Count;
+        if (duplicateClaims > 0)
+            faultList.AddRange(Enumerable.Range(0, duplicateClaims).Select(_ => ExceptionHelper.SameKeyAlreadyAdded));
         faultList.Check(select!);
         OperationFault = faultList.Fault;
     }
@@ -243,5 +270,24 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>(Colle
     {
         lock (access)
             return dictionary.TryGetValue(key, out value);
+    }
+
+    TValue WinningValueWithAccess(List<PrefixWeightedSequenceNode<KeyValuePair<TKey, TValue>>> claimants)
+    {
+        var winner = claimants[0];
+        if (claimants.Count > 1)
+        {
+            var winningIndex = claims.IndexOf(winner);
+            for (int i = 1, ii = claimants.Count; i < ii; ++i)
+            {
+                var index = claims.IndexOf(claimants[i]);
+                if (index < winningIndex)
+                {
+                    winner = claimants[i];
+                    winningIndex = index;
+                }
+            }
+        }
+        return winner.Item.Value;
     }
 }
