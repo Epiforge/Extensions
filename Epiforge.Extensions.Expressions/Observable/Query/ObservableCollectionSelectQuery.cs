@@ -3,10 +3,59 @@ namespace Epiforge.Extensions.Expressions.Observable.Query;
 sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> source, Expression<Func<TElement, TResult>> selector) :
     ObservableCollectionQuery<TResult>(collectionObserver)
 {
+    sealed class Projection(IObservableExpression<TElement, TResult> observableExpression, TResult committedResult)
+    {
+        internal TResult CommittedResult = committedResult;
+        internal readonly IObservableExpression<TElement, TResult> ObservableExpression = observableExpression;
+    }
+
+    sealed class SnapshotEnumerator :
+        IEnumerator<TResult>
+    {
+        internal SnapshotEnumerator(ObservableCollectionSelectQuery<TElement, TResult> query, List<TResult> snapshot)
+        {
+            this.query = query;
+            this.snapshot = snapshot;
+            enumerator = snapshot.GetEnumerator();
+        }
+
+        List<TResult>.Enumerator enumerator;
+        bool isDisposed;
+        readonly ObservableCollectionSelectQuery<TElement, TResult> query;
+        readonly List<TResult> snapshot;
+
+        public TResult Current =>
+            enumerator.Current;
+
+        object? IEnumerator.Current =>
+            enumerator.Current;
+
+        public void Dispose()
+        {
+            if (isDisposed)
+                return;
+            isDisposed = true;
+            enumerator.Dispose();
+            query.EnumerationEnded();
+        }
+
+        public bool MoveNext() =>
+            enumerator.MoveNext();
+
+        public void Reset() =>
+            enumerator = snapshot.GetEnumerator();
+    }
+
+    const int maximumEnumerationSnapshotPatches = 128;
+
     readonly object access = new();
     readonly IEqualityComparer<TElement> elementComparer = EqualityComparer<TElement>.Default;
-    readonly Dictionary<IObservableExpression<TElement, TResult>, (int Positions, Exception? Fault)> observableExpressionStates = [];
-    readonly List<(IObservableExpression<TElement, TResult> ObservableExpression, TResult CommittedResult)> projections = [];
+    List<TResult>? enumerationSnapshot;
+    int enumerationSnapshotPatches;
+    bool enumerationSnapshotShared;
+    int liveEnumerations;
+    readonly Dictionary<IObservableExpression<TElement, TResult>, (Projection Projection, List<PrefixWeightedSequenceNode<Projection>> Nodes, Exception? Fault)> observableExpressionStates = [];
+    readonly PrefixWeightedSequence<Projection> positions = new();
     readonly EqualityComparer<TResult> resultComparer = EqualityComparer<TResult>.Default;
     internal readonly Expression<Func<TElement, TResult>> Selector = selector;
 
@@ -15,7 +64,11 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
         get
         {
             lock (access)
-                return projections[index].CommittedResult;
+            {
+                if (index < 0 || index >= positions.Count)
+                    throw ExceptionHelper.IndexArgumentWasOutOfRange;
+                return positions.NodeAt(index).Item.CommittedResult;
+            }
         }
     }
 
@@ -24,9 +77,12 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
         get
         {
             lock (access)
-                return projections.Count;
+                return positions.Count;
         }
     }
+
+    internal override bool HasIndexerPenalty =>
+        true;
 
     protected override bool Dispose(bool disposing)
     {
@@ -35,15 +91,17 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
             var removedFromCache = source.QueryDisposed(this);
             if (removedFromCache)
             {
-                foreach (var observableExpression in observableExpressionStates.Keys)
+                foreach (var (observableExpression, state) in observableExpressionStates)
                 {
                     observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
-                    for (int i = 0, ii = observableExpressionStates[observableExpression].Positions; i < ii; ++i)
+                    for (int i = 0, ii = state.Nodes.Count; i < ii; ++i)
                         observableExpression.Dispose();
                 }
                 source.CollectionChanged -= SourceCollectionChanged;
                 source.PropertyChanging -= SourcePropertyChanging;
                 source.PropertyChanged -= SourcePropertyChanged;
+                enumerationSnapshot = null;
+                enumerationSnapshotShared = false;
                 RemovedFromCache();
             }
             return removedFromCache;
@@ -51,15 +109,31 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
         return true;
     }
 
+    void EnumerationEnded() =>
+        Interlocked.Decrement(ref liveEnumerations);
+
     public override IEnumerator<TResult> GetEnumerator()
     {
         lock (access)
         {
-            var results = new List<TResult>(projections.Count);
-            for (int i = 0, ii = projections.Count; i < ii; ++i)
-                results.Add(projections[i].CommittedResult);
-            return results.GetEnumerator();
+            if (enumerationSnapshot is null)
+            {
+                var results = new List<TResult>(positions.Count);
+                for (var node = positions.FirstNode; node is not null; node = positions.Next(node))
+                    results.Add(node.Item.CommittedResult);
+                enumerationSnapshot = results;
+            }
+            enumerationSnapshotPatches = 0;
+            enumerationSnapshotShared = true;
+            Interlocked.Increment(ref liveEnumerations);
+            return new SnapshotEnumerator(this, enumerationSnapshot);
         }
+    }
+
+    void InvalidateEnumerationSnapshotWithAccess()
+    {
+        enumerationSnapshot = null;
+        enumerationSnapshotShared = false;
     }
 
     void ObservableExpressionPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -74,35 +148,42 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
             var (newFault, newResult) = observableExpression.Evaluation;
             if (FaultList.ExchangeElementFault(OperationFault, observableExpression.Argument, elementComparer, state.Fault, newFault, out var newOperationFault))
             {
-                observableExpressionStates[observableExpression] = (state.Positions, newFault);
+                observableExpressionStates[observableExpression] = (state.Projection, state.Nodes, newFault);
                 OperationFault = newOperationFault;
             }
-            for (int i = 0, ii = projections.Count; i < ii; ++i)
+            var committedResult = state.Projection.CommittedResult;
+            if (resultComparer.Equals(committedResult, newResult))
+                return;
+            state.Projection.CommittedResult = newResult;
+            var nodes = state.Nodes;
+            if (nodes.Count == 1)
+                ReplaceAtWithAccess(positions.IndexOf(nodes[0]), committedResult, newResult);
+            else
             {
-                var (iObservableExpression, committedResult) = projections[i];
-                if (ReferenceEquals(iObservableExpression, observableExpression) && !resultComparer.Equals(committedResult, newResult))
-                {
-                    projections[i] = (iObservableExpression, newResult);
-                    OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, newResult, committedResult, i));
-                }
+                var indicies = new List<int>(nodes.Count);
+                for (int i = 0, ii = nodes.Count; i < ii; ++i)
+                    indicies.Add(positions.IndexOf(nodes[i]));
+                indicies.Sort();
+                for (int i = 0, ii = indicies.Count; i < ii; ++i)
+                    ReplaceAtWithAccess(indicies[i], committedResult, newResult);
             }
         }
     }
 
-    IObservableExpression<TElement, TResult> ObserveElementWithAccess(TElement element, FaultList faultList)
+    void ObserveElementWithAccess(TElement element, int index, FaultList faultList)
     {
         var observableExpression = collectionObserver.ExpressionObserver.ObserveWithoutOptimization(Selector, element);
         var (fault, result) = observableExpression.Evaluation;
         if (fault is not null)
             faultList.Add(new EvaluationFaultException(element, fault));
         if (observableExpressionStates.TryGetValue(observableExpression, out var state))
-            observableExpressionStates[observableExpression] = (state.Positions + 1, state.Fault);
+            state.Nodes.Add(positions.Insert(index, state.Projection, 1));
         else
         {
-            observableExpressionStates.Add(observableExpression, (1, fault));
+            var projection = new Projection(observableExpression, result);
+            observableExpressionStates.Add(observableExpression, (projection, [positions.Insert(index, projection, 1)], fault));
             observableExpression.PropertyChanged += ObservableExpressionPropertyChanged;
         }
-        return observableExpression;
     }
 
     protected override void OnInitialization()
@@ -110,35 +191,25 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
         lock (access)
         {
             var faultList = new FaultList();
-
-            void processElement(TElement element)
-            {
-                var observableExpression = ObserveElementWithAccess(element, faultList!);
-                projections!.Add((observableExpression, observableExpression.Evaluation.Result));
-            }
-
             if (!source.HasIndexerPenalty)
                 for (int i = 0, ii = source.Count; i < ii; ++i)
-                    processElement(source[i]);
+                    ObserveElementWithAccess(source[i], positions.Count, faultList);
             else
                 foreach (var element in source)
-                    processElement(element);
-
+                    ObserveElementWithAccess(element, positions.Count, faultList);
             OperationFault = faultList.Fault;
-
             source.CollectionChanged += SourceCollectionChanged;
             source.PropertyChanging += SourcePropertyChanging;
             source.PropertyChanged += SourcePropertyChanged;
         }
     }
 
-    void ReleaseProjectionWithAccess((IObservableExpression<TElement, TResult> ObservableExpression, TResult CommittedResult) projection)
+    void ReleaseProjectionWithAccess(PrefixWeightedSequenceNode<Projection> node)
     {
-        var observableExpression = projection.ObservableExpression;
+        var observableExpression = node.Item.ObservableExpression;
         var state = observableExpressionStates[observableExpression];
-        if (state.Positions > 1)
-            observableExpressionStates[observableExpression] = (state.Positions - 1, state.Fault);
-        else
+        state.Nodes.Remove(node);
+        if (state.Nodes.Count == 0)
         {
             observableExpressionStates.Remove(observableExpression);
             observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
@@ -146,35 +217,32 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
         observableExpression.Dispose();
     }
 
+    void ReplaceAtWithAccess(int index, TResult oldResult, TResult newResult)
+    {
+        if (TryBeginEnumerationSnapshotPatchWithAccess(out var snapshot) && index < snapshot.Count)
+            snapshot[index] = newResult;
+        OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, newResult, oldResult, index));
+    }
+
     NotifyCollectionChangedEventArgs ResetWithAccess()
     {
-        foreach (var observableExpression in observableExpressionStates.Keys)
+        foreach (var (observableExpression, state) in observableExpressionStates)
         {
             observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
-            for (int i = 0, ii = observableExpressionStates[observableExpression].Positions; i < ii; ++i)
+            for (int i = 0, ii = state.Nodes.Count; i < ii; ++i)
                 observableExpression.Dispose();
         }
-
         observableExpressionStates.Clear();
-        projections.Clear();
-
+        positions.Clear();
+        InvalidateEnumerationSnapshotWithAccess();
         var faultList = new FaultList();
-
-        void processElement(TElement element)
-        {
-            var observableExpression = ObserveElementWithAccess(element, faultList!);
-            projections!.Add((observableExpression, observableExpression.Evaluation.Result));
-        }
-
         if (!source.HasIndexerPenalty)
             for (int i = 0, ii = source.Count; i < ii; ++i)
-                processElement(source[i]);
+                ObserveElementWithAccess(source[i], positions.Count, faultList);
         else
             foreach (var element in source)
-                processElement(element);
-
+                ObserveElementWithAccess(element, positions.Count, faultList);
         OperationFault = faultList.Fault;
-
         return new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset);
     }
 
@@ -193,38 +261,27 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
                     var oldItems = new List<TResult>();
                     if (e.OldItems is not null && e.OldStartingIndex >= 0)
                     {
-                        List<(IObservableExpression<TElement, TResult> ObservableExpression, TResult CommittedResult)>? removedProjections = null;
-                        try
-                        {
-                            removedProjections = projections.GetRange(e.OldStartingIndex, e.OldItems.Count);
-                        }
-                        catch (ArgumentException)
+                        if (e.OldStartingIndex + e.OldItems.Count > positions.Count)
                         {
                             eventArgs = ResetWithAccess();
                             break;
                         }
-                        projections.RemoveRange(e.OldStartingIndex, e.OldItems.Count);
-                        for (int i = 0, ii = removedProjections.Count; i < ii; ++i)
+                        for (var i = e.OldItems.Count - 1; i >= 0; --i)
                         {
-                            var removedProjection = removedProjections[i];
-                            oldItems.Add(removedProjection.CommittedResult);
-                            ReleaseProjectionWithAccess(removedProjection);
+                            var node = positions.RemoveAt(e.OldStartingIndex + i);
+                            oldItems.Insert(0, node.Item.CommittedResult);
+                            ReleaseProjectionWithAccess(node);
                         }
                     }
                     var newItems = new List<TResult>();
                     if (e.NewItems is not null && e.NewStartingIndex >= 0)
                     {
                         var faultList = new FaultList(OperationFault);
-                        var addedProjections = new List<(IObservableExpression<TElement, TResult> ObservableExpression, TResult CommittedResult)>();
-                        for (int i = 0, ii = e.NewItems.Count; i < ii; ++i)
+                        for (var i = 0; i < e.NewItems.Count; ++i)
                         {
-                            var element = (TElement)e.NewItems[i]!;
-                            var addedObservableExpression = ObserveElementWithAccess(element, faultList);
-                            var committedResult = addedObservableExpression.Evaluation.Result;
-                            newItems.Add(committedResult);
-                            addedProjections.Add((addedObservableExpression, committedResult));
+                            ObserveElementWithAccess((TElement)e.NewItems[i]!, e.NewStartingIndex + i, faultList);
+                            newItems.Add(positions.NodeAt(e.NewStartingIndex + i).Item.CommittedResult);
                         }
-                        projections.InsertRange(e.NewStartingIndex, addedProjections);
                         OperationFault = faultList.Fault;
                     }
                     if (oldItems.Count > 0)
@@ -236,26 +293,36 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
                     }
                     else if (newItems.Count > 0)
                         eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, newItems.AsReadOnly(), e.NewStartingIndex);
+                    if (eventArgs is not null && TryBeginEnumerationSnapshotPatchWithAccess(out var patched))
+                    {
+                        if (oldItems.Count > 0)
+                            patched.RemoveRange(e.OldStartingIndex, oldItems.Count);
+                        if (newItems.Count > 0)
+                            patched.InsertRange(e.NewStartingIndex, newItems);
+                    }
                     break;
                 case NotifyCollectionChangedAction.Move:
-                    if (e.OldItems?.Count > 0 && e.OldStartingIndex != e.NewStartingIndex)
+                    if (e.OldItems is not null && e.OldItems.Count > 0 && e.OldStartingIndex != e.NewStartingIndex)
                     {
-                        List<(IObservableExpression<TElement, TResult> ObservableExpression, TResult CommittedResult)>? movedProjections = null;
-                        try
-                        {
-                            movedProjections = projections.GetRange(e.OldStartingIndex, e.OldItems.Count);
-                        }
-                        catch (ArgumentException)
+                        if (e.OldStartingIndex + e.OldItems.Count > positions.Count)
                         {
                             eventArgs = ResetWithAccess();
                             break;
                         }
-                        projections.RemoveRange(e.OldStartingIndex, e.OldItems.Count);
-                        projections.InsertRange(e.NewStartingIndex, movedProjections);
-                        var movedItems = new List<TResult>(movedProjections.Count);
-                        for (int i = 0, ii = movedProjections.Count; i < ii; ++i)
-                            movedItems.Add(movedProjections[i].CommittedResult);
+                        var movedItems = new List<TResult>(e.OldItems.Count);
+                        var movedNode = positions.NodeAt(e.OldStartingIndex);
+                        for (var i = 0; i < e.OldItems.Count && movedNode is not null; ++i)
+                        {
+                            movedItems.Add(movedNode.Item.CommittedResult);
+                            movedNode = positions.Next(movedNode);
+                        }
+                        positions.MoveRange(e.OldStartingIndex, e.NewStartingIndex, e.OldItems.Count);
                         eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Move, movedItems.AsReadOnly(), e.NewStartingIndex, e.OldStartingIndex);
+                        if (TryBeginEnumerationSnapshotPatchWithAccess(out var movedSnapshot))
+                        {
+                            movedSnapshot.RemoveRange(e.OldStartingIndex, movedItems.Count);
+                            movedSnapshot.InsertRange(e.NewStartingIndex, movedItems);
+                        }
                     }
                     break;
                 case NotifyCollectionChangedAction.Reset:
@@ -281,4 +348,25 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
 
     public override string ToString() =>
         $"mapping {source} with {Selector}";
+
+    bool TryBeginEnumerationSnapshotPatchWithAccess([NotNullWhen(true)] out List<TResult>? snapshot)
+    {
+        if (enumerationSnapshot is { } existing && ++enumerationSnapshotPatches <= maximumEnumerationSnapshotPatches)
+        {
+            if (enumerationSnapshotShared)
+            {
+                if (Volatile.Read(ref liveEnumerations) > 0)
+                {
+                    existing = new List<TResult>(existing);
+                    enumerationSnapshot = existing;
+                }
+                enumerationSnapshotShared = false;
+            }
+            snapshot = existing;
+            return true;
+        }
+        InvalidateEnumerationSnapshotWithAccess();
+        snapshot = null;
+        return false;
+    }
 }

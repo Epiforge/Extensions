@@ -36,3 +36,4 @@ packages/
 *.ncrunchsolution
 *.ncrunchproject
 nCrunchTemp_*.*
+BenchmarkDotNet.Artifacts/
