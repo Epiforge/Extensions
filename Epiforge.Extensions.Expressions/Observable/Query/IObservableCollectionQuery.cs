@@ -87,6 +87,7 @@ public interface IObservableCollectionQuery<TElement> :
     /// </summary>
     /// <param name="second">The collection to concatenate to this collection</param>
     /// <returns>The concatenated elements of this and the specified collection</returns>
+    /// <remarks>Because its two sources may change independently of one another, this query holds a lock while raising its notifications so that the indices it reports stay consistent with its contents; reading it from within a handler for one of those notifications, while another thread is changing the other source, may therefore deadlock</remarks>
     [return: DisposeWhenDiscarded]
     IObservableCollectionQuery<TElement> ObserveConcat(IObservableCollectionQuery<TElement> second);
 
