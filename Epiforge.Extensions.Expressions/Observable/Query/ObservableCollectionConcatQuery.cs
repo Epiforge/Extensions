@@ -3,8 +3,14 @@ namespace Epiforge.Extensions.Expressions.Observable.Query;
 sealed class ObservableCollectionConcatQuery<TElement>(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> first, IObservableCollectionQuery<TElement> second) :
     ObservableCollectionQuery<TElement>(collectionObserver)
 {
-    int announcedCount;
+#if IS_NET_9_0_OR_GREATER
+    readonly Lock access = new();
+#else
+    readonly object access = new();
+#endif
+    int count;
     int firstCount;
+    int secondCount;
 
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     internal readonly IObservableCollectionQuery<TElement> Second = second;
@@ -13,22 +19,15 @@ sealed class ObservableCollectionConcatQuery<TElement>(CollectionObserver collec
     {
         get
         {
-            var offset = firstCount;
+            int offset;
+            lock (access)
+                offset = firstCount;
             return index >= offset ? Second[index - offset] : first[index];
         }
     }
 
     public override int Count =>
-        firstCount + Second.Count;
-
-    void AnnounceCount()
-    {
-        var value = firstCount + Second.Count;
-        if (Interlocked.Exchange(ref announcedCount, value) == value)
-            return;
-        OnPropertyChanging(countPropertyChangingEventArgs);
-        OnPropertyChanged(countPropertyChangedEventArgs);
-    }
+        count;
 
     protected override bool Dispose(bool disposing)
     {
@@ -50,13 +49,16 @@ sealed class ObservableCollectionConcatQuery<TElement>(CollectionObserver collec
 
     void FirstCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
-        if (e.Action == NotifyCollectionChangedAction.Reset)
-            firstCount = first.Count;
-        else
-            firstCount += (e.NewItems?.Count ?? 0) - (e.OldItems?.Count ?? 0);
-        if (e.Action != NotifyCollectionChangedAction.Move)
-            AnnounceCount();
-        OnCollectionChanged(e);
+        lock (access)
+        {
+            if (e.Action is NotifyCollectionChangedAction.Reset)
+                firstCount = first.Count;
+            else
+                firstCount += (e.NewItems?.Count ?? 0) - (e.OldItems?.Count ?? 0);
+            if (e.Action is not NotifyCollectionChangedAction.Move)
+                SetCount();
+            OnCollectionChanged(e);
+        }
     }
 
     void FirstPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -70,33 +72,50 @@ sealed class ObservableCollectionConcatQuery<TElement>(CollectionObserver collec
 
     protected override void OnInitialization()
     {
-        firstCount = first.Count;
-        announcedCount = firstCount + Second.Count;
-        first.CollectionChanged += FirstCollectionChanged;
-        first.PropertyChanged += FirstPropertyChanged;
-        Second.CollectionChanged += SecondCollectionChanged;
-        Second.PropertyChanged += SecondPropertyChanged;
+        lock (access)
+        {
+            firstCount = first.Count;
+            secondCount = Second.Count;
+            count = firstCount + secondCount;
+            first.CollectionChanged += FirstCollectionChanged;
+            first.PropertyChanged += FirstPropertyChanged;
+            Second.CollectionChanged += SecondCollectionChanged;
+            Second.PropertyChanged += SecondPropertyChanged;
+        }
     }
 
     void SecondCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
-        if (e.Action != NotifyCollectionChangedAction.Move)
-            AnnounceCount();
-        OnCollectionChanged(e.Action switch
+        lock (access)
         {
-            NotifyCollectionChangedAction.Add => new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, e.NewItems, firstCount + e.NewStartingIndex),
-            NotifyCollectionChangedAction.Move => new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Move, e.NewItems, firstCount + e.NewStartingIndex, firstCount + e.OldStartingIndex),
-            NotifyCollectionChangedAction.Remove => new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, e.OldItems, firstCount + e.OldStartingIndex),
-            NotifyCollectionChangedAction.Replace => new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, e.NewItems!, e.OldItems!, firstCount + e.NewStartingIndex),
-            NotifyCollectionChangedAction.Reset => new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset),
-            _ => throw new NotSupportedException($"collection changed action {e.Action} is not supported"),
-        });
+            if (e.Action is NotifyCollectionChangedAction.Reset)
+                secondCount = Second.Count;
+            else
+                secondCount += (e.NewItems?.Count ?? 0) - (e.OldItems?.Count ?? 0);
+            if (e.Action is not NotifyCollectionChangedAction.Move)
+                SetCount();
+            OnCollectionChanged(e.Action switch
+            {
+                NotifyCollectionChangedAction.Add => new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, e.NewItems, firstCount + e.NewStartingIndex),
+                NotifyCollectionChangedAction.Move => new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Move, e.NewItems, firstCount + e.NewStartingIndex, firstCount + e.OldStartingIndex),
+                NotifyCollectionChangedAction.Remove => new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, e.OldItems, firstCount + e.OldStartingIndex),
+                NotifyCollectionChangedAction.Replace => new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, e.NewItems!, e.OldItems!, firstCount + e.NewStartingIndex),
+                NotifyCollectionChangedAction.Reset => new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset),
+                _ => throw new NotSupportedException($"collection changed action {e.Action} is not supported"),
+            });
+        }
     }
 
     void SecondPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(IObservableCollectionQuery<>.OperationFault))
             SetOperationFault();
+    }
+
+    void SetCount()
+    {
+        var value = firstCount + secondCount;
+        SetBackedProperty(ref count, in value, countPropertyChangingEventArgs, countPropertyChangedEventArgs);
     }
 
     void SetOperationFault()
