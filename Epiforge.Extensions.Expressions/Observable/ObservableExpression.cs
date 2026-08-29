@@ -98,7 +98,7 @@ abstract class ObservableExpression :
 
     internal void EvaluateIfDeferred()
     {
-        if (Interlocked.Exchange(ref deferringEvaluation, 0) != 0)
+        if (Volatile.Read(ref deferringEvaluation) != 0 && Interlocked.Exchange(ref deferringEvaluation, 0) != 0)
             Evaluate();
     }
 
