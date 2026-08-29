@@ -18,9 +18,11 @@ Intel Core Ultra 9 275HX 2.70GHz, 1 CPU, 24 logical and 24 physical cores
 
 ```
 dotnet run --project Epiforge.Extensions.Benchmarking --configuration Release -- --filter *QueryFootprintBenchmarks*
+dotnet run --project Epiforge.Extensions.Benchmarking --configuration Release -- --filter *QueryFanOutBenchmarks*
+dotnet run --project Epiforge.Extensions.Benchmarking --configuration Release -- --filter *ObservableExpressionBenchmarks*
 ```
 
-## The comparison this document cannot make
+## The comparison this document could not make at first
 
 There is no valid before-figure for `QueryFootprintBenchmarks`. The last run before the change was `QueryFootprintBenchmarks-20260828-174822`, and `QueryFootprintBenchmarks.cs` was edited eight minutes after that run began. The two runs therefore measure different benchmarks, not different libraries.
 
@@ -50,6 +52,55 @@ Treat that as a slope and not a law: the `FiveNodes` row sits roughly 300 bytes 
 The four reference fields removed from each node come to 24 bytes on a 64-bit runtime. Against 816 bytes per node per element, that is **three percent**.
 
 Allocation measurement here is precise enough to resolve three percent — the per-element figures above are stable to under two percent across sizes. It is not resolvable without a matched baseline, which is what this run lacks. So the change is sound on its merits, and this benchmark neither confirms nor refutes the arithmetic behind it. The finalizer removal is not visible here at all; a benchmark that constructs and disposes deterministically never queues a finalizable object, so that saving lives on the teardown path and would need `QueryFanOutBenchmarks` or a dedicated finalization measurement to appear.
+
+## The comparison two other benchmarks could make
+
+Written after the fact. `QueryFanOutBenchmarks` and `ObservableExpressionBenchmarks` both had valid before-figures on disk — in each case the benchmark source predates its own last result, so the same benchmark measured the old library. They were re-run against the change.
+
+### QueryFanOut, 1,000 elements
+
+| | before | after | change |
+|--- |---: |---: |---: |
+| `ChangeTheSharedValue` | 38.55 μs | 39.08 μs | none |
+| `ConstructAndDisposeWithFanOut` | 3,244.83 μs | 3,071.36 μs | −5.3% |
+| `ConstructAndDisposeWithoutFanOut` | 2,623.85 μs | 2,311.59 μs | −11.9% |
+| `ChangeTheSharedValue` allocated | 86.26 KB | 86.26 KB | none |
+| `ConstructAndDisposeWithFanOut` allocated | 4,446.22 KB | 4,375.84 KB | −70.38 KB |
+| `ConstructAndDisposeWithoutFanOut` allocated | 3,880.10 KB | 3,799.76 KB | −80.34 KB |
+
+`ChangeTheSharedValue` moved 1.4%, inside its own error on both runs, and allocated the same to the byte. The notification path is unchanged, which is the expected result: the removed `OnPropertyChanged` raised a delegate that was already null, and a predictable branch costs nothing.
+
+### ObservableExpression
+
+| existing expressions | before | after | change |
+|--- |---: |---: |---: |
+| 0 | 2.759 μs | 2.418 μs | −12.4% |
+| 1,000 | 2.609 μs | 2.422 μs | −7.2% |
+| 10,000 | 4.501 μs | 4.511 μs | none |
+| 0, allocated | 4.61 KB | 4.56 KB | −51 B |
+
+At ten thousand existing expressions the row is dominated by the cache lookup and does not move, which is the control this pair happens to come with.
+
+### The arithmetic, checked
+
+Both fan-out predicates substitute each element as a constant, so each element gets its own binary, member and constant node — three — while the shared subtree is built once. The saving per node is therefore:
+
+| row | saved per element | ÷ 3 nodes |
+|--- |---: |---: |
+| `ConstructAndDisposeWithFanOut` | 72.1 B | **24.0 B** |
+| `ConstructAndDisposeWithoutFanOut` | 82.3 B | 27.4 B |
+
+The estimate was 24 bytes per node — four reference fields on a 64-bit runtime. The fan-out row lands on it exactly. The row without fan-out runs about three bytes per node high, which is unexplained; it is a smaller graph and the per-query savings are not divided out, so the discrepancy is not necessarily per-node at all.
+
+### The part the estimate missed
+
+Allocation fell about two percent. Time fell twelve. The bytes were the smaller half of this change.
+
+Two removals plausibly account for the difference and this run cannot separate them. A type with a finalizer is registered on the finalization queue when it is allocated and must be promoted rather than collected in gen 0; removing `~SyncDisposable()` removes that from every node, on both the allocation and the collection path. Independently, `SyncDisposable` logged on every dispose through three event-raising wrappers, and `PropertyChangeNotifier` ran a virtual `LoggerSet` on every construction — roughly half a dozen null-checked calls per node that no longer happen.
+
+The gen 1 counter for `ConstructAndDisposeWithoutFanOut` fell from 156.25 to 93.75 collections per thousand operations, which is what the finalization-queue story predicts. Treat that as suggestive only: the same counter doubled on `CreateAndDispose` at zero existing expressions, so these columns are too coarse here to carry an argument.
+
+The conclusion that matters is about method rather than about bytes. `QueryFootprint` was the benchmark chosen for this change and it was the wrong instrument twice over — it had no valid baseline, and by constructing and disposing deterministically it can never observe a finalization cost at all. The two benchmarks that answered the question were not the ones the change was designed around.
 
 ## Where the 816 bytes actually go
 
