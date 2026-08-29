@@ -75,8 +75,35 @@ For scale, the entire move from `SyncDisposable` to `PlainSyncDisposable` — a 
 
 The `ObservableExpression` timing rows moved up at one thousand and ten thousand existing expressions. Same treatment: within a noisier run than its predecessor, no claim made.
 
-## What is left on this path
+## The read guard, measured
 
-`EvaluateIfDeferred` still performs an interlocked write on every read of `Evaluation`, forever, although the latch can only flip once. A `Volatile.Read` guard in front of the exchange would make the settled case — which is nearly every case — a plain read with no locked instruction at all. That is the next thing to measure, and `ChangeTheSharedValue` is now demonstrably the instrument sensitive enough to see it.
+The section above, as first written, proposed a follow-up: `EvaluateIfDeferred` still performed an interlocked write on every read of `Evaluation`, forever, although the latch can only flip once. Guarding the exchange with a `Volatile.Read` makes the settled case — nearly every case — a plain read with no locked instruction. It was measured immediately afterwards and this section records the result.
+
+The prediction made before the run was that a thousand dependents each reading `Evaluation` meant roughly a thousand locked writes, on the order of seven microseconds, worth perhaps another twenty-five percent of the row.
+
+| | before | after | change |
+|--- |---: |---: |---: |
+| `ChangeTheSharedValue` | 26.60 μs | 21.28 μs | **−20.0%** |
+| `ConstructAndDisposeWithFanOut` | 2,890.46 μs | 2,795.61 μs | −3.3% |
+| `ConstructAndDisposeWithoutFanOut` | 2,394.69 μs | 2,260.23 μs | −5.6% |
+
+All three allocation figures are identical to the byte — 86.26 KB, 4,246.03 KB and 3,680.03 KB — because deleting a locked instruction allocates nothing. That is the cleanest possible confirmation that the movement is instruction cost and not a change in the work being done.
+
+The measured saving on the notification row is 5.32 μs against a predicted seven, so the model was right in kind and about thirty percent optimistic in size. Dividing by roughly a thousand reads puts the cost of the removed instruction near fourteen cycles, against the twenty assumed. The two construction rows improved as well, at a third of the magnitude, which is consistent with the getter being called during construction but far less often per node than during a fan-out notification.
+
+### Cumulative
+
+`ChangeTheSharedValue` across the three changes recorded on 28 and 29 August:
+
+| after | mean |
+|--- |---: |
+| baseline, before plain disposal | 38.55 μs |
+| plain disposal | 39.08 μs |
+| deferral latch | 26.60 μs |
+| read guard | 21.28 μs |
+
+**−44.8% overall**, all of it from the last two changes, and none of it from the one the work was originally aimed at.
+
+## What is left
 
 Of the three per-node locks, two remain. `InitializationAccess` is load-bearing: the observer releases its cache lock before initializing, so two threads can hold the same cached node and race. Merging it with `dependentsAccess` appears safe under a parent-to-child acquisition ordering, but that argument has not been reviewed and a lock-ordering mistake does not fail a test suite reliably.
