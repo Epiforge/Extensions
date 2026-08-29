@@ -32,6 +32,35 @@ No baseline document captured the pre-change figures, so the earlier numbers exi
 
 ## What the run says on its own terms
 
+### The figures themselves
+
+Recorded here because BenchmarkDotNet overwrites its own report on the next run of the same filter, and these are the before-figures for whatever is measured next.
+
+| Predicate | Elements | Mean | Allocated |
+|--- |---: |---: |---: |
+| `OneNode` | 250 | 147.5 μs | 203.67 KB |
+| `ThreeNodes` | 250 | 524.5 μs | 939.17 KB |
+| `FiveNodes` | 250 | 818.5 μs | 1,271.48 KB |
+| `ElevenNodes` | 250 | 1,936.8 μs | 2,525.13 KB |
+| `SharedChangeableSubexpression` | 250 | 670.2 μs | 1,096.59 KB |
+| `OneNode` | 1,000 | 615.2 μs | 798.59 KB |
+| `ThreeNodes` | 1,000 | 2,850.1 μs | 3,754.13 KB |
+| `FiveNodes` | 1,000 | 4,077.6 μs | 5,078.09 KB |
+| `ElevenNodes` | 1,000 | 9,177.1 μs | 10,180.88 KB |
+| `SharedChangeableSubexpression` | 1,000 | 3,859.0 μs | 4,369.59 KB |
+| `OneNode` | 4,000 | 3,546.2 μs | 2,907.80 KB |
+| `ThreeNodes` | 4,000 | 30,733.7 μs | 14,793.67 KB |
+| `FiveNodes` | 4,000 | 44,116.4 μs | 20,200.09 KB |
+| `ElevenNodes` | 4,000 | 82,175.8 μs | 40,303.35 KB |
+| `SharedChangeableSubexpression` | 4,000 | 35,272.4 μs | 17,043.17 KB |
+| `OneNode` | 10,000 | 10,149.2 μs | 7,752.21 KB |
+| `ThreeNodes` | 10,000 | 83,730.0 μs | 37,659.43 KB |
+| `FiveNodes` | 10,000 | 113,484.3 μs | 50,602.05 KB |
+| `ElevenNodes` | 10,000 | 212,447.6 μs | 101,422.43 KB |
+| `SharedChangeableSubexpression` | 10,000 | 99,419.5 μs | 42,732.22 KB |
+
+Timing at the larger element counts carries standard deviations of two to five percent; treat the allocation column as the reliable one.
+
 Allocation per element, derived from the reported totals:
 
 | Predicate | 250 | 1,000 | 4,000 | 10,000 |
