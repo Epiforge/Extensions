@@ -140,9 +140,6 @@ abstract class ObservableExpression :
     internal (Exception? Fault, object? Result) CurrentEvaluation =>
         evaluation;
 
-    internal bool CurrentEvaluationEquals(in (Exception? Fault, object? Result) other) =>
-        ReferenceEquals(evaluation.Fault, other.Fault) && resultEqualityComparer.Equals(evaluation.Result, other.Result);
-
     protected abstract void OnInitialization();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -288,13 +285,16 @@ abstract class ScopedObservableExpression :
 
     void RaiseIfEvaluationChanged()
     {
-        if (!notificationForced && observableExpression.CurrentEvaluationEquals(in evaluation))
+        var current = observableExpression.CurrentEvaluation;
+        if (!notificationForced && ReferenceEquals(evaluation.Fault, current.Fault) && ResultEquals(evaluation.Result, current.Result))
             return;
         notificationForced = false;
         PropertyChanging?.Invoke(this, ObservableExpression.EvaluationPropertyChangingEventArgs);
-        evaluation = observableExpression.CurrentEvaluation;
+        evaluation = current;
         PropertyChanged?.Invoke(this, ObservableExpression.EvaluationPropertyChangedEventArgs);
     }
+
+    private protected abstract bool ResultEquals(object? x, object? y);
 
     internal void RaisePendingNotification()
     {
@@ -323,6 +323,9 @@ class ScopedObservableExpression<TResult> :
             return (fault, (TResult)result!);
         }
     }
+
+    private protected override bool ResultEquals(object? x, object? y) =>
+        x is null || y is null ? ReferenceEquals(x, y) : EqualityComparer<TResult>.Default.Equals((TResult)x, (TResult)y);
 }
 
 class ScopedObservableExpression<TArgument, TResult> :
