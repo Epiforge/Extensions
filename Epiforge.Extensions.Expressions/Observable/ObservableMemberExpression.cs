@@ -175,6 +175,9 @@ sealed class ObservableMemberExpression(ExpressionObserver observer, MemberExpre
         }
     }
 
-    void ValueChanged(object? sender, EventArgs e) =>
-        OnPropertyChanged(nameof(Evaluation));
+    void ValueChanged(object? sender, EventArgs e)
+    {
+        OnPropertyChanged(EvaluationPropertyChangedEventArgs);
+        NotifyDependentsChanged();
+    }
 }
