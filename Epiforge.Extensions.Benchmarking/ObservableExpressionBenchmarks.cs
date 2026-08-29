@@ -1,6 +1,7 @@
 ﻿namespace Epiforge.Extensions.Benchmarking;
 
 [MemoryDiagnoser]
+[SimpleJob(launchCount: 3)]
 public class ObservableExpressionBenchmarks
 {
     const int poolSize = 64;

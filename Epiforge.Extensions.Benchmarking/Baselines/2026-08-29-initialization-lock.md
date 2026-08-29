@@ -56,7 +56,9 @@ The ten-thousand row is the one that had not moved through any previous change o
 
 `ConstructAndDisposeWithoutFanOut` moved from 2,463.39 μs to 2,216.08 μs **with no change to the code between the two runs**. That is an eleven percent swing on an idle row, and the allocation anomaly in the first run — 3,681.28 KB against 3,680.03, with gen 0 at 195.3125 rather than 187.5 — vanished with it.
 
-That row therefore cannot support a timing claim below roughly ten percent, and two earlier claims in this series rest partly on it:
+That reading was diagnosed at the time as a property of the benchmark. A later measurement showed it is not, and the correction is recorded in the section below; the withdrawals that follow still stand, because they rest on single-launch measurements regardless of what the row is capable of when pooled.
+
+Two earlier claims in this series rest partly on this row:
 
 - The plain disposal document reads −11.9% on this row. That figure is at the edge of the noise, but the twelve percent conclusion there does not depend on it alone: `CreateAndDispose` at zero existing expressions independently gave −12.4% on a much tighter row.
 - The deferral latch document reads −5.6% on this row for the read guard. **That figure should not be relied upon.** The conclusion it accompanied does not depend on it either; the read guard's evidence is `ChangeTheSharedValue` at −20.0%, a row whose standard deviation runs two hundred to five hundred nanoseconds against a five microsecond movement.
@@ -64,6 +66,26 @@ That row therefore cannot support a timing claim below roughly ten percent, and 
 `ChangeTheSharedValue` and `CreateAndDispose` remain the trustworthy instruments in this pair. The construct-and-dispose rows are for allocation, which is deterministic, and not for time.
 
 `ConstructAndDisposeWithFanOut` is the one open question. Two post-change runs agree to within 1.6 μs of each other at about 2,880 μs, against a single pre-change measurement of 2,795.61. The post-change pair is tight enough to trust; whether the single pre-change figure was representative is unknown, so a three percent construction cost here is possible and unproven.
+
+## Correction: the row is capable, the run was contaminated
+
+Every benchmark in this project ran at BenchmarkDotNet's default `launchCount` of one. The diagnosis above assumed that reported error therefore excluded process-to-process variance, and that pooling several launches would widen the error bars to something honest. `QueryFanOutBenchmarks` was given `[SimpleJob(launchCount: 3)]` to test that.
+
+The prediction was wrong in the direction that falsifies it.
+
+| | single launch, range across runs | three launches, pooled |
+|--- |---: |---: |
+| `ChangeTheSharedValue` | 21.03–21.51 μs, error ±0.25–0.41 | 21.09 μs, error ±0.12 |
+| `ConstructAndDisposeWithFanOut` | 2,795–2,880 μs, error ±44–56 | 2,816.12 μs, error ±24.5 |
+| `ConstructAndDisposeWithoutFanOut` | 2,216–2,463 μs, error ±38–49 | 2,161.86 μs, error ±19.6 |
+
+Error roughly halved, which more samples alone would explain. Standard deviation also fell, from 74.3 to 44.1 and from 58.6 to 38.2 on the two construction rows, which more samples alone would not. If between-process variance were the missing term, pooling three processes would have raised the standard deviation rather than lowering it.
+
+So process-to-process variance is small here, and the 2,463.39 μs reading — whose own standard deviation was 72.96, high by this row's standards — was a contaminated run rather than a fair sample of the row's spread. The benchmark is not structurally incapable of resolving a few percent. It reports 0.9% error when pooled. It is simply vulnerable to an occasional disturbed run, and three launches dilute that.
+
+This also closes the open question above. `ConstructAndDisposeWithFanOut` at 2,816.12 ± 24.5 sits within one percent of the 2,795.61 measured before the change. The suspected three percent construction cost is not supported. The two single runs near 2,880 that agreed to within 1.6 μs of each other were agreeing precisely about something that did not reproduce.
+
+`launchCount` of three is now set on `QueryFanOutBenchmarks` and `ObservableExpressionBenchmarks`, the two used for decisions on this path. `QueryFootprintBenchmarks` is left at one: it already runs for six minutes, and it is used for breadth rather than for resolving small differences.
 
 ## Why the change is kept
 
