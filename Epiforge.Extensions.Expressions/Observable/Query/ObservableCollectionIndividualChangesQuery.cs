@@ -12,6 +12,7 @@ sealed class ObservableCollectionIndividualChangesQuery<TElement> :
     }
 
     readonly object access;
+    IReadOnlyList<TElement>? enumerationSnapshot;
     readonly ObservableRangeCollection<TElement> elements;
     readonly ObservableCollectionQuery<TElement> source;
 
@@ -53,7 +54,7 @@ sealed class ObservableCollectionIndividualChangesQuery<TElement> :
     public override IEnumerator<TElement> GetEnumerator()
     {
         lock (access)
-            return elements.ToList().AsReadOnly().GetEnumerator();
+            return (enumerationSnapshot ??= elements.ToList().AsReadOnly()).GetEnumerator();
     }
 
     protected override void OnInitialization()
@@ -64,8 +65,11 @@ sealed class ObservableCollectionIndividualChangesQuery<TElement> :
         source.CollectionChanged += SourceCollectionChanged;
     }
 
-    void ElementsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
+    void ElementsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        enumerationSnapshot = null;
         OnCollectionChanged(e);
+    }
 
     void ElementsPropertyChanged(object? sender, PropertyChangedEventArgs e) =>
         OnPropertyChanged(e);

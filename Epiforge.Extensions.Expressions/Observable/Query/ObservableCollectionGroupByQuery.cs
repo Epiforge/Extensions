@@ -21,6 +21,7 @@ sealed class ObservableCollectionGroupByQuery<TKey, TElement> :
     }
 
     readonly object access;
+    IReadOnlyList<IObservableGrouping<TKey, TElement>>? enumerationSnapshot;
     readonly NullableKeyDictionary<TKey, (ObservableRangeCollection<TElement> collection, IObservableGrouping<TKey, TElement> grouping)> collectionAndGroupingByKey;
     readonly ObservableRangeCollection<IObservableGrouping<TKey, TElement>> groupings;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
@@ -93,11 +94,14 @@ sealed class ObservableCollectionGroupByQuery<TKey, TElement> :
     public override IEnumerator<IObservableGrouping<TKey, TElement>> GetEnumerator()
     {
         lock (access)
-            return groupings.ToList().AsReadOnly().GetEnumerator();
+            return (enumerationSnapshot ??= groupings.ToList().AsReadOnly()).GetEnumerator();
     }
 
-    void GroupingsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
+    void GroupingsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        enumerationSnapshot = null;
         OnCollectionChanged(e);
+    }
 
     protected override void OnInitialization()
     {

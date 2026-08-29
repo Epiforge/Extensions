@@ -25,6 +25,7 @@ sealed class ObservableCollectionLookupQuery<TKey, TElement> :
     }
 
     readonly object access;
+    IReadOnlyList<IObservableGrouping<TKey, TElement>>? enumerationSnapshot;
     readonly Dictionary<TKey, (ObservableRangeCollection<TElement> collection, IObservableGrouping<TKey, TElement> grouping)> collectionAndGroupingByKey;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     readonly IObservableDictionaryQuery<TKey, IObservableGrouping<TKey, TElement>> groupingByKey;
@@ -201,7 +202,7 @@ sealed class ObservableCollectionLookupQuery<TKey, TElement> :
     public override IEnumerator<IObservableGrouping<TKey, TElement>> GetEnumerator()
     {
         lock (access)
-            return groupings.ToList().AsReadOnly().GetEnumerator();
+            return (enumerationSnapshot ??= groupings.ToList().AsReadOnly()).GetEnumerator();
     }
 
     IEnumerator<KeyValuePair<TKey, IObservableGrouping<TKey, TElement>>> IEnumerable<KeyValuePair<TKey, IObservableGrouping<TKey, TElement>>>.GetEnumerator()
@@ -216,8 +217,11 @@ sealed class ObservableCollectionLookupQuery<TKey, TElement> :
             return groupingByKey.GetRange(keys);
     }
 
-    void GroupingsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
+    void GroupingsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        enumerationSnapshot = null;
         OnCollectionChanged(e);
+    }
 
     protected override void OnInitialization()
     {

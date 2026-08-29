@@ -5,8 +5,11 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue>(CollectionObserver col
     where TKey : notnull
 {
     readonly object access = new();
+    IReadOnlyList<KeyValuePair<TKey, TValue>>? enumerationSnapshot;
+    IReadOnlyList<TKey>? keysSnapshot;
     readonly Dictionary<TKey, (IObservableExpression<KeyValuePair<TKey, TValue>, bool> ObservableExpression, Exception? CommittedFault, bool IsIncluded)> observableExpressions = new(source.KeyComparer);
     readonly ObservableDictionary<TKey, TValue> result = new(source.KeyComparer);
+    IReadOnlyList<TValue>? valuesSnapshot;
     internal readonly Expression<Func<KeyValuePair<TKey, TValue>, bool>> Predicate = predicate;
 
     public override TValue this[TKey key]
@@ -35,7 +38,7 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue>(CollectionObserver col
         get
         {
             lock (access)
-                return result.Keys.ToList().AsReadOnly();
+                return keysSnapshot ??= result.Keys.ToList().AsReadOnly();
         }
     }
 
@@ -44,7 +47,7 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue>(CollectionObserver col
         get
         {
             lock (access)
-                return result.Values.ToList().AsReadOnly();
+                return valuesSnapshot ??= result.Values.ToList().AsReadOnly();
         }
     }
 
@@ -94,7 +97,7 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue>(CollectionObserver col
     public override IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator()
     {
         lock (access)
-            return result.ToList().GetEnumerator();
+            return (enumerationSnapshot ??= result.ToList().AsReadOnly()).GetEnumerator();
     }
 
     public override IReadOnlyList<KeyValuePair<TKey, TValue>> GetRange(IEnumerable<TKey> keys)
@@ -126,11 +129,24 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue>(CollectionObserver col
         result.PropertyChanged += ResultPropertyChanged;
     }
 
-    void ResultCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
-        OnCollectionChanged(e);
+    void DiscardSnapshots()
+    {
+        enumerationSnapshot = null;
+        keysSnapshot = null;
+        valuesSnapshot = null;
+    }
 
-    void ResultDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e) =>
+    void ResultCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        DiscardSnapshots();
+        OnCollectionChanged(e);
+    }
+
+    void ResultDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e)
+    {
+        DiscardSnapshots();
         OnDictionaryChanged(e);
+    }
 
     void ResultDictionaryChangedBoxed(object? sender, NotifyDictionaryChangedEventArgs<object?, object?> e) =>
         OnDictionaryChangedBoxed(e);

@@ -5,9 +5,12 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>(Colle
     where TKey : notnull
 {
     readonly object access = new();
+    IReadOnlyList<KeyValuePair<TKey, TValue>>? enumerationSnapshot;
+    IReadOnlyList<TKey>? keysSnapshot;
     readonly PrefixWeightedSequence<KeyValuePair<TKey, TValue>> claims = new();
     readonly Dictionary<TKey, List<PrefixWeightedSequenceNode<KeyValuePair<TKey, TValue>>>> claimantsByKey = new(equalityComparer);
     readonly ObservableDictionary<TKey, TValue> dictionary = new(equalityComparer);
+    IReadOnlyList<TValue>? valuesSnapshot;
     int nullKeys;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     IObservableCollectionQuery<KeyValuePair<TKey, TValue>>? select;
@@ -41,7 +44,7 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>(Colle
         get
         {
             lock (access)
-                return dictionary.Keys.ToList().AsReadOnly();
+                return keysSnapshot ??= dictionary.Keys.ToList().AsReadOnly();
         }
     }
 
@@ -50,7 +53,7 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>(Colle
         get
         {
             lock(access)
-                return dictionary.Values.ToList().AsReadOnly();
+                return valuesSnapshot ??= dictionary.Values.ToList().AsReadOnly();
         }
     }
 
@@ -97,11 +100,24 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>(Colle
             ((ICollection<KeyValuePair<TKey, TValue>>)dictionary).CopyTo(array, arrayIndex);
     }
 
-    void DictionaryCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
-        OnCollectionChanged(e);
+    void DiscardSnapshots()
+    {
+        enumerationSnapshot = null;
+        keysSnapshot = null;
+        valuesSnapshot = null;
+    }
 
-    void DictionaryDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e) =>
+    void DictionaryCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        DiscardSnapshots();
+        OnCollectionChanged(e);
+    }
+
+    void DictionaryDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e)
+    {
+        DiscardSnapshots();
         OnDictionaryChanged(e);
+    }
 
     void DictionaryDictionaryChangedBoxed(object? sender, NotifyDictionaryChangedEventArgs<object?, object?> e) =>
         OnDictionaryChangedBoxed(e);
@@ -137,7 +153,7 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>(Colle
     public override IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator()
     {
         lock (access)
-            return dictionary.ToList().AsReadOnly().GetEnumerator();
+            return (enumerationSnapshot ??= dictionary.ToList().AsReadOnly()).GetEnumerator();
     }
 
     public override IReadOnlyList<KeyValuePair<TKey, TValue>> GetRange(IEnumerable<TKey> keys)

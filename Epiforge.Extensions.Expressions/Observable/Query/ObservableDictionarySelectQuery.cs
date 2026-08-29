@@ -6,11 +6,14 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
     where TSourceKey : notnull
 {
     readonly object access = new();
+    IReadOnlyList<KeyValuePair<TKey, TValue>>? enumerationSnapshot;
+    IReadOnlyList<TKey>? keysSnapshot;
     readonly Dictionary<TKey, List<TSourceKey>> claimantsByProjectedKey = new(equalityComparer);
     int duplicateClaims;
     int nullKeys;
     readonly ObservableDictionary<TSourceKey, (IObservableExpression<KeyValuePair<TSourceKey, TSourceValue>, KeyValuePair<TKey, TValue>> ObservableExpression, Exception? CommittedFault, KeyValuePair<TKey, TValue> CommittedProjection)> observableExpressions = new(source.KeyComparer);
     readonly ObservableDictionary<TKey, TValue> result = new(equalityComparer);
+    IReadOnlyList<TValue>? valuesSnapshot;
     readonly EqualityComparer<TValue> valueEqualityComparer = EqualityComparer<TValue>.Default;
 
     internal readonly IEqualityComparer<TKey> EqualityComparer = equalityComparer;
@@ -39,7 +42,7 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
         get
         {
             lock (access)
-                return result.Keys.ToList().AsReadOnly();
+                return keysSnapshot ??= result.Keys.ToList().AsReadOnly();
         }
     }
 
@@ -48,7 +51,7 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
         get
         {
             lock (access)
-                return result.Values.ToList().AsReadOnly();
+                return valuesSnapshot ??= result.Values.ToList().AsReadOnly();
         }
     }
 
@@ -115,7 +118,7 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
     public override IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator()
     {
         lock (access)
-            return result.ToList().GetEnumerator();
+            return (enumerationSnapshot ??= result.ToList().AsReadOnly()).GetEnumerator();
     }
 
     public override IReadOnlyList<KeyValuePair<TKey, TValue>> GetRange(IEnumerable<TKey> keys)
@@ -185,11 +188,24 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
         result.DictionaryChanged += ResultDictionaryChanged;
     }
 
-    void ResultCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
-        OnCollectionChanged(e);
+    void DiscardSnapshots()
+    {
+        enumerationSnapshot = null;
+        keysSnapshot = null;
+        valuesSnapshot = null;
+    }
 
-    void ResultDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e) =>
+    void ResultCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        DiscardSnapshots();
+        OnCollectionChanged(e);
+    }
+
+    void ResultDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e)
+    {
+        DiscardSnapshots();
         OnDictionaryChanged(e);
+    }
 
     void ResultDictionaryChangedBoxed(object? sender, NotifyDictionaryChangedEventArgs<object?, object?> e) =>
         OnDictionaryChangedBoxed(e);
