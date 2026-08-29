@@ -21,7 +21,11 @@ abstract class ObservableExpression :
 
     protected readonly object? defaultResult;
     int deferringEvaluation;
-    SpinLock dependentsAccess = new(enableThreadOwnerTracking: false);
+#if IS_NET_9_0_OR_GREATER
+    readonly Lock dependentsAccess = new();
+#else
+    readonly object dependentsAccess = new();
+#endif
     ObservableExpressionSubscription? firstDependent;
     ObservableExpressionSubscription? lastDependent;
     (Exception? Fault, object? Result) evaluation;
@@ -134,21 +138,14 @@ abstract class ObservableExpression :
     {
         ArgumentNullException.ThrowIfNull(dependent);
         var subscription = new ObservableExpressionSubscription(dependent);
-        var lockTaken = false;
-        try
+        lock (dependentsAccess)
         {
-            dependentsAccess.Enter(ref lockTaken);
             subscription.Previous = lastDependent;
             if (lastDependent is null)
                 Volatile.Write(ref firstDependent, subscription);
             else
                 lastDependent.Next = subscription;
             lastDependent = subscription;
-        }
-        finally
-        {
-            if (lockTaken)
-                dependentsAccess.Exit();
         }
         return subscription;
     }
@@ -170,10 +167,8 @@ abstract class ObservableExpression :
     internal void UnsubscribeDependent(ObservableExpressionSubscription subscription)
     {
         ArgumentNullException.ThrowIfNull(subscription);
-        var lockTaken = false;
-        try
+        lock (dependentsAccess)
         {
-            dependentsAccess.Enter(ref lockTaken);
             if (subscription.IsRemoved)
                 return;
             subscription.IsRemoved = true;
@@ -186,11 +181,6 @@ abstract class ObservableExpression :
             else
                 subscription.Next.Previous = subscription.Previous;
             subscription.Previous = null;
-        }
-        finally
-        {
-            if (lockTaken)
-                dependentsAccess.Exit();
         }
     }
 }
