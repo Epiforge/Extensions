@@ -209,6 +209,7 @@ abstract class ScopedObservableExpression :
     private protected readonly ObservableExpression observableExpression;
     readonly ExpressionObserver observer;
     int disposed;
+    int notificationPending;
     readonly ObservableExpressionSubscription? subscription;
 
     internal readonly Expression Expression;
@@ -235,6 +236,9 @@ abstract class ScopedObservableExpression :
         remove { }
     }
 
+    internal void ClearPendingNotification() =>
+        Volatile.Write(ref notificationPending, 0);
+
     public void Dispose()
     {
         if (Interlocked.Exchange(ref disposed, 1) != 0)
@@ -250,11 +254,33 @@ abstract class ScopedObservableExpression :
         Disposed?.Invoke(this, e);
     }
 
-    void ObservableExpressionPropertyChanging(object? sender, PropertyChangingEventArgs e) =>
+    void ObservableExpressionPropertyChanging(object? sender, PropertyChangingEventArgs e)
+    {
+        if (PropagationScope.IsPropagating)
+        {
+            if (Interlocked.Exchange(ref notificationPending, 1) != 0)
+                return;
+            PropagationScope.Enlist(this);
+        }
         PropertyChanging?.Invoke(this, e);
+    }
 
-    void IObservableExpressionDependent.OnDependencyEvaluationChanged(ObservableExpression dependency) =>
+    void IObservableExpressionDependent.OnDependencyEvaluationChanged(ObservableExpression dependency)
+    {
+        if (PropagationScope.IsPropagating)
+        {
+            if (Interlocked.Exchange(ref notificationPending, 1) == 0)
+                PropagationScope.Enlist(this);
+            return;
+        }
         PropertyChanged?.Invoke(this, ObservableExpression.EvaluationPropertyChangedEventArgs);
+    }
+
+    internal void RaisePendingNotification()
+    {
+        if (!IsDisposed)
+            PropertyChanged?.Invoke(this, ObservableExpression.EvaluationPropertyChangedEventArgs);
+    }
 
     public override string ToString() =>
         Expression.ToString();

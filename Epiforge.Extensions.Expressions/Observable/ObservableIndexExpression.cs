@@ -85,6 +85,7 @@ sealed class ObservableIndexExpression(ExpressionObserver observer, IndexExpress
     [SuppressMessage("Code Analysis", "CA1502: Avoid excessive complexity")]
     void ObjectValueCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
+        using var propagation = new PropagationScope();
         switch (e.Action)
         {
             case NotifyCollectionChangedAction.Add:
@@ -125,6 +126,7 @@ sealed class ObservableIndexExpression(ExpressionObserver observer, IndexExpress
 
     void ObjectValueDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<object?, object?> e)
     {
+        using var propagation = new PropagationScope();
         if (e.Action == NotifyDictionaryChangedAction.Reset)
             Evaluate();
         else if (arguments?.Count == 1)
@@ -149,7 +151,10 @@ sealed class ObservableIndexExpression(ExpressionObserver observer, IndexExpress
     void ObjectValuePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == indexer?.Name)
+        {
+            using var propagation = new PropagationScope();
             Evaluate();
+        }
     }
 
     protected override void OnInitialization()

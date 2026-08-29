@@ -22,7 +22,7 @@ public class Propagation
     }
 
     [TestMethod]
-    public void DiamondNotifiesTwicePerChange()
+    public void DiamondNotifiesOncePerChange()
     {
         var subject = new Numbered { Number = 5 };
         var values = new List<int>();
@@ -36,11 +36,29 @@ public class Propagation
             expr.PropertyChanged -= propertyChanged;
         }
         Assert.AreEqual(0, observer.CachedObservableExpressions);
-        Assert.IsTrue(new int[] { 20, 22 }.SequenceEqual(values));
+        Assert.IsTrue(new int[] { 22 }.SequenceEqual(values));
     }
 
     [TestMethod]
-    public void OptimizedDiamondNotifiesTwicePerChangeAndReturnsToItsOriginalValue()
+    public void DiamondRaisesChangingOncePerChange()
+    {
+        var subject = new Numbered { Number = 5 };
+        var changings = 0;
+        var observer = new ExpressionObserver();
+        using (var expr = observer.Observe(numbered => numbered.Number * 2 + (numbered.Number + 1), subject))
+        {
+            void propertyChanging(object? sender, PropertyChangingEventArgs e) => ++changings;
+            expr.PropertyChanging += propertyChanging;
+            Assert.AreEqual(16, expr.Evaluation.Result);
+            subject.Number = 7;
+            expr.PropertyChanging -= propertyChanging;
+        }
+        Assert.AreEqual(0, observer.CachedObservableExpressions);
+        Assert.AreEqual(1, changings);
+    }
+
+    [TestMethod]
+    public void OptimizedDiamondNotifiesOncePerChangeEvenWhenItsValueIsUnchanged()
     {
         var subject = new Numbered { Number = 3 };
         var values = new List<bool>();
@@ -55,7 +73,7 @@ public class Propagation
             expr.PropertyChanged -= propertyChanged;
         }
         Assert.AreEqual(0, observer.CachedObservableExpressions);
-        Assert.IsTrue(new bool[] { false, true }.SequenceEqual(values));
+        Assert.IsTrue(new bool[] { true }.SequenceEqual(values));
     }
 }
 
