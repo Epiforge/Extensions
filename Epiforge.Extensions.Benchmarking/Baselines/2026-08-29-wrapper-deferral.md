@@ -88,6 +88,41 @@ Against that, the whole of this mechanism's rent — scope entry and exit, both 
 
 That bound comes from measurements already in hand. Tightening it would need this benchmark run against `main`, and the decision it would inform does not change at either end of the range, so it was not run.
 
+## Making changing and changed symmetric
+
+Reviewing the above turned up an asymmetry this work had left behind. A node's *changed* notification travels the intrusive dependent list; its *changing* notification was still a multicast `internal event PropertyChangingEventHandler?`. Two mechanisms for the two halves of one transition, and only one of them had been converted.
+
+That cost more than tidiness. Every node carried the eight-byte delegate field although only a root node ever has a wrapper subscribed, and because a cached expression is shared across the distinct observations of it, that event accumulated one handler per observation — `Delegate.Combine` allocating N+1 slots per subscribe, the same growth the dependent list was built to eliminate, still standing on the other side.
+
+`IObservableExpressionDependent` gained `OnDependencyEvaluationChanging` with an empty default body, so the thirteen node types were untouched and `ScopedObservableExpression` is the only override. The event field is gone and the setter walks the same list.
+
+That is not a pure subtraction, and the first measurement said so:
+
+| at 1,000 elements | before | after the merge | with the flag |
+|--- |---: |---: |---: |
+| `ChangeTheSharedValue` | 21.23 μs | 23.16 μs | **21.32 μs** |
+| `ConstructAndDisposeWithFanOut` allocated | 4,222.57 KB | 4,074.11 KB | 4,074.11 KB |
+| `ConstructAndDisposeWithoutFanOut` allocated | 3,656.58 KB | 3,498.13 KB | 3,498.13 KB |
+
+The old changing channel was a null check on a node nobody watched. The new one was a full list walk with a virtual call per dependent, and the node a thousand comparisons hang off has a thousand dependents and no wrapper among them — so it walked them twice per change and called the empty default a thousand times. Nine percent, on the row this library exists to make fast.
+
+The flag is one bit: `ObservesEvaluationChanging`, default false on the interface and true on the wrapper, recorded on the node when a dependent subscribes, checked before the walk. Nodes no observation watches skip it entirely. That recovered the whole nine percent while keeping both allocation savings, which is what confirms the savings came from deleting the field and its delegate traffic rather than from the walk.
+
+## Net position
+
+| | before the branch | after |
+|--- |---: |---: |
+| `CostlyDiamondChange` ÷ `CostlyChainChange` | 2.008 | **1.002** |
+| `ChangeTheSharedValue` | 21.01 μs, 86.26 KB | 21.32 μs, 86.26 KB |
+| `ConstructAndDisposeWithFanOut` | 2,950.76 μs, 4,222.57 KB | 2,958.78 μs, **4,074.11 KB** |
+| `ConstructAndDisposeWithoutFanOut` | 2,232.40 μs, 3,656.58 KB | 2,211.75 μs, **3,498.13 KB** |
+| `ChainChange` | 82.63 ns, 312 B | 95.23 ns, 312 B |
+| `DiamondChange` | 124.57 ns, 488 B | 133.83 ns, 488 B |
+
+`QueryFanOutFlipBenchmarks` read 82.10 and 21.80 μs against 82.38 and 21.76 before the merge, with allocation identical to the byte on both rows — unmoved, as it should be.
+
+The `ChainChange` figure carries the deferral's rent and reads between 92.26 and 95.23 across four runs; the highest of those has four times the usual dispersion for that row, so treat the rent as roughly ten to twelve nanoseconds per propagation rather than as any one of those numbers. Against it, a diamond's boundary cost is halved and construction at a thousand elements allocates about a hundred and fifty kilobytes less than it did.
+
 ## What was deliberately left alone
 
 An expression whose value returns to where it started still raises one notification. `OptimizedDiamondNotifiesOncePerChangeEvenWhenItsValueIsUnchanged` covers a diamond over `Number > 5 == Number > 10` moving from 3 to 12: both comparisons flip, the result is `true` before and after, and the consumer is told something changed. Deferral removes the wrong value but not the spurious notification. Suppressing it needs the wrapper to remember its pre-propagation evaluation, which is per-observation memory and a separate decision.
@@ -101,5 +136,7 @@ Consolidating the scope's two thread-static fields into one object, and merging 
 Four predictions were recorded before this was measured. Two held: that the costly diamond row would fall to parity with the costly chain row, and that the single-path row was the one to watch. Two failed, both because they ignored an analysis made two days earlier in this same work — that deferral suppresses the boundary event and leaves the redundant internal recompute alone. `DiamondChange` and its allocation were predicted to fall; the join still evaluates twice and still boxes twice, so neither did.
 
 A fifth prediction, that the `Interlocked.Exchange` pair accounted for most of the rent, was wrong by a factor of four.
+
+Three more were recorded before the symmetry work was measured and all three held: that merging the changing channel would cost on the shared-node fan-out and nowhere else, that the flag would recover it in full, and that the allocation savings would survive the flag because they came from the field rather than the walk. The pattern across all eight is that predictions about *where* a cost falls have been reliable and predictions about *how a cost decomposes* have not.
 
 One benchmark run showed a suspiciously low mean on `CostlyDiamondChange` with a standard deviation eighty times its sibling's. The question that mattered was not whether the number was noisy but whether some fraction of propagations were skipping a notification, and a benchmark cannot answer that. `DiamondNotifiesOncePerChangeAcrossManyChanges` asserts one notification per change across a hundred thousand changes; it passes, and the dispersion did not reproduce.
