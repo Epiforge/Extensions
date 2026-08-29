@@ -88,7 +88,10 @@ sealed class ObservableMemberExpression(ExpressionObserver observer, MemberExpre
     void ObservableExpressionValuePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (string.IsNullOrEmpty(e.PropertyName) || e.PropertyName == member?.Name)
+        {
+            using var propagation = new PropagationScope();
             Evaluate();
+        }
     }
 
     protected override void OnInitialization()
@@ -171,6 +174,9 @@ sealed class ObservableMemberExpression(ExpressionObserver observer, MemberExpre
         }
     }
 
-    void ValueChanged(object? sender, EventArgs e) =>
-        NotifyDependentsChanged();
+    void ValueChanged(object? sender, EventArgs e)
+    {
+        using var propagation = new PropagationScope();
+        NotifyDependentsOfValueContentsChanged();
+    }
 }

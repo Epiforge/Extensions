@@ -9,7 +9,6 @@ namespace Epiforge.Extensions.Expressions.Observable.Query;
 public interface IObservableQuery :
     IDisposable,
     IDisposalStatus,
-    INotifyDisposalOverridden,
     INotifyDisposed,
     INotifyDisposing,
     INotifyPropertyChanged,
