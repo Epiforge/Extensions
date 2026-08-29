@@ -15,12 +15,12 @@ abstract class ObservableExpression :
         var type = Expression.Type;
         defaultResult = type.FastDefault();
         resultEqualityComparer = FastEqualityComparer.Get(type);
-        deferringEvaluation = deferEvaluation;
+        deferringEvaluation = deferEvaluation ? 1 : 0;
         evaluation = (null, defaultResult);
     }
 
     protected readonly object? defaultResult;
-    bool deferringEvaluation;
+    int deferringEvaluation;
 #if IS_NET_9_0_OR_GREATER
     readonly Lock dependentsAccess = new();
 #else
@@ -29,11 +29,6 @@ abstract class ObservableExpression :
     int dependentSequence;
     ObservableExpressionSubscription? firstDependent;
     ObservableExpressionSubscription? lastDependent;
-#if IS_NET_9_0_OR_GREATER
-    readonly Lock deferringEvaluationAccess = new();
-#else
-    readonly object deferringEvaluationAccess = new();
-#endif
     (Exception? Fault, object? Result) evaluation;
     protected readonly ExpressionObserver observer;
     readonly FastEqualityComparer resultEqualityComparer;
@@ -71,14 +66,8 @@ abstract class ObservableExpression :
         }
     }
 
-    protected bool IsDeferringEvaluation
-    {
-        get
-        {
-            lock (deferringEvaluationAccess)
-                return deferringEvaluation;
-        }
-    }
+    protected bool IsDeferringEvaluation =>
+        Volatile.Read(ref deferringEvaluation) != 0;
 
     internal event PropertyChangingEventHandler? PropertyChanging;
 
@@ -109,25 +98,13 @@ abstract class ObservableExpression :
 
     internal void EvaluateIfDeferred()
     {
-        var shouldEvaluate = false;
-        lock (deferringEvaluationAccess)
-        {
-            if (deferringEvaluation)
-            {
-                deferringEvaluation = false;
-                shouldEvaluate = true;
-            }
-        }
-        if (shouldEvaluate)
+        if (Interlocked.Exchange(ref deferringEvaluation, 0) != 0)
             Evaluate();
     }
 
     protected void EvaluateIfNotDeferred()
     {
-        bool shouldEvaluate;
-        lock (deferringEvaluationAccess)
-            shouldEvaluate = !deferringEvaluation;
-        if (shouldEvaluate)
+        if (Volatile.Read(ref deferringEvaluation) == 0)
             Evaluate();
     }
 
@@ -182,13 +159,10 @@ abstract class ObservableExpression :
 
     protected bool TryGetUndeferredResult(out object? result)
     {
-        lock (deferringEvaluationAccess)
+        if (Volatile.Read(ref deferringEvaluation) != 0)
         {
-            if (deferringEvaluation)
-            {
-                result = null;
-                return false;
-            }
+            result = null;
+            return false;
         }
         result = evaluation.Result;
         return true;
