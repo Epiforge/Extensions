@@ -5,6 +5,23 @@ public class ObservableMemberExpression
 {
     #region TestMethod Classes
 
+    public class CollectionChangeOnlyNotifier :
+        INotifyCollectionChanged
+    {
+        readonly List<string> items = [];
+
+        public int Count =>
+            items.Count;
+
+        public event NotifyCollectionChangedEventHandler? CollectionChanged;
+
+        public void Add(string item)
+        {
+            items.Add(item);
+            CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, item, items.Count - 1));
+        }
+    }
+
     public class TestObject :
         PropertyChangeNotifier
     {
@@ -45,6 +62,22 @@ public class ObservableMemberExpression
             Assert.AreEqual(5, expr.Evaluation.Result);
             john.Name = null;
             Assert.AreEqual(3, expr.Evaluation.Result);
+        }
+        Assert.AreEqual(0, observer.CachedObservableExpressions);
+    }
+
+    [TestMethod]
+    public void ClosureFieldValueCollectionChanged()
+    {
+        var collection = new CollectionChangeOnlyNotifier();
+        var observer = ExpressionObserverHelpers.Create();
+        using (var expr = observer.Observe(() => collection.Count))
+        {
+            Assert.AreEqual(0, expr.Evaluation.Result);
+            collection.Add("first");
+            Assert.AreEqual(1, expr.Evaluation.Result);
+            collection.Add("second");
+            Assert.AreEqual(2, expr.Evaluation.Result);
         }
         Assert.AreEqual(0, observer.CachedObservableExpressions);
     }
