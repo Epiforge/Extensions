@@ -493,25 +493,27 @@ public class ExpressionObserver :
             UnaryExpression unaryExpression => GetObservableExpression(unaryExpression, deferEvaluation),
             _ => throw new NotSupportedException($"expression type {expression.GetType().Name} is not supported")
         };
-        lock (observableExpression.InitializationAccess)
-        {
-            if (observableExpression.InitializationException is { } initializationException)
-                ExceptionDispatchInfo.Capture(initializationException).Throw();
-            try
+        if (Volatile.Read(ref observableExpression.InitializationAccess) is { } initializationAccess)
+            lock (initializationAccess)
             {
-                if (!observableExpression.IsInitialized)
+                if (observableExpression.InitializationException is { } initializationException)
+                    ExceptionDispatchInfo.Capture(initializationException).Throw();
+                try
                 {
-                    observableExpression.Initialize();
-                    observableExpression.IsInitialized = true;
+                    if (!observableExpression.IsInitialized)
+                    {
+                        observableExpression.Initialize();
+                        observableExpression.IsInitialized = true;
+                    }
                 }
+                catch (Exception ex)
+                {
+                    observableExpression.InitializationException = ex;
+                    observableExpression.Dispose();
+                    ExceptionDispatchInfo.Capture(ex).Throw();
+                }
+                Volatile.Write(ref observableExpression.InitializationAccess, null);
             }
-            catch (Exception ex)
-            {
-                observableExpression.InitializationException = ex;
-                observableExpression.Dispose();
-                ExceptionDispatchInfo.Capture(ex).Throw();
-            }
-        }
         if (!deferEvaluation)
             observableExpression.EvaluateIfDeferred();
         return observableExpression;

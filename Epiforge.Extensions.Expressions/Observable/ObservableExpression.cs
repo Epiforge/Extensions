@@ -35,9 +35,9 @@ abstract class ObservableExpression :
 
     internal readonly Expression Expression;
 #if IS_NET_9_0_OR_GREATER
-    internal readonly Lock InitializationAccess = new();
+    internal Lock? InitializationAccess = new();
 #else
-    internal readonly object InitializationAccess = new();
+    internal object? InitializationAccess = new();
 #endif
     internal Exception? InitializationException;
     internal bool IsInitialized;
