@@ -209,7 +209,7 @@ abstract class ScopedObservableExpression :
     private protected readonly ObservableExpression observableExpression;
     readonly ExpressionObserver observer;
     int disposed;
-    int notificationPending;
+    bool notificationPending;
     readonly ObservableExpressionSubscription? subscription;
 
     internal readonly Expression Expression;
@@ -237,7 +237,7 @@ abstract class ScopedObservableExpression :
     }
 
     internal void ClearPendingNotification() =>
-        Volatile.Write(ref notificationPending, 0);
+        notificationPending = false;
 
     public void Dispose()
     {
@@ -258,8 +258,9 @@ abstract class ScopedObservableExpression :
     {
         if (PropagationScope.IsPropagating)
         {
-            if (Interlocked.Exchange(ref notificationPending, 1) != 0)
+            if (notificationPending)
                 return;
+            notificationPending = true;
             PropagationScope.Enlist(this);
         }
         PropertyChanging?.Invoke(this, e);
@@ -269,8 +270,11 @@ abstract class ScopedObservableExpression :
     {
         if (PropagationScope.IsPropagating)
         {
-            if (Interlocked.Exchange(ref notificationPending, 1) == 0)
+            if (!notificationPending)
+            {
+                notificationPending = true;
                 PropagationScope.Enlist(this);
+            }
             return;
         }
         PropertyChanged?.Invoke(this, ObservableExpression.EvaluationPropertyChangedEventArgs);

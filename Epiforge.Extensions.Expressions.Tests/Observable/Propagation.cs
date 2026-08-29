@@ -40,6 +40,26 @@ public class Propagation
     }
 
     [TestMethod]
+    public void DiamondNotifiesOncePerChangeAcrossManyChanges()
+    {
+        const int changes = 100000;
+        var subject = new Numbered { Number = 0 };
+        var notifications = 0;
+        var observer = new ExpressionObserver();
+        using (var expr = observer.Observe(numbered => numbered.Number * 2 + (numbered.Number + 1), subject))
+        {
+            void propertyChanged(object? sender, PropertyChangedEventArgs e) => ++notifications;
+            expr.PropertyChanged += propertyChanged;
+            for (var i = 1; i <= changes; ++i)
+                subject.Number = i;
+            expr.PropertyChanged -= propertyChanged;
+            Assert.AreEqual(changes * 3 + 1, expr.Evaluation.Result);
+        }
+        Assert.AreEqual(0, observer.CachedObservableExpressions);
+        Assert.AreEqual(changes, notifications);
+    }
+
+    [TestMethod]
     public void DiamondRaisesChangingOncePerChange()
     {
         var subject = new Numbered { Number = 5 };
