@@ -21,6 +21,7 @@ Intel Core Ultra 9 275HX 2.70GHz, 1 CPU, 24 logical and 24 physical cores
 ```
 dotnet run --project Epiforge.Extensions.Benchmarking --configuration Release -- --filter *FastComparisonBenchmarks*
 dotnet run --project Epiforge.Extensions.Benchmarking --configuration Release -- --filter *QueryFanOutBenchmarks*
+dotnet run --project Epiforge.Extensions.Benchmarking --configuration Release -- --filter *ObserveOrderByBenchmarks*
 ```
 
 ## What changed
@@ -56,6 +57,23 @@ Thirty-two times faster on the two comparisons, fifty-three on the hash code, an
 Construction shed about a hundred and eighty kilobytes on both rows, which is each node's first evaluation paying the same toll once. The without-fan-out row reads slower in time, but its standard deviation is 113.74 μs against the difference of 205 — that row has never been trustworthy for timing and this does not change it.
 
 Every figure recorded in `2026-08-29-wrapper-deferral.md` was measured with this cost included. Those comparisons remain valid against each other, since the toll was constant across them, but the absolute numbers there are now historical.
+
+## ObserveOrderByBenchmarks
+
+`FastComparer` needed a consumer measured rather than a microbenchmark. `ObserveOrderBy` compares through `ObservableCollectionOrderingComparer`, and the most recent recorded figures for it are from 28 August.
+
+| | before | after |
+|--- |---: |---: |
+| `KeyChange`, 100 | 1,717.1 ns, 1341 B | 1,550.48 ns, 1085 B |
+| `KeyChange`, 1,000 | 2,657.5 ns, 1344 B | 2,477.09 ns, 1088 B |
+| `KeyChange`, 10,000 | 7,181.5 ns, 1344 B | 6,574.77 ns, 1088 B |
+| `Enumerate`, 10,000 | 8,244 ns, 40 B | 8,261.48 ns, 40 B |
+
+Two hundred and fifty-six bytes at every size — four comparisons at sixty-four bytes each — and seven to ten percent of the time. `Enumerate` did not move, which it must not, since enumerating compares nothing.
+
+The flatness is the finding. A key change does not re-sort; the ordering repairs locally, and a repair costs four comparisons whether the collection holds a hundred elements or ten thousand. The obvious story before measuring — that sorting compares O(n log n) times, so this should be enormous — was wrong, and no number was predicted for this row precisely because that story could not be checked without reading code that had not been read.
+
+The recorded before predates the `wrapper-deferral` merge, so the interval contains another change. What makes the attribution sound is not the size of the delta but its shape: four times sixty-four, identically, at three collection sizes.
 
 ## A note on method
 
