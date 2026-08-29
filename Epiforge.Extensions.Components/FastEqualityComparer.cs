@@ -6,6 +6,23 @@ namespace Epiforge.Extensions.Components;
 public class FastEqualityComparer :
     IEqualityComparer
 {
+    abstract class TypedComparer
+    {
+        internal abstract bool AreEqual(object? x, object? y);
+
+        internal abstract int HashCodeOf(object obj);
+    }
+
+    sealed class TypedComparer<T> :
+        TypedComparer
+    {
+        internal override bool AreEqual(object? x, object? y) =>
+            EqualityComparer<T>.Default.Equals((T)x!, (T)y!);
+
+        internal override int HashCodeOf(object obj) =>
+            EqualityComparer<T>.Default.GetHashCode((T)obj);
+    }
+
     static readonly ConcurrentDictionary<Type, FastEqualityComparer> equalityComparers = new();
 
     static FastEqualityComparer EqualityComparersValueFactory(Type type) =>
@@ -29,15 +46,10 @@ public class FastEqualityComparer :
     {
         ArgumentNullException.ThrowIfNull(type);
         Type = type;
-        var equalityComparerType = typeof(EqualityComparer<>).MakeGenericType(type);
-        equalityComparer = equalityComparerType.GetProperty(nameof(EqualityComparer<>.Default), BindingFlags.Public | BindingFlags.Static)!.FastGetValue(null)!;
-        equals = equalityComparerType.GetMethod(nameof(EqualityComparer<>.Equals), [type, type])!;
-        getHashCode = equalityComparerType.GetMethod(nameof(EqualityComparer<>.GetHashCode), [type])!;
+        typedComparer = (TypedComparer)Activator.CreateInstance(typeof(TypedComparer<>).MakeGenericType(type))!;
     }
 
-    readonly object equalityComparer;
-    readonly MethodInfo equals;
-    readonly MethodInfo getHashCode;
+    readonly TypedComparer typedComparer;
 
     /// <summary>
     /// Gets the type
@@ -46,9 +58,9 @@ public class FastEqualityComparer :
 
     /// <inheritdoc/>
     public new bool Equals(object? x, object? y) =>
-        (bool)equals.FastInvoke(equalityComparer, x, y)!;
+        typedComparer.AreEqual(x, y);
 
     /// <inheritdoc/>
     public int GetHashCode(object obj) =>
-        (int)getHashCode.FastInvoke(equalityComparer, obj)!;
+        typedComparer.HashCodeOf(obj);
 }

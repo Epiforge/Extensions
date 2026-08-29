@@ -6,6 +6,18 @@ namespace Epiforge.Extensions.Components;
 public class FastComparer :
     IComparer
 {
+    abstract class TypedComparer
+    {
+        internal abstract int Compare(object? x, object? y);
+    }
+
+    sealed class TypedComparer<T> :
+        TypedComparer
+    {
+        internal override int Compare(object? x, object? y) =>
+            Comparer<T>.Default.Compare((T)x!, (T)y!);
+    }
+
     static readonly ConcurrentDictionary<Type, FastComparer> comparers = new();
 
     static FastComparer ComparersValueFactory(Type type) =>
@@ -29,13 +41,10 @@ public class FastComparer :
     {
         ArgumentNullException.ThrowIfNull(type);
         Type = type;
-        var comparerType = typeof(Comparer<>).MakeGenericType(type);
-        comparer = comparerType.GetProperty(nameof(Comparer<>.Default), BindingFlags.Public | BindingFlags.Static)!.FastGetValue(null)!;
-        compare = comparerType.GetMethod(nameof(Comparer<>.Compare), [type, type])!;
+        typedComparer = (TypedComparer)Activator.CreateInstance(typeof(TypedComparer<>).MakeGenericType(type))!;
     }
 
-    readonly object comparer;
-    readonly MethodInfo compare;
+    readonly TypedComparer typedComparer;
 
     /// <summary>
     /// Gets the type
@@ -44,5 +53,5 @@ public class FastComparer :
 
     /// <inheritdoc/>
     public int Compare(object? x, object? y) =>
-        (int)compare.FastInvoke(comparer, x, y)!;
+        typedComparer.Compare(x, y);
 }
