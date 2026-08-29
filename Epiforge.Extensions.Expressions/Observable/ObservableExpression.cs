@@ -21,7 +21,7 @@ abstract class ObservableExpression :
 
     protected readonly object? defaultResult;
     int deferringEvaluation;
-    SpinLock dependentsAccess = new(true);
+    SpinLock dependentsAccess = new(enableThreadOwnerTracking: false);
     ObservableExpressionSubscription? firstDependent;
     ObservableExpressionSubscription? lastDependent;
     (Exception? Fault, object? Result) evaluation;
