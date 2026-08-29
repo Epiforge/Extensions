@@ -34,12 +34,6 @@ sealed class ScopedObservableScalarQuery<TResult> :
 
     public event EventHandler? Disposing;
 
-    event EventHandler? INotifyDisposalOverridden.DisposalOverridden
-    {
-        add { }
-        remove { }
-    }
-
     public void Dispose()
     {
         if (Interlocked.Exchange(ref disposed, 1) != 0)

@@ -10,7 +10,6 @@ namespace Epiforge.Extensions.Expressions.Observable;
 public interface IObservableExpression<TResult> :
     IDisposable,
     IDisposalStatus,
-    INotifyDisposalOverridden,
     INotifyDisposed,
     INotifyDisposing,
     INotifyPropertyChanged,
@@ -41,7 +40,6 @@ public interface IObservableExpression<TArgument, TResult> :
     IObservableExpression<TResult>,
     IDisposable,
     IDisposalStatus,
-    INotifyDisposalOverridden,
     INotifyDisposed,
     INotifyDisposing,
     INotifyPropertyChanged,
@@ -64,7 +62,6 @@ public interface IObservableExpression<TArgument1, TArgument2, TResult> :
     IObservableExpression<TResult>,
     IDisposable,
     IDisposalStatus,
-    INotifyDisposalOverridden,
     INotifyDisposed,
     INotifyDisposing,
     INotifyPropertyChanged,

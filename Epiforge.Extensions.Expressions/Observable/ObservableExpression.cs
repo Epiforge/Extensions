@@ -201,7 +201,6 @@ abstract class ObservableExpression :
 }
 
 abstract class ScopedObservableExpression :
-    INotifyDisposalOverridden,
     IObservableExpressionDependent
 {
     protected ScopedObservableExpression(ExpressionObserver observer, Expression expression, ObservableExpression observableExpression, IReadOnlyList<object?> arguments)
@@ -244,12 +243,6 @@ abstract class ScopedObservableExpression :
     public event EventHandler? Disposed;
 
     public event EventHandler? Disposing;
-
-    event EventHandler? INotifyDisposalOverridden.DisposalOverridden
-    {
-        add { }
-        remove { }
-    }
 
     internal void ClearPendingNotification() =>
         notificationPending = false;
