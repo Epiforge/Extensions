@@ -12,21 +12,23 @@ If you want to go with an implementation of the tried and true `IDisposable`, ju
 Want a taste of the new `IAsyncDisposable`? Then, inherit from `AsyncDisposable`.
 Or, if you want to support both, there's `Disposable`.
 Additionally, if your object needs to be dynamic, you can use `DynamicSyncDisposable`, `DynamicAsyncDisposable`, or `DynamicDisposable`.
+And if your object has no unmanaged resources to release and no need to announce its disposal as a property change, there are `PlainSyncDisposable`, `PlainAsyncDisposable`, and `PlainDisposable`, which keep the disposal claim, the events, and the ability to override disposal, but are not property change notifiers and declare no finalizer, which makes them meaningfully smaller.
+Because they have no finalizer, nothing at all happens if disposal is neglected, so hold unmanaged resources in a `SafeHandle` or use one of the classes above; their synchronous method is `DisposeCore`, which takes no argument, because without a finalizer nothing could pass false.
 Each of these features abstract methods to actually do your disposal.
 On `Disposable` and `DynamicDisposable`, the asynchronous one, `DisposeAsyncCore`, is virtual and defaults to the synchronous `Dispose(bool)`, so a type whose cleanup is entirely synchronous only writes it once.
 On `AsyncDisposable` and `DynamicAsyncDisposable` it stays abstract, because there is no synchronous path for it to delegate to.
 But all of the base classes feature:
 
-* proper implementation of the finalizer and use of `GC.SuppressFinalize`
+* proper implementation of the finalizer and use of `GC.SuppressFinalize`, save for the plain classes, which declare no finalizer
 * monitored access to disposal to ensure it can't happen twice
 * the ability to override or "cancel" disposal by returning false from the abstract methods (e.g. you're reference counting and only want to dispose when your counter reaches zero)
 * a protected `ThrowIfDisposed` method you can call to before doing anything that requires you haven't been disposed
-* an `IsDisposed` property the value (and change notifications) of which are handled for you
+* an `IsDisposed` property the value of which is handled for you, along with its change notifications on all but the plain classes
 
 This library provides the `IDisposalStatus` interface, which defines the `IsDisposed` property and all the base classes implement it.
 This library also provides the `INotifyDisposing`, `INotifyDisposed`, and `INotifyDisposalOverridden` interfaces, which add events that notify of these occurrences.
 
-Be sure to set the protected `Logger` property if you want the abstract class to log what's going on with disposal.
+Be sure to set the protected `Logger` property if you want the abstract class to log what's going on with disposal; the plain classes do not log, which is part of what makes them smaller.
 
 # Reflection
 This library has useful tools for when you can't be certain of some things at compile time, such as types, methods, etc.
