@@ -1,16 +1,15 @@
 namespace Epiforge.Extensions.Expressions.Observable;
 
 sealed class ObservableNewExpression(ExpressionObserver observer, NewExpression newExpression, bool deferEvaluation) :
-    ObservableExpression(observer, newExpression, deferEvaluation)
+    ObservableExpression(observer, newExpression, deferEvaluation),
+    IObservableExpressionDependent
 {
     ReadOnlyCollection<ObservableExpression>? arguments;
+    ObservableExpressionSubscription?[]? argumentSubscriptions;
     ConstructorInfo? constructor;
     EquatableList<Type> constructorParameterTypes;
 
     internal readonly NewExpression NewExpression = newExpression;
-
-    void ArgumentPropertyChanged(object? sender, PropertyChangedEventArgs e) =>
-        Evaluate();
 
     protected override bool Dispose(bool disposing)
     {
@@ -24,8 +23,8 @@ sealed class ObservableNewExpression(ExpressionObserver observer, NewExpression 
                     for (int i = 0, ii = arguments.Count; i < ii; ++i)
                     {
                         var argument = arguments[i];
-                        if (argument.CanChange)
-                            argument.PropertyChanged -= ArgumentPropertyChanged;
+                        if (argumentSubscriptions?[i] is { } argumentDependency)
+                            argument.UnsubscribeDependent(argumentDependency);
                         argument.Dispose();
                     }
                 RemovedFromCache();
@@ -61,6 +60,9 @@ sealed class ObservableNewExpression(ExpressionObserver observer, NewExpression 
     protected override bool GetShouldValueBeDisposed() =>
         observer.IsConstructedTypeDisposed(NewExpression.Type, constructorParameterTypes);
 
+    void IObservableExpressionDependent.OnDependencyEvaluationChanged(ObservableExpression dependency) =>
+        Evaluate();
+
     protected override void OnInitialization()
     {
         var argumentsList = new List<ObservableExpression>();
@@ -68,12 +70,14 @@ sealed class ObservableNewExpression(ExpressionObserver observer, NewExpression 
         {
             constructor = NewExpression.Constructor;
             var newExpressionArguments = NewExpression.Arguments;
+            var subscriptions = new ObservableExpressionSubscription?[newExpressionArguments.Count];
+            argumentSubscriptions = subscriptions;
             for (int i = 0, ii = newExpressionArguments.Count; i < ii; ++i)
             {
                 var newExpressionArgument = newExpressionArguments[i];
                 var argument = observer.GetObservableExpression(newExpressionArgument, IsDeferringEvaluation);
                 if (argument.CanChange)
-                    argument.PropertyChanged += ArgumentPropertyChanged;
+                    subscriptions[i] = argument.SubscribeDependent(this);
                 argumentsList.Add(argument);
             }
             arguments = argumentsList.AsReadOnly();
@@ -86,8 +90,8 @@ sealed class ObservableNewExpression(ExpressionObserver observer, NewExpression 
             for (int i = 0, ii = argumentsList.Count; i < ii; ++i)
             {
                 var argument = argumentsList[i];
-                if (argument.CanChange)
-                    argument.PropertyChanged -= ArgumentPropertyChanged;
+                if (argumentSubscriptions?[i] is { } argumentDependency)
+                    argument.UnsubscribeDependent(argumentDependency);
                 argument.Dispose();
             }
             ExceptionDispatchInfo.Capture(ex).Throw();

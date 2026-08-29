@@ -1,7 +1,8 @@
 namespace Epiforge.Extensions.Expressions.Observable;
 
 sealed class ObservableUnaryExpression(ExpressionObserver observer, UnaryExpression unaryExpression, bool deferEvaluation) :
-    ObservableExpression(observer, unaryExpression, deferEvaluation)
+    ObservableExpression(observer, unaryExpression, deferEvaluation),
+    IObservableExpressionDependent
 {
     #region Delegates
 
@@ -24,6 +25,7 @@ sealed class ObservableUnaryExpression(ExpressionObserver observer, UnaryExpress
     MethodInfo? method;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     ObservableExpression? operand;
+    ObservableExpressionSubscription? operandSubscription;
 
     internal readonly UnaryExpression UnaryExpression = unaryExpression;
 
@@ -36,8 +38,8 @@ sealed class ObservableUnaryExpression(ExpressionObserver observer, UnaryExpress
             {
                 if (operand is not null)
                 {
-                    if (operand.CanChange)
-                        operand.PropertyChanged -= OperandPropertyChanged;
+                    if (operandSubscription is { } operandDependency)
+                        operand.UnsubscribeDependent(operandDependency);
                     operand.Dispose();
                     DisposeValueIfNecessaryAndPossible();
                 }
@@ -81,7 +83,7 @@ sealed class ObservableUnaryExpression(ExpressionObserver observer, UnaryExpress
         {
             operand = observer.GetObservableExpression(UnaryExpression.Operand, IsDeferringEvaluation);
             if (operand.CanChange)
-                operand.PropertyChanged += OperandPropertyChanged;
+                operandSubscription = operand.SubscribeDependent(this);
             method = UnaryExpression.Method;
             @delegate = implementations.GetOrAdd(new(UnaryExpression.NodeType, UnaryExpression.Operand.Type, UnaryExpression.Type, UnaryExpression.Method), ImplementationsValueFactory);
             EvaluateIfNotDeferred();
@@ -91,14 +93,14 @@ sealed class ObservableUnaryExpression(ExpressionObserver observer, UnaryExpress
             DisposeValueIfNecessaryAndPossible();
             if (operand is not null)
             {
-                if (operand.CanChange)
-                    operand.PropertyChanged -= OperandPropertyChanged;
+                if (operandSubscription is { } operandDependency)
+                    operand.UnsubscribeDependent(operandDependency);
                 operand.Dispose();
             }
             ExceptionDispatchInfo.Capture(ex).Throw();
         }
     }
 
-    void OperandPropertyChanged(object? sender, PropertyChangedEventArgs e) =>
+    void IObservableExpressionDependent.OnDependencyEvaluationChanged(ObservableExpression dependency) =>
         Evaluate();
 }

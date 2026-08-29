@@ -1,14 +1,18 @@
 namespace Epiforge.Extensions.Expressions.Observable;
 
 sealed class ObservableConditionalExpression(ExpressionObserver observer, ConditionalExpression conditionalExpression, bool deferEvaluation) :
-    ObservableExpression(observer, conditionalExpression, deferEvaluation)
+    ObservableExpression(observer, conditionalExpression, deferEvaluation),
+    IObservableExpressionDependent
 {
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     ObservableExpression? ifFalse;
+    ObservableExpressionSubscription? ifFalseSubscription;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     ObservableExpression? ifTrue;
+    ObservableExpressionSubscription? ifTrueSubscription;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     ObservableExpression? test;
+    ObservableExpressionSubscription? testSubscription;
 
     internal readonly ConditionalExpression ConditionalExpression = conditionalExpression;
 
@@ -21,20 +25,20 @@ sealed class ObservableConditionalExpression(ExpressionObserver observer, Condit
             {
                 if (test is not null)
                 {
-                    if (test.CanChange)
-                        test.PropertyChanged -= TestPropertyChanged;
+                    if (testSubscription is { } testDependency)
+                        test.UnsubscribeDependent(testDependency);
                     test.Dispose();
                 }
                 if (ifTrue is not null)
                 {
-                    if (ifTrue.CanChange)
-                        ifTrue.PropertyChanged -= IfTruePropertyChanged;
+                    if (ifTrueSubscription is { } ifTrueDependency)
+                        ifTrue.UnsubscribeDependent(ifTrueDependency);
                     ifTrue.Dispose();
                 }
                 if (ifFalse is not null)
                 {
-                    if (ifFalse.CanChange)
-                        ifFalse.PropertyChanged -= IfFalsePropertyChanged;
+                    if (ifFalseSubscription is { } ifFalseDependency)
+                        ifFalse.UnsubscribeDependent(ifFalseDependency);
                     ifFalse.Dispose();
                 }
                 RemovedFromCache();
@@ -71,53 +75,39 @@ sealed class ObservableConditionalExpression(ExpressionObserver observer, Condit
             var conditionalExpression = ConditionalExpression;
             test = observer.GetObservableExpression(conditionalExpression.Test, IsDeferringEvaluation);
             if (test.CanChange)
-                test.PropertyChanged += TestPropertyChanged;
+                testSubscription = test.SubscribeDependent(this);
             ifTrue = observer.GetObservableExpression(conditionalExpression.IfTrue, true);
             if (ifTrue.CanChange)
-                ifTrue.PropertyChanged += IfTruePropertyChanged;
+                ifTrueSubscription = ifTrue.SubscribeDependent(this);
             ifFalse = observer.GetObservableExpression(conditionalExpression.IfFalse, true);
             if (ifFalse.CanChange)
-                ifFalse.PropertyChanged += IfFalsePropertyChanged;
+                ifFalseSubscription = ifFalse.SubscribeDependent(this);
             EvaluateIfNotDeferred();
         }
         catch (Exception ex)
         {
             if (test is not null)
             {
-                if (test.CanChange)
-                    test.PropertyChanged -= TestPropertyChanged;
+                if (testSubscription is { } testDependency)
+                    test.UnsubscribeDependent(testDependency);
                 test.Dispose();
             }
             if (ifTrue is not null)
             {
-                if (ifTrue.CanChange)
-                    ifTrue.PropertyChanged -= IfTruePropertyChanged;
+                if (ifTrueSubscription is { } ifTrueDependency)
+                    ifTrue.UnsubscribeDependent(ifTrueDependency);
                 ifTrue.Dispose();
             }
             if (ifFalse is not null)
             {
-                if (ifFalse.CanChange)
-                    ifFalse.PropertyChanged -= IfFalsePropertyChanged;
+                if (ifFalseSubscription is { } ifFalseDependency)
+                    ifFalse.UnsubscribeDependent(ifFalseDependency);
                 ifFalse.Dispose();
             }
             ExceptionDispatchInfo.Capture(ex).Throw();
         }
     }
 
-    void IfFalsePropertyChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        var (testFault, testResult) = test?.Evaluation ?? (null, null);
-        if (testFault is null && !(testResult is bool testBool && testBool))
-            Evaluation = ifFalse!.Evaluation;
-    }
-
-    void IfTruePropertyChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        var (testFault, testResult) = test?.Evaluation ?? (null, null);
-        if (testFault is null && testResult is bool testBool && testBool)
-            Evaluation = ifTrue!.Evaluation;
-    }
-
-    void TestPropertyChanged(object? sender, PropertyChangedEventArgs e) =>
+    void IObservableExpressionDependent.OnDependencyEvaluationChanged(ObservableExpression dependency) =>
         Evaluate();
 }

@@ -23,6 +23,14 @@ abstract class ObservableExpression :
     protected readonly object? defaultResult;
     bool deferringEvaluation;
 #if IS_NET_9_0_OR_GREATER
+    readonly Lock dependentsAccess = new();
+#else
+    readonly object dependentsAccess = new();
+#endif
+    int dependentSequence;
+    ObservableExpressionSubscription? firstDependent;
+    ObservableExpressionSubscription? lastDependent;
+#if IS_NET_9_0_OR_GREATER
     readonly Lock deferringEvaluationAccess = new();
 #else
     readonly object deferringEvaluationAccess = new();
@@ -59,6 +67,7 @@ abstract class ObservableExpression :
                 OnPropertyChanging(EvaluationPropertyChangingEventArgs);
                 evaluation = value;
                 OnPropertyChanged(EvaluationPropertyChangedEventArgs);
+                NotifyDependentsChanged();
                 DisposeIfNecessaryAndPossible(previousValue);
             }
         }
@@ -131,11 +140,42 @@ abstract class ObservableExpression :
         observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionInitialized, "Initialized observation of {Expression}", Expression);
     }
 
+    private protected void NotifyDependentsChanged()
+    {
+        var limit = Volatile.Read(ref dependentSequence);
+        var current = Volatile.Read(ref firstDependent);
+        while (current is not null)
+        {
+            var following = current.Next;
+            if (current.Sequence < limit && !current.IsRemoved)
+                current.Dependent.OnDependencyEvaluationChanged(this);
+            current = following;
+        }
+    }
+
     protected abstract void OnInitialization();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     protected void RemovedFromCache() =>
         observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionDisposed, "Disposed observation of {Expression}", Expression);
+
+    internal ObservableExpressionSubscription SubscribeDependent(IObservableExpressionDependent dependent)
+    {
+        ArgumentNullException.ThrowIfNull(dependent);
+        var subscription = new ObservableExpressionSubscription(dependent);
+        lock (dependentsAccess)
+        {
+            subscription.Sequence = dependentSequence;
+            subscription.Previous = lastDependent;
+            if (lastDependent is null)
+                Volatile.Write(ref firstDependent, subscription);
+            else
+                lastDependent.Next = subscription;
+            lastDependent = subscription;
+            Volatile.Write(ref dependentSequence, dependentSequence + 1);
+        }
+        return subscription;
+    }
 
     public override string ToString() =>
         Expression.ToString();
@@ -153,10 +193,31 @@ abstract class ObservableExpression :
         result = evaluation.Result;
         return true;
     }
+
+    internal void UnsubscribeDependent(ObservableExpressionSubscription subscription)
+    {
+        ArgumentNullException.ThrowIfNull(subscription);
+        lock (dependentsAccess)
+        {
+            if (subscription.IsRemoved)
+                return;
+            subscription.IsRemoved = true;
+            if (subscription.Previous is null)
+                Volatile.Write(ref firstDependent, subscription.Next);
+            else
+                subscription.Previous.Next = subscription.Next;
+            if (subscription.Next is null)
+                lastDependent = subscription.Previous;
+            else
+                subscription.Next.Previous = subscription.Previous;
+            subscription.Previous = null;
+        }
+    }
 }
 
 abstract class ScopedObservableExpression :
-    INotifyDisposalOverridden
+    INotifyDisposalOverridden,
+    IObservableExpressionDependent
 {
     protected ScopedObservableExpression(ExpressionObserver observer, Expression expression, ObservableExpression observableExpression, IReadOnlyList<object?> arguments)
     {
@@ -167,14 +228,18 @@ abstract class ScopedObservableExpression :
         this.observer = observer;
         Expression = expression;
         this.observableExpression = observableExpression;
-        this.observableExpression.PropertyChanged += ObservableExpressionPropertyChanged;
-        this.observableExpression.PropertyChanging += ObservableExpressionPropertyChanging;
+        if (this.observableExpression.CanChange)
+        {
+            this.observableExpression.PropertyChanging += ObservableExpressionPropertyChanging;
+            subscription = this.observableExpression.SubscribeDependent(this);
+        }
         Arguments = arguments;
     }
 
     private protected readonly ObservableExpression observableExpression;
     readonly ExpressionObserver observer;
     int disposed;
+    readonly ObservableExpressionSubscription? subscription;
 
     internal readonly Expression Expression;
 
@@ -206,17 +271,20 @@ abstract class ScopedObservableExpression :
             return;
         var e = EventArgs.Empty;
         Disposing?.Invoke(this, e);
-        observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
-        observableExpression.PropertyChanging -= ObservableExpressionPropertyChanging;
+        if (subscription is { } dependency)
+        {
+            observableExpression.PropertyChanging -= ObservableExpressionPropertyChanging;
+            observableExpression.UnsubscribeDependent(dependency);
+        }
         observableExpression.Dispose();
         Disposed?.Invoke(this, e);
     }
 
-    void ObservableExpressionPropertyChanged(object? sender, PropertyChangedEventArgs e) =>
-        PropertyChanged?.Invoke(this, e);
-
     void ObservableExpressionPropertyChanging(object? sender, PropertyChangingEventArgs e) =>
         PropertyChanging?.Invoke(this, e);
+
+    void IObservableExpressionDependent.OnDependencyEvaluationChanged(ObservableExpression dependency) =>
+        PropertyChanged?.Invoke(this, ObservableExpression.EvaluationPropertyChangedEventArgs);
 
     public override string ToString() =>
         Expression.ToString();

@@ -1,7 +1,8 @@
 namespace Epiforge.Extensions.Expressions.Observable;
 
 class ObservableBinaryExpression(ExpressionObserver observer, BinaryExpression binaryExpression, bool deferEvaluation) :
-    ObservableExpression(observer, binaryExpression, deferEvaluation)
+    ObservableExpression(observer, binaryExpression, deferEvaluation),
+    IObservableExpressionDependent
 {
     #region Delegates
 
@@ -25,8 +26,10 @@ class ObservableBinaryExpression(ExpressionObserver observer, BinaryExpression b
     BinaryOperationDelegate? @delegate;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     protected ObservableExpression? left;
+    ObservableExpressionSubscription? leftSubscription;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     protected ObservableExpression? right;
+    ObservableExpressionSubscription? rightSubscription;
 
     internal readonly BinaryExpression BinaryExpression = binaryExpression;
 
@@ -40,14 +43,14 @@ class ObservableBinaryExpression(ExpressionObserver observer, BinaryExpression b
                 DisposeValueIfNecessaryAndPossible();
                 if (left is not null)
                 {
-                    if (left.CanChange)
-                        left.PropertyChanged -= LeftPropertyChanged;
+                    if (leftSubscription is { } leftDependency)
+                        left.UnsubscribeDependent(leftDependency);
                     left.Dispose();
                 }
                 if (right is not null)
                 {
-                    if (right.CanChange)
-                        right.PropertyChanged -= RightPropertyChanged;
+                    if (rightSubscription is { } rightDependency)
+                        right.UnsubscribeDependent(rightDependency);
                     right.Dispose();
                 }
                 RemovedFromCache();
@@ -100,7 +103,7 @@ class ObservableBinaryExpression(ExpressionObserver observer, BinaryExpression b
             var binaryExpression = BinaryExpression;
             left = observer.GetObservableExpression(binaryExpression.Left, IsDeferringEvaluation);
             if (left.CanChange)
-                left.PropertyChanged += LeftPropertyChanged;
+                leftSubscription = left.SubscribeDependent(this);
             switch (Expression.NodeType)
             {
                 case ExpressionType.Coalesce:
@@ -113,7 +116,7 @@ class ObservableBinaryExpression(ExpressionObserver observer, BinaryExpression b
                     break;
             }
             if (right.CanChange)
-                right.PropertyChanged += RightPropertyChanged;
+                rightSubscription = right.SubscribeDependent(this);
             if (Expression.NodeType is not ExpressionType.Coalesce)
                 EvaluateIfNotDeferred();
         }
@@ -122,23 +125,20 @@ class ObservableBinaryExpression(ExpressionObserver observer, BinaryExpression b
             DisposeValueIfNecessaryAndPossible();
             if (left is not null)
             {
-                if (left.CanChange)
-                    left.PropertyChanged -= LeftPropertyChanged;
+                if (leftSubscription is { } leftDependency)
+                    left.UnsubscribeDependent(leftDependency);
                 left.Dispose();
             }
             if (right is not null)
             {
-                if (right.CanChange)
-                    right.PropertyChanged -= RightPropertyChanged;
+                if (rightSubscription is { } rightDependency)
+                    right.UnsubscribeDependent(rightDependency);
                 right.Dispose();
             }
             ExceptionDispatchInfo.Capture(ex).Throw();
         }
     }
 
-    void LeftPropertyChanged(object? sender, PropertyChangedEventArgs e) =>
-        Evaluate();
-
-    void RightPropertyChanged(object? sender, PropertyChangedEventArgs e) =>
+    void IObservableExpressionDependent.OnDependencyEvaluationChanged(ObservableExpression dependency) =>
         Evaluate();
 }

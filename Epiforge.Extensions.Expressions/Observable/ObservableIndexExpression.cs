@@ -1,19 +1,19 @@
 namespace Epiforge.Extensions.Expressions.Observable;
 
 sealed class ObservableIndexExpression(ExpressionObserver observer, IndexExpression indexExpression, bool deferEvaluation) :
-    ObservableExpression(observer, indexExpression, deferEvaluation)
+    ObservableExpression(observer, indexExpression, deferEvaluation),
+    IObservableExpressionDependent
 {
     EquatableList<ObservableExpression>? arguments;
+    ObservableExpressionSubscription?[]? argumentSubscriptions;
     MethodInfo? getMethod;
     PropertyInfo? indexer;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     ObservableExpression? @object;
+    ObservableExpressionSubscription? objectSubscription;
     object? objectResult;
 
     internal readonly IndexExpression IndexExpression = indexExpression;
-
-    void ArgumentPropertyChanged(object? sender, PropertyChangedEventArgs e) =>
-        Evaluate();
 
     protected override bool Dispose(bool disposing)
     {
@@ -26,16 +26,16 @@ sealed class ObservableIndexExpression(ExpressionObserver observer, IndexExpress
                 UnsubscribeFromObjectValueNotifications();
                 if (@object is not null)
                 {
-                    if (@object.CanChange)
-                        @object.PropertyChanged -= ObjectPropertyChanged;
+                    if (objectSubscription is { } objectDependency)
+                        @object.UnsubscribeDependent(objectDependency);
                     @object.Dispose();
                 }
                 if (arguments is { } nonNullArguments)
                     for (int i = 0, ii = nonNullArguments.Count; i < ii; ++i)
                     {
                         var argument = nonNullArguments[i];
-                        if (argument.CanChange)
-                            argument.PropertyChanged -= ArgumentPropertyChanged;
+                        if (argumentSubscriptions?[i] is { } argumentDependency)
+                            argument.UnsubscribeDependent(argumentDependency);
                         argument.Dispose();
                     }
                 RemovedFromCache();
@@ -83,7 +83,7 @@ sealed class ObservableIndexExpression(ExpressionObserver observer, IndexExpress
     protected override bool GetShouldValueBeDisposed() =>
         getMethod is not null && observer.IsMethodReturnValueDisposed(getMethod);
 
-    void ObjectPropertyChanged(object? sender, PropertyChangedEventArgs e) =>
+    void IObservableExpressionDependent.OnDependencyEvaluationChanged(ObservableExpression dependency) =>
         Evaluate();
 
     [SuppressMessage("Code Analysis", "CA1502: Avoid excessive complexity")]
@@ -165,14 +165,16 @@ sealed class ObservableIndexExpression(ExpressionObserver observer, IndexExpress
             getMethod = indexer!.GetMethod;
             @object = observer.GetObservableExpression(IndexExpression.Object!, IsDeferringEvaluation);
             if (@object.CanChange)
-                @object.PropertyChanged += ObjectPropertyChanged;
+                objectSubscription = @object.SubscribeDependent(this);
             var indexedExpressionArguments = IndexExpression.Arguments;
+            var subscriptions = new ObservableExpressionSubscription?[indexedExpressionArguments.Count];
+            argumentSubscriptions = subscriptions;
             for (var i = 0; i < indexedExpressionArguments.Count; ++i)
             {
                 var indexExpressionArgument = indexedExpressionArguments[i];
                 var argument = observer.GetObservableExpression(indexExpressionArgument, IsDeferringEvaluation);
                 if (argument.CanChange)
-                    argument.PropertyChanged += ArgumentPropertyChanged;
+                    subscriptions[i] = argument.SubscribeDependent(this);
                 argumentsList.Add(argument);
             }
             arguments = new EquatableList<ObservableExpression>(argumentsList);
@@ -184,15 +186,15 @@ sealed class ObservableIndexExpression(ExpressionObserver observer, IndexExpress
             UnsubscribeFromObjectValueNotifications();
             if (@object is not null)
             {
-                if (@object.CanChange)
-                    @object.PropertyChanged -= ObjectPropertyChanged;
+                if (objectSubscription is { } objectDependency)
+                    @object.UnsubscribeDependent(objectDependency);
                 @object.Dispose();
             }
             for (int i = 0, ii = argumentsList.Count; i < ii; ++i)
             {
                 var argument = argumentsList[i];
-                if (argument.CanChange)
-                    argument.PropertyChanged -= ArgumentPropertyChanged;
+                if (argumentSubscriptions?[i] is { } argumentDependency)
+                    argument.UnsubscribeDependent(argumentDependency);
                 argument.Dispose();
             }
             ExceptionDispatchInfo.Capture(ex).Throw();

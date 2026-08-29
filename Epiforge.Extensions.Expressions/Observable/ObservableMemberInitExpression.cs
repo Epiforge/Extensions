@@ -1,11 +1,13 @@
 namespace Epiforge.Extensions.Expressions.Observable;
 
 sealed class ObservableMemberInitExpression(ExpressionObserver observer, MemberInitExpression memberInitExpression, bool deferEvaluation) :
-    ObservableExpression(observer, memberInitExpression, deferEvaluation)
+    ObservableExpression(observer, memberInitExpression, deferEvaluation),
+    IObservableExpressionDependent
 {
-    IReadOnlyDictionary<ObservableExpression, MemberInfo>? memberAssignmentObservableExpressions;
+    IReadOnlyDictionary<ObservableExpression, (MemberInfo Member, ObservableExpressionSubscription? Subscription)>? memberAssignmentObservableExpressions;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     ObservableExpression? newObservableExpression;
+    ObservableExpressionSubscription? newObservableExpressionSubscription;
 
     internal readonly MemberInitExpression MemberInitExpression = memberInitExpression;
 
@@ -19,15 +21,15 @@ sealed class ObservableMemberInitExpression(ExpressionObserver observer, MemberI
                 DisposeValueIfNecessaryAndPossible();
                 if (newObservableExpression is not null)
                 {
-                    if (newObservableExpression.CanChange)
-                        newObservableExpression.PropertyChanged -= NewObservableExpressionPropertyChanged;
+                    if (newObservableExpressionSubscription is { } newObservableExpressionDependency)
+                        newObservableExpression.UnsubscribeDependent(newObservableExpressionDependency);
                     newObservableExpression.Dispose();
                 }
                 if (memberAssignmentObservableExpressions is not null)
                     foreach (var kv in memberAssignmentObservableExpressions)
                     {
-                        if (kv.Key.CanChange)
-                            kv.Key.PropertyChanged -= MemberAssignmentObservableExpressionPropertyChanged;
+                        if (kv.Value.Subscription is { } memberAssignmentDependency)
+                            kv.Key.UnsubscribeDependent(memberAssignmentDependency);
                         kv.Key.Dispose();
                     }
                 RemovedFromCache();
@@ -57,9 +59,9 @@ sealed class ObservableMemberInitExpression(ExpressionObserver observer, MemberI
                 if (memberAssignmentObservableExpressions is not null)
                     foreach (var kv in memberAssignmentObservableExpressions)
                     {
-                        if (kv.Value is FieldInfo field)
+                        if (kv.Value.Member is FieldInfo field)
                             field.SetValue(newObservableExpressionResult, kv.Key.Evaluation.Result);
-                        else if (kv.Value is PropertyInfo property)
+                        else if (kv.Value.Member is PropertyInfo property)
                             property.FastSetValue(newObservableExpressionResult, kv.Key.Evaluation.Result);
                         else
                             throw new NotSupportedException("Cannot handle member that is not a field or property");
@@ -75,10 +77,17 @@ sealed class ObservableMemberInitExpression(ExpressionObserver observer, MemberI
         }
     }
 
-    void MemberAssignmentObservableExpressionPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    void IObservableExpressionDependent.OnDependencyEvaluationChanged(ObservableExpression dependency)
     {
-        if (sender is ObservableExpression memberAssignmentObservableExpression && (memberAssignmentObservableExpressions?.TryGetValue(memberAssignmentObservableExpression, out var member) ?? false))
+        if (ReferenceEquals(dependency, newObservableExpression))
         {
+            Evaluate();
+            return;
+        }
+        var memberAssignmentObservableExpression = dependency;
+        if (memberAssignmentObservableExpressions?.TryGetValue(memberAssignmentObservableExpression, out var assignment) ?? false)
+        {
+            var member = assignment.Member;
             var (memberAssignmentObservableExpressionFault, memberAssignmentObservableExpressionResult) = memberAssignmentObservableExpression.Evaluation;
             if (memberAssignmentObservableExpressionFault is not null)
                 Evaluation = (memberAssignmentObservableExpressionFault, defaultResult);
@@ -102,19 +111,16 @@ sealed class ObservableMemberInitExpression(ExpressionObserver observer, MemberI
         }
     }
 
-    void NewObservableExpressionPropertyChanged(object? sender, PropertyChangedEventArgs e) =>
-        Evaluate();
-
     protected override void OnInitialization()
     {
         if (MemberInitExpression.NewExpression.Type.IsValueType)
             throw new NotSupportedException("Member initialization expressions of value types are not supported");
-        var memberAssignmentObservableExpressions = new Dictionary<ObservableExpression, MemberInfo>(ObservableExpressionEqualityComparer.Default);
+        var memberAssignmentObservableExpressions = new Dictionary<ObservableExpression, (MemberInfo Member, ObservableExpressionSubscription? Subscription)>(ObservableExpressionEqualityComparer.Default);
         try
         {
             newObservableExpression = observer.GetObservableExpression(MemberInitExpression.NewExpression, IsDeferringEvaluation);
             if (newObservableExpression.CanChange)
-                newObservableExpression.PropertyChanged += NewObservableExpressionPropertyChanged;
+                newObservableExpressionSubscription = newObservableExpression.SubscribeDependent(this);
             var bindings = MemberInitExpression.Bindings;
             for (int i = 0, ii = bindings.Count; i < ii; ++i)
             {
@@ -122,9 +128,7 @@ sealed class ObservableMemberInitExpression(ExpressionObserver observer, MemberI
                 if (binding is MemberAssignment memberAssignmentBinding)
                 {
                     var memberAssignmentObservableExpression = observer.GetObservableExpression(memberAssignmentBinding.Expression, IsDeferringEvaluation);
-                    memberAssignmentObservableExpressions.Add(memberAssignmentObservableExpression, memberAssignmentBinding.Member);
-                    if (memberAssignmentObservableExpression.CanChange)
-                        memberAssignmentObservableExpression.PropertyChanged += MemberAssignmentObservableExpressionPropertyChanged;
+                    memberAssignmentObservableExpressions.Add(memberAssignmentObservableExpression, (memberAssignmentBinding.Member, memberAssignmentObservableExpression.CanChange ? memberAssignmentObservableExpression.SubscribeDependent(this) : null));
                 }
                 else
                     throw new NotSupportedException("Only member assignment bindings are supported in member init expressions");
@@ -136,15 +140,15 @@ sealed class ObservableMemberInitExpression(ExpressionObserver observer, MemberI
         {
             if (newObservableExpression is not null)
             {
-                if (newObservableExpression.CanChange)
-                    newObservableExpression.PropertyChanged -= NewObservableExpressionPropertyChanged;
+                if (newObservableExpressionSubscription is { } newObservableExpressionDependency)
+                    newObservableExpression.UnsubscribeDependent(newObservableExpressionDependency);
                 newObservableExpression.Dispose();
             }
-            foreach (var memberAssignmentObservableExpression in memberAssignmentObservableExpressions.Keys)
+            foreach (var kv in memberAssignmentObservableExpressions)
             {
-                if (memberAssignmentObservableExpression.CanChange)
-                    memberAssignmentObservableExpression.PropertyChanged -= MemberAssignmentObservableExpressionPropertyChanged;
-                memberAssignmentObservableExpression.Dispose();
+                if (kv.Value.Subscription is { } memberAssignmentDependency)
+                    kv.Key.UnsubscribeDependent(memberAssignmentDependency);
+                kv.Key.Dispose();
             }
             ExceptionDispatchInfo.Capture(ex).Throw();
         }

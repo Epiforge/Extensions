@@ -1,13 +1,17 @@
 namespace Epiforge.Extensions.Expressions.Observable;
 
 sealed class ObservableInvocationExpression(ExpressionObserver observer, InvocationExpression invocationExpression, bool deferEvaluation) :
-    ObservableExpression(observer, invocationExpression, deferEvaluation)
+    ObservableExpression(observer, invocationExpression, deferEvaluation),
+    IObservableExpressionDependent
 {
+    ObservableExpressionSubscription?[]? observableArgumentSubscriptions;
     IReadOnlyList<ObservableExpression>? observableArguments;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     ObservableExpression? observableDelegateExpression;
+    ObservableExpressionSubscription? observableDelegateExpressionSubscription;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     ObservableExpression? observableExpression;
+    ObservableExpressionSubscription? observableExpressionSubscription;
 
     internal readonly InvocationExpression InvocationExpression = invocationExpression;
 
@@ -28,13 +32,13 @@ sealed class ObservableInvocationExpression(ExpressionObserver observer, Invocat
                 if (observableDelegateExpression.Evaluation.Result is Delegate @delegate)
                     observableExpression = observer.GetObservableExpression(@delegate.Target is { } target ? Expression.Call(Expression.Constant(target), @delegate.Method, InvocationExpression.Arguments) : Expression.Call(@delegate.Method, InvocationExpression.Arguments), IsDeferringEvaluation);
                 if (observableDelegateExpressionCreated && observableDelegateExpression.CanChange)
-                    observableDelegateExpression.PropertyChanged += ObservableDelegateExpressionPropertyChanged;
+                    observableDelegateExpressionSubscription = observableDelegateExpression.SubscribeDependent(this);
                 break;
             default:
                 throw new NotSupportedException($"invocation expression expression type {InvocationExpression.Expression.GetType().Name} is not supported");
         }
         if (observableExpression is not null && observableExpression.CanChange)
-            observableExpression.PropertyChanged += ObservableExpressionPropertyChanged;
+            observableExpressionSubscription = observableExpression.SubscribeDependent(this);
         EvaluateIfNotDeferred();
     }
 
@@ -47,22 +51,22 @@ sealed class ObservableInvocationExpression(ExpressionObserver observer, Invocat
             {
                 if (observableExpression is not null)
                 {
-                    if (observableExpression.CanChange)
-                        observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
+                    if (observableExpressionSubscription is { } observableExpressionDependency)
+                        observableExpression.UnsubscribeDependent(observableExpressionDependency);
                     observableExpression.Dispose();
                 }
                 if (observableDelegateExpression is not null)
                 {
-                    if (observableDelegateExpression.CanChange)
-                        observableDelegateExpression.PropertyChanged -= ObservableDelegateExpressionPropertyChanged;
+                    if (observableDelegateExpressionSubscription is { } observableDelegateExpressionDependency)
+                        observableDelegateExpression.UnsubscribeDependent(observableDelegateExpressionDependency);
                     observableDelegateExpression.Dispose();
                 }
                 if (observableArguments is not null)
                     for (int i = 0, ii = observableArguments.Count; i < ii; i++)
                     {
                         var obserableArgument = observableArguments[i];
-                        if (obserableArgument.CanChange)
-                            obserableArgument.PropertyChanged -= ObservableArgumentPropertyChanged;
+                        if (observableArgumentSubscriptions?[i] is { } obserableArgumentDependency)
+                            obserableArgument.UnsubscribeDependent(obserableArgumentDependency);
                         obserableArgument.Dispose();
                     }
                 RemovedFromCache();
@@ -92,12 +96,13 @@ sealed class ObservableInvocationExpression(ExpressionObserver observer, Invocat
         }
     }
 
-    void ObservableArgumentPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    void OnObservableArgumentEvaluationChanged()
     {
         if (observableExpression is not null)
         {
-            if (observableExpression.CanChange)
-                observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
+            if (observableExpressionSubscription is { } observableExpressionDependency)
+                observableExpression.UnsubscribeDependent(observableExpressionDependency);
+            observableExpressionSubscription = null;
             observableExpression.Dispose();
             observableExpression = null;
         }
@@ -107,20 +112,28 @@ sealed class ObservableInvocationExpression(ExpressionObserver observer, Invocat
             Evaluate();
     }
 
-    void ObservableDelegateExpressionPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    void IObservableExpressionDependent.OnDependencyEvaluationChanged(ObservableExpression dependency)
+    {
+        if (ReferenceEquals(dependency, observableExpression))
+            Evaluate();
+        else if (ReferenceEquals(dependency, observableDelegateExpression))
+            OnObservableDelegateExpressionEvaluationChanged();
+        else
+            OnObservableArgumentEvaluationChanged();
+    }
+
+    void OnObservableDelegateExpressionEvaluationChanged()
     {
         if (observableExpression is not null)
         {
-            if (observableExpression.CanChange)
-                observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
+            if (observableExpressionSubscription is { } observableExpressionDependency)
+                observableExpression.UnsubscribeDependent(observableExpressionDependency);
+            observableExpressionSubscription = null;
             observableExpression.Dispose();
             observableExpression = null;
         }
         CreateObservableExpression();
     }
-
-    void ObservableExpressionPropertyChanged(object? sender, PropertyChangedEventArgs e) =>
-        Evaluate();
 
     protected override void OnInitialization()
     {
@@ -130,12 +143,14 @@ sealed class ObservableInvocationExpression(ExpressionObserver observer, Invocat
             if (InvocationExpression.Expression is LambdaExpression)
             {
                 var invocationExpressionArguments = InvocationExpression.Arguments;
+                var subscriptions = new ObservableExpressionSubscription?[invocationExpressionArguments.Count];
+                observableArgumentSubscriptions = subscriptions;
                 for (int i = 0, ii = invocationExpressionArguments.Count; i < ii; ++i)
                 {
                     var invocationExpressionArgument = invocationExpressionArguments[i];
                     var observableArgument = observer.GetObservableExpression(invocationExpressionArgument, IsDeferringEvaluation);
                     if (observableArgument.CanChange)
-                        observableArgument.PropertyChanged += ObservableArgumentPropertyChanged;
+                        subscriptions[i] = observableArgument.SubscribeDependent(this);
                     observableArgumentsList.Add(observableArgument);
                 }
                 observableArguments = [..observableArgumentsList];
@@ -146,21 +161,21 @@ sealed class ObservableInvocationExpression(ExpressionObserver observer, Invocat
         {
             if (observableExpression is not null)
             {
-                if (observableExpression.CanChange)
-                    observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
+                if (observableExpressionSubscription is { } observableExpressionDependency)
+                    observableExpression.UnsubscribeDependent(observableExpressionDependency);
                 observableExpression.Dispose();
             }
             if (observableDelegateExpression is not null)
             {
-                if (observableDelegateExpression.CanChange)
-                    observableDelegateExpression.PropertyChanged -= ObservableDelegateExpressionPropertyChanged;
+                if (observableDelegateExpressionSubscription is { } observableDelegateExpressionDependency)
+                    observableDelegateExpression.UnsubscribeDependent(observableDelegateExpressionDependency);
                 observableDelegateExpression.Dispose();
             }
             for (int i = 0, ii = observableArgumentsList.Count; i < ii; ++i)
             {
                 var observableArgument = observableArgumentsList[i];
-                if (observableArgument.CanChange)
-                    observableArgument.PropertyChanged -= ObservableArgumentPropertyChanged;
+                if (observableArgumentSubscriptions?[i] is { } observableArgumentDependency)
+                    observableArgument.UnsubscribeDependent(observableArgumentDependency);
                 observableArgument.Dispose();
             }
             ExceptionDispatchInfo.Capture(ex).Throw();

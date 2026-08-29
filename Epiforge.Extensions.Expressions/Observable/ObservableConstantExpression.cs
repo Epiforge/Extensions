@@ -45,6 +45,9 @@ sealed class ObservableConstantExpression(ExpressionObserver observer, ConstantE
         }
     }
 
-    void ValueChanged(object? sender, EventArgs e) =>
+    void ValueChanged(object? sender, EventArgs e)
+    {
         OnPropertyChanged(EvaluationPropertyChangedEventArgs);
+        NotifyDependentsChanged();
+    }
 }

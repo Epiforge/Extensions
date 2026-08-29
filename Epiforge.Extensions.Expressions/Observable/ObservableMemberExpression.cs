@@ -1,7 +1,8 @@
 namespace Epiforge.Extensions.Expressions.Observable;
 
 sealed class ObservableMemberExpression(ExpressionObserver observer, MemberExpression memberExpression, bool deferEvaluation) :
-    ObservableExpression(observer, memberExpression, deferEvaluation)
+    ObservableExpression(observer, memberExpression, deferEvaluation),
+    IObservableExpressionDependent
 {
     bool doNotListenForPropertyChanges;
     FieldInfo? field;
@@ -11,6 +12,7 @@ sealed class ObservableMemberExpression(ExpressionObserver observer, MemberExpre
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     ObservableExpression? observableExpression;
     object? observableExpressionResult;
+    ObservableExpressionSubscription? observableExpressionSubscription;
 
     internal readonly MemberExpression MemberExpression = memberExpression;
 
@@ -28,8 +30,8 @@ sealed class ObservableMemberExpression(ExpressionObserver observer, MemberExpre
                     UnsubscribeFromValueNotifications();
                 if (observableExpression is not null)
                 {
-                    if (observableExpression.CanChange)
-                        observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
+                    if (observableExpressionSubscription is { } observableExpressionDependency)
+                        observableExpression.UnsubscribeDependent(observableExpressionDependency);
                     observableExpression.Dispose();
                 }
                 RemovedFromCache();
@@ -84,7 +86,7 @@ sealed class ObservableMemberExpression(ExpressionObserver observer, MemberExpre
     protected override bool GetShouldValueBeDisposed() =>
         getMethod is not null && observer.IsMethodReturnValueDisposed(getMethod);
 
-    void ObservableExpressionPropertyChanged(object? sender, PropertyChangedEventArgs e) =>
+    void IObservableExpressionDependent.OnDependencyEvaluationChanged(ObservableExpression dependency) =>
         Evaluate();
 
     void ObservableExpressionValuePropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -101,7 +103,7 @@ sealed class ObservableMemberExpression(ExpressionObserver observer, MemberExpre
             {
                 observableExpression = observer.GetObservableExpression(memberExpressionExpression, IsDeferringEvaluation);
                 if (observableExpression.CanChange)
-                    observableExpression.PropertyChanged += ObservableExpressionPropertyChanged;
+                    observableExpressionSubscription = observableExpression.SubscribeDependent(this);
             }
             member = MemberExpression.Member;
             switch (member)
@@ -127,8 +129,8 @@ sealed class ObservableMemberExpression(ExpressionObserver observer, MemberExpre
                 UnsubscribeFromValueNotifications();
             if (observableExpression is not null)
             {
-                if (observableExpression.CanChange)
-                    observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
+                if (observableExpressionSubscription is { } observableExpressionDependency)
+                    observableExpression.UnsubscribeDependent(observableExpressionDependency);
                 observableExpression.Dispose();
             }
             ExceptionDispatchInfo.Capture(ex).Throw();

@@ -1,17 +1,17 @@
 namespace Epiforge.Extensions.Expressions.Observable;
 
 sealed class ObservableMethodCallExpression(ExpressionObserver observer, MethodCallExpression methodCallExpression, bool deferEvaluation) :
-    ObservableExpression(observer, methodCallExpression, deferEvaluation)
+    ObservableExpression(observer, methodCallExpression, deferEvaluation),
+    IObservableExpressionDependent
 {
     ReadOnlyCollection<ObservableExpression>? arguments;
+    ObservableExpressionSubscription?[]? argumentSubscriptions;
     MethodInfo? method;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     ObservableExpression? @object;
+    ObservableExpressionSubscription? objectSubscription;
 
     internal readonly MethodCallExpression MethodCallExpression = methodCallExpression;
-
-    void ArgumentPropertyChanged(object? sender, PropertyChangedEventArgs e) =>
-        Evaluate();
 
     protected override bool Dispose(bool disposing)
     {
@@ -23,16 +23,16 @@ sealed class ObservableMethodCallExpression(ExpressionObserver observer, MethodC
                 DisposeValueIfNecessaryAndPossible();
                 if (@object is not null)
                 {
-                    if (@object.CanChange)
-                        @object.PropertyChanged -= ObjectPropertyChanged;
+                    if (objectSubscription is { } objectDependency)
+                        @object.UnsubscribeDependent(objectDependency);
                     @object.Dispose();
                 }
                 if (arguments is not null)
                     for (int i = 0, ii = arguments.Count; i < ii; ++i)
                     {
                         var argument = arguments[i];
-                        if (argument.CanChange)
-                            argument.PropertyChanged -= ArgumentPropertyChanged;
+                        if (argumentSubscriptions?[i] is { } argumentDependency)
+                            argument.UnsubscribeDependent(argumentDependency);
                         argument.Dispose();
                     }
                 RemovedFromCache();
@@ -84,15 +84,17 @@ sealed class ObservableMethodCallExpression(ExpressionObserver observer, MethodC
             {
                 @object = observer.GetObservableExpression(methodCallExpressionObject, IsDeferringEvaluation);
                 if (@object.CanChange)
-                    @object.PropertyChanged += ObjectPropertyChanged;
+                    objectSubscription = @object.SubscribeDependent(this);
             }
             var methodCallExpressionArguments = MethodCallExpression.Arguments;
+            var subscriptions = new ObservableExpressionSubscription?[methodCallExpressionArguments.Count];
+            argumentSubscriptions = subscriptions;
             for (int i = 0, ii = methodCallExpressionArguments.Count; i < ii; ++i)
             {
                 var methodCallExpressionArgument = methodCallExpressionArguments[i];
                 var argument = observer.GetObservableExpression(methodCallExpressionArgument, IsDeferringEvaluation);
                 if (argument.CanChange)
-                    argument.PropertyChanged += ArgumentPropertyChanged;
+                    subscriptions[i] = argument.SubscribeDependent(this);
                 argumentsList.Add(argument);
             }
             arguments = argumentsList.AsReadOnly();
@@ -103,21 +105,21 @@ sealed class ObservableMethodCallExpression(ExpressionObserver observer, MethodC
             DisposeValueIfNecessaryAndPossible();
             if (@object is not null)
             {
-                if (@object.CanChange)
-                    @object.PropertyChanged -= ObjectPropertyChanged;
+                if (objectSubscription is { } objectDependency)
+                    @object.UnsubscribeDependent(objectDependency);
                 @object.Dispose();
             }
             for (int i = 0, ii = argumentsList.Count; i < ii; ++i)
             {
                 var argument = argumentsList[i];
-                if (argument.CanChange)
-                    argument.PropertyChanged -= ArgumentPropertyChanged;
+                if (argumentSubscriptions?[i] is { } argumentDependency)
+                    argument.UnsubscribeDependent(argumentDependency);
                 argument.Dispose();
             }
             ExceptionDispatchInfo.Capture(ex).Throw();
         }
     }
 
-    void ObjectPropertyChanged(object? sender, PropertyChangedEventArgs e) =>
+    void IObservableExpressionDependent.OnDependencyEvaluationChanged(ObservableExpression dependency) =>
         Evaluate();
 }

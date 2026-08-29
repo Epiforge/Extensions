@@ -1,7 +1,8 @@
 namespace Epiforge.Extensions.Expressions.Observable;
 
 sealed class ObservableTypeBinaryExpression(ExpressionObserver observer, TypeBinaryExpression typeBinaryExpression, bool deferEvaluation) :
-    ObservableExpression(observer, typeBinaryExpression, deferEvaluation)
+    ObservableExpression(observer, typeBinaryExpression, deferEvaluation),
+    IObservableExpressionDependent
 {
     #region Delegates
 
@@ -20,6 +21,7 @@ sealed class ObservableTypeBinaryExpression(ExpressionObserver observer, TypeBin
     TypeIsDelegate? @delegate;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     ObservableExpression? expression;
+    ObservableExpressionSubscription? expressionSubscription;
     Type? typeOperand;
 
     internal readonly TypeBinaryExpression TypeBinaryExpression = typeBinaryExpression;
@@ -33,8 +35,8 @@ sealed class ObservableTypeBinaryExpression(ExpressionObserver observer, TypeBin
             {
                 if (expression is not null)
                 {
-                    if (expression.CanChange)
-                        expression.PropertyChanged -= ExpressionPropertyChanged;
+                    if (expressionSubscription is { } expressionDependency)
+                        expression.UnsubscribeDependent(expressionDependency);
                     expression.Dispose();
                 }
                 RemovedFromCache();
@@ -60,7 +62,7 @@ sealed class ObservableTypeBinaryExpression(ExpressionObserver observer, TypeBin
         }
     }
 
-    void ExpressionPropertyChanged(object? sender, PropertyChangedEventArgs e) =>
+    void IObservableExpressionDependent.OnDependencyEvaluationChanged(ObservableExpression dependency) =>
         Evaluate();
 
     protected override void OnInitialization()
@@ -69,7 +71,7 @@ sealed class ObservableTypeBinaryExpression(ExpressionObserver observer, TypeBin
         {
             expression = observer.GetObservableExpression(TypeBinaryExpression.Expression, IsDeferringEvaluation);
             if (expression.CanChange)
-                expression.PropertyChanged += ExpressionPropertyChanged;
+                expressionSubscription = expression.SubscribeDependent(this);
             typeOperand = TypeBinaryExpression.TypeOperand;
             @delegate = delegates.GetOrAdd(typeOperand, CreateDelegate);
             EvaluateIfNotDeferred();
@@ -78,8 +80,8 @@ sealed class ObservableTypeBinaryExpression(ExpressionObserver observer, TypeBin
         {
             if (expression is not null)
             {
-                if (expression.CanChange)
-                    expression.PropertyChanged -= ExpressionPropertyChanged;
+                if (expressionSubscription is { } expressionDependency)
+                    expression.UnsubscribeDependent(expressionDependency);
                 expression.Dispose();
             }
             ExceptionDispatchInfo.Capture(ex).Throw();

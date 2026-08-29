@@ -1,10 +1,12 @@
 namespace Epiforge.Extensions.Expressions.Observable;
 
 sealed class ObservableNewArrayInitExpression(ExpressionObserver observer, NewArrayExpression newArrayExpression, bool deferEvaluation) :
-    ObservableExpression(observer, newArrayExpression, deferEvaluation)
+    ObservableExpression(observer, newArrayExpression, deferEvaluation),
+    IObservableExpressionDependent
 {
     Type? elementType;
     ReadOnlyCollection<ObservableExpression>? initializers;
+    ObservableExpressionSubscription?[]? initializerSubscriptions;
 
     internal readonly NewArrayExpression NewArrayExpression = newArrayExpression;
 
@@ -19,8 +21,8 @@ sealed class ObservableNewArrayInitExpression(ExpressionObserver observer, NewAr
                     for (int i = 0, ii = initializers.Count; i < ii; ++i)
                     {
                         var initializer = initializers[i];
-                        if (initializer.CanChange)
-                            initializer.PropertyChanged -= InitializerPropertyChanged;
+                        if (initializerSubscriptions?[i] is { } initializerDependency)
+                            initializer.UnsubscribeDependent(initializerDependency);
                         initializer.Dispose();
                     }
                 RemovedFromCache();
@@ -47,7 +49,7 @@ sealed class ObservableNewArrayInitExpression(ExpressionObserver observer, NewAr
         }
     }
 
-    void InitializerPropertyChanged(object? sender, PropertyChangedEventArgs e) =>
+    void IObservableExpressionDependent.OnDependencyEvaluationChanged(ObservableExpression dependency) =>
         Evaluate();
 
     protected override void OnInitialization()
@@ -57,12 +59,14 @@ sealed class ObservableNewArrayInitExpression(ExpressionObserver observer, NewAr
         {
             elementType = NewArrayExpression.Type.GetElementType();
             var newArrayExpressionInitializers = NewArrayExpression.Expressions;
+            var subscriptions = new ObservableExpressionSubscription?[newArrayExpressionInitializers.Count];
+            initializerSubscriptions = subscriptions;
             for (int i = 0, ii = newArrayExpressionInitializers.Count; i < ii; ++i)
             {
                 var newArrayExpressionInitializer = newArrayExpressionInitializers[i];
                 var initializer = observer.GetObservableExpression(newArrayExpressionInitializer, IsDeferringEvaluation);
                 if (initializer.CanChange)
-                    initializer.PropertyChanged += InitializerPropertyChanged;
+                    subscriptions[i] = initializer.SubscribeDependent(this);
                 initializersList.Add(initializer);
             }
             initializers = initializersList.AsReadOnly();
@@ -73,8 +77,8 @@ sealed class ObservableNewArrayInitExpression(ExpressionObserver observer, NewAr
             for (int i = 0, ii = initializersList.Count; i < ii; ++i)
             {
                 var initializer = initializersList[i];
-                if (initializer.CanChange)
-                    initializer.PropertyChanged -= InitializerPropertyChanged;
+                if (initializerSubscriptions?[i] is { } initializerDependency)
+                    initializer.UnsubscribeDependent(initializerDependency);
                 initializer.Dispose();
             }
             ExceptionDispatchInfo.Capture(ex).Throw();
