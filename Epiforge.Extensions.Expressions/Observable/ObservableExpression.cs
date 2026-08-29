@@ -57,7 +57,7 @@ abstract class ObservableExpression :
             if (!ReferenceEquals(evaluation.Fault, value.Fault) || !resultEqualityComparer.Equals(evaluation.Result, value.Result))
             {
                 var previousValue = evaluation.Result;
-                PropertyChanging?.Invoke(this, EvaluationPropertyChangingEventArgs);
+                NotifyDependentsChanging();
                 evaluation = value;
                 NotifyDependentsChanged();
                 DisposeIfNecessaryAndPossible(previousValue);
@@ -67,8 +67,6 @@ abstract class ObservableExpression :
 
     protected bool IsDeferringEvaluation =>
         Volatile.Read(ref deferringEvaluation) != 0;
-
-    internal event PropertyChangingEventHandler? PropertyChanging;
 
     void DisposeIfNecessaryAndPossible(object? value)
     {
@@ -124,6 +122,18 @@ abstract class ObservableExpression :
             var following = current.Next;
             if (!current.IsRemoved)
                 current.Dependent.OnDependencyEvaluationChanged(this);
+            current = following;
+        }
+    }
+
+    void NotifyDependentsChanging()
+    {
+        var current = Volatile.Read(ref firstDependent);
+        while (current is not null)
+        {
+            var following = current.Next;
+            if (!current.IsRemoved)
+                current.Dependent.OnDependencyEvaluationChanging(this);
             current = following;
         }
     }
@@ -199,10 +209,7 @@ abstract class ScopedObservableExpression :
         Expression = expression;
         this.observableExpression = observableExpression;
         if (this.observableExpression.CanChange)
-        {
-            this.observableExpression.PropertyChanging += ObservableExpressionPropertyChanging;
             subscription = this.observableExpression.SubscribeDependent(this);
-        }
         Arguments = arguments;
     }
 
@@ -246,24 +253,9 @@ abstract class ScopedObservableExpression :
         var e = EventArgs.Empty;
         Disposing?.Invoke(this, e);
         if (subscription is { } dependency)
-        {
-            observableExpression.PropertyChanging -= ObservableExpressionPropertyChanging;
             observableExpression.UnsubscribeDependent(dependency);
-        }
         observableExpression.Dispose();
         Disposed?.Invoke(this, e);
-    }
-
-    void ObservableExpressionPropertyChanging(object? sender, PropertyChangingEventArgs e)
-    {
-        if (PropagationScope.IsPropagating)
-        {
-            if (notificationPending)
-                return;
-            notificationPending = true;
-            PropagationScope.Enlist(this);
-        }
-        PropertyChanging?.Invoke(this, e);
     }
 
     void IObservableExpressionDependent.OnDependencyEvaluationChanged(ObservableExpression dependency)
@@ -278,6 +270,18 @@ abstract class ScopedObservableExpression :
             return;
         }
         PropertyChanged?.Invoke(this, ObservableExpression.EvaluationPropertyChangedEventArgs);
+    }
+
+    void IObservableExpressionDependent.OnDependencyEvaluationChanging(ObservableExpression dependency)
+    {
+        if (PropagationScope.IsPropagating)
+        {
+            if (notificationPending)
+                return;
+            notificationPending = true;
+            PropagationScope.Enlist(this);
+        }
+        PropertyChanging?.Invoke(this, ObservableExpression.EvaluationPropertyChangingEventArgs);
     }
 
     internal void RaisePendingNotification()
