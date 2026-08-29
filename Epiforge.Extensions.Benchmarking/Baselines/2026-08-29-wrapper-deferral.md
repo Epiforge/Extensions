@@ -67,6 +67,12 @@ Allocation is identical to the byte on all three rows. Time moved about one perc
 
 That row measures less than it appears to. `ChangeTheSharedValue` toggles a threshold between 0 and 1 across people ranked 0 through 999, so exactly one comparison changes sides. The other 999 nodes re-evaluate, produce the same boolean, and are suppressed by the equality check in the `Evaluation` setter before they ever reach a wrapper. One thousand nodes touched, one boundary crossed. It measures the mechanism's cost per *propagation* at scale, not per *notification*.
 
+## The wrapper's footprint
+
+`ScopedObservableExpression` gained one `bool`, and there is one of those per observed element, which puts it in the budget this project guards hardest. `ConstructAndDisposeWithFanOut` builds and disposes a thousand of them and allocated 4,222.57 KB both before and after — identical to the byte, at a resolution of ten. Eight more bytes per wrapper would have read as eight kilobytes here. The flag landed in existing padding and costs nothing.
+
+`ObservableExpressionBenchmarks` was run to answer the same question and cannot: `CreateAndDispose` allocates about 4.5 KB across roughly four nodes and one wrapper, so a single eight-byte field is 0.17% of the row, at the edge of what the counter resolves. Its figures — 4.46, 4.12 and 4.29 KB at zero, one thousand and ten thousand existing expressions — are marginally below the last recorded 4.49, 4.14 and 4.32, which is consistent with the intervening fence removal and says nothing about this change either way. The fan-out row is the instrument; this one was a detour.
+
 ## QueryFanOutFlipBenchmarks
 
 Written to separate those two costs. Two independent thousand-element graphs so their thresholds cannot contaminate each other; one flips a single element, the other moves the threshold to the median and flips five hundred.

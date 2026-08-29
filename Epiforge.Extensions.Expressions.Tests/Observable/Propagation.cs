@@ -4,6 +4,29 @@ namespace Epiforge.Extensions.Expressions.Tests.Observable;
 public class Propagation
 {
     [TestMethod]
+    public void ANotificationHandlerMayStartAnotherPropagation()
+    {
+        var subject = new Numbered { Number = 5 };
+        var values = new List<int>();
+        var observer = new ExpressionObserver();
+        using (var expr = observer.Observe(numbered => numbered.Number * 2 + (numbered.Number + 1), subject))
+        {
+            void propertyChanged(object? sender, PropertyChangedEventArgs e)
+            {
+                values.Add(expr.Evaluation.Result);
+                if (subject.Number == 7)
+                    subject.Number = 9;
+            }
+            expr.PropertyChanged += propertyChanged;
+            Assert.AreEqual(16, expr.Evaluation.Result);
+            subject.Number = 7;
+            expr.PropertyChanged -= propertyChanged;
+        }
+        Assert.AreEqual(0, observer.CachedObservableExpressions);
+        Assert.IsTrue(new int[] { 22, 28 }.SequenceEqual(values));
+    }
+
+    [TestMethod]
     public void ChainNotifiesOncePerChange()
     {
         var subject = new Numbered { Number = 5 };
