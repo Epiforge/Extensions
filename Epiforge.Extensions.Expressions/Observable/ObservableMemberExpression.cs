@@ -177,6 +177,6 @@ sealed class ObservableMemberExpression(ExpressionObserver observer, MemberExpre
     void ValueChanged(object? sender, EventArgs e)
     {
         using var propagation = new PropagationScope();
-        NotifyDependentsChanged();
+        NotifyDependentsOfValueContentsChanged();
     }
 }

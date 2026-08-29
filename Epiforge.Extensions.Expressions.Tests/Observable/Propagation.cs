@@ -45,6 +45,24 @@ public class Propagation
     }
 
     [TestMethod]
+    public void ChangingIsRaisedBeforeTheValueChanges()
+    {
+        var subject = new Numbered { Number = 5 };
+        var observedWhileChanging = 0;
+        var observer = new ExpressionObserver();
+        using (var expr = observer.Observe(numbered => numbered.Number * 2 + (numbered.Number + 1), subject))
+        {
+            void propertyChanging(object? sender, PropertyChangingEventArgs e) => observedWhileChanging = expr.Evaluation.Result;
+            expr.PropertyChanging += propertyChanging;
+            subject.Number = 7;
+            expr.PropertyChanging -= propertyChanging;
+            Assert.AreEqual(22, expr.Evaluation.Result);
+        }
+        Assert.AreEqual(0, observer.CachedObservableExpressions);
+        Assert.AreEqual(16, observedWhileChanging);
+    }
+
+    [TestMethod]
     public void DiamondNotifiesOncePerChange()
     {
         var subject = new Numbered { Number = 5 };
@@ -101,22 +119,27 @@ public class Propagation
     }
 
     [TestMethod]
-    public void OptimizedDiamondNotifiesOncePerChangeEvenWhenItsValueIsUnchanged()
+    public void OptimizedDiamondIsSilentWhenItsValueIsUnchanged()
     {
         var subject = new Numbered { Number = 3 };
+        var changings = 0;
         var values = new List<bool>();
         var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe(numbered => numbered.Number > 5 == numbered.Number > 10, subject))
         {
             void propertyChanged(object? sender, PropertyChangedEventArgs e) => values.Add(expr.Evaluation.Result);
+            void propertyChanging(object? sender, PropertyChangingEventArgs e) => ++changings;
             expr.PropertyChanged += propertyChanged;
+            expr.PropertyChanging += propertyChanging;
             Assert.IsTrue(expr.Evaluation.Result);
             subject.Number = 12;
             Assert.IsTrue(expr.Evaluation.Result);
+            expr.PropertyChanging -= propertyChanging;
             expr.PropertyChanged -= propertyChanged;
         }
         Assert.AreEqual(0, observer.CachedObservableExpressions);
-        Assert.IsTrue(new bool[] { true }.SequenceEqual(values));
+        Assert.AreEqual(0, changings);
+        Assert.AreEqual(0, values.Count);
     }
 }
 

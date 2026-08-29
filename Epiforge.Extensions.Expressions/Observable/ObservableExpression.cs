@@ -27,7 +27,6 @@ abstract class ObservableExpression :
     readonly object dependentsAccess = new();
 #endif
     ObservableExpressionSubscription? firstDependent;
-    bool hasChangingDependents;
     ObservableExpressionSubscription? lastDependent;
     (Exception? Fault, object? Result) evaluation;
     protected readonly ExpressionObserver observer;
@@ -58,7 +57,6 @@ abstract class ObservableExpression :
             if (!ReferenceEquals(evaluation.Fault, value.Fault) || !resultEqualityComparer.Equals(evaluation.Result, value.Result))
             {
                 var previousValue = evaluation.Result;
-                NotifyDependentsChanging();
                 evaluation = value;
                 NotifyDependentsChanged();
                 DisposeIfNecessaryAndPossible(previousValue);
@@ -127,19 +125,23 @@ abstract class ObservableExpression :
         }
     }
 
-    void NotifyDependentsChanging()
+    private protected void NotifyDependentsOfValueContentsChanged()
     {
-        if (!hasChangingDependents)
-            return;
         var current = Volatile.Read(ref firstDependent);
         while (current is not null)
         {
             var following = current.Next;
             if (!current.IsRemoved)
-                current.Dependent.OnDependencyEvaluationChanging(this);
+                current.Dependent.OnDependencyValueContentsChanged(this);
             current = following;
         }
     }
+
+    internal (Exception? Fault, object? Result) CurrentEvaluation =>
+        evaluation;
+
+    internal bool CurrentEvaluationEquals(in (Exception? Fault, object? Result) other) =>
+        ReferenceEquals(evaluation.Fault, other.Fault) && resultEqualityComparer.Equals(evaluation.Result, other.Result);
 
     protected abstract void OnInitialization();
 
@@ -153,8 +155,6 @@ abstract class ObservableExpression :
         var subscription = new ObservableExpressionSubscription(dependent);
         lock (dependentsAccess)
         {
-            if (dependent.ObservesEvaluationChanging)
-                hasChangingDependents = true;
             subscription.Previous = lastDependent;
             if (lastDependent is null)
                 Volatile.Write(ref firstDependent, subscription);
@@ -212,6 +212,7 @@ abstract class ScopedObservableExpression :
         this.observer = observer;
         Expression = expression;
         this.observableExpression = observableExpression;
+        evaluation = observableExpression.CurrentEvaluation;
         if (this.observableExpression.CanChange)
             subscription = this.observableExpression.SubscribeDependent(this);
         Arguments = arguments;
@@ -220,6 +221,8 @@ abstract class ScopedObservableExpression :
     private protected readonly ObservableExpression observableExpression;
     readonly ExpressionObserver observer;
     int disposed;
+    private protected (Exception? Fault, object? Result) evaluation;
+    bool notificationForced;
     bool notificationPending;
     readonly ObservableExpressionSubscription? subscription;
 
@@ -232,9 +235,6 @@ abstract class ScopedObservableExpression :
 
     public IExpressionObserver Observer =>
         observer;
-
-    bool IObservableExpressionDependent.ObservesEvaluationChanging =>
-        true;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -261,34 +261,45 @@ abstract class ScopedObservableExpression :
 
     void IObservableExpressionDependent.OnDependencyEvaluationChanged(ObservableExpression dependency)
     {
-        if (PropagationScope.IsPropagating)
-        {
-            if (!notificationPending)
-            {
-                notificationPending = true;
-                PropagationScope.Enlist(this);
-            }
+        if (Enlisted())
             return;
-        }
-        PropertyChanged?.Invoke(this, ObservableExpression.EvaluationPropertyChangedEventArgs);
+        RaiseIfEvaluationChanged();
     }
 
-    void IObservableExpressionDependent.OnDependencyEvaluationChanging(ObservableExpression dependency)
+    void IObservableExpressionDependent.OnDependencyValueContentsChanged(ObservableExpression dependency)
     {
-        if (PropagationScope.IsPropagating)
+        notificationForced = true;
+        if (Enlisted())
+            return;
+        RaiseIfEvaluationChanged();
+    }
+
+    bool Enlisted()
+    {
+        if (!PropagationScope.IsPropagating)
+            return false;
+        if (!notificationPending)
         {
-            if (notificationPending)
-                return;
             notificationPending = true;
             PropagationScope.Enlist(this);
         }
+        return true;
+    }
+
+    void RaiseIfEvaluationChanged()
+    {
+        if (!notificationForced && observableExpression.CurrentEvaluationEquals(in evaluation))
+            return;
+        notificationForced = false;
         PropertyChanging?.Invoke(this, ObservableExpression.EvaluationPropertyChangingEventArgs);
+        evaluation = observableExpression.CurrentEvaluation;
+        PropertyChanged?.Invoke(this, ObservableExpression.EvaluationPropertyChangedEventArgs);
     }
 
     internal void RaisePendingNotification()
     {
         if (!IsDisposed)
-            PropertyChanged?.Invoke(this, ObservableExpression.EvaluationPropertyChangedEventArgs);
+            RaiseIfEvaluationChanged();
     }
 
     public override string ToString() =>
@@ -308,7 +319,7 @@ class ScopedObservableExpression<TResult> :
     {
         get
         {
-            var (fault, result) = observableExpression.Evaluation;
+            var (fault, result) = evaluation;
             return (fault, (TResult)result!);
         }
     }
