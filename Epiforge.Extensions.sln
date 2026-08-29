@@ -8,6 +8,7 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Configuration", "Configuration", "{BFE4E58F-AC85-4522-A710-F490EC01BFC5}"
 	ProjectSection(SolutionItems) = preProject
 		.editorconfig = .editorconfig
+		.gitattributes = .gitattributes
 		.gitignore = .gitignore
 		.runsettings = .runsettings
 		azure-pipelines.yml = azure-pipelines.yml
