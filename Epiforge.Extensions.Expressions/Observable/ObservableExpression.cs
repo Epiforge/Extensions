@@ -27,6 +27,7 @@ abstract class ObservableExpression :
     readonly object dependentsAccess = new();
 #endif
     ObservableExpressionSubscription? firstDependent;
+    bool hasChangingDependents;
     ObservableExpressionSubscription? lastDependent;
     (Exception? Fault, object? Result) evaluation;
     protected readonly ExpressionObserver observer;
@@ -128,6 +129,8 @@ abstract class ObservableExpression :
 
     void NotifyDependentsChanging()
     {
+        if (!hasChangingDependents)
+            return;
         var current = Volatile.Read(ref firstDependent);
         while (current is not null)
         {
@@ -150,6 +153,8 @@ abstract class ObservableExpression :
         var subscription = new ObservableExpressionSubscription(dependent);
         lock (dependentsAccess)
         {
+            if (dependent.ObservesEvaluationChanging)
+                hasChangingDependents = true;
             subscription.Previous = lastDependent;
             if (lastDependent is null)
                 Volatile.Write(ref firstDependent, subscription);
@@ -228,6 +233,9 @@ abstract class ScopedObservableExpression :
 
     public IExpressionObserver Observer =>
         observer;
+
+    bool IObservableExpressionDependent.ObservesEvaluationChanging =>
+        true;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
