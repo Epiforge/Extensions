@@ -9,5 +9,4 @@ sealed class ObservableExpressionSubscription
     internal volatile bool IsRemoved;
     internal volatile ObservableExpressionSubscription? Next;
     internal ObservableExpressionSubscription? Previous;
-    internal int Sequence;
 }

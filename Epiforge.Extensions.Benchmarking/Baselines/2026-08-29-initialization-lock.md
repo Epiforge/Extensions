@@ -87,6 +87,26 @@ This also closes the open question above. `ConstructAndDisposeWithFanOut` at 2,8
 
 `launchCount` of three is now set on `QueryFanOutBenchmarks` and `ObservableExpressionBenchmarks`, the two used for decisions on this path. `QueryFootprintBenchmarks` is left at one: it already runs for six minutes, and it is used for breadth rather than for resolving small differences.
 
+## Pooled baseline
+
+Both instruments re-measured against unchanged code once `launchCount` of three was in place. These are the durable before-figures for whatever is measured next, recorded here because BenchmarkDotNet overwrites its own reports.
+
+| QueryFanOut, 1,000 elements | mean | error | std dev | allocated |
+|--- |---: |---: |---: |---: |
+| `ChangeTheSharedValue` | 21.09 μs | ±0.119 | 0.218 | 86.26 KB |
+| `ConstructAndDisposeWithFanOut` | 2,816.12 μs | ±24.455 | 44.098 | 4,246.03 KB |
+| `ConstructAndDisposeWithoutFanOut` | 2,161.86 μs | ±19.569 | 38.168 | 3,680.03 KB |
+
+| ObservableExpression | mean | error | std dev | allocated |
+|--- |---: |---: |---: |---: |
+| `CreateAndDispose`, 0 | 2.326 μs | ±0.0171 | 0.0308 | 4.49 KB |
+| `CreateAndDispose`, 1,000 | 2.499 μs | ±0.0233 | 0.0454 | 4.14 KB |
+| `CreateAndDispose`, 10,000 | 4.335 μs | ±0.0578 | 0.1901 | 4.32 KB |
+
+One row refines the correction above rather than confirming it. `CreateAndDispose` at zero existing expressions saw its standard deviation rise from 0.0168 to 0.0308 when pooled — the only row in either benchmark to widen. That is between-process variance becoming visible, and it is visible there because the absolute spread is about thirty nanoseconds and this is the one row small enough for thirty nanoseconds to matter.
+
+So process-to-process variance is real but small in absolute terms. On the millisecond construction rows it is lost in the noise it was blamed for; on a two-microsecond row it doubles the spread. The general claim to carry forward is not that such variance is negligible, but that it is roughly constant in absolute size and therefore matters in inverse proportion to what is being measured.
+
 ## Why the change is kept
 
 The benefit is live-set reduction, and no benchmark in this suite measures it. Both harnesses construct and dispose, so a lock object that dies early and one that dies late cost the same in every column they report.

@@ -21,12 +21,7 @@ abstract class ObservableExpression :
 
     protected readonly object? defaultResult;
     int deferringEvaluation;
-#if IS_NET_9_0_OR_GREATER
-    readonly Lock dependentsAccess = new();
-#else
-    readonly object dependentsAccess = new();
-#endif
-    int dependentSequence;
+    SpinLock dependentsAccess = new(true);
     ObservableExpressionSubscription? firstDependent;
     ObservableExpressionSubscription? lastDependent;
     (Exception? Fault, object? Result) evaluation;
@@ -119,12 +114,11 @@ abstract class ObservableExpression :
 
     private protected void NotifyDependentsChanged()
     {
-        var limit = Volatile.Read(ref dependentSequence);
         var current = Volatile.Read(ref firstDependent);
         while (current is not null)
         {
             var following = current.Next;
-            if (current.Sequence < limit && !current.IsRemoved)
+            if (!current.IsRemoved)
                 current.Dependent.OnDependencyEvaluationChanged(this);
             current = following;
         }
@@ -140,16 +134,21 @@ abstract class ObservableExpression :
     {
         ArgumentNullException.ThrowIfNull(dependent);
         var subscription = new ObservableExpressionSubscription(dependent);
-        lock (dependentsAccess)
+        var lockTaken = false;
+        try
         {
-            subscription.Sequence = dependentSequence;
+            dependentsAccess.Enter(ref lockTaken);
             subscription.Previous = lastDependent;
             if (lastDependent is null)
                 Volatile.Write(ref firstDependent, subscription);
             else
                 lastDependent.Next = subscription;
             lastDependent = subscription;
-            Volatile.Write(ref dependentSequence, dependentSequence + 1);
+        }
+        finally
+        {
+            if (lockTaken)
+                dependentsAccess.Exit();
         }
         return subscription;
     }
@@ -171,8 +170,10 @@ abstract class ObservableExpression :
     internal void UnsubscribeDependent(ObservableExpressionSubscription subscription)
     {
         ArgumentNullException.ThrowIfNull(subscription);
-        lock (dependentsAccess)
+        var lockTaken = false;
+        try
         {
+            dependentsAccess.Enter(ref lockTaken);
             if (subscription.IsRemoved)
                 return;
             subscription.IsRemoved = true;
@@ -185,6 +186,11 @@ abstract class ObservableExpression :
             else
                 subscription.Next.Previous = subscription.Previous;
             subscription.Previous = null;
+        }
+        finally
+        {
+            if (lockTaken)
+                dependentsAccess.Exit();
         }
     }
 }
