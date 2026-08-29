@@ -40,6 +40,32 @@ public class DisposalParity
             CollectionAssert.AreEqual(DeclaredSurfaceOf(counterpart), DeclaredSurfaceOf(dynamicVariant), $"{counterpart.Name} and {dynamicVariant.Name} no longer declare the same members; these are maintained as copies of one another and a change to either belongs in both");
     }
 
+    [TestMethod]
+    public void EachPlainVariantDeclaresWhatItsNotifyingCounterpartDeclares()
+    {
+        const string renamedSynchronousHook = "method Boolean Dispose(Boolean) abstract";
+        const string requiredAsynchronousHook = "method ValueTask`1 DisposeAsyncCore() virtual";
+        var pairs = new (Type notifying, Type plain, (string from, string to)[] divergences)[]
+        {
+            (typeof(Components.AsyncDisposable), typeof(Components.PlainAsyncDisposable), []),
+            (typeof(Components.Disposable), typeof(Components.PlainDisposable), [(renamedSynchronousHook, "method Boolean DisposeCore() abstract"), (requiredAsynchronousHook, "method ValueTask`1 DisposeAsyncCore() abstract")]),
+            (typeof(Components.SyncDisposable), typeof(Components.PlainSyncDisposable), [(renamedSynchronousHook, "method Boolean DisposeCore() abstract")])
+        };
+        foreach (var (notifying, plain, divergences) in pairs)
+        {
+            var expected = DeclaredSurfaceOf(notifying);
+            expected.RemoveAll(member => member.StartsWith("method Void Finalize(", StringComparison.Ordinal) || member.StartsWith("method Void LoggerSet(", StringComparison.Ordinal));
+            foreach (var (from, to) in divergences)
+            {
+                var index = expected.IndexOf(from);
+                Assert.IsTrue(index >= 0, $"{notifying.Name} no longer declares {from}, so the divergence recorded here for {plain.Name} is stale");
+                expected[index] = to;
+            }
+            expected.Sort(StringComparer.Ordinal);
+            CollectionAssert.AreEqual(expected, DeclaredSurfaceOf(plain), $"{notifying.Name} and {plain.Name} differ by more than the finalizer, the logger hook, and the divergences recorded here; a change to either usually belongs in both");
+        }
+    }
+
     static string ParametersOf(MethodBase method) =>
         string.Join(", ", method.GetParameters().Select(parameter => parameter.ParameterType.Name));
 }
