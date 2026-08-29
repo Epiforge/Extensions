@@ -16,36 +16,32 @@ sealed class ObservableConditionalExpression(ExpressionObserver observer, Condit
 
     internal readonly ConditionalExpression ConditionalExpression = conditionalExpression;
 
-    protected override bool Dispose(bool disposing)
+    protected override bool DisposeCore()
     {
-        if (disposing)
+        var removedFromCache = observer.ExpressionDisposed(this);
+        if (removedFromCache)
         {
-            var removedFromCache = observer.ExpressionDisposed(this);
-            if (removedFromCache)
+            if (test is not null)
             {
-                if (test is not null)
-                {
-                    if (testSubscription is { } testDependency)
-                        test.UnsubscribeDependent(testDependency);
-                    test.Dispose();
-                }
-                if (ifTrue is not null)
-                {
-                    if (ifTrueSubscription is { } ifTrueDependency)
-                        ifTrue.UnsubscribeDependent(ifTrueDependency);
-                    ifTrue.Dispose();
-                }
-                if (ifFalse is not null)
-                {
-                    if (ifFalseSubscription is { } ifFalseDependency)
-                        ifFalse.UnsubscribeDependent(ifFalseDependency);
-                    ifFalse.Dispose();
-                }
-                RemovedFromCache();
+                if (testSubscription is { } testDependency)
+                    test.UnsubscribeDependent(testDependency);
+                test.Dispose();
             }
-            return removedFromCache;
+            if (ifTrue is not null)
+            {
+                if (ifTrueSubscription is { } ifTrueDependency)
+                    ifTrue.UnsubscribeDependent(ifTrueDependency);
+                ifTrue.Dispose();
+            }
+            if (ifFalse is not null)
+            {
+                if (ifFalseSubscription is { } ifFalseDependency)
+                    ifFalse.UnsubscribeDependent(ifFalseDependency);
+                ifFalse.Dispose();
+            }
+            RemovedFromCache();
         }
-        return true;
+        return removedFromCache;
     }
 
     protected override void Evaluate()

@@ -13,33 +13,29 @@ sealed class ObservableMethodCallExpression(ExpressionObserver observer, MethodC
 
     internal readonly MethodCallExpression MethodCallExpression = methodCallExpression;
 
-    protected override bool Dispose(bool disposing)
+    protected override bool DisposeCore()
     {
-        if (disposing)
+        var removedFromCache = observer.ExpressionDisposed(this);
+        if (removedFromCache)
         {
-            var removedFromCache = observer.ExpressionDisposed(this);
-            if (removedFromCache)
+            DisposeValueIfNecessaryAndPossible();
+            if (@object is not null)
             {
-                DisposeValueIfNecessaryAndPossible();
-                if (@object is not null)
-                {
-                    if (objectSubscription is { } objectDependency)
-                        @object.UnsubscribeDependent(objectDependency);
-                    @object.Dispose();
-                }
-                if (arguments is not null)
-                    for (int i = 0, ii = arguments.Count; i < ii; ++i)
-                    {
-                        var argument = arguments[i];
-                        if (argumentSubscriptions?[i] is { } argumentDependency)
-                            argument.UnsubscribeDependent(argumentDependency);
-                        argument.Dispose();
-                    }
-                RemovedFromCache();
+                if (objectSubscription is { } objectDependency)
+                    @object.UnsubscribeDependent(objectDependency);
+                @object.Dispose();
             }
-            return removedFromCache;
+            if (arguments is not null)
+                for (int i = 0, ii = arguments.Count; i < ii; ++i)
+                {
+                    var argument = arguments[i];
+                    if (argumentSubscriptions?[i] is { } argumentDependency)
+                        argument.UnsubscribeDependent(argumentDependency);
+                    argument.Dispose();
+                }
+            RemovedFromCache();
         }
-        return true;
+        return removedFromCache;
     }
 
     protected override void Evaluate()

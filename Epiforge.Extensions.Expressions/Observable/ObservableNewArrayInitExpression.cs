@@ -10,26 +10,22 @@ sealed class ObservableNewArrayInitExpression(ExpressionObserver observer, NewAr
 
     internal readonly NewArrayExpression NewArrayExpression = newArrayExpression;
 
-    protected override bool Dispose(bool disposing)
+    protected override bool DisposeCore()
     {
-        if (disposing)
+        var removedFromCache = observer.ExpressionDisposed(this);
+        if (removedFromCache)
         {
-            var removedFromCache = observer.ExpressionDisposed(this);
-            if (removedFromCache)
-            {
-                if (initializers is not null)
-                    for (int i = 0, ii = initializers.Count; i < ii; ++i)
-                    {
-                        var initializer = initializers[i];
-                        if (initializerSubscriptions?[i] is { } initializerDependency)
-                            initializer.UnsubscribeDependent(initializerDependency);
-                        initializer.Dispose();
-                    }
-                RemovedFromCache();
-            }
-            return removedFromCache;
+            if (initializers is not null)
+                for (int i = 0, ii = initializers.Count; i < ii; ++i)
+                {
+                    var initializer = initializers[i];
+                    if (initializerSubscriptions?[i] is { } initializerDependency)
+                        initializer.UnsubscribeDependent(initializerDependency);
+                    initializer.Dispose();
+                }
+            RemovedFromCache();
         }
-        return true;
+        return removedFromCache;
     }
 
     protected override void Evaluate()

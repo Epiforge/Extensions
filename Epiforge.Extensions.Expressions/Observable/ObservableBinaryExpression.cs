@@ -33,31 +33,27 @@ class ObservableBinaryExpression(ExpressionObserver observer, BinaryExpression b
 
     internal readonly BinaryExpression BinaryExpression = binaryExpression;
 
-    protected override bool Dispose(bool disposing)
+    protected override bool DisposeCore()
     {
-        if (disposing)
+        var removedFromCache = observer.ExpressionDisposed(this);
+        if (removedFromCache)
         {
-            var removedFromCache = observer.ExpressionDisposed(this);
-            if (removedFromCache)
+            DisposeValueIfNecessaryAndPossible();
+            if (left is not null)
             {
-                DisposeValueIfNecessaryAndPossible();
-                if (left is not null)
-                {
-                    if (leftSubscription is { } leftDependency)
-                        left.UnsubscribeDependent(leftDependency);
-                    left.Dispose();
-                }
-                if (right is not null)
-                {
-                    if (rightSubscription is { } rightDependency)
-                        right.UnsubscribeDependent(rightDependency);
-                    right.Dispose();
-                }
-                RemovedFromCache();
+                if (leftSubscription is { } leftDependency)
+                    left.UnsubscribeDependent(leftDependency);
+                left.Dispose();
             }
-            return removedFromCache;
+            if (right is not null)
+            {
+                if (rightSubscription is { } rightDependency)
+                    right.UnsubscribeDependent(rightDependency);
+                right.Dispose();
+            }
+            RemovedFromCache();
         }
-        return true;
+        return removedFromCache;
     }
 
     protected override void Evaluate()

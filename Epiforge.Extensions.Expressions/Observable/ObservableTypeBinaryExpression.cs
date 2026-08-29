@@ -26,24 +26,20 @@ sealed class ObservableTypeBinaryExpression(ExpressionObserver observer, TypeBin
 
     internal readonly TypeBinaryExpression TypeBinaryExpression = typeBinaryExpression;
 
-    protected override bool Dispose(bool disposing)
+    protected override bool DisposeCore()
     {
-        if (disposing)
+        var removedFromCache = observer.ExpressionDisposed(this);
+        if (removedFromCache)
         {
-            var removedFromCache = observer.ExpressionDisposed(this);
-            if (removedFromCache)
+            if (expression is not null)
             {
-                if (expression is not null)
-                {
-                    if (expressionSubscription is { } expressionDependency)
-                        expression.UnsubscribeDependent(expressionDependency);
-                    expression.Dispose();
-                }
-                RemovedFromCache();
+                if (expressionSubscription is { } expressionDependency)
+                    expression.UnsubscribeDependent(expressionDependency);
+                expression.Dispose();
             }
-            return removedFromCache;
+            RemovedFromCache();
         }
-        return true;
+        return removedFromCache;
     }
 
     protected override void Evaluate()

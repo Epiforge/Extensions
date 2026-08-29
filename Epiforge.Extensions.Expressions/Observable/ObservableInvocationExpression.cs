@@ -42,38 +42,34 @@ sealed class ObservableInvocationExpression(ExpressionObserver observer, Invocat
         EvaluateIfNotDeferred();
     }
 
-    protected override bool Dispose(bool disposing)
+    protected override bool DisposeCore()
     {
-        if (disposing)
+        var removedFromCache = observer.ExpressionDisposed(this);
+        if (removedFromCache)
         {
-            var removedFromCache = observer.ExpressionDisposed(this);
-            if (removedFromCache)
+            if (observableExpression is not null)
             {
-                if (observableExpression is not null)
-                {
-                    if (observableExpressionSubscription is { } observableExpressionDependency)
-                        observableExpression.UnsubscribeDependent(observableExpressionDependency);
-                    observableExpression.Dispose();
-                }
-                if (observableDelegateExpression is not null)
-                {
-                    if (observableDelegateExpressionSubscription is { } observableDelegateExpressionDependency)
-                        observableDelegateExpression.UnsubscribeDependent(observableDelegateExpressionDependency);
-                    observableDelegateExpression.Dispose();
-                }
-                if (observableArguments is not null)
-                    for (int i = 0, ii = observableArguments.Count; i < ii; i++)
-                    {
-                        var obserableArgument = observableArguments[i];
-                        if (observableArgumentSubscriptions?[i] is { } obserableArgumentDependency)
-                            obserableArgument.UnsubscribeDependent(obserableArgumentDependency);
-                        obserableArgument.Dispose();
-                    }
-                RemovedFromCache();
+                if (observableExpressionSubscription is { } observableExpressionDependency)
+                    observableExpression.UnsubscribeDependent(observableExpressionDependency);
+                observableExpression.Dispose();
             }
-            return removedFromCache;
+            if (observableDelegateExpression is not null)
+            {
+                if (observableDelegateExpressionSubscription is { } observableDelegateExpressionDependency)
+                    observableDelegateExpression.UnsubscribeDependent(observableDelegateExpressionDependency);
+                observableDelegateExpression.Dispose();
+            }
+            if (observableArguments is not null)
+                for (int i = 0, ii = observableArguments.Count; i < ii; i++)
+                {
+                    var obserableArgument = observableArguments[i];
+                    if (observableArgumentSubscriptions?[i] is { } obserableArgumentDependency)
+                        obserableArgument.UnsubscribeDependent(obserableArgumentDependency);
+                    obserableArgument.Dispose();
+                }
+            RemovedFromCache();
         }
-        return true;
+        return removedFromCache;
     }
 
     protected override void Evaluate()

@@ -11,27 +11,23 @@ sealed class ObservableNewExpression(ExpressionObserver observer, NewExpression 
 
     internal readonly NewExpression NewExpression = newExpression;
 
-    protected override bool Dispose(bool disposing)
+    protected override bool DisposeCore()
     {
-        if (disposing)
+        var removedFromCache = observer.ExpressionDisposed(this);
+        if (removedFromCache)
         {
-            var removedFromCache = observer.ExpressionDisposed(this);
-            if (removedFromCache)
-            {
-                DisposeValueIfNecessaryAndPossible();
-                if (arguments is not null)
-                    for (int i = 0, ii = arguments.Count; i < ii; ++i)
-                    {
-                        var argument = arguments[i];
-                        if (argumentSubscriptions?[i] is { } argumentDependency)
-                            argument.UnsubscribeDependent(argumentDependency);
-                        argument.Dispose();
-                    }
-                RemovedFromCache();
-            }
-            return removedFromCache;
+            DisposeValueIfNecessaryAndPossible();
+            if (arguments is not null)
+                for (int i = 0, ii = arguments.Count; i < ii; ++i)
+                {
+                    var argument = arguments[i];
+                    if (argumentSubscriptions?[i] is { } argumentDependency)
+                        argument.UnsubscribeDependent(argumentDependency);
+                    argument.Dispose();
+                }
+            RemovedFromCache();
         }
-        return true;
+        return removedFromCache;
     }
 
     protected override void Evaluate()

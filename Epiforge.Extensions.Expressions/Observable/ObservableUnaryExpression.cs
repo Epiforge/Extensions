@@ -29,25 +29,21 @@ sealed class ObservableUnaryExpression(ExpressionObserver observer, UnaryExpress
 
     internal readonly UnaryExpression UnaryExpression = unaryExpression;
 
-    protected override bool Dispose(bool disposing)
+    protected override bool DisposeCore()
     {
-        if (disposing)
+        var removedFromCache = observer.ExpressionDisposed(this);
+        if (removedFromCache)
         {
-            var removedFromCache = observer.ExpressionDisposed(this);
-            if (removedFromCache)
+            if (operand is not null)
             {
-                if (operand is not null)
-                {
-                    if (operandSubscription is { } operandDependency)
-                        operand.UnsubscribeDependent(operandDependency);
-                    operand.Dispose();
-                    DisposeValueIfNecessaryAndPossible();
-                }
-                RemovedFromCache();
+                if (operandSubscription is { } operandDependency)
+                    operand.UnsubscribeDependent(operandDependency);
+                operand.Dispose();
+                DisposeValueIfNecessaryAndPossible();
             }
-            return removedFromCache;
+            RemovedFromCache();
         }
-        return true;
+        return removedFromCache;
     }
 
     protected override void Evaluate()

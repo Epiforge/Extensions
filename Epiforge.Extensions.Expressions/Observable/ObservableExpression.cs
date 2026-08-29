@@ -1,7 +1,7 @@
 namespace Epiforge.Extensions.Expressions.Observable;
 
 abstract class ObservableExpression :
-    SyncDisposable
+    PlainSyncDisposable
 {
     internal static readonly PropertyChangedEventArgs EvaluationPropertyChangedEventArgs = new(nameof(Evaluation));
     internal static readonly PropertyChangingEventArgs EvaluationPropertyChangingEventArgs = new(nameof(Evaluation));
@@ -11,7 +11,6 @@ abstract class ObservableExpression :
         ArgumentNullException.ThrowIfNull(observer);
         ArgumentNullException.ThrowIfNull(expression);
         this.observer = observer;
-        Logger = observer.Logger;
         Expression = expression;
         var type = Expression.Type;
         defaultResult = type.FastDefault();
@@ -64,9 +63,8 @@ abstract class ObservableExpression :
             if (!ReferenceEquals(evaluation.Fault, value.Fault) || !resultEqualityComparer.Equals(evaluation.Result, value.Result))
             {
                 var previousValue = evaluation.Result;
-                OnPropertyChanging(EvaluationPropertyChangingEventArgs);
+                PropertyChanging?.Invoke(this, EvaluationPropertyChangingEventArgs);
                 evaluation = value;
-                OnPropertyChanged(EvaluationPropertyChangedEventArgs);
                 NotifyDependentsChanged();
                 DisposeIfNecessaryAndPossible(previousValue);
             }
@@ -81,6 +79,8 @@ abstract class ObservableExpression :
                 return deferringEvaluation;
         }
     }
+
+    internal event PropertyChangingEventHandler? PropertyChanging;
 
     void DisposeIfNecessaryAndPossible(object? value)
     {

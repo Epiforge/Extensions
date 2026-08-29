@@ -16,29 +16,25 @@ sealed class ObservableMemberExpression(ExpressionObserver observer, MemberExpre
 
     internal readonly MemberExpression MemberExpression = memberExpression;
 
-    protected override bool Dispose(bool disposing)
+    protected override bool DisposeCore()
     {
-        if (disposing)
+        var removedFromCache = observer.ExpressionDisposed(this);
+        if (removedFromCache)
         {
-            var removedFromCache = observer.ExpressionDisposed(this);
-            if (removedFromCache)
+            DisposeValueIfNecessaryAndPossible();
+            if (getMethod is not null)
+                UnsubscribeFromExpressionValueNotifications();
+            else if (field is not null)
+                UnsubscribeFromValueNotifications();
+            if (observableExpression is not null)
             {
-                DisposeValueIfNecessaryAndPossible();
-                if (getMethod is not null)
-                    UnsubscribeFromExpressionValueNotifications();
-                else if (field is not null)
-                    UnsubscribeFromValueNotifications();
-                if (observableExpression is not null)
-                {
-                    if (observableExpressionSubscription is { } observableExpressionDependency)
-                        observableExpression.UnsubscribeDependent(observableExpressionDependency);
-                    observableExpression.Dispose();
-                }
-                RemovedFromCache();
+                if (observableExpressionSubscription is { } observableExpressionDependency)
+                    observableExpression.UnsubscribeDependent(observableExpressionDependency);
+                observableExpression.Dispose();
             }
-            return removedFromCache;
+            RemovedFromCache();
         }
-        return true;
+        return removedFromCache;
     }
 
     protected override void Evaluate()
@@ -175,9 +171,6 @@ sealed class ObservableMemberExpression(ExpressionObserver observer, MemberExpre
         }
     }
 
-    void ValueChanged(object? sender, EventArgs e)
-    {
-        OnPropertyChanged(EvaluationPropertyChangedEventArgs);
+    void ValueChanged(object? sender, EventArgs e) =>
         NotifyDependentsChanged();
-    }
 }

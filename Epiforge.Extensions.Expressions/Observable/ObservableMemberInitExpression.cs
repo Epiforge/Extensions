@@ -11,32 +11,28 @@ sealed class ObservableMemberInitExpression(ExpressionObserver observer, MemberI
 
     internal readonly MemberInitExpression MemberInitExpression = memberInitExpression;
 
-    protected override bool Dispose(bool disposing)
+    protected override bool DisposeCore()
     {
-        if (disposing)
+        var removedFromCache = observer.ExpressionDisposed(this);
+        if (removedFromCache)
         {
-            var removedFromCache = observer.ExpressionDisposed(this);
-            if (removedFromCache)
+            DisposeValueIfNecessaryAndPossible();
+            if (newObservableExpression is not null)
             {
-                DisposeValueIfNecessaryAndPossible();
-                if (newObservableExpression is not null)
-                {
-                    if (newObservableExpressionSubscription is { } newObservableExpressionDependency)
-                        newObservableExpression.UnsubscribeDependent(newObservableExpressionDependency);
-                    newObservableExpression.Dispose();
-                }
-                if (memberAssignmentObservableExpressions is not null)
-                    foreach (var kv in memberAssignmentObservableExpressions)
-                    {
-                        if (kv.Value.Subscription is { } memberAssignmentDependency)
-                            kv.Key.UnsubscribeDependent(memberAssignmentDependency);
-                        kv.Key.Dispose();
-                    }
-                RemovedFromCache();
+                if (newObservableExpressionSubscription is { } newObservableExpressionDependency)
+                    newObservableExpression.UnsubscribeDependent(newObservableExpressionDependency);
+                newObservableExpression.Dispose();
             }
-            return removedFromCache;
+            if (memberAssignmentObservableExpressions is not null)
+                foreach (var kv in memberAssignmentObservableExpressions)
+                {
+                    if (kv.Value.Subscription is { } memberAssignmentDependency)
+                        kv.Key.UnsubscribeDependent(memberAssignmentDependency);
+                    kv.Key.Dispose();
+                }
+            RemovedFromCache();
         }
-        return true;
+        return removedFromCache;
     }
 
     protected override void Evaluate()

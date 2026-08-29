@@ -15,34 +15,30 @@ sealed class ObservableIndexExpression(ExpressionObserver observer, IndexExpress
 
     internal readonly IndexExpression IndexExpression = indexExpression;
 
-    protected override bool Dispose(bool disposing)
+    protected override bool DisposeCore()
     {
-        if (disposing)
+        var removedFromCache = observer.ExpressionDisposed(this);
+        if (removedFromCache)
         {
-            var removedFromCache = observer.ExpressionDisposed(this);
-            if (removedFromCache)
+            DisposeValueIfNecessaryAndPossible();
+            UnsubscribeFromObjectValueNotifications();
+            if (@object is not null)
             {
-                DisposeValueIfNecessaryAndPossible();
-                UnsubscribeFromObjectValueNotifications();
-                if (@object is not null)
-                {
-                    if (objectSubscription is { } objectDependency)
-                        @object.UnsubscribeDependent(objectDependency);
-                    @object.Dispose();
-                }
-                if (arguments is { } nonNullArguments)
-                    for (int i = 0, ii = nonNullArguments.Count; i < ii; ++i)
-                    {
-                        var argument = nonNullArguments[i];
-                        if (argumentSubscriptions?[i] is { } argumentDependency)
-                            argument.UnsubscribeDependent(argumentDependency);
-                        argument.Dispose();
-                    }
-                RemovedFromCache();
+                if (objectSubscription is { } objectDependency)
+                    @object.UnsubscribeDependent(objectDependency);
+                @object.Dispose();
             }
-            return removedFromCache;
+            if (arguments is { } nonNullArguments)
+                for (int i = 0, ii = nonNullArguments.Count; i < ii; ++i)
+                {
+                    var argument = nonNullArguments[i];
+                    if (argumentSubscriptions?[i] is { } argumentDependency)
+                        argument.UnsubscribeDependent(argumentDependency);
+                    argument.Dispose();
+                }
+            RemovedFromCache();
         }
-        return true;
+        return removedFromCache;
     }
 
     protected override void Evaluate()

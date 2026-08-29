@@ -10,23 +10,19 @@ sealed class ObservableConstantExpression(ExpressionObserver observer, ConstantE
     internal override bool CanChange =>
         valueNotifies;
 
-    protected override bool Dispose(bool disposing)
+    protected override bool DisposeCore()
     {
-        if (disposing)
+        var removedFromCache = observer.ExpressionDisposed(this);
+        if (removedFromCache)
         {
-            var removedFromCache = observer.ExpressionDisposed(this);
-            if (removedFromCache)
-            {
-                var value = Evaluation.Result;
-                if (observer.ConstantExpressionsListenForDictionaryChanged && value is INotifyDictionaryChanged dictionaryChanged)
-                    dictionaryChanged.DictionaryChanged -= ValueChanged;
-                else if (observer.ConstantExpressionsListenForCollectionChanged && value is INotifyCollectionChanged collectionChanged)
-                    collectionChanged.CollectionChanged -= ValueChanged;
-                RemovedFromCache();
-            }
-            return removedFromCache;
+            var value = Evaluation.Result;
+            if (observer.ConstantExpressionsListenForDictionaryChanged && value is INotifyDictionaryChanged dictionaryChanged)
+                dictionaryChanged.DictionaryChanged -= ValueChanged;
+            else if (observer.ConstantExpressionsListenForCollectionChanged && value is INotifyCollectionChanged collectionChanged)
+                collectionChanged.CollectionChanged -= ValueChanged;
+            RemovedFromCache();
         }
-        return true;
+        return removedFromCache;
     }
 
     protected override void OnInitialization()
@@ -45,9 +41,6 @@ sealed class ObservableConstantExpression(ExpressionObserver observer, ConstantE
         }
     }
 
-    void ValueChanged(object? sender, EventArgs e)
-    {
-        OnPropertyChanged(EvaluationPropertyChangedEventArgs);
+    void ValueChanged(object? sender, EventArgs e) =>
         NotifyDependentsChanged();
-    }
 }
