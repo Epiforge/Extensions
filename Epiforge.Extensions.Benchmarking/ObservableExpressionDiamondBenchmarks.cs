@@ -6,15 +6,18 @@ public class ObservableExpressionDiamondBenchmarks
 {
     sealed class Probe
     {
-        internal Probe(IObservableExpression<BenchmarkPerson, int> expression, BenchmarkPerson subject, int observerCost)
+        internal Probe(IObservableExpression<BenchmarkPerson, int> expression, BenchmarkPerson subject, int observerCost, bool observed)
         {
             this.expression = expression;
+            this.observed = observed;
             this.observerCost = observerCost;
             this.subject = subject;
-            expression.PropertyChanged += ExpressionPropertyChanged;
+            if (observed)
+                expression.PropertyChanged += ExpressionPropertyChanged;
         }
 
         readonly IObservableExpression<BenchmarkPerson, int> expression;
+        readonly bool observed;
         readonly int observerCost;
         readonly BenchmarkPerson subject;
 
@@ -22,7 +25,8 @@ public class ObservableExpressionDiamondBenchmarks
 
         internal void Dispose()
         {
-            expression.PropertyChanged -= ExpressionPropertyChanged;
+            if (observed)
+                expression.PropertyChanged -= ExpressionPropertyChanged;
             expression.Dispose();
         }
 
@@ -44,6 +48,8 @@ public class ObservableExpressionDiamondBenchmarks
     Probe costlyDiamond = null!;
     Probe diamond = null!;
     ExpressionObserver observer = null!;
+    Probe unobservedChain = null!;
+    Probe unobservedDiamond = null!;
 
     [Benchmark(Baseline = true)]
     public void ChainChange() =>
@@ -56,6 +62,8 @@ public class ObservableExpressionDiamondBenchmarks
         costlyChain.Dispose();
         costlyDiamond.Dispose();
         diamond.Dispose();
+        unobservedChain.Dispose();
+        unobservedDiamond.Dispose();
     }
 
     [Benchmark]
@@ -70,16 +78,16 @@ public class ObservableExpressionDiamondBenchmarks
     public void DiamondChange() =>
         diamond.Toggle();
 
-    Probe NewChainProbe(int observerCost)
+    Probe NewChainProbe(int observerCost, bool observed = true)
     {
         var subject = new BenchmarkPerson("chain", 4);
-        return new(observer.Observe(person => person.Rank * 2 + 1, subject), subject, observerCost);
+        return new(observer.Observe(person => person.Rank * 2 + 1, subject), subject, observerCost, observed);
     }
 
-    Probe NewDiamondProbe(int observerCost)
+    Probe NewDiamondProbe(int observerCost, bool observed = true)
     {
         var subject = new BenchmarkPerson("diamond", 4);
-        return new(observer.Observe(person => person.Rank * 2 + (person.Rank + 1), subject), subject, observerCost);
+        return new(observer.Observe(person => person.Rank * 2 + (person.Rank + 1), subject), subject, observerCost, observed);
     }
 
     [GlobalSetup]
@@ -90,5 +98,15 @@ public class ObservableExpressionDiamondBenchmarks
         costlyChain = NewChainProbe(costlyObserver);
         costlyDiamond = NewDiamondProbe(costlyObserver);
         diamond = NewDiamondProbe(freeObserver);
+        unobservedChain = NewChainProbe(freeObserver, false);
+        unobservedDiamond = NewDiamondProbe(freeObserver, false);
     }
+
+    [Benchmark]
+    public void UnobservedChainChange() =>
+        unobservedChain.Toggle();
+
+    [Benchmark]
+    public void UnobservedDiamondChange() =>
+        unobservedDiamond.Toggle();
 }
