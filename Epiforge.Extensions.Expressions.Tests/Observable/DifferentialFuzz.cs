@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Expressions.Tests.Observable;
+﻿namespace Epiforge.Extensions.Expressions.Tests.Observable;
 
 [TestClass]
 public class DifferentialFuzz
@@ -9,12 +9,15 @@ public class DifferentialFuzz
         {
             var log = new SubscriptionLog();
             Log = log;
+            Items = [];
             Other = new Recorded(log) { Rank = 3, Score = 5, Tag = "o" };
             Subject = new Recorded(log) { Rank = 7, Score = 2, Tag = "s" };
             Observer = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = useDirectSubscription });
-            OtherMember = CaptureOf(Other);
+            (OtherMember, ItemsMember) = CaptureOf(Other, Items);
         }
 
+        internal readonly ObservableRangeCollection<Recorded> Items;
+        internal readonly MemberExpression ItemsMember;
         internal readonly SubscriptionLog Log;
         internal readonly ExpressionObserver Observer;
         internal readonly Recorded Other;
@@ -27,62 +30,65 @@ public class DifferentialFuzz
             which == 0 ? Subject : Other;
     }
 
+    static readonly PropertyInfo count = typeof(ObservableRangeCollection<Recorded>).GetProperty(nameof(ObservableRangeCollection<Recorded>.Count))!;
     static readonly PropertyInfo next = typeof(Recorded).GetProperty(nameof(Recorded.Next))!;
     static readonly PropertyInfo rank = typeof(Recorded).GetProperty(nameof(Recorded.Rank))!;
     static readonly PropertyInfo score = typeof(Recorded).GetProperty(nameof(Recorded.Score))!;
     static readonly PropertyInfo tag = typeof(Recorded).GetProperty(nameof(Recorded.Tag))!;
 
-    static MemberExpression CaptureOf(Recorded other)
+    static (MemberExpression Other, MemberExpression Items) CaptureOf(Recorded other, ObservableRangeCollection<Recorded> items)
     {
-        Expression<Func<bool>> capture = () => other.Rank > 0;
-        return (MemberExpression)((MemberExpression)((BinaryExpression)capture.Body).Left).Expression!;
+        Expression<Func<bool>> capture = () => other.Rank > 0 & items.Count > 0;
+        var body = (BinaryExpression)capture.Body;
+        return ((MemberExpression)((MemberExpression)((BinaryExpression)body.Left).Left).Expression!, (MemberExpression)((MemberExpression)((BinaryExpression)body.Right).Left).Expression!);
     }
 
-    static Expression Boolean(Random rng, int depth, ParameterExpression subject, MemberExpression other) =>
+    static Expression Boolean(Random rng, int depth, ParameterExpression subject, MemberExpression other, MemberExpression items) =>
         depth <= 0 ? Expression.Constant(rng.Next(2) == 0) : (rng.Next(8) switch
         {
-            0 => Expression.GreaterThan(Integer(rng, depth - 1, subject, other), Integer(rng, depth - 1, subject, other)),
-            1 => Expression.LessThan(Integer(rng, depth - 1, subject, other), Integer(rng, depth - 1, subject, other)),
-            2 => Expression.Equal(Integer(rng, depth - 1, subject, other), Integer(rng, depth - 1, subject, other)),
-            3 => Expression.And(Boolean(rng, depth - 1, subject, other), Boolean(rng, depth - 1, subject, other)),
-            4 => Expression.Or(Boolean(rng, depth - 1, subject, other), Boolean(rng, depth - 1, subject, other)),
-            5 => Expression.AndAlso(Boolean(rng, depth - 1, subject, other), Boolean(rng, depth - 1, subject, other)),
-            6 => Expression.Equal(Text(rng, depth - 1, subject, other), Text(rng, depth - 1, subject, other)),
-            _ => Expression.TypeIs(Text(rng, depth - 1, subject, other), typeof(string))
+            0 => Expression.GreaterThan(Integer(rng, depth - 1, subject, other, items), Integer(rng, depth - 1, subject, other, items)),
+            1 => Expression.LessThan(Integer(rng, depth - 1, subject, other, items), Integer(rng, depth - 1, subject, other, items)),
+            2 => Expression.Equal(Integer(rng, depth - 1, subject, other, items), Integer(rng, depth - 1, subject, other, items)),
+            3 => Expression.And(Boolean(rng, depth - 1, subject, other, items), Boolean(rng, depth - 1, subject, other, items)),
+            4 => Expression.Or(Boolean(rng, depth - 1, subject, other, items), Boolean(rng, depth - 1, subject, other, items)),
+            5 => Expression.AndAlso(Boolean(rng, depth - 1, subject, other, items), Boolean(rng, depth - 1, subject, other, items)),
+            6 => Expression.Equal(Text(rng, depth - 1, subject, other, items), Text(rng, depth - 1, subject, other, items)),
+            _ => Expression.TypeIs(Text(rng, depth - 1, subject, other, items), typeof(string))
         });
 
-    static Expression Integer(Random rng, int depth, ParameterExpression subject, MemberExpression other) =>
-        depth <= 0 ? Leaf(rng, subject, other) : (rng.Next(7) switch
+    static Expression Integer(Random rng, int depth, ParameterExpression subject, MemberExpression other, MemberExpression items) =>
+        depth <= 0 ? Leaf(rng, subject, other, items) : (rng.Next(7) switch
         {
-            0 => Expression.Add(Integer(rng, depth - 1, subject, other), Integer(rng, depth - 1, subject, other)),
-            1 => Expression.Subtract(Integer(rng, depth - 1, subject, other), Integer(rng, depth - 1, subject, other)),
-            2 => Expression.Multiply(Integer(rng, depth - 1, subject, other), Integer(rng, depth - 1, subject, other)),
-            3 => Expression.Divide(Integer(rng, depth - 1, subject, other), Integer(rng, depth - 1, subject, other)),
-            4 => Expression.Negate(Integer(rng, depth - 1, subject, other)),
-            5 => Expression.Condition(Boolean(rng, depth - 1, subject, other), Integer(rng, depth - 1, subject, other), Integer(rng, depth - 1, subject, other)),
-            _ => Leaf(rng, subject, other)
+            0 => Expression.Add(Integer(rng, depth - 1, subject, other, items), Integer(rng, depth - 1, subject, other, items)),
+            1 => Expression.Subtract(Integer(rng, depth - 1, subject, other, items), Integer(rng, depth - 1, subject, other, items)),
+            2 => Expression.Multiply(Integer(rng, depth - 1, subject, other, items), Integer(rng, depth - 1, subject, other, items)),
+            3 => Expression.Divide(Integer(rng, depth - 1, subject, other, items), Integer(rng, depth - 1, subject, other, items)),
+            4 => Expression.Negate(Integer(rng, depth - 1, subject, other, items)),
+            5 => Expression.Condition(Boolean(rng, depth - 1, subject, other, items), Integer(rng, depth - 1, subject, other, items), Integer(rng, depth - 1, subject, other, items)),
+            _ => Leaf(rng, subject, other, items)
         });
 
-    static Expression Leaf(Random rng, ParameterExpression subject, MemberExpression other) =>
-        rng.Next(6) switch
+    static Expression Leaf(Random rng, ParameterExpression subject, MemberExpression other, MemberExpression items) =>
+        rng.Next(7) switch
         {
             0 => Expression.MakeMemberAccess(subject, rank),
             1 => Expression.MakeMemberAccess(subject, score),
             2 => Expression.MakeMemberAccess(other, rank),
             3 => Expression.MakeMemberAccess(other, score),
             4 => Expression.MakeMemberAccess(Expression.MakeMemberAccess(subject, next), rank),
+            5 => Expression.MakeMemberAccess(items, count),
             _ => Expression.Constant(rng.Next(1, 5))
         };
 
-    static Expression Text(Random rng, int depth, ParameterExpression subject, MemberExpression other) =>
-        depth <= 0 ? TextLeaf(rng, subject, other) : (rng.Next(3) switch
+    static Expression Text(Random rng, int depth, ParameterExpression subject, MemberExpression other, MemberExpression items) =>
+        depth <= 0 ? TextLeaf(rng, subject, other, items) : (rng.Next(3) switch
         {
-            0 => Expression.Coalesce(Text(rng, depth - 1, subject, other), Text(rng, depth - 1, subject, other)),
-            1 => Expression.Condition(Boolean(rng, depth - 1, subject, other), Text(rng, depth - 1, subject, other), Text(rng, depth - 1, subject, other)),
-            _ => TextLeaf(rng, subject, other)
+            0 => Expression.Coalesce(Text(rng, depth - 1, subject, other, items), Text(rng, depth - 1, subject, other, items)),
+            1 => Expression.Condition(Boolean(rng, depth - 1, subject, other, items), Text(rng, depth - 1, subject, other, items), Text(rng, depth - 1, subject, other, items)),
+            _ => TextLeaf(rng, subject, other, items)
         });
 
-    static Expression TextLeaf(Random rng, ParameterExpression subject, MemberExpression other) =>
+    static Expression TextLeaf(Random rng, ParameterExpression subject, MemberExpression other, MemberExpression items) =>
         rng.Next(4) switch
         {
             0 => Expression.MakeMemberAccess(subject, tag),
@@ -91,15 +97,15 @@ public class DifferentialFuzz
             _ => Expression.Constant(rng.Next(2) == 0 ? "s" : null, typeof(string))
         };
 
-    static Expression<Func<Recorded, object?>> Lambda(int seed, int depth, MemberExpression other)
+    static Expression<Func<Recorded, object?>> Lambda(int seed, int depth, MemberExpression other, MemberExpression items)
     {
         var rng = new Random(seed);
         var subject = Expression.Parameter(typeof(Recorded), "s");
         var body = rng.Next(3) switch
         {
-            0 => Boolean(rng, depth, subject, other),
-            1 => Text(rng, depth, subject, other),
-            _ => Integer(rng, depth, subject, other)
+            0 => Boolean(rng, depth, subject, other, items),
+            1 => Text(rng, depth, subject, other, items),
+            _ => Integer(rng, depth, subject, other, items)
         };
         return Expression.Lambda<Func<Recorded, object?>>(Expression.Convert(body, typeof(object)), subject);
     }
@@ -110,8 +116,18 @@ public class DifferentialFuzz
     static void Mutate(World world, Random rng, int step)
     {
         var target = world.Chosen(rng.Next(2));
-        switch (rng.Next(5))
+        switch (rng.Next(8))
         {
+            case 5:
+                world.Items.Add(new Recorded(world.Log) { Rank = rng.Next(0, 4) });
+                break;
+            case 6:
+                if (world.Items.Count > 0)
+                    world.Items.RemoveAt(world.Items.Count - 1);
+                break;
+            case 7:
+                world.Items.Clear();
+                break;
             case 0:
                 target.Rank = rng.Next(0, 4);
                 break;
@@ -134,8 +150,8 @@ public class DifferentialFuzz
     {
         var graphWorld = new World(false);
         var fastWorld = new World(true);
-        var graphLambda = Lambda(seed, depth, graphWorld.OtherMember);
-        var fastLambda = Lambda(seed, depth, fastWorld.OtherMember);
+        var graphLambda = Lambda(seed, depth, graphWorld.OtherMember, graphWorld.ItemsMember);
+        var fastLambda = Lambda(seed, depth, fastWorld.OtherMember, fastWorld.ItemsMember);
         Assert.AreEqual(graphLambda.ToString().Replace("value(", "@("), fastLambda.ToString().Replace("value(", "@("), $"seed {seed}: the two worlds were given different expressions");
         using var graphExpression = graphWorld.Observer.Observe(graphLambda, graphWorld.Subject);
         using var fastExpression = fastWorld.Observer.Observe(fastLambda, fastWorld.Subject);

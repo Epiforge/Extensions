@@ -4,6 +4,51 @@
 public class DirectSubscriptionExecution
 {
     [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void AContentsChangeIsAnnouncedWhenTheValueIsTheCollectionItself(bool useDirectSubscription)
+    {
+        var log = new SubscriptionLog();
+        var items = new ObservableRangeCollection<Recorded>();
+        var subject = new Recorded(log) { Rank = 1 };
+        var observer = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = useDirectSubscription });
+        var announcements = 0;
+        using (var expr = observer.Observe(s => items, subject))
+        {
+            Assert.AreSame(items, expr.Evaluation.Result);
+            expr.PropertyChanged += (sender, e) => ++announcements;
+            items.Add(new Recorded(log));
+            Assert.AreEqual(1, announcements);
+            Assert.AreSame(items, expr.Evaluation.Result);
+            items.Clear();
+            Assert.AreEqual(2, announcements);
+        }
+        Assert.AreEqual(0, log.Outstanding);
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void AContentsChangeIsNotAnnouncedWhenTheValueIsUnaffected(bool useDirectSubscription)
+    {
+        var log = new SubscriptionLog();
+        var items = new ObservableRangeCollection<Recorded>();
+        var subject = new Recorded(log) { Rank = 1 };
+        var observer = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = useDirectSubscription });
+        var announcements = 0;
+        using (var expr = observer.Observe(s => s.Rank + (items.Count > 0 ? 0 : 0), subject))
+        {
+            Assert.AreEqual(1, expr.Evaluation.Result);
+            expr.PropertyChanged += (sender, e) => ++announcements;
+            items.Add(new Recorded(log));
+            Assert.AreEqual(0, announcements);
+            subject.Rank = 2;
+            Assert.AreEqual(1, announcements);
+        }
+        Assert.AreEqual(0, log.Outstanding);
+    }
+
+    [TestMethod]
     public void ChangeIsObservedAndAnnouncedOnce()
     {
         var log = new SubscriptionLog();
