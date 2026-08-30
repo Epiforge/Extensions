@@ -213,7 +213,11 @@ A divergence is not a defect to patch in the analyser. It is evidence that the e
 
 **Purity.** Re-invoking the whole lambda calls every method in it on every change, where the graph may call only the ones downstream of what moved. For a pure expression this is a performance difference; for an impure one it is a behavioural difference. The library already cannot promise evaluation counts, but the fast path widens the gap.
 
-**Expression caching.** The graph shares nodes between observations of equal subexpressions, which is where its advantage over runtime-capture systems comes from. A fast-path observation shares nothing. At high fan-out over a shared subexpression, the fast path may lose. That is a measurement to make, not a reason to stop.
+**Expression caching. Measured, and it is a condition rather than a hazard.** The graph shares nodes between observations of equal subexpressions. A naive fast path shares nothing, and `2026-08-30-direct-subscription-ceiling.md` shows what that costs: construction over a closure source shared by N observations grows 113× for a tenfold increase in N, against the graph's 14.8×, because every observation performs its own `+=` and `Delegate.Combine` copies the invocation list each time. The crossover is near a thousand observations, and beyond it the mechanism is asymptotically worse than what it replaces.
+
+So the execution path **must** share one real subscription per resolved source, keyed by the source object, the event kind and the property name, with the observations wanting it held in an intrusive list — which `ObservableExpressionSubscription` already is. This is not an optimization to add later. It is designed in from the first line, or the mechanism is a regression on the workload it exists for.
+
+The same measurement settles the rest of the question: on the shapes that survive eligibility, direct subscription propagates a change 4–5× faster with a third less allocation, and constructs an observation 60–75× faster with a thirteenth of the memory. A node holds its value as `(Exception?, object?)` and therefore boxes every value-typed result; a fast path holds it typed and boxes nothing, which is where a third of the propagation advantage comes from.
 
 ## Where the analyser is conservative rather than correct
 
