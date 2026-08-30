@@ -174,7 +174,45 @@ The consumer case is independently sufficient. This mechanism's failure mode is 
 
 The mechanism is not labelled experimental either. A label gathers no data without telemetry; it transfers blame rather than reducing risk. The one thing it would legitimately buy is licence to remove the feature without a major version, and the option already buys something better — a consumer in trouble fixes it themselves in one line without waiting for a release.
 
-Adding the member to `IExpressionObserver` is a breaking change for anyone implementing that interface. Expressions is already at an unreleased 4.0.0, so it is free if this lands before that ships and expensive afterward.
+Adding the member to `IExpressionObserver` is a breaking change for anyone implementing that interface.
+
+An earlier draft of this paragraph said Expressions "is already at an unreleased 4.0.0," which was an assumption stated as a fact. The csproj says **3.0.1**, with `PackageValidationBaselineVersion` at 3.0.0, and Daniel sets versions at release time rather than as work lands. So this change does not arrive somewhere already broken; it is one of the things that *forces* the next release to be a major one. The other is the removal of `INotifyDisposalOverridden` during `wrapper-deferral`.
+
+That makes `CompatibilitySuppressions.xml` more than build noise. It is the accumulating list of reasons the next version cannot be 3.0.1, and it should be read that way at release time rather than regenerated reflexively.
+
+## The execution path
+
+Three decisions settle its shape, and the first settles most of it.
+
+### The fast path is a node
+
+Every `Observe` overload funnels through one private method that does `new ScopedObservableExpression<…>(this, expression, GetObservableExpression(expression, false), arguments)`. The wrapper is what a consumer holds, and it already owns everything the contract cares about: `PropagationScope` enlistment, compare-then-notify, the typed `Evaluation`, `Disposing` and `Disposed`, `Arguments`, `Observer`. All of it is written against an `ObservableExpression`.
+
+So the fast path is an `ObservableExpression` subclass. It overrides `OnInitialization` to resolve its plan's subscriptions instead of building children, and `Evaluate` to invoke a compiled delegate instead of combining child evaluations. The observer changes in exactly one place: which node it hands the wrapper. Nothing about notification, scoping or disposal is written a second time.
+
+That matters more here than the alternative's speed. Every defect in this branch has come from one decision being expressed twice — the subscription rules, the duplicate-collapsing rule, the deferral behaviour. A parallel implementation of the notification contract would be the largest such duplication yet, and it would be the one whose divergence a consumer sees.
+
+**The cost, stated rather than hidden.** A node holds its value as `(Exception? Fault, object? Result)`, so a value-typed result is boxed on every evaluation. The ceiling measurement attributes exactly 24 bytes per notification to that box, a third of the propagation allocation advantage. Reusing the wrapper gives it up. It is given up deliberately, because the same measurement shows the speed advantage is path length rather than allocation — the graph walks constant to member to wrapper through two dependent lists, where the fast path invokes one delegate — and path length survives intact. If the remaining bytes prove worth a typed path later, that is a decision to make against a benchmark of the built thing, not against a guess about it.
+
+### Subscriptions to a shared source are shared
+
+Required, not optional: `2026-08-30-direct-subscription-ceiling.md` shows a fast path which subscribes per observation is quadratic in the number of observations and loses to the graph beyond about a thousand.
+
+The observer therefore holds a registry keyed by the resolved source object's *identity*, the event kind, and the property name. Each entry owns exactly one real `+=` against the source and an intrusive list, with tombstones, of the fast nodes that want it — the same structure `ObservableExpression` uses for its dependents, because removal during notification is the hazard in both cases. The last node to leave takes the real subscription with it.
+
+The list structure is duplicated rather than extracted, and the distinction from the duplications this document has refused elsewhere is deliberate: those duplicated a *decision* — which event, which name, which branch — that could drift into disagreement. An intrusive linked list contains no decision. Extracting it would mean editing the notification walk that `wrapper-deferral` benched, without a benchmark in hand to confirm the added indirection is free. Recorded as a candidate for unification once both are measured.
+
+### Eligibility is decided once, at observation
+
+The observer computes the normalized expression already. It asks the analyzer for a plan, and takes the fast node when `UseDirectSubscription` is on and the plan is eligible. There is no per-change re-decision and no fallback mid-life: an observation is one mechanism or the other for its whole lifetime.
+
+This is also where the convenience anticipated under **The analyser is public** gets built, since the observer is the only place that holds both the lambda and its normalization.
+
+### Order
+
+1. `UseDirectSubscription` on the options, the interface and the observer. It is a breaking interface change, and one of the reasons the next release must be a major version.
+2. The registry and the fast node, wired into the observer.
+3. Differential tests: every case in `SubscriptionAgreement` run down both mechanisms and compared, which is the step the instrument was built to make possible.
 
 ## The evidence required before shipping
 

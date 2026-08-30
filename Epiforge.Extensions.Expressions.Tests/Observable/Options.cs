@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Expressions.Tests.Observable;
+﻿namespace Epiforge.Extensions.Expressions.Tests.Observable;
 
 [TestClass]
 public class Options
@@ -220,4 +220,15 @@ public class Options
         await Task.WhenAny(disposedTcs.Task, Task.Delay(TimeSpan.FromSeconds(1)));
         Assert.IsTrue(person.IsDisposed);
     }
+
+    [TestMethod]
+    public void UseDirectSubscriptionDefaultsToEnabled()
+    {
+        Assert.IsTrue(new ExpressionObserverOptions().UseDirectSubscription);
+        Assert.IsTrue(new ExpressionObserver().UseDirectSubscription);
+    }
+
+    [TestMethod]
+    public void UseDirectSubscriptionDisabled() =>
+        Assert.IsFalse(new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = false }).UseDirectSubscription);
 }

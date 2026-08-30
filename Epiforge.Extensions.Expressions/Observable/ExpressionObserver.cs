@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Expressions.Observable;
+﻿namespace Epiforge.Extensions.Expressions.Observable;
 
 /// <summary>
 /// Represents an observer of expressions
@@ -106,6 +106,7 @@ public class ExpressionObserver :
         MemberExpressionsListenToGeneratedTypesFieldValuesForDictionaryChanged = options.MemberExpressionsListenToGeneratedTypesFieldValuesForDictionaryChanged;
         Optimizer = options.Optimizer;
         PreferAsyncDisposal = options.PreferAsyncDisposal;
+        UseDirectSubscription = options.UseDirectSubscription;
         disposeConstructedTypes = [..options.DisposeConstructedTypes.Keys];
         disposeMethodReturnValues = [..options.DisposeMethodReturnValues.Keys];
         ignoredPropertyChangeNotifications = [..options.IgnoredPropertyChangeNotifications.Keys];
@@ -222,6 +223,9 @@ public class ExpressionObserver :
 
     /// <inheritdoc/>
     public bool PreferAsyncDisposal { get; }
+
+    /// <inheritdoc/>
+    public bool UseDirectSubscription { get; }
 
     /// <inheritdoc/>
     public Task ConditionAsync(Expression<Func<bool>> condition) =>

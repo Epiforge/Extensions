@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Expressions.Observable;
+﻿namespace Epiforge.Extensions.Expressions.Observable;
 
 /// <summary>
 /// Defines the options available when instantiating a new <see cref="IExpressionObserver"/>
@@ -67,6 +67,11 @@ public class ExpressionObserverOptions
     /// Gets/sets whether the expression observer will prefer asynchronous disposal over synchronous disposal when both interfaces are implemented; the default is <c>true</c>
     /// </summary>
     public bool PreferAsyncDisposal { get; set; } = true;
+
+    /// <summary>
+    /// Gets/sets whether the expression observer may observe an eligible expression by subscribing directly to its change sources instead of by building a graph of observable expressions; the default is <c>true</c>
+    /// </summary>
+    public bool UseDirectSubscription { get; set; } = true;
 
     /// <summary>
     /// Specifies that the expression observer will dispose of objects it has created of the specified type and using constructor arguments of the specified types when the objects are replaced or otherwise discarded

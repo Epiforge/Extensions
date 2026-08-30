@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Expressions.Observable;
+﻿namespace Epiforge.Extensions.Expressions.Observable;
 
 /// <summary>
 /// Represents an observer of expressions
@@ -59,6 +59,11 @@ public interface IExpressionObserver
     /// Gets whether the expression observer will prefer asynchronous disposal over synchronous disposal when both interfaces are implemented; the default is <c>true</c>
     /// </summary>
     bool PreferAsyncDisposal { get; }
+
+    /// <summary>
+    /// Gets whether the expression observer may observe an eligible expression by subscribing directly to its change sources instead of by building a graph of observable expressions; the default is <c>true</c>
+    /// </summary>
+    bool UseDirectSubscription { get; }
 
     /// <summary>
     /// Returns a task which is only completed when the specified condition evaluates to <c>true</c>
