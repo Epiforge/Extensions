@@ -1,10 +1,12 @@
-# Direct subscription: the first cut, measured
+# Direct subscription: the execution path, measured in three cuts
+
+> **Read the third cut for the current state.** The first two sections record a regression and its diagnosis, kept because the reasoning that found the cost is worth more than the numbers it corrected.
 
 `DirectSubscriptionCeilingBenchmarks`, .NET 10.0.11, Intel Core Ultra 9 275HX, one launch. Three arms: **graph** (`UseDirectSubscription = false`), **fast** (the mechanism as built), **ceiling** (the hand-rolled stand-in from `2026-08-30-direct-subscription-ceiling.md`).
 
 Per-observation figures throughout, N = 1000 unless noted.
 
-## The headline
+## First cut
 
 **Construction is a regression.** The fast path is slower and larger than the graph it replaces, against a ceiling that is sixty times faster than the graph. That has to be fixed before this can ship, and the option defaulting to on makes it urgent rather than academic.
 
@@ -85,6 +87,35 @@ Selector construction is 1,840 ns against a ceiling of 30. Two named components 
 
 The order is clear: the delegate cache is a bounded fix worth taking first, because it is measured, contained, and buys roughly 40% of what remains. The normalization redesign is larger and should follow it, with its own measurement.
 
+## Third cut: the weak table, and a benchmark of my own making
+
+Two changes. The compiled-delegate cache became a `ConditionalWeakTable` keyed by the lambda instance, deleting the reference counting, eviction and locking that existed only to serve repeatedly rebuilt lambdas. And the benchmark's lambdas were hoisted to fields, so it measures what `ObservableCollectionWhereQuery` actually does — hold a predicate and reuse the object — rather than rebuilding a tree per element.
+
+The first attempt at the second change hoisted the lambdas in the `Observe` methods and forgot `Setup`, which still built one per standing observation. With reference-keyed caching that gave each of a thousand observations its own compiled delegate. Propagation appeared to regress from 36.5 ns to 53.4 ns while nothing in the propagation path had changed, and the regression was ten times larger at N=1000 than at N=100 — the signature of a call site going megamorphic, not of an edit. Sharing one delegate restored it to 38.0 ns, which confirms the diagnosis.
+
+### Where it lands
+
+| per observation, N=1000 | graph | fast | ceiling | fast vs graph |
+|--- |---: |---: |---: |---: |
+| selector construction | 1,919 ns / 1,785 B | **908 ns / 1,702 B** | 30 ns / 180 B | **2.11× faster, 0.95× memory** |
+| comparison construction | 2,820 ns / 3,610 B | **1,217 ns / 2,231 B** | — | **2.32× faster, 0.62× memory** |
+| selector propagation | 47.2 ns / 72 B | **38.0 ns / 72 B** | 11.0 ns / 48 B | **1.24× faster** |
+| comparison propagation | 60.5 ns / 94 B | **37.5 ns / 70 B** | 11.3 ns / 47 B | **1.61× faster, 0.75× memory** |
+
+The selector rows are the cleanest comparison. The comparison-construction figure for the graph moved 17% between runs, which is not noise: hoisting the lambda in `Setup` means the standing observations now share subexpressions with the benchmark's, so the observer's node cache is warm for `closure.threshold.Rank` where it previously was not. That is the more realistic arrangement, but it makes cross-run comparison of that one row unsafe.
+
+Propagation allocation on the selector is still 72 bytes against the ceiling's 48. That remains the boxing, and it remains the price of reusing the wrapper.
+
+### The cliff, priced
+
+`FastSelectorObserveRebuildingTheLambda` costs **22,582 ns per observation** — 11.8× the graph. That is a compile every time, and it is what a caller pays for building the same lambda fresh in a loop instead of holding it. The pattern was judged abnormal enough not to carry machinery for; this is the number that judgement is standing on, recorded so nobody has to re-derive it. `UseDirectSubscription` is the escape if anyone ever lands on it.
+
+### What remains
+
+Construction is 908 ns against a ceiling of 30. The largest identified component is expression normalization: `ReplaceParameters` rebuilds the whole tree per observation, and `Plan` then walks that tree — both per observation, both on work whose *shape* is identical for every argument. A fast path that determined eligibility and planned from the **lambda**, cached once, and resolved subscriptions relative to the argument would skip both. The graph cannot do this; its node caches are keyed by the normalized tree, so it must build one every time. That is the one place the fast path is structurally advantaged rather than merely leaner, and it is where the remaining order of magnitude lives.
+
+Propagation is 38.0 ns against a ceiling of 11.0. That gap is the node-and-wrapper path — registry, scope, two intrusive lists, the `Evaluation` setter, `FastEqualityComparer`, the wrapper's compare — and closing it means not reusing the wrapper, which was a deliberate trade and should stay one until something forces it.
+
 ## Status
 
-The mechanism is correct — the test suite is green, including the propagation and subscription-agreement work — and it is now at parity on construction and 1.3 to 1.6 times faster on propagation. It is not yet worth the machinery it costs; two named, measured changes stand between here and that.
+The mechanism is correct and it is now a clear win: **2.1–2.3× on construction with equal or less allocation, and 1.2–1.6× on propagation**. It is worth what it costs. The remaining headroom is real and is concentrated in one identified place, which is a better position than the machinery being of ambiguous value.
