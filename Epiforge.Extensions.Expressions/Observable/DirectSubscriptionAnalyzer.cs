@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Expressions.Observable;
+﻿namespace Epiforge.Extensions.Expressions.Observable;
 
 /// <summary>
 /// Determines whether an expression can be observed by subscribing directly to its change sources instead of by building a graph of observable expressions
@@ -11,6 +11,16 @@ namespace Epiforge.Extensions.Expressions.Observable;
 /// </remarks>
 public sealed class DirectSubscriptionAnalyzer
 {
+    sealed class Planner
+    {
+        readonly HashSet<Expression> planned = new(ExpressionEqualityComparer.Default);
+
+        internal readonly List<DirectSubscription> Subscriptions = [];
+
+        internal bool Reached(Expression expression) =>
+            !planned.Add(expression);
+    }
+
     static void AddContentsSubscription(List<DirectSubscription> subscriptions, Expression source, bool dictionaryPermitted, bool collectionPermitted)
     {
         if (source is ConstantExpression constantExpression)
@@ -83,14 +93,14 @@ public sealed class DirectSubscriptionAnalyzer
         return AnalyzeNode(expression, null);
     }
 
-    DirectSubscriptionAnalysis AnalyzeConstant(ConstantExpression constantExpression, List<DirectSubscription>? subscriptions)
+    DirectSubscriptionAnalysis AnalyzeConstant(ConstantExpression constantExpression, Planner? planner)
     {
-        if (subscriptions is not null)
-            AddContentsSubscription(subscriptions, constantExpression, options.ConstantExpressionsListenForDictionaryChanged, options.ConstantExpressionsListenForCollectionChanged);
+        if (planner is not null)
+            AddContentsSubscription(planner.Subscriptions, constantExpression, options.ConstantExpressionsListenForDictionaryChanged, options.ConstantExpressionsListenForCollectionChanged);
         return DirectSubscriptionAnalysis.Eligible;
     }
 
-    DirectSubscriptionAnalysis AnalyzeIndex(IndexExpression indexExpression, List<DirectSubscription>? subscriptions)
+    DirectSubscriptionAnalysis AnalyzeIndex(IndexExpression indexExpression, Planner? planner)
     {
         if (indexExpression.Indexer is not { } indexer)
             return new(indexExpression, DirectSubscriptionIneligibility.UnsupportedExpressionKind);
@@ -100,24 +110,24 @@ public sealed class DirectSubscriptionAnalyzer
             return new(indexExpression, DirectSubscriptionIneligibility.UnsupportedExpressionKind);
         if (!IsFixed(target))
             return new(indexExpression, DirectSubscriptionIneligibility.ChangeableIndexTarget);
-        var targetAnalysis = AnalyzeNode(target, subscriptions);
+        var targetAnalysis = AnalyzeNode(target, planner);
         if (!targetAnalysis.IsEligible)
             return targetAnalysis;
         for (int i = 0, ii = indexExpression.Arguments.Count; i < ii; ++i)
         {
-            var argumentAnalysis = AnalyzeNode(indexExpression.Arguments[i], subscriptions);
+            var argumentAnalysis = AnalyzeNode(indexExpression.Arguments[i], planner);
             if (!argumentAnalysis.IsEligible)
                 return argumentAnalysis;
         }
-        if (subscriptions is not null)
+        if (planner is not null)
         {
-            AddContentsSubscription(subscriptions, target, true, true);
-            AddPropertyChangedSubscription(subscriptions, target, DirectSubscriptionKind.IndexerPropertyChanged, indexer.Name);
+            AddContentsSubscription(planner.Subscriptions, target, true, true);
+            AddPropertyChangedSubscription(planner.Subscriptions, target, DirectSubscriptionKind.IndexerPropertyChanged, indexer.Name);
         }
         return DirectSubscriptionAnalysis.Eligible;
     }
 
-    DirectSubscriptionAnalysis AnalyzeMember(MemberExpression memberExpression, List<DirectSubscription>? subscriptions)
+    DirectSubscriptionAnalysis AnalyzeMember(MemberExpression memberExpression, Planner? planner)
     {
         if (memberExpression.Member is PropertyInfo disposedProperty && options.IsPropertyValueDisposed(disposedProperty))
             return new(memberExpression, DirectSubscriptionIneligibility.ValueRequiresDisposal);
@@ -125,34 +135,34 @@ public sealed class DirectSubscriptionAnalyzer
             return DirectSubscriptionAnalysis.Eligible;
         if (!IsFixed(target))
             return new(memberExpression, DirectSubscriptionIneligibility.ChangeableMemberTarget);
-        var targetAnalysis = AnalyzeNode(target, subscriptions);
-        if (!targetAnalysis.IsEligible || subscriptions is null)
+        var targetAnalysis = AnalyzeNode(target, planner);
+        if (!targetAnalysis.IsEligible || planner is null)
             return targetAnalysis;
         if (memberExpression.Member is PropertyInfo property)
         {
             if (!options.IsIgnoredPropertyChangeNotification(property))
-                AddPropertyChangedSubscription(subscriptions, target, DirectSubscriptionKind.MemberPropertyChanged, property.Name);
+                AddPropertyChangedSubscription(planner.Subscriptions, target, DirectSubscriptionKind.MemberPropertyChanged, property.Name);
         }
         else if (memberExpression.Member is FieldInfo && IsCompilerGenerated(target))
-            AddContentsSubscription(subscriptions, memberExpression, options.MemberExpressionsListenToGeneratedTypesFieldValuesForDictionaryChanged, options.MemberExpressionsListenToGeneratedTypesFieldValuesForCollectionChanged);
+            AddContentsSubscription(planner.Subscriptions, memberExpression, options.MemberExpressionsListenToGeneratedTypesFieldValuesForDictionaryChanged, options.MemberExpressionsListenToGeneratedTypesFieldValuesForCollectionChanged);
         return targetAnalysis;
     }
 
-    DirectSubscriptionAnalysis AnalyzeNode(Expression expression, List<DirectSubscription>? subscriptions) =>
-        expression switch
+    DirectSubscriptionAnalysis AnalyzeNode(Expression expression, Planner? planner) =>
+        planner is not null && planner.Reached(expression) ? DirectSubscriptionAnalysis.Eligible : expression switch
         {
-            ConstantExpression constantExpression => AnalyzeConstant(constantExpression, subscriptions),
+            ConstantExpression constantExpression => AnalyzeConstant(constantExpression, planner),
             ParameterExpression => DirectSubscriptionAnalysis.Eligible,
-            MemberExpression memberExpression => AnalyzeMember(memberExpression, subscriptions),
-            IndexExpression indexExpression => AnalyzeIndex(indexExpression, subscriptions),
+            MemberExpression memberExpression => AnalyzeMember(memberExpression, planner),
+            IndexExpression indexExpression => AnalyzeIndex(indexExpression, planner),
             BinaryExpression binaryExpression when binaryExpression.Method is not null => new(binaryExpression, DirectSubscriptionIneligibility.UserDefinedOperator),
             BinaryExpression binaryExpression when binaryExpression.Conversion is not null => new(binaryExpression, DirectSubscriptionIneligibility.UnsupportedExpressionKind),
-            BinaryExpression binaryExpression => AnalyzeNode(binaryExpression.Left, subscriptions) is { IsEligible: false } left ? left : AnalyzeNode(binaryExpression.Right, subscriptions),
-            ConditionalExpression conditionalExpression => AnalyzeNode(conditionalExpression.Test, subscriptions) is { IsEligible: false } test ? test : AnalyzeNode(conditionalExpression.IfTrue, subscriptions) is { IsEligible: false } ifTrue ? ifTrue : AnalyzeNode(conditionalExpression.IfFalse, subscriptions),
-            TypeBinaryExpression typeBinaryExpression when typeBinaryExpression.NodeType is not ExpressionType.TypeAs => AnalyzeNode(typeBinaryExpression.Expression, subscriptions),
+            BinaryExpression binaryExpression => AnalyzeNode(binaryExpression.Left, planner) is { IsEligible: false } left ? left : AnalyzeNode(binaryExpression.Right, planner),
+            ConditionalExpression conditionalExpression => AnalyzeNode(conditionalExpression.Test, planner) is { IsEligible: false } test ? test : AnalyzeNode(conditionalExpression.IfTrue, planner) is { IsEligible: false } ifTrue ? ifTrue : AnalyzeNode(conditionalExpression.IfFalse, planner),
+            TypeBinaryExpression typeBinaryExpression when typeBinaryExpression.NodeType is not ExpressionType.TypeAs => AnalyzeNode(typeBinaryExpression.Expression, planner),
             UnaryExpression unaryExpression when unaryExpression.NodeType is ExpressionType.Quote => DirectSubscriptionAnalysis.Eligible,
             UnaryExpression unaryExpression when unaryExpression.Method is not null => new(unaryExpression, DirectSubscriptionIneligibility.UserDefinedOperator),
-            UnaryExpression unaryExpression => AnalyzeNode(unaryExpression.Operand, subscriptions),
+            UnaryExpression unaryExpression => AnalyzeNode(unaryExpression.Operand, planner),
             _ => new(expression, DirectSubscriptionIneligibility.UnsupportedExpressionKind)
         };
 
@@ -163,8 +173,8 @@ public sealed class DirectSubscriptionAnalyzer
     public DirectSubscriptionPlan Plan(Expression expression)
     {
         ArgumentNullException.ThrowIfNull(expression);
-        var subscriptions = new List<DirectSubscription>();
-        var analysis = AnalyzeNode(expression, subscriptions);
-        return new(analysis, analysis.IsEligible ? subscriptions.ToArray() : null);
+        var planner = new Planner();
+        var analysis = AnalyzeNode(expression, planner);
+        return new(analysis, analysis.IsEligible ? planner.Subscriptions.ToArray() : null);
     }
 }

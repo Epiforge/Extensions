@@ -145,12 +145,25 @@ public class DirectSubscriptionPlanning
         Analyzer().Plan(null!);
 
     [TestMethod]
-    public void RepeatedMemberPlansRepeatedSubscriptions()
+    public void RepeatedMemberPlansOneSubscription()
     {
-        var plan = Analyzer().Plan(Bound<long>(person => person.NameGets + person.NameGets, TestPerson.CreateEmily()));
+        var person = TestPerson.CreateEmily();
+        var plan = Analyzer().Plan(Bound<long>(subject => subject.NameGets + subject.NameGets, person));
         Assert.IsTrue(plan.IsEligible);
-        Assert.AreEqual(2, plan.Subscriptions.Count);
-        Assert.AreEqual(plan.Subscriptions[0], plan.Subscriptions[1]);
+        Assert.AreEqual(1, plan.Subscriptions.Count);
+        Assert.AreEqual(DirectSubscriptionKind.MemberPropertyChanged, plan.Subscriptions[0].Kind);
+        Assert.AreEqual(nameof(TestPerson.NameGets), plan.Subscriptions[0].PropertyName);
+        Assert.AreSame(person, ValueOf(plan.Subscriptions[0].Source));
+    }
+
+    [TestMethod]
+    public void RepeatedSubexpressionsOfDifferentKindsEachPlanTheirOwn()
+    {
+        var people = new ObservableCollection<TestPerson>(TestPerson.MakePeople());
+        var index = Expression.MakeIndex(Expression.Constant(people), typeof(ObservableCollection<TestPerson>).GetProperty("Item")!, [Expression.Constant(0)]);
+        var plan = Analyzer().Plan(Expression.MakeBinary(ExpressionType.Equal, index, index));
+        Assert.IsTrue(plan.IsEligible);
+        Assert.AreEqual(3, plan.Subscriptions.Count);
     }
 
     [TestMethod]
