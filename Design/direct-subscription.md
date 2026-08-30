@@ -124,7 +124,23 @@ Values that cannot change:
 - a parameter's value, which is replaced by a constant before observation begins
 - a field of a compiler-generated closure type, reached from either of the above
 
-The third deserves its reasoning written down, because it is what admits the archetype. `person => person.Rank > threshold.Rank` does not compile to that shape; it compiles to `person => person.Rank > closure.threshold.Rank`, so the comparison's right operand is a member access two deep. The saving fact is that a compiler-generated closure does not implement `INotifyPropertyChanged`, so **the graph never subscribes to it either.** A reassignment of the captured local goes unnoticed by both mechanisms. The fast path is not permitted to be blind to anything the graph can see; it is permitted to be blind to what the graph is already blind to.
+The third deserves its reasoning written down, because it is what admits the archetype. `person => person.Rank > threshold.Rank` does not compile to that shape; it compiles to `person => person.Rank > closure.threshold.Rank`, so the comparison's right operand is a member access two deep. A compiler-generated closure does not implement `INotifyPropertyChanged`, so **the graph never subscribes to it either.**
+
+An earlier draft continued: "A reassignment of the captured local goes unnoticed by both mechanisms. The fast path is not permitted to be blind to anything the graph can see; it is permitted to be blind to what the graph is already blind to."
+
+**That is false, and it is the load-bearing sentence of this section.** They are not blind in the same way. Neither subscribes, but the graph *caches* — `ObservableMemberExpression` for `closure.threshold` evaluates once, at initialization, and has no dependency that can ever wake it, so it holds that value for the observation's life. The fast path caches nothing: its compiled delegate dereferences the closure field on every evaluation. So a reassignment of the captured local is unnoticed by the graph **permanently**, and unnoticed by the fast path **only until something else wakes it**, at which point it silently adopts the new object while remaining subscribed to the old one.
+
+`DirectSubscriptionReadsACapturedLocalAfreshOnEveryEvaluation` and `TheGraphKeepsTheValueACapturedLocalHeldWhenTheObservationBegan` pin both behaviours. They are deliberately two tests rather than one agreeing test, because the mechanisms do not agree, and that fact should be visible in the suite rather than only here.
+
+The fast path's behaviour is worse than "reads afresh" makes it sound. It stays subscribed to the object the local held at construction and reports a value computed from the object the local holds now — so it is **woken by one object and answers about another**. Its value therefore depends on the timing of changes to an input it no longer reads.
+
+**The graph is not defective here, and that matters for how this gets fixed.** A captured local's reassignment is a plain field write on a compiler-generated class; nothing notifies, and observing what notifies is the library's whole premise. The closure is part of what was observed, fixed at the moment of observation, in exactly the way the argument is — nobody expects `Observe(lambda, subject)` to start reporting on a different subject. The graph delivers a coherent observation of the closure it was given. The fast path delivers an incoherent mixture.
+
+So the fix is not "make the fast path match the reference implementation." It is that **freezing the captured values is the correct semantics**, and the fast path currently fails to implement them.
+
+**This is a divergence in the direction the contract forbids and it is not yet fixed.** It is not reachable by the differential fuzzer, which never reassigns its captured locals; it was found by reasoning outward from a divergence the fuzzer *did* find, and then confirmed by reading `ObservableMemberExpression`.
+
+The general shape, which subsumes both discoveries: **the graph evaluates incrementally from cached node values, and the fast path evaluates from scratch. Wherever an input is not subscribed — for any reason — the graph freezes it and the fast path does not.** Every instance of this is a divergence, and they must be enumerated rather than met one at a time.
 
 What that excludes: `person.Manager.Rank`, where `person.Manager` is a member on a type that does notify. Its value can be replaced, the object to watch for `Rank` changes with it, and no fixed set of subscriptions can follow. That needs the graph, and the analyser must say so.
 
@@ -261,6 +277,29 @@ That is a change from released behaviour: a consumer watching a faulted observab
 What it deliberately does not do is make fault identity stable — `Evaluation.Fault` keeps the instance from the first throw of a run, so the stack trace is the first occurrence rather than the latest. Making the fast path reuse its own exception instance was considered and rejected: it would have traded this divergence for the mirror-image one, since the graph does mint a new instance whenever it genuinely re-evaluates.
 
 The node's own `Evaluation` setter still compares faults by reference, so a re-throwing node still notifies its dependents and they still recompute. That is wasted work which the wrapper now absorbs, and it is left alone because changing it would alter when downstream nodes evaluate, which is a larger question than this fix.
+
+## The frozen-input divergence, and why the normalization redesign is now required
+
+The fuzzer's second finding, and the first one it produced in the fatal direction: **the values disagreed.** Seed 1047, `s => -s.Rank + other.Score`, with change notifications for `Rank` ignored by the options. The graph said -5, the fast path said -4.
+
+The cause is the general shape stated under the eligibility rule. An ignored property is never subscribed, so the graph's node for `s.Rank` evaluates once and freezes. Nothing can wake it — its only dependency is the constant holding the argument. Meanwhile a change to `other.Score` wakes both mechanisms, and the fast path re-invokes the whole delegate, reading the current `s.Rank` and quietly incorporating a change the graph had frozen out.
+
+**Two instances are now known, and they are the same defect:**
+
+| unsubscribed input | graph | fast path |
+|--- |--- |--- |
+| a property whose change notifications are ignored | freezes the value read at initialization | reads it afresh on every evaluation |
+| a captured local which is reassigned | freezes the object held at initialization | reads the field afresh on every evaluation |
+
+**The first is fixed by refusal.** An expression touching a property with ignored change notifications is now ineligible, reported as `IgnoredChangeNotification`. There is no cheaper fix: the fast path has no per-node cache to freeze the value in, and any full re-evaluation reads the property. The cost is that one ignored property disqualifies the whole expression, which is acceptable because ignoring a property is explicit and rare.
+
+**The second is not fixed, and refusal is not available** — refusing closure-field targets would refuse the archetype this whole mechanism exists to serve.
+
+What fixes it is the redesign already identified for performance: resolve each fixed subexpression once, and give the compiled delegate those resolved values as arguments rather than letting it dereference closure fields live. A lambda rewritten so that every maximal fixed subexpression becomes an indexed read from a values array can be compiled once per lambda and invoked with the values resolved at construction — which freezes exactly what the graph freezes, and removes both `ReplaceParameters` and `Plan` from the per-observation path as a side effect.
+
+So the redesign has stopped being an optimization. **It is the correctness fix**, and the performance is a by-product. That reorders everything: it is not the thing to do after the fuzzer, it is the thing the fuzzer has just made mandatory.
+
+Until it lands, the mechanism has a known divergence and should not ship.
 
 ## The evidence required before shipping
 

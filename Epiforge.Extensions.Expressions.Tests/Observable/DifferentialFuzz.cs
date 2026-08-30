@@ -5,14 +5,14 @@ public class DifferentialFuzz
 {
     sealed class World
     {
-        internal World(bool useDirectSubscription)
+        internal World(int seed, bool useDirectSubscription)
         {
             var log = new SubscriptionLog();
             Log = log;
             Items = [];
             Other = new Recorded(log) { Rank = 3, Score = 5, Tag = "o" };
             Subject = new Recorded(log) { Rank = 7, Score = 2, Tag = "s" };
-            Observer = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = useDirectSubscription });
+            Observer = new ExpressionObserver(Configured(seed, useDirectSubscription));
             (OtherMember, ItemsMember) = CaptureOf(Other, Items);
         }
 
@@ -35,6 +35,22 @@ public class DifferentialFuzz
     static readonly PropertyInfo rank = typeof(Recorded).GetProperty(nameof(Recorded.Rank))!;
     static readonly PropertyInfo score = typeof(Recorded).GetProperty(nameof(Recorded.Score))!;
     static readonly PropertyInfo tag = typeof(Recorded).GetProperty(nameof(Recorded.Tag))!;
+
+    static ExpressionObserverOptions Configured(int seed, bool useDirectSubscription)
+    {
+        var rng = new Random(seed ^ 0x0b71);
+        var options = new ExpressionObserverOptions
+        {
+            MemberExpressionsListenToGeneratedTypesFieldValuesForCollectionChanged = rng.Next(4) != 0,
+            MemberExpressionsListenToGeneratedTypesFieldValuesForDictionaryChanged = rng.Next(4) != 0,
+            UseDirectSubscription = useDirectSubscription
+        };
+        if (rng.Next(5) == 0)
+            options.AddIgnoredPropertyChangeNotification(rank);
+        if (rng.Next(7) == 0)
+            options.AddIgnoredPropertyChangeNotification(score);
+        return options;
+    }
 
     static (MemberExpression Other, MemberExpression Items) CaptureOf(Recorded other, ObservableRangeCollection<Recorded> items)
     {
@@ -148,8 +164,8 @@ public class DifferentialFuzz
 
     static void RunProgram(int seed, int depth, int steps)
     {
-        var graphWorld = new World(false);
-        var fastWorld = new World(true);
+        var graphWorld = new World(seed, false);
+        var fastWorld = new World(seed, true);
         var graphLambda = Lambda(seed, depth, graphWorld.OtherMember, graphWorld.ItemsMember);
         var fastLambda = Lambda(seed, depth, fastWorld.OtherMember, fastWorld.ItemsMember);
         Assert.AreEqual(graphLambda.ToString().Replace("value(", "@("), fastLambda.ToString().Replace("value(", "@("), $"seed {seed}: the two worlds were given different expressions");

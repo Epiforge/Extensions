@@ -171,6 +171,8 @@ public sealed class DirectSubscriptionAnalyzer
     {
         if (memberExpression.Member is PropertyInfo disposedProperty && isPropertyValueDisposed(disposedProperty))
             return new(memberExpression, DirectSubscriptionIneligibility.ValueRequiresDisposal);
+        if (memberExpression.Member is PropertyInfo ignoredProperty && isIgnoredPropertyChangeNotification(ignoredProperty))
+            return new(memberExpression, DirectSubscriptionIneligibility.IgnoredChangeNotification);
         if (memberExpression.Expression is not { } target)
             return DirectSubscriptionAnalysis.Eligible;
         if (!IsFixed(target))
@@ -179,10 +181,7 @@ public sealed class DirectSubscriptionAnalyzer
         if (!targetAnalysis.IsEligible || planner is null)
             return targetAnalysis;
         if (memberExpression.Member is PropertyInfo property)
-        {
-            if (!isIgnoredPropertyChangeNotification(property))
-                AddPropertyChangedSubscription(planner.Subscriptions, target, DirectSubscriptionKind.MemberPropertyChanged, property.Name);
-        }
+            AddPropertyChangedSubscription(planner.Subscriptions, target, DirectSubscriptionKind.MemberPropertyChanged, property.Name);
         else if (memberExpression.Member is FieldInfo && IsCompilerGenerated(target))
             AddContentsSubscription(planner.Subscriptions, memberExpression, generatedTypeFieldsListenForDictionaryChanged, generatedTypeFieldsListenForCollectionChanged);
         return targetAnalysis;

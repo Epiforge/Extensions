@@ -49,6 +49,21 @@ public class DirectSubscriptionExecution
     }
 
     [TestMethod]
+    public void AnIgnoredPropertyChangeNotificationBuildsTheGraph()
+    {
+        var options = new ExpressionObserverOptions();
+        options.AddIgnoredPropertyChangeNotification(typeof(Recorded).GetProperty(nameof(Recorded.Rank))!);
+        var subject = new Recorded(new SubscriptionLog()) { Rank = 3 };
+        var observer = new ExpressionObserver(options);
+        using (var expr = observer.Observe(s => s.Rank * 2, subject))
+        {
+            Assert.AreEqual(6, expr.Evaluation.Result);
+            Assert.AreNotEqual(0, observer.CachedObservableExpressions);
+        }
+        Assert.AreEqual(0, observer.CachedObservableExpressions);
+    }
+
+    [TestMethod]
     public void ChangeIsObservedAndAnnouncedOnce()
     {
         var log = new SubscriptionLog();

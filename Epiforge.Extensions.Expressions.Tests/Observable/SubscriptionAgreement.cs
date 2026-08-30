@@ -70,6 +70,48 @@ public class SubscriptionAgreement
     }
 
     [TestMethod]
+    public void DirectSubscriptionReadsACapturedLocalAfreshOnEveryEvaluation()
+    {
+        var log = new SubscriptionLog();
+        var first = new Recorded(log) { Rank = 10 };
+        var second = new Recorded(log) { Rank = 20 };
+        var subject = new Recorded(log) { Rank = 1 };
+        var other = first;
+        var observer = new ExpressionObserver();
+        using var expr = observer.Observe(s => s.Rank + other.Rank, subject);
+        Assert.AreEqual(11, expr.Evaluation.Result);
+        other = second;
+        Assert.AreEqual(11, expr.Evaluation.Result);
+        subject.Rank = 2;
+        Assert.AreEqual(22, expr.Evaluation.Result);
+        second.Rank = 30;
+        Assert.AreEqual(22, expr.Evaluation.Result);
+        first.Rank = 40;
+        Assert.AreEqual(32, expr.Evaluation.Result);
+    }
+
+    [TestMethod]
+    public void TheGraphKeepsTheValueACapturedLocalHeldWhenTheObservationBegan()
+    {
+        var log = new SubscriptionLog();
+        var first = new Recorded(log) { Rank = 10 };
+        var second = new Recorded(log) { Rank = 20 };
+        var subject = new Recorded(log) { Rank = 1 };
+        var other = first;
+        var observer = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = false });
+        using var expr = observer.Observe(s => s.Rank + other.Rank, subject);
+        Assert.AreEqual(11, expr.Evaluation.Result);
+        other = second;
+        Assert.AreEqual(11, expr.Evaluation.Result);
+        subject.Rank = 2;
+        Assert.AreEqual(12, expr.Evaluation.Result);
+        second.Rank = 30;
+        Assert.AreEqual(12, expr.Evaluation.Result);
+        first.Rank = 40;
+        Assert.AreEqual(42, expr.Evaluation.Result);
+    }
+
+    [TestMethod]
     public void ClosureFieldHoldingACollection()
     {
         var log = new SubscriptionLog();
@@ -91,14 +133,6 @@ public class SubscriptionAgreement
         var log = new SubscriptionLog();
         var table = new RecordedTable(log);
         AssertAgreement(subject => subject.Rank + table.Count, new Recorded(log), new ExpressionObserverOptions { MemberExpressionsListenToGeneratedTypesFieldValuesForDictionaryChanged = false });
-    }
-
-    [TestMethod]
-    public void IgnoredPropertyChangeNotification()
-    {
-        var options = new ExpressionObserverOptions();
-        options.AddIgnoredPropertyChangeNotification(typeof(Recorded).GetProperty(nameof(Recorded.Rank))!);
-        AssertAgreement(subject => subject.Rank * 2, new Recorded(new SubscriptionLog()), options);
     }
 
     [TestMethod]

@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Expressions.Observable;
+﻿namespace Epiforge.Extensions.Expressions.Observable;
 
 /// <summary>
 /// Describes why an expression cannot be observed by subscribing directly to its change sources
@@ -29,6 +29,11 @@ public enum DirectSubscriptionIneligibility
     /// A branch or operand is present which the graph does not evaluate, and therefore does not subscribe to, until it is first taken
     /// </summary>
     DeferredBranch,
+
+    /// <summary>
+    /// Change notifications for a property are ignored, so the graph reads its value once and keeps that value, where a fast path would read it afresh on every evaluation
+    /// </summary>
+    IgnoredChangeNotification,
 
     /// <summary>
     /// The value produced is registered for disposal, which only the graph performs

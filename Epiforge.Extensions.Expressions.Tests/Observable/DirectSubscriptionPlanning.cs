@@ -94,12 +94,13 @@ public class DirectSubscriptionPlanning
     }
 
     [TestMethod]
-    public void IgnoredPropertyChangeNotificationPlansNothing()
+    public void IgnoredPropertyChangeNotificationIsIneligible()
     {
         var options = new ExpressionObserverOptions();
         options.AddIgnoredPropertyChangeNotification(typeof(TestPerson).GetProperty(nameof(TestPerson.Name))!);
         var plan = Analyzer(options).Plan(Bound<string?>(person => person.Name, TestPerson.CreateEmily()));
-        Assert.IsTrue(plan.IsEligible);
+        Assert.IsFalse(plan.IsEligible);
+        Assert.AreEqual(DirectSubscriptionIneligibility.IgnoredChangeNotification, plan.Analysis.Ineligibility);
         Assert.AreEqual(0, plan.Subscriptions.Count);
     }
 
