@@ -97,6 +97,8 @@ public class DirectSubscriptionCeilingBenchmarks
     BenchmarkPerson[] graphSelectorSubjects = null!;
     int notifications;
     BenchmarkPerson[] observeSubjects = null!;
+    Expression<Func<BenchmarkPerson, bool>> comparisonLambda = null!;
+    Expression<Func<BenchmarkPerson, int>> selectorLambda = null!;
     BenchmarkPerson threshold = null!;
 
     [Params(100, 1000)]
@@ -160,10 +162,9 @@ public class DirectSubscriptionCeilingBenchmarks
     [Benchmark]
     public void FastComparisonObserve()
     {
-        var captured = threshold;
         var observations = new IObservableExpression<BenchmarkPerson, bool>[Observations];
         for (var i = 0; i < Observations; ++i)
-            observations[i] = fastObserver.Observe(person => person.Rank > captured.Rank, observeSubjects[i]);
+            observations[i] = fastObserver.Observe(comparisonLambda, observeSubjects[i]);
         for (var i = 0; i < Observations; ++i)
             observations[i].Dispose();
     }
@@ -177,6 +178,16 @@ public class DirectSubscriptionCeilingBenchmarks
 
     [Benchmark]
     public void FastSelectorObserve()
+    {
+        var observations = new IObservableExpression<BenchmarkPerson, int>[Observations];
+        for (var i = 0; i < Observations; ++i)
+            observations[i] = fastObserver.Observe(selectorLambda, observeSubjects[i]);
+        for (var i = 0; i < Observations; ++i)
+            observations[i].Dispose();
+    }
+
+    [Benchmark]
+    public void FastSelectorObserveRebuildingTheLambda()
     {
         var observations = new IObservableExpression<BenchmarkPerson, int>[Observations];
         for (var i = 0; i < Observations; ++i)
@@ -195,10 +206,9 @@ public class DirectSubscriptionCeilingBenchmarks
     [Benchmark]
     public void GraphComparisonObserve()
     {
-        var captured = threshold;
         var observations = new IObservableExpression<BenchmarkPerson, bool>[Observations];
         for (var i = 0; i < Observations; ++i)
-            observations[i] = graphObserver.Observe(person => person.Rank > captured.Rank, observeSubjects[i]);
+            observations[i] = graphObserver.Observe(comparisonLambda, observeSubjects[i]);
         for (var i = 0; i < Observations; ++i)
             observations[i].Dispose();
     }
@@ -215,7 +225,7 @@ public class DirectSubscriptionCeilingBenchmarks
     {
         var observations = new IObservableExpression<BenchmarkPerson, int>[Observations];
         for (var i = 0; i < Observations; ++i)
-            observations[i] = graphObserver.Observe(person => person.Rank, observeSubjects[i]);
+            observations[i] = graphObserver.Observe(selectorLambda, observeSubjects[i]);
         for (var i = 0; i < Observations; ++i)
             observations[i].Dispose();
     }
@@ -230,6 +240,8 @@ public class DirectSubscriptionCeilingBenchmarks
         graphObserver = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = false });
         threshold = new BenchmarkPerson("threshold", 4);
         var captured = threshold;
+        comparisonLambda = person => person.Rank > captured.Rank;
+        selectorLambda = person => person.Rank;
         ceilingComparisons = new DirectComparison[Observations];
         ceilingComparisonSubjects = new BenchmarkPerson[Observations];
         ceilingSelectors = new DirectSelector[Observations];

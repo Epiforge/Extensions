@@ -82,6 +82,32 @@ There is an escape hatch worth telling callers about. The non-short-circuiting `
 
 `TheGraphDoesNotSubscribeToAnUntakenBranchUntilItIsTaken` remains as a test, pinning the graph behaviour at two subscriptions before the branch is taken and three after, so the reason for the refusal cannot quietly stop being true.
 
+### A proposal for readmitting them, not yet attempted
+
+Recorded as a proposal with its hazards attached, because it has been reasoned and not tried. Nothing below has touched code.
+
+The refusal rests on a misreading worth naming: the problem was never that the fast path *watches* too much. It is that watching too much causes *evaluation* too much, and evaluation has consequences — getters that raise notifications of their own, and a faulting taken branch that mints a fresh exception the wrapper announces because it compares faults by reference.
+
+So do not subscribe lazily as the graph does. **Subscribe eagerly and ignore what cannot matter yet.**
+
+Tag every planned subscription with the branch it lives under. Keep a mask of which branches the last evaluation actually took. A notification arriving from a source whose branch is dead returns without evaluating: no getter runs, no exception is minted, nothing is announced. The extra handler sits attached and does nothing, which is the one divergence from the graph with no observable consequence.
+
+It is safe for a reason that can be checked rather than hoped. A dead branch becomes live only through a change in a test's value, and test sources are subscribed unconditionally and never filtered — so every transition that could matter arrives through a subscription that is always live. Evaluation reads current values, so a skipped notification cannot leave anything stale: a source in an untaken branch could not have affected the current value, and cannot affect it until the test moves, which wakes us.
+
+The principle underneath, which the eligibility rule missed: **a fixed set of subscribed objects is what the fast path requires; a fixed set of *relevant* subscriptions is not.** Branches change relevance. Chained members change identity. The rule was written to exclude the second and caught the first by accident.
+
+`&&`, `||` and `??` are all the same shape as `?:` — a selector and alternatives — so one mechanism readmits all four refused kinds.
+
+**The hazard that would kill it.** Obtaining the mask requires rewriting the tree once per lambda so the compiled delegate records which branch it took. A careless rewrite is exactly how the dead branch's getter gets invoked: hoist the recording outside the conditional, or lift the branches into locals before the test, and both sides evaluate. That would be a side effect the graph never produces, on an expression the caller wrote specifically to guard against it.
+
+So the rewrite has one non-negotiable property — **it must preserve short-circuiting exactly** — and coalesce is the hard case, since `a ?? b` needs a temporary so `a` is evaluated once without pulling `b` forward.
+
+That property is falsifiable in one run. A test type whose dead-side getter throws, asserted never to be called, settles it. **That test is written before the rewrite, not after.**
+
+Two other things could still sink it. The instrumented delegate may be measurably slower than the clean one, which would tax every eligible expression to serve four node kinds — a benchmark question, and the answer might be to instrument only lambdas that contain a short-circuiting node. And the mask is one evaluation old by construction; the argument above says that is safe, but it is an argument, and the differential fuzzer is what would test it.
+
+For the avoidance of doubt: **this changes nothing today.** The four kinds remain refused, on the reasoning above them, until this proposal has been tried and measured.
+
 Two things follow immediately.
 
 **Every subscription is to the value of some subexpression.** So the question of whether a fixed set of subscriptions can reproduce the graph's set is exactly the question of whether those particular values can change.

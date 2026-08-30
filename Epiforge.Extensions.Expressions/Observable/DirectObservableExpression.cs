@@ -12,12 +12,12 @@ abstract class DirectObservableExpression :
             _ => throw new NotSupportedException($"the analyzer planned a subscription to {expression}, whose value the execution path cannot resolve without invoking something")
         };
 
-    protected DirectObservableExpression(ExpressionObserver observer, Expression expression, LambdaExpression lambdaExpression) :
-        base(observer, expression, false) =>
-        this.lambdaExpression = lambdaExpression;
+    protected DirectObservableExpression(ExpressionObserver observer, Expression expression) :
+        base(observer, expression, false)
+    {
+    }
 
     DirectSubscriptionAttachment[]? attachments;
-    readonly LambdaExpression lambdaExpression;
     int released;
 
     internal override bool CanChange =>
@@ -30,7 +30,6 @@ abstract class DirectObservableExpression :
         if (attachments is { } attached)
             for (var i = 0; i < attached.Length; ++i)
                 observer.DirectSubscriptions.Detach(attached[i]);
-        observer.CompiledLambdaDisposed(lambdaExpression);
         RemovedFromCache();
         return true;
     }
@@ -61,8 +60,8 @@ abstract class DirectObservableExpression :
 sealed class DirectObservableExpression<TArgument, TResult> :
     DirectObservableExpression
 {
-    internal DirectObservableExpression(ExpressionObserver observer, Expression expression, DirectSubscriptionPlan plan, LambdaExpression lambdaExpression, Func<TArgument, TResult> evaluate, TArgument argument) :
-        base(observer, expression, lambdaExpression)
+    internal DirectObservableExpression(ExpressionObserver observer, Expression expression, DirectSubscriptionPlan plan, Func<TArgument, TResult> evaluate, TArgument argument) :
+        base(observer, expression)
     {
         this.argument = argument;
         this.evaluate = evaluate;

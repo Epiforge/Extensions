@@ -113,12 +113,7 @@ public class ExpressionObserver :
         Logger = options.Logger;
     }
 
-    readonly Dictionary<LambdaExpression, (Delegate Compiled, int Observations)> compiledLambdas = new(ExpressionEqualityComparer.Default);
-#if IS_NET_9_0_OR_GREATER
-    readonly Lock compiledLambdasAccess = new();
-#else
-    readonly object compiledLambdasAccess = new();
-#endif
+    readonly ConditionalWeakTable<LambdaExpression, Delegate> compiledLambdas = [];
     DirectSubscriptionAnalyzer? directSubscriptionAnalyzer;
 
     internal readonly DirectSubscriptionRegistry DirectSubscriptions = new();
@@ -800,48 +795,20 @@ public class ExpressionObserver :
     ScopedObservableExpression<TArgument, TResult> Observe<TArgument, TResult>(TArgument argument, Expression<Func<TArgument, TResult>> lambdaExpression, Expression? parameterReplacedExpression) =>
         new(this, parameterReplacedExpression!, GetObservationMechanism(lambdaExpression, parameterReplacedExpression!, argument), argument);
 
-    internal Delegate CompiledLambdaObserved(LambdaExpression lambdaExpression)
+    Delegate CompiledLambda(LambdaExpression lambdaExpression)
     {
-        lock (compiledLambdasAccess)
-        {
-            if (compiledLambdas.TryGetValue(lambdaExpression, out var cached))
-            {
-                compiledLambdas[lambdaExpression] = (cached.Compiled, cached.Observations + 1);
-                return cached.Compiled;
-            }
-            var compiled = lambdaExpression.Compile();
-            compiledLambdas.Add(lambdaExpression, (compiled, 1));
+        if (compiledLambdas.TryGetValue(lambdaExpression, out var compiled))
             return compiled;
-        }
-    }
-
-    internal void CompiledLambdaDisposed(LambdaExpression lambdaExpression)
-    {
-        lock (compiledLambdasAccess)
-        {
-            if (!compiledLambdas.TryGetValue(lambdaExpression, out var cached))
-                return;
-            if (cached.Observations > 1)
-                compiledLambdas[lambdaExpression] = (cached.Compiled, cached.Observations - 1);
-            else
-                compiledLambdas.Remove(lambdaExpression);
-        }
-    }
-
-    internal int CompiledLambdas
-    {
-        get
-        {
-            lock (compiledLambdasAccess)
-                return compiledLambdas.Count;
-        }
+        compiled = lambdaExpression.Compile();
+        compiledLambdas.AddOrUpdate(lambdaExpression, compiled);
+        return compiled;
     }
 
     ObservableExpression GetObservationMechanism<TArgument, TResult>(Expression<Func<TArgument, TResult>> lambdaExpression, Expression parameterReplacedExpression, TArgument argument)
     {
         if (UseDirectSubscription && (directSubscriptionAnalyzer ??= new DirectSubscriptionAnalyzer(this)).Plan(parameterReplacedExpression) is { IsEligible: true } plan)
         {
-            var directObservableExpression = new DirectObservableExpression<TArgument, TResult>(this, parameterReplacedExpression, plan, lambdaExpression, (Func<TArgument, TResult>)CompiledLambdaObserved(lambdaExpression), argument);
+            var directObservableExpression = new DirectObservableExpression<TArgument, TResult>(this, parameterReplacedExpression, plan, (Func<TArgument, TResult>)CompiledLambda(lambdaExpression), argument);
             directObservableExpression.Initialize();
             directObservableExpression.IsInitialized = true;
             return directObservableExpression;
