@@ -126,6 +126,15 @@ A divergence is not a defect to patch in the analyser. It is evidence that the e
 
 **Expression caching.** The graph shares nodes between observations of equal subexpressions, which is where its advantage over runtime-capture systems comes from. A fast-path observation shares nothing. At high fan-out over a shared subexpression, the fast path may lose. That is a measurement to make, not a reason to stop.
 
+## Where the analyser is conservative rather than correct
+
+Each of these is a place the mechanism becomes stairs when it might have been an escalator. They are listed so that relaxing one is a deliberate act with evidence behind it, rather than something that drifts in.
+
+- **Method calls, invocations, `new`, member init and array init** are refused outright. Their disposal and purity semantics are among the unresolved hazards below.
+- **Operators implemented by a method** are refused, for the same reason: the graph treats them as method calls and may dispose their results.
+- **Members and indexers whose values are registered for disposal** are refused, since disposal is a graph behaviour with nowhere to live on a fast path.
+- **Indexers are refused in practice, and by accident of shape.** C# compiles `people[0]` in an expression tree to a call of `get_Item`, not to an `IndexExpression`. The observer normalizes such calls back into index and member access before building its graph; the analyser does not, so every indexer arrives as a method call and is refused. The analyser is therefore correct but blind here, and closing it means either sharing the observer's normalization or performing the analysis after it. That is a design question, not an oversight, and it is deferred rather than answered.
+
 ## Order of work
 
 1. This document.
