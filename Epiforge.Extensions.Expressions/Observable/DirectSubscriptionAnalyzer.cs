@@ -66,6 +66,12 @@ public sealed class DirectSubscriptionAnalyzer
     static bool IsCompilerGenerated(Expression? expression) =>
         expression?.Type.Name.StartsWith('<') ?? false;
 
+    static ExpressionObserverOptions Validated(ExpressionObserverOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        return options;
+    }
+
     /// <summary>
     /// Instantiates a direct subscription analyzer with the default options
     /// </summary>
@@ -78,13 +84,32 @@ public sealed class DirectSubscriptionAnalyzer
     /// Instantiates a direct subscription analyzer with the specified options
     /// </summary>
     /// <param name="options">The options which decide which change sources are subscribed to</param>
-    public DirectSubscriptionAnalyzer(ExpressionObserverOptions options)
+    public DirectSubscriptionAnalyzer(ExpressionObserverOptions options) :
+        this(Validated(options).ConstantExpressionsListenForCollectionChanged, options.ConstantExpressionsListenForDictionaryChanged, options.MemberExpressionsListenToGeneratedTypesFieldValuesForCollectionChanged, options.MemberExpressionsListenToGeneratedTypesFieldValuesForDictionaryChanged, options.IsIgnoredPropertyChangeNotification, options.IsPropertyValueDisposed)
     {
-        ArgumentNullException.ThrowIfNull(options);
-        this.options = options;
     }
 
-    readonly ExpressionObserverOptions options;
+    internal DirectSubscriptionAnalyzer(ExpressionObserver observer) :
+        this(observer.ConstantExpressionsListenForCollectionChanged, observer.ConstantExpressionsListenForDictionaryChanged, observer.MemberExpressionsListenToGeneratedTypesFieldValuesForCollectionChanged, observer.MemberExpressionsListenToGeneratedTypesFieldValuesForDictionaryChanged, observer.IsIgnoredPropertyChangeNotification, observer.IsPropertyValueDisposed)
+    {
+    }
+
+    DirectSubscriptionAnalyzer(bool constantsListenForCollectionChanged, bool constantsListenForDictionaryChanged, bool generatedTypeFieldsListenForCollectionChanged, bool generatedTypeFieldsListenForDictionaryChanged, Func<PropertyInfo, bool> isIgnoredPropertyChangeNotification, Func<PropertyInfo, bool> isPropertyValueDisposed)
+    {
+        this.constantsListenForCollectionChanged = constantsListenForCollectionChanged;
+        this.constantsListenForDictionaryChanged = constantsListenForDictionaryChanged;
+        this.generatedTypeFieldsListenForCollectionChanged = generatedTypeFieldsListenForCollectionChanged;
+        this.generatedTypeFieldsListenForDictionaryChanged = generatedTypeFieldsListenForDictionaryChanged;
+        this.isIgnoredPropertyChangeNotification = isIgnoredPropertyChangeNotification;
+        this.isPropertyValueDisposed = isPropertyValueDisposed;
+    }
+
+    readonly bool constantsListenForCollectionChanged;
+    readonly bool constantsListenForDictionaryChanged;
+    readonly bool generatedTypeFieldsListenForCollectionChanged;
+    readonly bool generatedTypeFieldsListenForDictionaryChanged;
+    readonly Func<PropertyInfo, bool> isIgnoredPropertyChangeNotification;
+    readonly Func<PropertyInfo, bool> isPropertyValueDisposed;
 
     /// <summary>
     /// Determines whether the specified expression can be observed by subscribing directly to its change sources
@@ -99,7 +124,7 @@ public sealed class DirectSubscriptionAnalyzer
     DirectSubscriptionAnalysis AnalyzeConstant(ConstantExpression constantExpression, Planner? planner)
     {
         if (planner is not null)
-            AddContentsSubscription(planner.Subscriptions, constantExpression, options.ConstantExpressionsListenForDictionaryChanged, options.ConstantExpressionsListenForCollectionChanged);
+            AddContentsSubscription(planner.Subscriptions, constantExpression, constantsListenForDictionaryChanged, constantsListenForCollectionChanged);
         return DirectSubscriptionAnalysis.Eligible;
     }
 
@@ -107,7 +132,7 @@ public sealed class DirectSubscriptionAnalyzer
     {
         if (indexExpression.Indexer is not { } indexer)
             return new(indexExpression, DirectSubscriptionIneligibility.UnsupportedExpressionKind);
-        if (options.IsPropertyValueDisposed(indexer))
+        if (isPropertyValueDisposed(indexer))
             return new(indexExpression, DirectSubscriptionIneligibility.ValueRequiresDisposal);
         if (indexExpression.Object is not { } target)
             return new(indexExpression, DirectSubscriptionIneligibility.UnsupportedExpressionKind);
@@ -132,7 +157,7 @@ public sealed class DirectSubscriptionAnalyzer
 
     DirectSubscriptionAnalysis AnalyzeMember(MemberExpression memberExpression, Planner? planner)
     {
-        if (memberExpression.Member is PropertyInfo disposedProperty && options.IsPropertyValueDisposed(disposedProperty))
+        if (memberExpression.Member is PropertyInfo disposedProperty && isPropertyValueDisposed(disposedProperty))
             return new(memberExpression, DirectSubscriptionIneligibility.ValueRequiresDisposal);
         if (memberExpression.Expression is not { } target)
             return DirectSubscriptionAnalysis.Eligible;
@@ -143,11 +168,11 @@ public sealed class DirectSubscriptionAnalyzer
             return targetAnalysis;
         if (memberExpression.Member is PropertyInfo property)
         {
-            if (!options.IsIgnoredPropertyChangeNotification(property))
+            if (!isIgnoredPropertyChangeNotification(property))
                 AddPropertyChangedSubscription(planner.Subscriptions, target, DirectSubscriptionKind.MemberPropertyChanged, property.Name);
         }
         else if (memberExpression.Member is FieldInfo && IsCompilerGenerated(target))
-            AddContentsSubscription(planner.Subscriptions, memberExpression, options.MemberExpressionsListenToGeneratedTypesFieldValuesForDictionaryChanged, options.MemberExpressionsListenToGeneratedTypesFieldValuesForCollectionChanged);
+            AddContentsSubscription(planner.Subscriptions, memberExpression, generatedTypeFieldsListenForDictionaryChanged, generatedTypeFieldsListenForCollectionChanged);
         return targetAnalysis;
     }
 

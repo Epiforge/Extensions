@@ -113,6 +113,16 @@ public class ExpressionObserver :
         Logger = options.Logger;
     }
 
+    readonly Dictionary<LambdaExpression, (Delegate Compiled, int Observations)> compiledLambdas = new(ExpressionEqualityComparer.Default);
+#if IS_NET_9_0_OR_GREATER
+    readonly Lock compiledLambdasAccess = new();
+#else
+    readonly object compiledLambdasAccess = new();
+#endif
+    DirectSubscriptionAnalyzer? directSubscriptionAnalyzer;
+
+    internal readonly DirectSubscriptionRegistry DirectSubscriptions = new();
+
     readonly Dictionary<BinaryExpression, ObservableBinaryExpression> cachedObservableBinaryExpressions = new(ExpressionEqualityComparer.Default);
     readonly Dictionary<ConditionalExpression, ObservableConditionalExpression> cachedObservableConditionalExpressions = new(ExpressionEqualityComparer.Default);
     readonly Dictionary<ConstantExpression, ObservableConstantExpression> cachedObservableConstantExpressionExpressions = new(ConstantExpressionExpressionEqualityComparer.Default);
@@ -787,8 +797,57 @@ public class ExpressionObserver :
     public IObservableExpression<TResult> ObserveWithoutOptimization<TResult>(Expression<Func<TResult>> expression) =>
         ObserveWithoutOptimization<TResult>((LambdaExpression)expression);
 
-    ScopedObservableExpression<TArgument, TResult> Observe<TArgument, TResult>(TArgument argument, Expression? parameterReplacedExpression) =>
-        new(this, parameterReplacedExpression!, GetObservableExpression(parameterReplacedExpression!, false), argument);
+    ScopedObservableExpression<TArgument, TResult> Observe<TArgument, TResult>(TArgument argument, Expression<Func<TArgument, TResult>> lambdaExpression, Expression? parameterReplacedExpression) =>
+        new(this, parameterReplacedExpression!, GetObservationMechanism(lambdaExpression, parameterReplacedExpression!, argument), argument);
+
+    internal Delegate CompiledLambdaObserved(LambdaExpression lambdaExpression)
+    {
+        lock (compiledLambdasAccess)
+        {
+            if (compiledLambdas.TryGetValue(lambdaExpression, out var cached))
+            {
+                compiledLambdas[lambdaExpression] = (cached.Compiled, cached.Observations + 1);
+                return cached.Compiled;
+            }
+            var compiled = lambdaExpression.Compile();
+            compiledLambdas.Add(lambdaExpression, (compiled, 1));
+            return compiled;
+        }
+    }
+
+    internal void CompiledLambdaDisposed(LambdaExpression lambdaExpression)
+    {
+        lock (compiledLambdasAccess)
+        {
+            if (!compiledLambdas.TryGetValue(lambdaExpression, out var cached))
+                return;
+            if (cached.Observations > 1)
+                compiledLambdas[lambdaExpression] = (cached.Compiled, cached.Observations - 1);
+            else
+                compiledLambdas.Remove(lambdaExpression);
+        }
+    }
+
+    internal int CompiledLambdas
+    {
+        get
+        {
+            lock (compiledLambdasAccess)
+                return compiledLambdas.Count;
+        }
+    }
+
+    ObservableExpression GetObservationMechanism<TArgument, TResult>(Expression<Func<TArgument, TResult>> lambdaExpression, Expression parameterReplacedExpression, TArgument argument)
+    {
+        if (UseDirectSubscription && (directSubscriptionAnalyzer ??= new DirectSubscriptionAnalyzer(this)).Plan(parameterReplacedExpression) is { IsEligible: true } plan)
+        {
+            var directObservableExpression = new DirectObservableExpression<TArgument, TResult>(this, parameterReplacedExpression, plan, lambdaExpression, (Func<TArgument, TResult>)CompiledLambdaObserved(lambdaExpression), argument);
+            directObservableExpression.Initialize();
+            directObservableExpression.IsInitialized = true;
+            return directObservableExpression;
+        }
+        return GetObservableExpression(parameterReplacedExpression, false);
+    }
 
     /// <inheritdoc/>
     [return: DisposeWhenDiscarded]
@@ -796,7 +855,7 @@ public class ExpressionObserver :
     {
         ArgumentNullException.ThrowIfNull(expression);
         var parameterReplacedExpression = ReplaceParameters(expression, argument);
-        return Observe<TArgument, TResult>(argument, parameterReplacedExpression);
+        return Observe<TArgument, TResult>(argument, expression, parameterReplacedExpression);
     }
 
     /// <inheritdoc/>
@@ -805,7 +864,7 @@ public class ExpressionObserver :
     {
         ArgumentNullException.ThrowIfNull(expression);
         var parameterReplacedExpression = ExpressionObserver.ReplaceParametersWithoutOptimization(expression, argument);
-        return Observe<TArgument, TResult>(argument, parameterReplacedExpression);
+        return Observe<TArgument, TResult>(argument, expression, parameterReplacedExpression);
     }
 
     ScopedObservableExpression<TArgument1, TArgument2, TResult> Observe<TArgument1, TArgument2, TResult>(TArgument1 argument1, TArgument2 argument2, Expression? parameterReplacedExpression) =>
