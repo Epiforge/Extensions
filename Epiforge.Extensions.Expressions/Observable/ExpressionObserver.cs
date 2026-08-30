@@ -792,9 +792,6 @@ public class ExpressionObserver :
     public IObservableExpression<TResult> ObserveWithoutOptimization<TResult>(Expression<Func<TResult>> expression) =>
         ObserveWithoutOptimization<TResult>((LambdaExpression)expression);
 
-    ScopedObservableExpression<TArgument, TResult> Observe<TArgument, TResult>(TArgument argument, Expression<Func<TArgument, TResult>> lambdaExpression, Expression? parameterReplacedExpression) =>
-        new(this, parameterReplacedExpression!, GetObservationMechanism(lambdaExpression, parameterReplacedExpression!, argument), argument);
-
     DirectEvaluator CompiledLambda<TArgument, TResult>(Expression<Func<TArgument, TResult>> lambdaExpression)
     {
         if (compiledLambdas.TryGetValue(lambdaExpression, out var evaluator))
@@ -833,20 +830,18 @@ public class ExpressionObserver :
         };
     }
 
-    ObservableExpression GetObservationMechanism<TArgument, TResult>(Expression<Func<TArgument, TResult>> lambdaExpression, Expression parameterReplacedExpression, TArgument argument)
+    DirectObservableExpression<TArgument, TResult>? DirectObservation<TArgument, TResult>(Expression<Func<TArgument, TResult>> lambdaExpression, TArgument argument)
     {
-        if (UseDirectSubscription && CompiledLambda(lambdaExpression) is { Sites: { } sites } evaluator)
-        {
-            var fixedSubexpressions = evaluator.FixedSubexpressions;
-            var values = new object?[fixedSubexpressions.Length];
-            for (var i = 0; i < values.Length; ++i)
-                values[i] = DirectObservableExpression.Resolve(fixedSubexpressions[i]);
-            var directObservableExpression = new DirectObservableExpression<TArgument, TResult>(this, parameterReplacedExpression, sites, (Func<TArgument, object?[], TResult>)evaluator.Evaluate, argument, values);
-            directObservableExpression.Initialize();
-            directObservableExpression.IsInitialized = true;
-            return directObservableExpression;
-        }
-        return GetObservableExpression(parameterReplacedExpression, false);
+        if (!UseDirectSubscription || CompiledLambda(lambdaExpression) is not { Sites: { } sites } evaluator)
+            return null;
+        var fixedSubexpressions = evaluator.FixedSubexpressions;
+        var values = new object?[fixedSubexpressions.Length];
+        for (var i = 0; i < values.Length; ++i)
+            values[i] = DirectObservableExpression.Resolve(fixedSubexpressions[i]);
+        var directObservableExpression = new DirectObservableExpression<TArgument, TResult>(this, lambdaExpression, sites, (Func<TArgument, object?[], TResult>)evaluator.Evaluate, argument, values);
+        directObservableExpression.Initialize();
+        directObservableExpression.IsInitialized = true;
+        return directObservableExpression;
     }
 
     /// <inheritdoc/>
@@ -854,8 +849,10 @@ public class ExpressionObserver :
     public IObservableExpression<TArgument, TResult> Observe<TArgument, TResult>(Expression<Func<TArgument, TResult>> expression, TArgument argument)
     {
         ArgumentNullException.ThrowIfNull(expression);
+        if (DirectObservation<TArgument, TResult>(expression, argument) is { } direct)
+            return new ScopedObservableExpression<TArgument, TResult>(this, null, direct, argument);
         var parameterReplacedExpression = ReplaceParameters(expression, argument);
-        return Observe<TArgument, TResult>(argument, expression, parameterReplacedExpression);
+        return new ScopedObservableExpression<TArgument, TResult>(this, parameterReplacedExpression!, GetObservableExpression(parameterReplacedExpression!, false), argument);
     }
 
     /// <inheritdoc/>
@@ -863,8 +860,10 @@ public class ExpressionObserver :
     public IObservableExpression<TArgument, TResult> ObserveWithoutOptimization<TArgument, TResult>(Expression<Func<TArgument, TResult>> expression, TArgument argument)
     {
         ArgumentNullException.ThrowIfNull(expression);
+        if (DirectObservation<TArgument, TResult>(expression, argument) is { } direct)
+            return new ScopedObservableExpression<TArgument, TResult>(this, null, direct, argument);
         var parameterReplacedExpression = ExpressionObserver.ReplaceParametersWithoutOptimization(expression, argument);
-        return Observe<TArgument, TResult>(argument, expression, parameterReplacedExpression);
+        return new ScopedObservableExpression<TArgument, TResult>(this, parameterReplacedExpression!, GetObservableExpression(parameterReplacedExpression!, false), argument);
     }
 
     ScopedObservableExpression<TArgument1, TArgument2, TResult> Observe<TArgument1, TArgument2, TResult>(TArgument1 argument1, TArgument2 argument2, Expression? parameterReplacedExpression) =>

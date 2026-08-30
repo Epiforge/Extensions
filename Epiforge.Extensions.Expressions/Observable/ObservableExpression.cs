@@ -6,13 +6,20 @@ abstract class ObservableExpression :
     internal static readonly PropertyChangedEventArgs EvaluationPropertyChangedEventArgs = new(nameof(Evaluation));
     internal static readonly PropertyChangingEventArgs EvaluationPropertyChangingEventArgs = new(nameof(Evaluation));
 
-    protected ObservableExpression(ExpressionObserver observer, Expression expression, bool deferEvaluation)
+    static Expression Validated(Expression expression)
+    {
+        ArgumentNullException.ThrowIfNull(expression);
+        return expression;
+    }
+
+    protected ObservableExpression(ExpressionObserver observer, Expression expression, bool deferEvaluation) :
+        this(observer, Validated(expression).Type, deferEvaluation) =>
+        this.expression = expression;
+
+    private protected ObservableExpression(ExpressionObserver observer, Type type, bool deferEvaluation)
     {
         ArgumentNullException.ThrowIfNull(observer);
-        ArgumentNullException.ThrowIfNull(expression);
         this.observer = observer;
-        Expression = expression;
-        var type = Expression.Type;
         defaultResult = type.FastDefault();
         resultEqualityComparer = FastEqualityComparer.Get(type);
         deferringEvaluation = deferEvaluation ? 1 : 0;
@@ -21,6 +28,7 @@ abstract class ObservableExpression :
 
     protected readonly object? defaultResult;
     int deferringEvaluation;
+    Expression? expression;
 #if IS_NET_9_0_OR_GREATER
     readonly Lock dependentsAccess = new();
 #else
@@ -32,7 +40,6 @@ abstract class ObservableExpression :
     protected readonly ExpressionObserver observer;
     readonly FastEqualityComparer resultEqualityComparer;
 
-    internal readonly Expression Expression;
 #if IS_NET_9_0_OR_GREATER
     internal Lock? InitializationAccess = new();
 #else
@@ -44,6 +51,12 @@ abstract class ObservableExpression :
 
     internal virtual bool CanChange =>
         true;
+
+    internal Expression Expression =>
+        expression ??= Materialize();
+
+    private protected virtual Expression Materialize() =>
+        throw new NotSupportedException("this observation was constructed without an expression and cannot produce one");
 
     public (Exception? Fault, object? Result) Evaluation
     {
@@ -206,14 +219,13 @@ abstract class ScopedObservableExpression :
     static bool FaultEquals(Exception? x, Exception? y) =>
         ReferenceEquals(x, y) || (x is not null && y is not null && x.GetType() == y.GetType() && x.Message == y.Message);
 
-    protected ScopedObservableExpression(ExpressionObserver observer, Expression expression, ObservableExpression observableExpression, IReadOnlyList<object?> arguments)
+    protected ScopedObservableExpression(ExpressionObserver observer, Expression? expression, ObservableExpression observableExpression, IReadOnlyList<object?> arguments)
     {
         ArgumentNullException.ThrowIfNull(observer);
-        ArgumentNullException.ThrowIfNull(expression);
         ArgumentNullException.ThrowIfNull(observableExpression);
         ArgumentNullException.ThrowIfNull(arguments);
         this.observer = observer;
-        Expression = expression;
+        this.expression = expression;
         this.observableExpression = observableExpression;
         evaluation = observableExpression.CurrentEvaluation;
         if (this.observableExpression.CanChange)
@@ -224,12 +236,14 @@ abstract class ScopedObservableExpression :
     private protected readonly ObservableExpression observableExpression;
     readonly ExpressionObserver observer;
     int disposed;
+    Expression? expression;
     private protected (Exception? Fault, object? Result) evaluation;
     bool notificationForced;
     bool notificationPending;
     readonly ObservableExpressionSubscription? subscription;
 
-    internal readonly Expression Expression;
+    internal Expression Expression =>
+        expression ??= observableExpression.Expression;
 
     public IReadOnlyList<object?> Arguments { get; }
 
@@ -316,7 +330,7 @@ class ScopedObservableExpression<TResult> :
     ScopedObservableExpression,
     IObservableExpression<TResult>
 {
-    public ScopedObservableExpression(ExpressionObserver observer, Expression expression, ObservableExpression observableExpression, IReadOnlyList<object?> arguments) :
+    public ScopedObservableExpression(ExpressionObserver observer, Expression? expression, ObservableExpression observableExpression, IReadOnlyList<object?> arguments) :
         base(observer, expression, observableExpression, arguments)
     {
     }
@@ -338,7 +352,7 @@ class ScopedObservableExpression<TArgument, TResult> :
     ScopedObservableExpression<TResult>,
     IObservableExpression<TArgument, TResult>
 {
-    public ScopedObservableExpression(ExpressionObserver observer, Expression expression, ObservableExpression observableExpression, TArgument argument) :
+    public ScopedObservableExpression(ExpressionObserver observer, Expression? expression, ObservableExpression observableExpression, TArgument argument) :
         base(observer, expression, observableExpression, [argument]) =>
         Argument = argument;
 

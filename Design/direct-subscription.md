@@ -294,6 +294,21 @@ Planning the raw body removes the disagreement by construction. This was a side 
 
 An observation is still one mechanism or the other for its whole lifetime, with no per-change re-decision and no fallback mid-life.
 
+### Normalization becomes something the fast path only pays for if asked
+
+With eligibility known from the lambda alone, `ReplaceParameters` is no longer needed to *decide* anything — and the fast node never needed its output to *evaluate*, since it holds a compiled delegate and an argument. It was needed for exactly two things, both of which are debugging affordances: `ToString()`, and the `{Expression}` in the trace log.
+
+So the normalized tree is now built on demand. `ObservableExpression.Expression` became a property over a nullable field with a virtual `Materialize()`; graph nodes assign the field in their constructor and never reach the fallback, and the fast node overrides `Materialize()` to normalize its lambda against its argument at the moment somebody asks. The wrapper does the same, deferring to its node.
+
+Two things make this safe rather than clever:
+
+- **The field was `internal readonly`, so the swap to a property cannot break a caller.** A readonly field can be neither assigned nor passed by reference from outside its declaring constructor, which leaves reading as the only thing any call site was doing, and reads are source-compatible with a property. This is a proof, not a survey.
+- **Nothing compares `Expression` by reference any more.** The one place that did was the fast path's `forcesNotification` test, which is now decided at cache time and baked into the site. The lazy field is therefore free to race benignly: two threads may both materialize, and two structurally equal trees are as good as one.
+
+The cost is that an observer with a logger attached materializes on initialization and again on disposal, because `LogTrace` takes the expression as a structured argument and evaluates it. Null-conditional short-circuiting means an observer without a logger — the default — pays nothing. Tracing is a debugging mode and the value logged has to be right, so this is the correct trade rather than a regression to fix.
+
+**One divergence deliberately chosen.** The fast node materializes with `ReplaceParametersWithoutOptimization`, even under `Observe`, which optimizes. That means with an `Optimizer` configured the two mechanisms print different strings for the same observation. This is the right way round: the fast path compiles and evaluates the *raw* body, so the raw body is what its `ToString()` should show. Printing an optimized tree the delegate does not evaluate would be the more comfortable answer and the less true one.
+
 ### Order
 
 1. `UseDirectSubscription` on the options, the interface and the observer. It is a breaking interface change, and one of the reasons the next release must be a major version.

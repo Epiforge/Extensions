@@ -12,8 +12,8 @@ abstract class DirectObservableExpression :
             _ => throw new NotSupportedException($"the analyzer planned a subscription to {expression}, whose value the execution path cannot resolve without invoking something")
         };
 
-    protected DirectObservableExpression(ExpressionObserver observer, Expression expression) :
-        base(observer, expression, false)
+    protected DirectObservableExpression(ExpressionObserver observer, Type type) :
+        base(observer, type, false)
     {
     }
 
@@ -60,19 +60,24 @@ abstract class DirectObservableExpression :
 sealed class DirectObservableExpression<TArgument, TResult> :
     DirectObservableExpression
 {
-    internal DirectObservableExpression(ExpressionObserver observer, Expression expression, DirectSubscriptionSite[] sites, Func<TArgument, object?[], TResult> evaluate, TArgument argument, object?[] values) :
-        base(observer, expression)
+    internal DirectObservableExpression(ExpressionObserver observer, Expression<Func<TArgument, TResult>> lambdaExpression, DirectSubscriptionSite[] sites, Func<TArgument, object?[], TResult> evaluate, TArgument argument, object?[] values) :
+        base(observer, lambdaExpression.Body.Type)
     {
         this.argument = argument;
         this.evaluate = evaluate;
+        this.lambdaExpression = lambdaExpression;
         this.sites = sites;
         this.values = values;
     }
 
     readonly TArgument argument;
     readonly Func<TArgument, object?[], TResult> evaluate;
+    readonly Expression<Func<TArgument, TResult>> lambdaExpression;
     readonly DirectSubscriptionSite[] sites;
     readonly object?[] values;
+
+    private protected override Expression Materialize() =>
+        ExpressionObserver.ReplaceParametersWithoutOptimization(lambdaExpression, argument)!;
 
     protected override void Evaluate()
     {
