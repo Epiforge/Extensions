@@ -32,7 +32,7 @@ That is a claim about what crosses the boundary, not about the graph. The graph 
 
 ## What changed
 
-`PropagationScope` is a thread-static depth counter and a list of enlisted observations. Every root at which a change can enter the expression graph now brackets its work in one: the three handlers in `ObservableMemberExpression` and `ObservableIndexExpression` that subscribe to a value's `PropertyChanged`, and the two that subscribe to its `CollectionChanged` and `DictionaryChanged`. Five bodies, in two files. That is the entire root set — everything else that looks like an entry point is `OnDependencyEvaluationChanged`, which is downstream by construction.
+`PropagationScope` is a thread-static depth counter and a list of enlisted observations. Every root at which a change can enter the expression graph brackets its work in one. There are eight such subscriptions across six handlers in three node types: `ObservableMemberExpression` subscribes a value's `PropertyChanged` and its `CollectionChanged` or `DictionaryChanged`, `ObservableIndexExpression` subscribes all three on the object it indexes, and `ObservableConstantExpression` subscribes a constant value's `CollectionChanged` or `DictionaryChanged`. Everything else that looks like an entry point is `OnDependencyEvaluationChanged`, which is downstream by construction.
 
 `ScopedObservableExpression` — the wrapper, and the only thing a caller or a query class ever subscribes to — raises `PropertyChanged` in exactly one place and `PropertyChanging` in one other. While a propagation is in flight the first marks itself pending and enlists instead of raising, and the second raises once and suppresses afterward. Without that second half the change would have traded two changed notifications for one changed and N changing.
 
@@ -130,6 +130,14 @@ An expression whose value returns to where it started still raises one notificat
 The query composition graph has its own roots — the adapters that wrap a caller's collection — and its own per-query `NotificationDeferral`, which holds a lock across its flush because it spans one query. A diamond formed by composing queries is not covered here.
 
 Consolidating the scope's two thread-static fields into one object, and merging the wrapper's check-then-enlist into a single call, would take a propagation from roughly eight thread-static lookups to four. That is the standing hypothesis for where the remaining rent lives. Given the bound above it does not pay for itself yet.
+
+## A correction
+
+This document first claimed the root set was five handlers in two files, and that claim was wrong. `ObservableConstantExpression` subscribes to a constant value's collection and dictionary events under `ConstantExpressionsListenForCollectionChanged` and `ConstantExpressionsListenForDictionaryChanged`, and it was missed. The enumeration that produced the original figure came from a search whose output had been truncated at a result limit, and the count was taken from the visible portion without checking whether anything had been cut.
+
+The consequence was not cosmetic. That root was left unbracketed, so deferral never applied to it, and — worse — it continued to announce a contents change as though it were a value change. Once the wrapper began comparing before announcing, a constant whose observable value's contents changed without its reference moving went silent. That behaviour reached `main` and was corrected before release.
+
+The failure has a shape worth naming, because it is not the same one recorded below. It was not a wrong prediction; it was an unverified premise treated as a finding, and then cited repeatedly as though it had been established. When a search is truncated, its count is not a result.
 
 ## A note on method
 

@@ -25,6 +25,8 @@ readonly ref struct PropagationScope
     public PropagationScope() =>
         ++depth;
 
+    [SuppressMessage("Code Analysis", "CA1508: Avoid dead conditional code", Justification = "raising a notification can reenter this scope and assign the field, which the analyzer cannot see")]
+    [SuppressMessage("Code Analysis", "CA1822: Mark members as static", Justification = "the using statement binds to an instance method, so a scope whose whole state is thread-static still cannot be static")]
     public void Dispose()
     {
         if (--depth != 0 || pending is not { Count: > 0 } flushing)
