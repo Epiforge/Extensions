@@ -13,6 +13,10 @@ public class DirectSubscriptionAnalyzer
         new();
 
     [TestMethod]
+    public void AndAlsoOfMembersIsEligible() =>
+        Assert.IsTrue(Analyzer().Analyze(BodyOf<bool>(person => person.NameGets > 0 && person.NameGets < 100)).IsEligible);
+
+    [TestMethod]
     public void BinaryOfMembersIsEligible() =>
         Assert.IsTrue(Analyzer().Analyze(BodyOf<bool>(person => person.NameGets > 0)).IsEligible);
 
@@ -32,6 +36,10 @@ public class DirectSubscriptionAnalyzer
         var other = TestPerson.CreateEmily();
         Assert.IsTrue(Analyzer().Analyze(BodyOf<bool>(person => person.NameGets > other.NameGets)).IsEligible);
     }
+
+    [TestMethod]
+    public void CoalesceOfMembersIsEligible() =>
+        Assert.IsTrue(Analyzer().Analyze(BodyOf<string?>(person => person.Name ?? person.Placeholder)).IsEligible);
 
     [TestMethod]
     public void ConditionalOfMembersIsEligible() =>
@@ -60,6 +68,38 @@ public class DirectSubscriptionAnalyzer
     }
 
     [TestMethod]
+    public void IndexOnChangeableTargetIsIneligible()
+    {
+        var person = Expression.Parameter(typeof(TestPerson));
+        var analysis = Analyzer().Analyze(Expression.MakeIndex(Expression.Property(person, nameof(TestPerson.Name)), typeof(string).GetProperty("Chars")!, [Expression.Constant(0)]));
+        Assert.IsFalse(analysis.IsEligible);
+        Assert.AreEqual(DirectSubscriptionIneligibility.ChangeableIndexTarget, analysis.Ineligibility);
+    }
+
+    [TestMethod]
+    public void IndexOnConstantIsEligible()
+    {
+        var people = new ObservableCollection<TestPerson>(TestPerson.MakePeople());
+        Assert.IsTrue(Analyzer().Analyze(Expression.MakeIndex(Expression.Constant(people), typeof(ObservableCollection<TestPerson>).GetProperty("Item")!, [Expression.Constant(0)])).IsEligible);
+    }
+
+    [TestMethod]
+    public void InvocationIsIneligible()
+    {
+        var analysis = Analyzer().Analyze(Expression.Invoke(Expression.Constant((Func<int>)(() => 3))));
+        Assert.IsFalse(analysis.IsEligible);
+        Assert.AreEqual(DirectSubscriptionIneligibility.UnsupportedExpressionKind, analysis.Ineligibility);
+    }
+
+    [TestMethod]
+    public void MemberInitIsIneligible()
+    {
+        var analysis = Analyzer().Analyze(BodyOf<TestPerson>(person => new TestPerson { Name = "Emily" }));
+        Assert.IsFalse(analysis.IsEligible);
+        Assert.AreEqual(DirectSubscriptionIneligibility.UnsupportedExpressionKind, analysis.Ineligibility);
+    }
+
+    [TestMethod]
     public void MemberOnParameterIsEligible() =>
         Assert.IsTrue(Analyzer().Analyze(BodyOf<string?>(person => person.Name)).IsEligible);
 
@@ -67,6 +107,14 @@ public class DirectSubscriptionAnalyzer
     public void MethodCallIsIneligible()
     {
         var analysis = Analyzer().Analyze(BodyOf<string>(person => person.ToString()));
+        Assert.IsFalse(analysis.IsEligible);
+        Assert.AreEqual(DirectSubscriptionIneligibility.UnsupportedExpressionKind, analysis.Ineligibility);
+    }
+
+    [TestMethod]
+    public void NewArrayInitIsIneligible()
+    {
+        var analysis = Analyzer().Analyze(BodyOf<long[]>(person => new[] { person.NameGets }));
         Assert.IsFalse(analysis.IsEligible);
         Assert.AreEqual(DirectSubscriptionIneligibility.UnsupportedExpressionKind, analysis.Ineligibility);
     }
@@ -88,6 +136,22 @@ public class DirectSubscriptionAnalyzer
     [ExpectedException(typeof(ArgumentNullException))]
     public void NullOptions() =>
         new Epiforge.Extensions.Expressions.Observable.DirectSubscriptionAnalyzer(null!);
+
+    [TestMethod]
+    public void OrElseOfMembersIsEligible() =>
+        Assert.IsTrue(Analyzer().Analyze(BodyOf<bool>(person => person.NameGets > 0 || person.NameGets < 100)).IsEligible);
+
+    [TestMethod]
+    public void QuotedLambdaIsEligible() =>
+        Assert.IsTrue(Analyzer().Analyze(Expression.Quote(Expression.Lambda<Func<int>>(Expression.Constant(3)))).IsEligible);
+
+    [TestMethod]
+    public void StringComparisonIsIneligible()
+    {
+        var analysis = Analyzer().Analyze(BodyOf<bool>(person => person.Name == "Emily"));
+        Assert.IsFalse(analysis.IsEligible);
+        Assert.AreEqual(DirectSubscriptionIneligibility.UserDefinedOperator, analysis.Ineligibility);
+    }
 
     [TestMethod]
     public void TypeTestOfMemberIsEligible() =>
