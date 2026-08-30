@@ -17,6 +17,14 @@ public class DirectSubscriptionAnalyzer
         Assert.IsTrue(Analyzer().Analyze(BodyOf<bool>(person => person.NameGets > 0 && person.NameGets < 100)).IsEligible);
 
     [TestMethod]
+    public void ArrayAccessIsIneligible()
+    {
+        var analysis = Analyzer().Analyze(Expression.ArrayAccess(Expression.Constant(new[] { 3 }), Expression.Constant(0)));
+        Assert.IsFalse(analysis.IsEligible);
+        Assert.AreEqual(DirectSubscriptionIneligibility.UnsupportedExpressionKind, analysis.Ineligibility);
+    }
+
+    [TestMethod]
     public void BinaryOfMembersIsEligible() =>
         Assert.IsTrue(Analyzer().Analyze(BodyOf<bool>(person => person.NameGets > 0)).IsEligible);
 
@@ -144,6 +152,21 @@ public class DirectSubscriptionAnalyzer
     [TestMethod]
     public void QuotedLambdaIsEligible() =>
         Assert.IsTrue(Analyzer().Analyze(Expression.Quote(Expression.Lambda<Func<int>>(Expression.Constant(3)))).IsEligible);
+
+    [TestMethod]
+    public void StaticPropertyIsIneligible()
+    {
+        var analysis = Analyzer().Analyze(Expression.Property(null, typeof(DateTime).GetProperty(nameof(DateTime.Now))!));
+        Assert.IsFalse(analysis.IsEligible);
+        Assert.AreEqual(DirectSubscriptionIneligibility.ValueRequiresDisposal, analysis.Ineligibility);
+    }
+
+    [TestMethod]
+    public void StaticPropertyIsEligibleWhenStaticDisposalIsExcluded()
+    {
+        var options = new ExpressionObserverOptions { DisposeStaticMethodReturnValues = false };
+        Assert.IsTrue(new Epiforge.Extensions.Expressions.Observable.DirectSubscriptionAnalyzer(options).Analyze(Expression.Property(null, typeof(DateTime).GetProperty(nameof(DateTime.Now))!)).IsEligible);
+    }
 
     [TestMethod]
     public void StringComparisonIsIneligible()

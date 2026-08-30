@@ -37,6 +37,20 @@ Verified by search across the node layer, with the tail of the results checked: 
 | `ObservableConstantExpression` | `DictionaryChanged` | the constant's value | `ConstantExpressionsListenForDictionaryChanged` |
 | `ObservableConstantExpression` | `CollectionChanged` | the constant's value | `ConstantExpressionsListenForCollectionChanged` |
 
+### Four corrections the table was too coarse to carry
+
+Found by reading the three node types line by line while building the subscription plan. The table above is right about which events exist; it was wrong about how they combine, and each of these is a way the fast path could have diverged silently.
+
+**Dictionary and collection are alternatives, never both.** All three node types write `if (… dictionary …) else if (… collection …)`. A value implementing both gets one subscription, not two.
+
+**In the member and constant cases the option is inside the branch condition, so excluding one changes which the other gets.** `if (dictionaryPermitted && value is INotifyDictionaryChanged) … else if (collectionPermitted && value is INotifyCollectionChanged)`. A value implementing both, with `DictionaryChanged` excluded, falls through and takes `CollectionChanged` — it is not simply left unsubscribed. The index case has no options at all, so there dictionary wins outright. The single rule covering all three is: *dictionary first, then collection, among those the options permit.*
+
+**The index's `PropertyChanged` is additional and ungated.** It is a separate `if`, not part of the `else if` chain, and `IsIgnoredPropertyChangeNotification` is never consulted for it. An eligible index therefore always contributes two subscription sites to the same object.
+
+**A member's property and a member's field subscribe to entirely different things.** A property subscribes `PropertyChanged` on *the target's* value. A field subscribes contents on *its own* value, and only when the target's type is compiler-generated. A field of an ordinary type subscribes to nothing at all, and no member expression ever does both.
+
+There is also an asymmetry in the two `PropertyChanged` handlers which the fast path has to reproduce rather than tidy up: the member's acts when the reported name is its own **or is null or empty**, the index's acts only on an exact name match. That is why the plan names two property-changed kinds instead of one.
+
 Two things follow immediately.
 
 **Every subscription is to the value of some subexpression.** So the question of whether a fixed set of subscriptions can reproduce the graph's set is exactly the question of whether those particular values can change.
@@ -87,6 +101,30 @@ The cost is that a caller holding a lambda cannot ask the question directly. Tha
 
 The result is a structured value: eligible, or ineligible with the offending subexpression and a reason, as the previous section requires.
 
+## The subscription plan
+
+The verdict says whether. The plan says what, and it is what makes the execution path a transcription rather than a second derivation.
+
+A plan is an ordered list of subscriptions, each naming three things: the expression whose value is resolved once to yield the object subscribed to, the event attached to it, and the member name the handler acts upon. That is the table above, instantiated for a particular expression under particular options. The order is the graph's own — for an index, contents before indexer; for an operand, the operand's own subscriptions before those taken on it — so that a plan reads as the script the graph would perform.
+
+Several decisions inside it are worth stating, because each had a plausible alternative.
+
+**It is produced by the same walk as the verdict, not a second one.** The recursion carries a nullable collector; `Analyze` passes null and allocates nothing, `Plan` passes a list. Had planning been its own traversal, the two would have been separate statements of one rule, free to disagree about which subexpressions matter. This way there is nothing to keep in agreement.
+
+**The verdict-only path stays allocation-free.** Ineligibility is the common answer for anything nontrivial, and the observer asks for a verdict far more often than it will ask for a plan.
+
+**A plan names sites, not attachments.** Whether anything actually attaches at a site depends on which notification interfaces the value implements, which the analyzer generally cannot know without invoking something. It does not invoke anything. The one exception costs nothing: a `ConstantExpression` carries its value as a field of the node, so where the source is a constant the analyzer reads it, resolves `DictionaryOrCollectionChanged` down to the exact event or to no subscription at all, and drops property-changed sites on values that do not notify. That prune is what keeps a plan legible — without it every parameter-replacement constant and every integer index argument would contribute a site that resolves to nothing.
+
+The rule dividing those cases is worth stating as a rule, because it will be tempting to cross: **the analyzer inspects what the expression tree already holds and invokes nothing.** Reading a closure field would resolve more sites, and it is exactly the work the fast path exists to defer to execution.
+
+**Duplicate subscriptions are kept.** `person.NameGets + person.NameGets` plans two identical subscriptions, because the graph builds two member nodes and attaches two handlers. The rule reaches further than the obvious case, which a wrong test expectation was what revealed: an index over a constant collection plans `CollectionChanged` on it **twice** — once because the constant is itself a node that watches its own contents, and once because the index watches the contents of the object it indexes. Both really happen in the graph, on the same event of the same object, with different handlers. Collapsing them is permitted by the contract — which speaks of a *set* of change sources — and would be a strict win, since a fast-path handler re-evaluates the whole lambda and running it twice per change accomplishes nothing. It is not done here for two reasons: it requires deciding when two source expressions are the same, which the parameter-replacement pass has not been read closely enough to answer; and keeping the duplicates is the direction that matches the graph, which is the direction this document requires when in doubt. It is a deliberate deferral, not an oversight.
+
+**The plan is public, and it was going to be internal.** The argument for internal was that publishing a shape before anything consumes it is how you publish the wrong shape. The argument that beat it is that tests in this repository do not get visibility the library does not otherwise expose, so an internal plan is an untestable plan — and the whole reason to build it before the execution path is to have it under test first. The window in which this is a free breaking change closes when 4.0.0 ships.
+
+### A tightening found while doing it
+
+`IndexExpression.Indexer` is null for an array access, and the graph dereferences it unconditionally, so `GetObservableExpression` would throw on one. The analyzer previously declared such an expression eligible, which would have handed the fast path an expression the graph cannot observe — a divergence in the direction the fast path is not permitted to err, even though here the fast path is the one that works. It now refuses a null indexer as an unsupported kind.
+
 ## Turning it off
 
 `ExpressionObserverOptions` gains `UseDirectSubscription`, mirrored on `IExpressionObserver` as the other options are, so that a caller can decline the mechanism for a whole observer.
@@ -133,14 +171,17 @@ Each of these is a place the mechanism becomes stairs when it might have been an
 - **Method calls, invocations, `new`, member init and array init** are refused outright. Their disposal and purity semantics are among the unresolved hazards below.
 - **Operators implemented by a method** are refused, for the same reason: the graph treats them as method calls and may dispose their results. This is far more costly than it sounds. `String` declares `op_Equality` and `op_Inequality`, so every comparison of two strings arrives as a binary expression with a method attached, and `person => person.Name == "Emily"` — as ordinary a predicate as exists — is refused. The relaxation is available and principled: ask `IsMethodReturnValueDisposed` about the operator's method, exactly as members are already asked `IsPropertyValueDisposed`, and refuse only when the answer is yes. It is not taken here because widening the eligible set is the dangerous direction, the fuzzer does not yet exist to check it, and it surfaced as a failing test rather than as a decision. It should be made deliberately, with evidence, and not as a reflex to a red bar.
 - **Members and indexers whose values are registered for disposal** are refused, since disposal is a graph behaviour with nowhere to live on a fast path.
+- **Every static property is refused under default options**, which was not intended and was found by a test written to check something else. `DisposeStaticMethodReturnValues` defaults to `true`, a static property's getter is a static method, and `IsPropertyValueDisposed` therefore answers yes for all of them — so `DateTime.Now` is ineligible for the same stated reason as a property a caller deliberately registered. The rule is not wrong: the graph really would dispose that value, and a fast path really has nowhere to do it. But the reach is much wider than "members registered for disposal" suggests, and anything reading a static configuration or clock is excluded. Worth revisiting with the same evidence that would relax method-backed operators, since it is the same unresolved hazard.
 - **Indexers are refused in practice, and by accident of shape.** C# compiles `people[0]` in an expression tree to a call of `get_Item`, not to an `IndexExpression`. The observer normalizes such calls back into index and member access before building its graph; the analyser does not, so every indexer arrives as a method call and is refused. The analyser is therefore correct but blind here, and closing it means either sharing the observer's normalization or performing the analysis after it. That is a design question, not an oversight, and it is deferred rather than answered.
+- **Duplicate subscriptions to one object** are planned rather than collapsed, for the reasons given under the subscription plan. This is the one entry here that is conservative in the cheap direction: it costs redundant handler invocations, not eligibility.
 
 ## Order of work
 
 1. This document.
 2. The analyser, returning the structured verdict, with no execution path behind it.
 3. Tests over the full node taxonomy — the thirteen expression kinds `GetObservableExpression` dispatches — asserting eligibility and, for the ineligible, the offending subexpression.
-4. The execution path.
-5. A differential fuzzer running generated expressions down both paths and comparing complete notification sequences, which the `wrapper-deferral` work made possible by settling what crosses the boundary.
+4. The subscription plan, with tests, so that the execution path is a transcription of something already established rather than a fresh derivation.
+5. The execution path.
+6. A differential fuzzer running generated expressions down both paths and comparing complete notification sequences, which the `wrapper-deferral` work made possible by settling what crosses the boundary.
 
-Nothing in step 4 begins before step 3 is green.
+Nothing in step 5 begins before step 4 is green.
