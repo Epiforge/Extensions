@@ -23,7 +23,7 @@ sealed class FixedSubexpressionRewriter :
             _ => base.Visit(node)
         };
 
-    Expression Substitute(MemberExpression memberExpression)
+    UnaryExpression Substitute(MemberExpression memberExpression)
     {
         var index = fixedSubexpressions.Count;
         for (var i = 0; i < index; ++i)

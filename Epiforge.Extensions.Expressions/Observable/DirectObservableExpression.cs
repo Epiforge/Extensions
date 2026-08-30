@@ -1,7 +1,7 @@
-﻿namespace Epiforge.Extensions.Expressions.Observable;
+namespace Epiforge.Extensions.Expressions.Observable;
 
-abstract class DirectObservableExpression :
-    ObservableExpression
+abstract class DirectObservableExpression(ExpressionObserver observer, Type type) :
+    ObservableExpression(observer, type, false)
 {
     internal static object? Resolve(Expression expression) =>
         expression switch
@@ -11,11 +11,6 @@ abstract class DirectObservableExpression :
             UnaryExpression { NodeType: ExpressionType.Quote } unaryExpression => unaryExpression.Operand,
             _ => throw new NotSupportedException($"the analyzer planned a subscription to {expression}, whose value the execution path cannot resolve without invoking something")
         };
-
-    protected DirectObservableExpression(ExpressionObserver observer, Type type) :
-        base(observer, type, false)
-    {
-    }
 
     DirectSubscriptionAttachment[]? attachments;
     int released;

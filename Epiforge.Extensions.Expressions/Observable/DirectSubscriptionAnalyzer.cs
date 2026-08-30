@@ -1,4 +1,4 @@
-﻿namespace Epiforge.Extensions.Expressions.Observable;
+namespace Epiforge.Extensions.Expressions.Observable;
 
 /// <summary>
 /// Determines whether an expression can be observed by subscribing directly to its change sources instead of by building a graph of observable expressions
@@ -70,7 +70,7 @@ public sealed class DirectSubscriptionAnalyzer
         };
 
     static bool IsShortCircuiting(BinaryExpression binaryExpression) =>
-        binaryExpression.NodeType is ExpressionType.Coalesce || (binaryExpression.NodeType is ExpressionType.AndAlso or ExpressionType.OrElse && binaryExpression.Type == typeof(bool));
+        binaryExpression.NodeType is ExpressionType.Coalesce || binaryExpression.NodeType is ExpressionType.AndAlso or ExpressionType.OrElse && binaryExpression.Type == typeof(bool);
 
     static bool IsClosureField(MemberExpression memberExpression) =>
         memberExpression.Member is FieldInfo && IsCompilerGenerated(memberExpression.Expression);

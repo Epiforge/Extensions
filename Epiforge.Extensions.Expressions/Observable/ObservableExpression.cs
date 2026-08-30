@@ -1,4 +1,4 @@
-﻿namespace Epiforge.Extensions.Expressions.Observable;
+namespace Epiforge.Extensions.Expressions.Observable;
 
 abstract class ObservableExpression :
     PlainSyncDisposable
@@ -217,7 +217,7 @@ abstract class ScopedObservableExpression :
     /// Determines whether two faults are the same fault, which is by type and message rather than by identity because an expression which is re-evaluated while faulted throws a new exception every time, and announcing that as a change would make the number of notifications a consumer receives depend on how often the mechanism happens to re-evaluate
     /// </summary>
     static bool FaultEquals(Exception? x, Exception? y) =>
-        ReferenceEquals(x, y) || (x is not null && y is not null && x.GetType() == y.GetType() && x.Message == y.Message);
+        ReferenceEquals(x, y) || x is not null && y is not null && x.GetType() == y.GetType() && x.Message == y.Message;
 
     protected ScopedObservableExpression(ExpressionObserver observer, Expression? expression, ObservableExpression observableExpression, IReadOnlyList<object?> arguments)
     {
@@ -326,15 +326,10 @@ abstract class ScopedObservableExpression :
         Expression.ToString();
 }
 
-class ScopedObservableExpression<TResult> :
-    ScopedObservableExpression,
+class ScopedObservableExpression<TResult>(ExpressionObserver observer, Expression? expression, ObservableExpression observableExpression, IReadOnlyList<object?> arguments) :
+    ScopedObservableExpression(observer, expression, observableExpression, arguments),
     IObservableExpression<TResult>
 {
-    public ScopedObservableExpression(ExpressionObserver observer, Expression? expression, ObservableExpression observableExpression, IReadOnlyList<object?> arguments) :
-        base(observer, expression, observableExpression, arguments)
-    {
-    }
-
     public (Exception? Fault, TResult Result) Evaluation
     {
         get
@@ -348,48 +343,29 @@ class ScopedObservableExpression<TResult> :
         x is null || y is null ? ReferenceEquals(x, y) : EqualityComparer<TResult>.Default.Equals((TResult)x, (TResult)y);
 }
 
-class ScopedObservableExpression<TArgument, TResult> :
-    ScopedObservableExpression<TResult>,
+class ScopedObservableExpression<TArgument, TResult>(ExpressionObserver observer, Expression? expression, ObservableExpression observableExpression, TArgument argument) :
+    ScopedObservableExpression<TResult>(observer, expression, observableExpression, [argument]),
     IObservableExpression<TArgument, TResult>
 {
-    public ScopedObservableExpression(ExpressionObserver observer, Expression? expression, ObservableExpression observableExpression, TArgument argument) :
-        base(observer, expression, observableExpression, [argument]) =>
-        Argument = argument;
-
-    public TArgument Argument { get; }
+    public TArgument Argument { get; } = argument;
 }
 
-class ScopedObservableExpression<TArgument1, TArgument2, TResult> :
-    ScopedObservableExpression<TResult>,
+class ScopedObservableExpression<TArgument1, TArgument2, TResult>(ExpressionObserver observer, Expression expression, ObservableExpression observableExpression, TArgument1 argument1, TArgument2 argument2) :
+    ScopedObservableExpression<TResult>(observer, expression, observableExpression, [argument1, argument2]),
     IObservableExpression<TArgument1, TArgument2, TResult>
 {
-    public ScopedObservableExpression(ExpressionObserver observer, Expression expression, ObservableExpression observableExpression, TArgument1 argument1, TArgument2 argument2) :
-        base(observer, expression, observableExpression, [argument1, argument2])
-    {
-        Argument1 = argument1;
-        Argument2 = argument2;
-    }
+    public TArgument1 Argument1 { get; } = argument1;
 
-    public TArgument1 Argument1 { get; }
-
-    public TArgument2 Argument2 { get; }
+    public TArgument2 Argument2 { get; } = argument2;
 }
 
-class ScopedObservableExpression<TArgument1, TArgument2, TArgument3, TResult> :
-    ScopedObservableExpression<TResult>,
+class ScopedObservableExpression<TArgument1, TArgument2, TArgument3, TResult>(ExpressionObserver observer, Expression expression, ObservableExpression observableExpression, TArgument1 argument1, TArgument2 argument2, TArgument3 argument3) :
+    ScopedObservableExpression<TResult>(observer, expression, observableExpression, [argument1, argument2, argument3]),
     IObservableExpression<TArgument1, TArgument2, TArgument3, TResult>
 {
-    public ScopedObservableExpression(ExpressionObserver observer, Expression expression, ObservableExpression observableExpression, TArgument1 argument1, TArgument2 argument2, TArgument3 argument3) :
-        base(observer, expression, observableExpression, [argument1, argument2, argument3])
-    {
-        Argument1 = argument1;
-        Argument2 = argument2;
-        Argument3 = argument3;
-    }
+    public TArgument1 Argument1 { get; } = argument1;
 
-    public TArgument1 Argument1 { get; }
+    public TArgument2 Argument2 { get; } = argument2;
 
-    public TArgument2 Argument2 { get; }
-
-    public TArgument3 Argument3 { get; }
+    public TArgument3 Argument3 { get; } = argument3;
 }
