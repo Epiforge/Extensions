@@ -231,7 +231,36 @@ Before the run I predicted the *first* of the two changes would be worth ~185 ns
 
 I considered a run between the two and decided against it to save fifteen minutes. That was wrong, and specifically wrong against this document's own standing lesson: predictions about *which code is hot* have failed every time here, and the one occasion built to test one, I skipped. The saving of 649 ns is real and measured; its split between the two changes is not recoverable from these instruments.
 
-It is partly recoverable cheaply. `DirectSubscriptionOverheadBenchmarks` measures `BuildThenPlanSelector` and `BuildSelectorOnly`; their difference is `Plan`'s cost on a normalized selector, which is exactly what the first change stopped paying per observation. That benchmark has been raised to three launches for the purpose.
+It is partly recoverable cheaply. `DirectSubscriptionOverheadBenchmarks` measures `BuildThenPlanSelector` and `BuildSelectorOnly`; their difference is `Plan`'s cost on a normalized selector, which is exactly what the first change stopped paying per observation. That benchmark was raised to three launches and re-run.
+
+### The attribution, recovered — and the prediction scored wrong
+
+| isolated, three launches | mean | allocated |
+|--- |---: |---: |
+| `BuildSelectorOnly` | 18.1 ns | 56 B |
+| `BuildThenAnalyzeSelector` | 32.8 ns | 56 B |
+| `BuildThenPlanSelector` | 87.9 ns | 464 B |
+
+By subtraction, `Analyze` costs **14.7 ns** and `Plan` costs **69.7 ns / 408 B**. The analyzer figure replicates the 12.6 ns measured two cuts ago, which is the check that the instrument is measuring what it did before.
+
+**Predicted 185 ns for the first change. Actual 70 ns. Wrong by 2.6×, overestimating.**
+
+The prediction's error is more instructive than its size. I justified my confidence by filing it under "count multiplied by a measured unit cost" — the class that has held every time in this document. It was not that. It was the *difference of two figures taken from two different instruments*: `Plan`'s 1,097 ns from the isolation benchmark minus the 912 ns drop measured in the observation benchmark. Those two were never a clean minuend and subtrahend, and the arithmetic silently assumed the entire observation-benchmark drop was the dedup set inside `Plan`. The lesson is not "predict less" but **the class label was doing the work of justifying the confidence, and I applied the label wrongly**. A prediction's pedigree has to be checked as carefully as its arithmetic.
+
+So the split of the 649 ns:
+
+| | time | allocation |
+|--- |---: |---: |
+| planning, moved to per-lambda | ~70 ns | ~408 B |
+| normalization, made lazy | ~579 ns | ~464 B |
+
+**Normalization was 89% of the time saved and roughly half the memory.** The fourth cut's prose said "that is where the remaining order of magnitude is," and it was right — but that too was a story about which code was hot, and it is recorded as having been lucky rather than sound, on the same evidence that just convicted mine.
+
+### An unrelated number this run turned up, worth chasing
+
+`BuildThenHashSelectorLambda` — one structural hash of a two-node lambda through `ExpressionEqualityComparer` — costs **681 ns and 1,441 B**, with a 12.7% standard deviation. That is the diagram-per-lookup cost recorded as parked long ago, and it is nearly three times what a whole fast-path observation now costs.
+
+The graph performs several such lookups per observation against its node caches, and `GraphSelectorObserve` is 1,797 ns. **The hypothesis is that structural hashing dominates the graph's construction cost.** That is precisely the sort of claim this document has been wrong about repeatedly, so it is written as a hypothesis with a measurement attached: count the comparer's invocations for one graph observation, multiply by 681 ns, and see whether the product resembles 1,797. If it does, the parked item is the largest remaining win in the library and it benefits the graph, the queries, and every consumer — not just the fast path.
 
 ### The fifth cut's variance findings replicated
 
