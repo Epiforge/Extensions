@@ -4,8 +4,8 @@
 
     <PropertyGroup>
         <Product>Epiforge.Extensions.Expressions</Product>
-        <Version>3.0.1</Version>
-        <PackageValidationBaselineVersion>3.0.0</PackageValidationBaselineVersion>
+        <Version>4.0.0</Version>
+        <PackageValidationBaselineVersion>3.0.1</PackageValidationBaselineVersion>
         <Description>This package assists in operating with expressions.</Description>
     </PropertyGroup>
 

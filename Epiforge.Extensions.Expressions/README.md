@@ -77,6 +77,48 @@ using (var expr = observer.Observe(e => e.Name.Length, elizabeth))
 // expr unsubcribed from elizabeth's PropertyChanged
 ```
 
+## How an Expression Gets Observed
+There are two mechanisms behind `Observe`. Which one an observation uses is settled when it is created and never changes for the rest of its life.
+
+The general one builds a small graph: a node per subexpression, each subscribing to its own change sources and telling the nodes above it whenever its value moves. It copes with anything you can write.
+
+The other skips the graph. It subscribes straight to the change sources and re-invokes a compiled delegate when one of them fires. It is faster to set up and faster to react, but it can only be used when every change source can be found without evaluating something that might change — which in practice means member and indexer access whose target is the argument, a constant, or a variable you closed over, and the operators over those.
+
+```csharp
+var observer = new ExpressionObserver();
+observer.Observe(e => e.Name.Length > minimum, elizabeth);       // direct
+observer.Observe(e => e.Manager.Name.Length, elizabeth);         // graph: Manager itself can change
+observer.Observe(e => e.IsActive ? e.Name : e.Alias, elizabeth); // graph: a branch is not subscribed to until it is taken
+```
+
+Conditionals, `&&`, `||`, and `??` always use the graph, because subscribing to a side you have not reached would mean invoking a property getter earlier than the expression says to. So do user-defined operators, properties whose change notification you have asked the observer to ignore, and properties whose value the observer disposes.
+
+Observing an eligible expression costs between a sixth and a ninth of what the graph costs and about half the memory, and a change to one of its sources arrives in roughly two thirds of the time. Nothing about the values you receive or the events you receive them through differs between the two.
+
+Set `UseDirectSubscription` to `false` on your options if you would rather always have the graph; it is `true` by default. And if you are curious why some particular expression is not eligible, you can ask directly:
+
+```csharp
+var analysis = new DirectSubscriptionAnalyzer(options).Analyze(expression.Body);
+// analysis.IsEligible is false
+// analysis.Ineligibility is DirectSubscriptionIneligibility.DeferredBranch
+// analysis.IneligibleExpression is the part responsible
+```
+
+Because eligibility depends on which change sources the observer subscribes to at all, it is a property of your options as much as of your expression; hand the analyzer the same options you hand the observer.
+
+### Variables You Close Over Are Read Once
+This one is worth knowing because it is easy to write code that assumes otherwise. The value a variable held when an observation began is the value that observation goes on using. Reassigning the variable afterward does not reach an observation that already exists.
+
+```csharp
+var threshold = low;
+using var expr = observer.Observe(e => e.Salary > threshold.Amount, elizabeth);
+threshold = high;    // expr is still comparing against low
+low.Amount = 50000;  // expr re-evaluates
+high.Amount = 90000; // expr does not
+```
+
+This has always been how the graph behaves, since it reads the variable once when it builds the node, and direct subscription behaves the same way. If you want the comparison to follow the variable, do not reassign the variable — make the thing it points at a property of an object that notifies, and close over that object instead.
+
 Observable expressions will also try to automatically dispose of disposable objects they create in the course of their evaluation when and where it makes sense. Use the `ExpressionObserverOptions` class for more direct control over this behavior.
 You can use the `Optimizer` property to specify an optimization method to invoke automatically during the observable expression creation process.
 We recommend Tuomas Hietanen's [Linq.Expression.Optimizer](https://thorium.github.io/Linq.Expression.Optimizer), the utilization of which would look like so:
