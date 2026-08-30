@@ -1,6 +1,6 @@
-# Direct subscription: the execution path, measured in five cuts
+# Direct subscription: the execution path, measured in six cuts
 
-> **Read the fifth cut for the current state.** The earlier sections record a regression, its diagnosis, and two corrections, kept because the reasoning that found the costs is worth more than the numbers it corrected. Every figure before the fifth cut comes from a single launch and should be read as provisional.
+> **Read the sixth cut for the current state.** The earlier sections record a regression, its diagnosis, and three corrections, kept because the reasoning that found the costs is worth more than the numbers it corrected. Every figure before the fifth cut comes from a single launch and should be read as provisional.
 
 `DirectSubscriptionCeilingBenchmarks`, .NET 10.0.11, Intel Core Ultra 9 275HX. Cuts one through four at one launch, the fifth at three. Three arms: **graph** (`UseDirectSubscription = false`), **fast** (the mechanism as built), **ceiling** (the hand-rolled stand-in from `2026-08-30-direct-subscription-ceiling.md`).
 
@@ -193,8 +193,56 @@ But the crossing did not arrive the predicted way. It was expected to come from 
 
 Both readings are true and they point opposite ways. Against the graph, construction is now the better result — more than half the available gap closed. Against the ceiling it is far the worse, because 53% of a 64× gap still leaves thirty-fold. Construction is where the remaining order of magnitude is, and the route to it is unchanged: analyze and plan from the lambda once, resolve sources relative to the argument, and skip `ReplaceParameters` and `Plan` per observation entirely.
 
+## Sixth cut: analysis, planning and normalization all leave the per-observation path
+
+Two changes, benched together. Eligibility and the subscription plan are computed once per lambda and cached beside the compiled delegate, with sources compiled into sites that resolve against the argument and the frozen-values array. And with eligibility known from the lambda alone, `ReplaceParameters` became unnecessary on the fast path — the normalized tree is now built lazily, only if something asks to print or log it.
+
+Three launches. Per observation, N = 1000.
+
+| | graph | fast | ceiling | fast vs graph |
+|--- |---: |---: |---: |---: |
+| selector construction | 1,797 ns / 1,784 B | **263 ns / 912 B** | 27 ns / 184 B | **6.8× faster, 0.51× memory** |
+| comparison construction | 2,918 ns / 3,608 B | **338 ns / 1,000 B** | 2,982 ns / 16,684 B | **8.6× faster, 0.28× memory** |
+| selector propagation | 45.5 ns / 72 B | **35.0 ns / 72 B** | 10.6 ns / 48 B | **1.30× faster** |
+| comparison propagation | 57.4 ns / 96 B | **35.7 ns / 72 B** | 11.2 ns / 48 B | **1.61× faster, 0.75× memory** |
+
+At N=100 construction is 6.4× and 8.6–10.1×; propagation 1.38× and 1.63×.
+
+Construction fell from the fifth cut's 912 ns to 263 ns — a saving of **649 ns per observation** — and allocation nearly halved. Propagation is unchanged to within 3%, which is what a change that touches only construction should do, and is the control that says the two figures are not moving together for some shared reason.
+
+### The ceiling has been passed on comparison construction
+
+At N=1000 the fast path constructs a comparison observation in 338 ns against the hand-rolled ceiling's 2,982 — **8.8× faster than the thing built to represent the best case**, on a sixteenth of the memory. At N=100 they are level: 273 ns against 270.
+
+That is the whole argument for the registry, drawn as a curve. The ceiling subscribes per observation to a shared closure source and pays `Delegate.Combine`'s quadratic; the fast path shares one subscription and pays a dictionary insert. The crossover the first cut predicted "not far beyond" N=1000 now sits at **N=100**, and past it the gap only widens.
+
+### What remains, and it is no longer construction
+
+| selector, N=1000 | fast | ceiling | fast is | share of the graph→ceiling gap closed |
+|--- |---: |---: |---: |---: |
+| construction | 263 ns | 27 ns | 9.6× the ceiling | **87%** |
+| propagation | 35.0 ns | 10.6 ns | 3.3× the ceiling | **30%** |
+
+The two readings have swapped places since the fifth cut, where construction was 30.7× the ceiling and the larger prize. Propagation is now the worse of the two against the ceiling and the place the remaining work is. Its 3.3× is the node-and-wrapper path — registry, scope, two intrusive lists, the `Evaluation` setter, `FastEqualityComparer`, the wrapper's compare — and closing it means not reusing the wrapper, which remains a deliberate trade.
+
+### A prediction I made unscoreable, which is a method error worth recording
+
+Before the run I predicted the *first* of the two changes would be worth ~185 ns of the 912, by subtracting the dedup set's measured 912 ns saving from `Plan`'s isolated 1,097 ns. I then benched both changes together, which makes the prediction unscoreable from this table.
+
+I considered a run between the two and decided against it to save fifteen minutes. That was wrong, and specifically wrong against this document's own standing lesson: predictions about *which code is hot* have failed every time here, and the one occasion built to test one, I skipped. The saving of 649 ns is real and measured; its split between the two changes is not recoverable from these instruments.
+
+It is partly recoverable cheaply. `DirectSubscriptionOverheadBenchmarks` measures `BuildThenPlanSelector` and `BuildSelectorOnly`; their difference is `Plan`'s cost on a normalized selector, which is exactly what the first change stopped paying per observation. That benchmark has been raised to three launches for the purpose.
+
+### The fifth cut's variance findings replicated
+
+`GraphComparisonObserve` is again the only wide arm — 14.5% standard deviation at N=1000, 18.2% at N=100, against 2.4% or less everywhere else. Two independent runs now agree that the variance is a property of that one arm rather than of the benchmark.
+
+The arms that did not change moved 3–8% run to run: `GraphSelectorObserve` −6.5%, `CeilingSelectorObserve` −8.0%, `GraphSelectorChange` −2.9%. That sits inside the ±20% band the fifth cut claimed and did not contradict it. The 6.8× construction ratio is large enough that this drift cannot account for it.
+
 ## Status
 
-The mechanism is correct, has a differential fuzzer behind it, and at three launches is **2.1× faster to construct on the selector (2.5–2.9× on the comparison) and 1.3 to 1.6× faster to propagate**, with equal or less allocation. Construction figures carry roughly ±20% run-to-run uncertainty and should be quoted as ranges.
+The mechanism is correct, has a differential fuzzer behind it, and at three launches is **6.8× faster to construct on the selector and 8.6× on the comparison, and 1.3 to 1.6× faster to propagate**, on roughly half the construction memory and equal or less propagation memory. Construction figures carry roughly ±20% run-to-run uncertainty; the ratios here are far larger than that band.
 
-The remaining performance work — lifting analysis and normalization out of the per-observation path — is now purely a performance change, since its correctness half has landed. Against the ceiling it is worth about thirty-fold on construction, which is the largest single item left anywhere in this document.
+The performance work this document has pointed at since its first cut — lifting analysis, planning and normalization out of the per-observation path — is **done**. Construction now closes 87% of the graph-to-ceiling gap and beats the hand-written ceiling outright wherever a subscription source is shared.
+
+What is left is propagation, at 3.3× the ceiling, whose cost is the reused wrapper. That trade should stay until something forces it.

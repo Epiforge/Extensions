@@ -1,7 +1,7 @@
 namespace Epiforge.Extensions.Benchmarking;
 
 [MemoryDiagnoser]
-[SimpleJob(launchCount: 1)]
+[SimpleJob(launchCount: 3)]
 public class DirectSubscriptionOverheadBenchmarks
 {
     DirectSubscriptionAnalyzer analyzer = null!;
