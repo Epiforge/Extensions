@@ -259,16 +259,16 @@ public class DirectSubscriptionCeilingBenchmarks
         {
             observeSubjects[i] = new BenchmarkPerson($"O{i}", 4);
             graphSelectorSubjects[i] = new BenchmarkPerson($"GS{i}", 4);
-            graphSelectors[i] = graphObserver.Observe(person => person.Rank, graphSelectorSubjects[i]);
+            graphSelectors[i] = graphObserver.Observe(selectorLambda, graphSelectorSubjects[i]);
             graphSelectors[i].PropertyChanged += Notified;
             graphComparisonSubjects[i] = new BenchmarkPerson($"GC{i}", 4);
-            graphComparisons[i] = graphObserver.Observe(person => person.Rank > captured.Rank, graphComparisonSubjects[i]);
+            graphComparisons[i] = graphObserver.Observe(comparisonLambda, graphComparisonSubjects[i]);
             graphComparisons[i].PropertyChanged += Notified;
             fastSelectorSubjects[i] = new BenchmarkPerson($"FS{i}", 4);
-            fastSelectors[i] = fastObserver.Observe(person => person.Rank, fastSelectorSubjects[i]);
+            fastSelectors[i] = fastObserver.Observe(selectorLambda, fastSelectorSubjects[i]);
             fastSelectors[i].PropertyChanged += Notified;
             fastComparisonSubjects[i] = new BenchmarkPerson($"FC{i}", 4);
-            fastComparisons[i] = fastObserver.Observe(person => person.Rank > captured.Rank, fastComparisonSubjects[i]);
+            fastComparisons[i] = fastObserver.Observe(comparisonLambda, fastComparisonSubjects[i]);
             fastComparisons[i].PropertyChanged += Notified;
             ceilingSelectorSubjects[i] = new BenchmarkPerson($"CS{i}", 4);
             ceilingSelectors[i] = new DirectSelector(ceilingSelectorSubjects[i]);
