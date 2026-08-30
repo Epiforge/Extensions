@@ -49,6 +49,8 @@ public class DifferentialFuzz
             options.AddIgnoredPropertyChangeNotification(rank);
         if (rng.Next(7) == 0)
             options.AddIgnoredPropertyChangeNotification(score);
+        if (rng.Next(2) == 0)
+            options.Optimizer = ExpressionOptimizer.tryVisit;
         return options;
     }
 

@@ -288,9 +288,9 @@ Anything else throws. That is not defensiveness for its own sake: a closure chai
 
 ### One consequence worth stating: the plan and the delegate now agree
 
-The fast path has always compiled the **raw** lambda body while planning the **optimized** normalized tree. With no `Optimizer` configured — the default — those are the same expression and nothing was wrong. With one configured they are not, and a plan derived from a tree the delegate does not evaluate can omit a subscription the delegate depends on.
+The fast path has always compiled the **raw** lambda body while planning the **optimized** normalized tree. With no `Optimizer` configured — the library's default, though *not* the test suite's, since `ExpressionObserverHelpers.Create` sets one on every observer it builds — those are the same expression. With one configured they are not, and planning the raw body removes the disagreement by construction.
 
-Planning the raw body removes the disagreement by construction. This was a side effect of moving the plan, not the reason for it, and it is recorded here because it changes which of the two trees is authoritative for the fast path: the one that gets evaluated.
+**How much that was worth is less than it first appears, and the earlier draft of this paragraph overstated it.** The claim was that a plan derived from a tree the delegate does not evaluate could omit a subscription the delegate depends on. It could omit the subscription — but if the optimizer eliminated that subexpression, the optimizer asserted the value does not depend on it, so no notification was due. For any semantics-preserving optimizer the old arrangement was safe, and the new one merely over-subscribes in the same case, which is also safe. The honest statement is that this makes the fast path's authority unambiguous, not that it fixed a defect.
 
 An observation is still one mechanism or the other for its whole lifetime, with no per-change re-decision and no fallback mid-life.
 
@@ -308,6 +308,8 @@ Two things make this safe rather than clever:
 The cost is that an observer with a logger attached materializes on initialization and again on disposal, because `LogTrace` takes the expression as a structured argument and evaluates it. Null-conditional short-circuiting means an observer without a logger — the default — pays nothing. Tracing is a debugging mode and the value logged has to be right, so this is the correct trade rather than a regression to fix.
 
 **One divergence deliberately chosen.** The fast node materializes with `ReplaceParametersWithoutOptimization`, even under `Observe`, which optimizes. That means with an `Optimizer` configured the two mechanisms print different strings for the same observation. This is the right way round: the fast path compiles and evaluates the *raw* body, so the raw body is what its `ToString()` should show. Printing an optimized tree the delegate does not evaluate would be the more comfortable answer and the less true one.
+
+The same fact deserves stating without the comfort of the `ToString()` framing: **under a configured optimizer the two mechanisms evaluate different trees.** The graph evaluates the optimized one, the fast path the raw one. They agree on values only because a correct optimizer preserves semantics — the library takes `Func<Expression, Expression>` and cannot check that, so the guarantee is the caller's, not ours. The differential fuzzer now enables `ExpressionOptimizer.tryVisit` on half its seeds, which is what turns that reasoning into evidence; before this it had never run with an optimizer at all, despite the rest of the suite running under one throughout.
 
 ### Order
 
