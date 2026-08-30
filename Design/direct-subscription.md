@@ -130,9 +130,21 @@ An earlier draft continued: "A reassignment of the captured local goes unnoticed
 
 **That is false, and it is the load-bearing sentence of this section.** They are not blind in the same way. Neither subscribes, but the graph *caches* — `ObservableMemberExpression` for `closure.threshold` evaluates once, at initialization, and has no dependency that can ever wake it, so it holds that value for the observation's life. The fast path caches nothing: its compiled delegate dereferences the closure field on every evaluation. So a reassignment of the captured local is unnoticed by the graph **permanently**, and unnoticed by the fast path **only until something else wakes it**, at which point it silently adopts the new object while remaining subscribed to the old one.
 
-`DirectSubscriptionReadsACapturedLocalAfreshOnEveryEvaluation` and `TheGraphKeepsTheValueACapturedLocalHeldWhenTheObservationBegan` pin both behaviours. They are deliberately two tests rather than one agreeing test, because the mechanisms do not agree, and that fact should be visible in the suite rather than only here.
+The fast path's behaviour was worse than "reads afresh" makes it sound. It stayed subscribed to the object the local held at construction and reported a value computed from the object the local holds now — **woken by one object and answering about another**, with a value depending on the timing of changes to an input it no longer read.
 
-The fast path's behaviour is worse than "reads afresh" makes it sound. It stays subscribed to the object the local held at construction and reports a value computed from the object the local holds now — so it is **woken by one object and answers about another**. Its value therefore depends on the timing of changes to an input it no longer reads.
+**This is fixed.** Every closure field chain in a lambda is now rewritten, once per lambda, into a read from an array of values resolved when an observation is constructed. `s => s.Rank + closure.other.Rank` compiles to `(s, values) => s.Rank + ((Recorded)values[0]).Rank`, and `values[0]` holds whatever the local held at that observation's construction. Reassigning the local afterwards changes nothing, which is what the graph does and what the semantics require. `ACapturedLocalKeepsTheValueItHeldWhenTheObservationBegan` asserts both mechanisms agree for a single observation.
+
+The values are resolved **per observation, not per lambda**. That was asserted as matching the graph, and it does not — the claim was made without checking, in the same paragraph that had already been wrong once about closures.
+
+**What the graph actually does is share one frozen value between overlapping observations.** Its node cache is keyed by structural expression equality, so a second `Observe` of a structurally-equal lambda finds the *existing* `ObservableMemberExpression` for `closure.other` — evaluated once, when the first observation was created — increments its observation count, and returns it. Both observations then report the object the local held at the *first* one's construction. Once every observation releases the node it is rebuilt, and a later observation reads the field afresh.
+
+`TheGraphSharesOneFrozenClosureValueBetweenOverlappingObservations` and `DirectSubscriptionFreezesAClosureValuePerObservation` pin both.
+
+**This residual divergence is not being chased, and the reason is that there is no coherent target.** Two independent observations, created at different moments, silently share a frozen closure value because their subexpressions happened to compare equal — so the second `Observe` returns a stale reading of the closure on account of an unrelated earlier observation still being alive. Unlike the reassignment question settled above, where the graph's behaviour was defensible and the fast path's was not, this is an artifact of the node cache leaking into semantics, and it is hard to describe to a caller as intended.
+
+What matters is that the two mechanisms are now *both coherent*, which is the change that was worth making. Before the rewrite the fast path subscribed to one object and evaluated from another, so its value depended on the timing of changes to an input it no longer read. Now each mechanism subscribes to and evaluates from the same object throughout; they merely disagree about which object, and only when a captured local is reassigned between two overlapping observations of structurally equal lambdas.
+
+**Reassigning a captured local while an observation is live is therefore unsupported**, and that is the honest statement rather than a claim of equivalence. It should be documented for consumers before this ships.
 
 **The graph is not defective here, and that matters for how this gets fixed.** A captured local's reassignment is a plain field write on a compiler-generated class; nothing notifies, and observing what notifies is the library's whole premise. The closure is part of what was observed, fixed at the moment of observation, in exactly the way the argument is — nobody expects `Observe(lambda, subject)` to start reporting on a different subject. The graph delivers a coherent observation of the closure it was given. The fast path delivers an incoherent mixture.
 
@@ -293,13 +305,11 @@ The cause is the general shape stated under the eligibility rule. An ignored pro
 
 **The first is fixed by refusal.** An expression touching a property with ignored change notifications is now ineligible, reported as `IgnoredChangeNotification`. There is no cheaper fix: the fast path has no per-node cache to freeze the value in, and any full re-evaluation reads the property. The cost is that one ignored property disqualifies the whole expression, which is acceptable because ignoring a property is explicit and rare.
 
-**The second is not fixed, and refusal is not available** — refusing closure-field targets would refuse the archetype this whole mechanism exists to serve.
+**The second is fixed by freezing**, since refusal was not available — refusing closure-field targets would refuse the archetype this whole mechanism exists to serve. `FixedSubexpressionRewriter` lifts every closure field chain out of the lambda into an array read, once per lambda, and the observer resolves that array per observation.
 
-What fixes it is the redesign already identified for performance: resolve each fixed subexpression once, and give the compiled delegate those resolved values as arguments rather than letting it dereference closure fields live. A lambda rewritten so that every maximal fixed subexpression becomes an indexed read from a values array can be compiled once per lambda and invoked with the values resolved at construction — which freezes exactly what the graph freezes, and removes both `ReplaceParameters` and `Plan` from the per-observation path as a side effect.
+Only closure field chains are lifted. A `ConstantExpression`'s value cannot change, so freezing it would buy nothing and cost a boxed array slot; and the parameter is the argument, already fixed at construction by being passed in.
 
-So the redesign has stopped being an optimization. **It is the correctness fix**, and the performance is a by-product. That reorders everything: it is not the thing to do after the fuzzer, it is the thing the fuzzer has just made mandatory.
-
-Until it lands, the mechanism has a known divergence and should not ship.
+**What this leaves for the performance redesign.** Freezing was the correctness half of the change identified earlier, and it is the smaller half. The larger one remains: the analysis and the plan are still computed per observation from a freshly normalized tree, and `ReplaceParameters` still runs every time. Determining eligibility and planning from the lambda, cached alongside the evaluator that now lives beside it, would remove both from the per-observation path. That is now purely a performance change, which is a much better position to attempt it from.
 
 ## The evidence required before shipping
 

@@ -70,28 +70,33 @@ public class SubscriptionAgreement
     }
 
     [TestMethod]
-    public void DirectSubscriptionReadsACapturedLocalAfreshOnEveryEvaluation()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void ACapturedLocalKeepsTheValueItHeldWhenTheObservationBegan(bool useDirectSubscription)
     {
         var log = new SubscriptionLog();
         var first = new Recorded(log) { Rank = 10 };
         var second = new Recorded(log) { Rank = 20 };
         var subject = new Recorded(log) { Rank = 1 };
         var other = first;
-        var observer = new ExpressionObserver();
-        using var expr = observer.Observe(s => s.Rank + other.Rank, subject);
-        Assert.AreEqual(11, expr.Evaluation.Result);
-        other = second;
-        Assert.AreEqual(11, expr.Evaluation.Result);
-        subject.Rank = 2;
-        Assert.AreEqual(22, expr.Evaluation.Result);
-        second.Rank = 30;
-        Assert.AreEqual(22, expr.Evaluation.Result);
-        first.Rank = 40;
-        Assert.AreEqual(32, expr.Evaluation.Result);
+        var observer = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = useDirectSubscription });
+        using (var expr = observer.Observe(s => s.Rank + other.Rank, subject))
+        {
+            Assert.AreEqual(11, expr.Evaluation.Result);
+            other = second;
+            Assert.AreEqual(11, expr.Evaluation.Result);
+            subject.Rank = 2;
+            Assert.AreEqual(12, expr.Evaluation.Result);
+            second.Rank = 30;
+            Assert.AreEqual(12, expr.Evaluation.Result);
+            first.Rank = 40;
+            Assert.AreEqual(42, expr.Evaluation.Result);
+        }
+        Assert.AreEqual(0, log.Outstanding);
     }
 
     [TestMethod]
-    public void TheGraphKeepsTheValueACapturedLocalHeldWhenTheObservationBegan()
+    public void TheGraphSharesOneFrozenClosureValueBetweenOverlappingObservations()
     {
         var log = new SubscriptionLog();
         var first = new Recorded(log) { Rank = 10 };
@@ -99,16 +104,37 @@ public class SubscriptionAgreement
         var subject = new Recorded(log) { Rank = 1 };
         var other = first;
         var observer = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = false });
-        using var expr = observer.Observe(s => s.Rank + other.Rank, subject);
-        Assert.AreEqual(11, expr.Evaluation.Result);
-        other = second;
-        Assert.AreEqual(11, expr.Evaluation.Result);
-        subject.Rank = 2;
-        Assert.AreEqual(12, expr.Evaluation.Result);
-        second.Rank = 30;
-        Assert.AreEqual(12, expr.Evaluation.Result);
-        first.Rank = 40;
-        Assert.AreEqual(42, expr.Evaluation.Result);
+        using (var earlier = observer.Observe(s => s.Rank + other.Rank, subject))
+        {
+            other = second;
+            using (var later = observer.Observe(s => s.Rank + other.Rank, subject))
+            {
+                Assert.AreEqual(11, earlier.Evaluation.Result);
+                Assert.AreEqual(11, later.Evaluation.Result);
+            }
+        }
+        Assert.AreEqual(0, log.Outstanding);
+    }
+
+    [TestMethod]
+    public void DirectSubscriptionFreezesAClosureValuePerObservation()
+    {
+        var log = new SubscriptionLog();
+        var first = new Recorded(log) { Rank = 10 };
+        var second = new Recorded(log) { Rank = 20 };
+        var subject = new Recorded(log) { Rank = 1 };
+        var other = first;
+        var observer = new ExpressionObserver();
+        using (var earlier = observer.Observe(s => s.Rank + other.Rank, subject))
+        {
+            other = second;
+            using (var later = observer.Observe(s => s.Rank + other.Rank, subject))
+            {
+                Assert.AreEqual(11, earlier.Evaluation.Result);
+                Assert.AreEqual(21, later.Evaluation.Result);
+            }
+        }
+        Assert.AreEqual(0, log.Outstanding);
     }
 
     [TestMethod]

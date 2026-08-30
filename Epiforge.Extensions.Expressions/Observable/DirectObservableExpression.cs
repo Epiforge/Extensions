@@ -3,7 +3,7 @@
 abstract class DirectObservableExpression :
     ObservableExpression
 {
-    protected static object? Resolve(Expression expression) =>
+    internal static object? Resolve(Expression expression) =>
         expression switch
         {
             ConstantExpression constantExpression => constantExpression.Value,
@@ -60,23 +60,25 @@ abstract class DirectObservableExpression :
 sealed class DirectObservableExpression<TArgument, TResult> :
     DirectObservableExpression
 {
-    internal DirectObservableExpression(ExpressionObserver observer, Expression expression, DirectSubscriptionPlan plan, Func<TArgument, TResult> evaluate, TArgument argument) :
+    internal DirectObservableExpression(ExpressionObserver observer, Expression expression, DirectSubscriptionPlan plan, Func<TArgument, object?[], TResult> evaluate, TArgument argument, object?[] values) :
         base(observer, expression)
     {
         this.argument = argument;
         this.evaluate = evaluate;
         this.plan = plan;
+        this.values = values;
     }
 
     readonly TArgument argument;
-    readonly Func<TArgument, TResult> evaluate;
+    readonly Func<TArgument, object?[], TResult> evaluate;
     readonly DirectSubscriptionPlan plan;
+    readonly object?[] values;
 
     protected override void Evaluate()
     {
         try
         {
-            var value = evaluate(argument);
+            var value = evaluate(argument, values);
             Evaluation = (null, value);
             observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{Expression} evaluated directly: {Value}", Expression, value);
         }

@@ -59,7 +59,7 @@ public sealed class DirectSubscriptionAnalyzer
         subscriptions.Add(new(source, kind, propertyName));
     }
 
-    static bool IsFixed(Expression expression) =>
+    internal static bool IsFixed(Expression expression) =>
         expression switch
         {
             ConstantExpression => true,
