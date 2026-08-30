@@ -1,7 +1,7 @@
 ﻿namespace Epiforge.Extensions.Benchmarking;
 
 [MemoryDiagnoser]
-[SimpleJob(launchCount: 1)]
+[SimpleJob(launchCount: 3)]
 public class DirectSubscriptionCeilingBenchmarks
 {
     sealed class DirectComparison :
@@ -182,16 +182,6 @@ public class DirectSubscriptionCeilingBenchmarks
         var observations = new IObservableExpression<BenchmarkPerson, int>[Observations];
         for (var i = 0; i < Observations; ++i)
             observations[i] = fastObserver.Observe(selectorLambda, observeSubjects[i]);
-        for (var i = 0; i < Observations; ++i)
-            observations[i].Dispose();
-    }
-
-    [Benchmark]
-    public void FastSelectorObserveRebuildingTheLambda()
-    {
-        var observations = new IObservableExpression<BenchmarkPerson, int>[Observations];
-        for (var i = 0; i < Observations; ++i)
-            observations[i] = fastObserver.Observe(person => person.Rank, observeSubjects[i]);
         for (var i = 0; i < Observations; ++i)
             observations[i].Dispose();
     }
