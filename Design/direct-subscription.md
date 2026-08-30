@@ -18,6 +18,10 @@ A fast-path observation satisfies the second trivially — it has no interior st
 
 Subscribing to *more* than the graph would is not a safe direction to err in. It costs extra notifications, and the whole point of the boundary work is that extra notifications are the expensive thing. Subscribing to *fewer* is the failure that cannot be tolerated at all: silent staleness, where the value is wrong and nothing says so.
 
+**So the analyser errs toward the graph, always.** Its default answer is ineligible, and eligibility has to be positively established; an expression kind it does not recognise, an option interaction it cannot reason about, or a shape it has not been taught are all ineligible by construction rather than by omission. A wrong "ineligible" costs a caller some speed they did not previously have. A wrong "eligible" costs them a value that is silently wrong. Those are not comparable, and no measurement will ever make them comparable.
+
+Mitch Hedberg had the shape of it: an escalator can never break, it can only become stairs. This mechanism is permitted to become stairs. It is not permitted to become a hole.
+
 ## What the graph actually subscribes to
 
 Verified by search across the node layer, with the tail of the results checked: **eight subscriptions, six handlers, three node types.** Every other method that looks like an entry point is `OnDependencyEvaluationChanged`, which is downstream by construction.
@@ -60,6 +64,20 @@ What that excludes: `person.Manager.Rank`, where `person.Manager` is a member on
 A structured verdict, not a log message and not a boolean. Eligible, or ineligible with the offending subexpression and the reason it offends. Two consumers need it in that form: the execution path, which needs only the verdict and the subscription set; and diagnostics, which need to tell a caller *which part of their lambda* cost them the fast path, because a cost model nobody can see is the library's standing weakness.
 
 Logging the declined path through `observer.Logger` under its own `EventId` follows from the structured value. It does not replace it.
+
+## The analyser is public
+
+The analyser is a public type a caller can instantiate against an `ExpressionObserverOptions`, and ask about an expression without observing it. An observer holds its own instance and uses it for its own decisions; nothing about that is privileged.
+
+Three things follow from making it public rather than internal.
+
+**Tests can assert eligibility directly.** Instead of inferring from behaviour that an observation probably took the fast path, a test states that the expression is eligible under these options, and thereby knows what the observer will do with it. Every subsequent assertion in that test is then about the mechanism it intended to exercise, rather than about whichever mechanism happened to be chosen.
+
+**Diagnostics stop depending on logs.** A caller who wants to know why their lambda is not being fast-tracked asks, and is told which subexpression is responsible. The library's standing weakness is that its cost model is invisible at the call site; a log message improves that only for someone already reading logs, and only after the fact.
+
+**It is honest about what the mechanism is.** A caller who can inspect the decision can predict the behaviour of their own code. One who cannot is being asked to trust a heuristic they are not allowed to see.
+
+The analysis takes what `Observe` takes — the lambda and its arguments — because parameters are replaced by constants before observation, and knowing those values makes the analysis more precise rather than less. The result is a structured value: eligible, or ineligible with the offending subexpression and a reason, as the previous section requires.
 
 ## Turning it off
 
