@@ -81,47 +81,36 @@ public class DirectSubscriptionCeilingBenchmarks
     static readonly PropertyChangedEventArgs EvaluationChanged = new("Evaluation");
     static readonly PropertyChangingEventArgs EvaluationChanging = new("Evaluation");
 
-    DirectComparison[] directComparisons = null!;
-    BenchmarkPerson[] directComparisonSubjects = null!;
-    DirectSelector[] directSelectors = null!;
-    BenchmarkPerson[] directSelectorSubjects = null!;
+    DirectComparison[] ceilingComparisons = null!;
+    BenchmarkPerson[] ceilingComparisonSubjects = null!;
+    DirectSelector[] ceilingSelectors = null!;
+    BenchmarkPerson[] ceilingSelectorSubjects = null!;
+    IObservableExpression<BenchmarkPerson, bool>[] fastComparisons = null!;
+    BenchmarkPerson[] fastComparisonSubjects = null!;
+    ExpressionObserver fastObserver = null!;
+    IObservableExpression<BenchmarkPerson, int>[] fastSelectors = null!;
+    BenchmarkPerson[] fastSelectorSubjects = null!;
     IObservableExpression<BenchmarkPerson, bool>[] graphComparisons = null!;
     BenchmarkPerson[] graphComparisonSubjects = null!;
+    ExpressionObserver graphObserver = null!;
     IObservableExpression<BenchmarkPerson, int>[] graphSelectors = null!;
     BenchmarkPerson[] graphSelectorSubjects = null!;
     int notifications;
     BenchmarkPerson[] observeSubjects = null!;
-    ExpressionObserver observer = null!;
     BenchmarkPerson threshold = null!;
 
     [Params(100, 1000)]
     public int Observations { get; set; }
 
-    [GlobalCleanup]
-    public void Cleanup()
+    [Benchmark]
+    public void CeilingComparisonChange()
     {
         for (var i = 0; i < Observations; ++i)
-        {
-            graphSelectors[i].PropertyChanged -= Notified;
-            graphSelectors[i].Dispose();
-            graphComparisons[i].PropertyChanged -= Notified;
-            graphComparisons[i].Dispose();
-            directSelectors[i].PropertyChanged -= Notified;
-            directSelectors[i].Dispose();
-            directComparisons[i].PropertyChanged -= Notified;
-            directComparisons[i].Dispose();
-        }
+            ceilingComparisonSubjects[i].Rank ^= 1;
     }
 
     [Benchmark]
-    public void DirectComparisonChange()
-    {
-        for (var i = 0; i < Observations; ++i)
-            directComparisonSubjects[i].Rank ^= 1;
-    }
-
-    [Benchmark]
-    public void DirectComparisonObserve()
+    public void CeilingComparisonObserve()
     {
         var observations = new DirectComparison[Observations];
         for (var i = 0; i < Observations; ++i)
@@ -131,18 +120,67 @@ public class DirectSubscriptionCeilingBenchmarks
     }
 
     [Benchmark]
-    public void DirectSelectorChange()
+    public void CeilingSelectorChange()
     {
         for (var i = 0; i < Observations; ++i)
-            directSelectorSubjects[i].Rank ^= 1;
+            ceilingSelectorSubjects[i].Rank ^= 1;
     }
 
     [Benchmark]
-    public void DirectSelectorObserve()
+    public void CeilingSelectorObserve()
     {
         var observations = new DirectSelector[Observations];
         for (var i = 0; i < Observations; ++i)
             observations[i] = new DirectSelector(observeSubjects[i]);
+        for (var i = 0; i < Observations; ++i)
+            observations[i].Dispose();
+    }
+
+    [GlobalCleanup]
+    public void Cleanup()
+    {
+        for (var i = 0; i < Observations; ++i)
+        {
+            graphSelectors[i].Dispose();
+            graphComparisons[i].Dispose();
+            fastSelectors[i].Dispose();
+            fastComparisons[i].Dispose();
+            ceilingSelectors[i].Dispose();
+            ceilingComparisons[i].Dispose();
+        }
+    }
+
+    [Benchmark]
+    public void FastComparisonChange()
+    {
+        for (var i = 0; i < Observations; ++i)
+            fastComparisonSubjects[i].Rank ^= 1;
+    }
+
+    [Benchmark]
+    public void FastComparisonObserve()
+    {
+        var captured = threshold;
+        var observations = new IObservableExpression<BenchmarkPerson, bool>[Observations];
+        for (var i = 0; i < Observations; ++i)
+            observations[i] = fastObserver.Observe(person => person.Rank > captured.Rank, observeSubjects[i]);
+        for (var i = 0; i < Observations; ++i)
+            observations[i].Dispose();
+    }
+
+    [Benchmark]
+    public void FastSelectorChange()
+    {
+        for (var i = 0; i < Observations; ++i)
+            fastSelectorSubjects[i].Rank ^= 1;
+    }
+
+    [Benchmark]
+    public void FastSelectorObserve()
+    {
+        var observations = new IObservableExpression<BenchmarkPerson, int>[Observations];
+        for (var i = 0; i < Observations; ++i)
+            observations[i] = fastObserver.Observe(person => person.Rank, observeSubjects[i]);
         for (var i = 0; i < Observations; ++i)
             observations[i].Dispose();
     }
@@ -160,7 +198,7 @@ public class DirectSubscriptionCeilingBenchmarks
         var captured = threshold;
         var observations = new IObservableExpression<BenchmarkPerson, bool>[Observations];
         for (var i = 0; i < Observations; ++i)
-            observations[i] = observer.Observe(person => person.Rank > captured.Rank, observeSubjects[i]);
+            observations[i] = graphObserver.Observe(person => person.Rank > captured.Rank, observeSubjects[i]);
         for (var i = 0; i < Observations; ++i)
             observations[i].Dispose();
     }
@@ -177,7 +215,7 @@ public class DirectSubscriptionCeilingBenchmarks
     {
         var observations = new IObservableExpression<BenchmarkPerson, int>[Observations];
         for (var i = 0; i < Observations; ++i)
-            observations[i] = observer.Observe(person => person.Rank, observeSubjects[i]);
+            observations[i] = graphObserver.Observe(person => person.Rank, observeSubjects[i]);
         for (var i = 0; i < Observations; ++i)
             observations[i].Dispose();
     }
@@ -188,13 +226,18 @@ public class DirectSubscriptionCeilingBenchmarks
     [GlobalSetup]
     public void Setup()
     {
-        observer = new ExpressionObserver();
+        fastObserver = new ExpressionObserver();
+        graphObserver = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = false });
         threshold = new BenchmarkPerson("threshold", 4);
         var captured = threshold;
-        directComparisons = new DirectComparison[Observations];
-        directComparisonSubjects = new BenchmarkPerson[Observations];
-        directSelectors = new DirectSelector[Observations];
-        directSelectorSubjects = new BenchmarkPerson[Observations];
+        ceilingComparisons = new DirectComparison[Observations];
+        ceilingComparisonSubjects = new BenchmarkPerson[Observations];
+        ceilingSelectors = new DirectSelector[Observations];
+        ceilingSelectorSubjects = new BenchmarkPerson[Observations];
+        fastComparisons = new IObservableExpression<BenchmarkPerson, bool>[Observations];
+        fastComparisonSubjects = new BenchmarkPerson[Observations];
+        fastSelectors = new IObservableExpression<BenchmarkPerson, int>[Observations];
+        fastSelectorSubjects = new BenchmarkPerson[Observations];
         graphComparisons = new IObservableExpression<BenchmarkPerson, bool>[Observations];
         graphComparisonSubjects = new BenchmarkPerson[Observations];
         graphSelectors = new IObservableExpression<BenchmarkPerson, int>[Observations];
@@ -204,17 +247,23 @@ public class DirectSubscriptionCeilingBenchmarks
         {
             observeSubjects[i] = new BenchmarkPerson($"O{i}", 4);
             graphSelectorSubjects[i] = new BenchmarkPerson($"GS{i}", 4);
-            graphSelectors[i] = observer.Observe(person => person.Rank, graphSelectorSubjects[i]);
+            graphSelectors[i] = graphObserver.Observe(person => person.Rank, graphSelectorSubjects[i]);
             graphSelectors[i].PropertyChanged += Notified;
             graphComparisonSubjects[i] = new BenchmarkPerson($"GC{i}", 4);
-            graphComparisons[i] = observer.Observe(person => person.Rank > captured.Rank, graphComparisonSubjects[i]);
+            graphComparisons[i] = graphObserver.Observe(person => person.Rank > captured.Rank, graphComparisonSubjects[i]);
             graphComparisons[i].PropertyChanged += Notified;
-            directSelectorSubjects[i] = new BenchmarkPerson($"DS{i}", 4);
-            directSelectors[i] = new DirectSelector(directSelectorSubjects[i]);
-            directSelectors[i].PropertyChanged += Notified;
-            directComparisonSubjects[i] = new BenchmarkPerson($"DC{i}", 4);
-            directComparisons[i] = new DirectComparison(directComparisonSubjects[i], threshold);
-            directComparisons[i].PropertyChanged += Notified;
+            fastSelectorSubjects[i] = new BenchmarkPerson($"FS{i}", 4);
+            fastSelectors[i] = fastObserver.Observe(person => person.Rank, fastSelectorSubjects[i]);
+            fastSelectors[i].PropertyChanged += Notified;
+            fastComparisonSubjects[i] = new BenchmarkPerson($"FC{i}", 4);
+            fastComparisons[i] = fastObserver.Observe(person => person.Rank > captured.Rank, fastComparisonSubjects[i]);
+            fastComparisons[i].PropertyChanged += Notified;
+            ceilingSelectorSubjects[i] = new BenchmarkPerson($"CS{i}", 4);
+            ceilingSelectors[i] = new DirectSelector(ceilingSelectorSubjects[i]);
+            ceilingSelectors[i].PropertyChanged += Notified;
+            ceilingComparisonSubjects[i] = new BenchmarkPerson($"CC{i}", 4);
+            ceilingComparisons[i] = new DirectComparison(ceilingComparisonSubjects[i], threshold);
+            ceilingComparisons[i].PropertyChanged += Notified;
         }
     }
 }
