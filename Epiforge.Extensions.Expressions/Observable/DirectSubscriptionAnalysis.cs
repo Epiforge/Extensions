@@ -3,7 +3,10 @@ namespace Epiforge.Extensions.Expressions.Observable;
 /// <summary>
 /// Represents whether an expression can be observed by subscribing directly to its change sources, and when it cannot, which part of it is responsible
 /// </summary>
-public sealed class DirectSubscriptionAnalysis
+/// <remarks>
+/// A default instance is ineligible, since eligibility is established rather than assumed
+/// </remarks>
+public readonly record struct DirectSubscriptionAnalysis
 {
     internal static readonly DirectSubscriptionAnalysis Eligible = new(null, DirectSubscriptionIneligibility.None);
 

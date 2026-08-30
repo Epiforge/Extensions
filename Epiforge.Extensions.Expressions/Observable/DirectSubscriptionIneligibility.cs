@@ -6,6 +6,11 @@ namespace Epiforge.Extensions.Expressions.Observable;
 public enum DirectSubscriptionIneligibility
 {
     /// <summary>
+    /// The expression has not been analyzed, which is the state of a default analysis and is treated as ineligible
+    /// </summary>
+    Unanalyzed,
+
+    /// <summary>
     /// The expression can be observed by subscribing directly to its change sources
     /// </summary>
     None,
