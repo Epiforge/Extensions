@@ -1,8 +1,8 @@
-# Direct subscription: the execution path, measured in three cuts
+# Direct subscription: the execution path, measured in five cuts
 
-> **Read the third cut for the current state.** The first two sections record a regression and its diagnosis, kept because the reasoning that found the cost is worth more than the numbers it corrected.
+> **Read the fifth cut for the current state.** The earlier sections record a regression, its diagnosis, and two corrections, kept because the reasoning that found the costs is worth more than the numbers it corrected. Every figure before the fifth cut comes from a single launch and should be read as provisional.
 
-`DirectSubscriptionCeilingBenchmarks`, .NET 10.0.11, Intel Core Ultra 9 275HX, one launch. Three arms: **graph** (`UseDirectSubscription = false`), **fast** (the mechanism as built), **ceiling** (the hand-rolled stand-in from `2026-08-30-direct-subscription-ceiling.md`).
+`DirectSubscriptionCeilingBenchmarks`, .NET 10.0.11, Intel Core Ultra 9 275HX. Cuts one through four at one launch, the fifth at three. Three arms: **graph** (`UseDirectSubscription = false`), **fast** (the mechanism as built), **ceiling** (the hand-rolled stand-in from `2026-08-30-direct-subscription-ceiling.md`).
 
 Per-observation figures throughout, N = 1000 unless noted.
 
@@ -141,6 +141,60 @@ Propagation is far more stable — the change arms sit within 2% across every ru
 
 **Before quoting a construction ratio for the record, re-run with `launchCount: 3`.** The single launch was chosen deliberately when the question was "fat or thin," and it answered that. It cannot answer "how much."
 
+## Fifth cut: three launches, and where the variance actually lives
+
+No code change. `[SimpleJob(launchCount: 3)]`, and `FastSelectorObserveRebuildingTheLambda` removed — at roughly 20 ms per operation it dominated the run and its cost is already priced above as a one-time measurement.
+
+### The figures of record
+
+Per observation, N = 1000.
+
+| | graph | fast | ceiling | fast vs graph |
+|--- |---: |---: |---: |---: |
+| selector construction | 1,922 ns / 1,784 B | **912 ns / 1,733 B** | 30 ns / 184 B | **2.11× faster, 0.97× memory** |
+| comparison construction | 3,372 ns / 3,607 B | **1,224 ns / 2,258 B** | 3,141 ns / 16,684 B | **2.75× faster, 0.63× memory** |
+| selector propagation | 46.8 ns / 72 B | **36.0 ns / 72 B** | 10.8 ns / 48 B | **1.30× faster** |
+| comparison propagation | 59.0 ns / 96 B | **36.5 ns / 72 B** | 11.2 ns / 48 B | **1.62× faster, 0.75× memory** |
+
+At N=100 the same ratios are 2.06×, 2.89×, 1.41× and 1.63×. So the defensible claims are **2.1× construction on the selector, 1.3 to 1.6× propagation**, with the comparison-construction figure carrying a caveat given below.
+
+### What the third launch found
+
+**The variance is not spread across the benchmark. It is concentrated in one arm.** `GraphComparisonObserve` has a standard deviation of 20% of its mean at N=100 and 11% at N=1000. Every other arm in the table is at or under 2.1%.
+
+The shape is launch-level bimodality, not sampling noise. At N=100 the mean sits 14% *above* the median; at N=1000 it sits 5% *below* it. Individual launches are landing in different places, and which place dominates changes with the parameter.
+
+**The single launch had landed on the fast mode.** It reported `GraphComparisonObserve` at 252,861 ns for N=100. The three-launch median is 252,984 ns — the same number. Had I quoted a comparison-construction ratio from that run I would have said 2.53×, stated it as a measurement, and been wrong by 14% in the direction that flattered the change. That is precisely the failure mode `launchCount: 1` cannot detect, and it is the reason this re-run happened.
+
+The honest comparison-construction claim is therefore a range: **2.5× to 2.9×**, resting on a graph arm whose distribution is wide. The selector rows, at under 2.1% deviation everywhere, are the ones to quote.
+
+### Three launches are still not enough
+
+`FastSelectorObserve` at N=1000 moved from 749,492 ns in the fourth cut to 912,332 ns here — up 21.7% — with identical code and identical allocation (1,694 KB then, 1,693 KB now). Its within-run deviation is 1.9%. So the run-to-run gap is eleven times the variance the run itself reports.
+
+Its Gen2 collections fell from 3.9063 to 0.9766 per thousand operations across the same two runs. Allocation did not change; when the collector chose to run did.
+
+I do not have an explanation I can defend. The obvious suspect — that removing a 6.9 MB-per-operation arm changed the GC environment — I believe is wrong, because BenchmarkDotNet runs each case in its own process, so the removed arm never shared a heap with this one. **Marking this as unexplained rather than inventing a mechanism.** What it establishes is a floor on honesty: construction figures carry run-to-run uncertainty of roughly ±20% that neither one launch nor three fully captures, and they should be quoted as ranges indefinitely, not just until the next re-run.
+
+Propagation remains stable to within 2% across all five cuts, for the reason given in the fourth cut: it measures a tight loop, not an allocation path racing the collector.
+
+### A prediction that came true sideways
+
+The first cut, watching the naive ceiling go quadratic on a shared closure source, said of the ceiling and the fast path: *"they cross not far beyond it."* They have crossed. At N=1000 the fast path constructs a comparison observation in 1,224 ns against the hand-written ceiling's 3,141 — **2.6× faster than the thing built to represent the best case**, on a sixth of the memory.
+
+But the crossing did not arrive the predicted way. It was expected to come from growing N until the ceiling's `Delegate.Combine` curve overtook a stationary fast path. Instead N stayed put and the fast path fell from 6,601 ns to 1,224. The direction was right and the mechanism was wrong, which puts it in the same category as every other prediction here that told a story about which code was hot.
+
+### Where the remaining room is
+
+| selector, N=1000 | fast | ceiling | fast is | share of the graph→ceiling gap closed |
+|--- |---: |---: |---: |---: |
+| construction | 912 ns | 30 ns | 30.7× the ceiling | **53%** |
+| propagation | 36.0 ns | 10.8 ns | 3.3× the ceiling | **30%** |
+
+Both readings are true and they point opposite ways. Against the graph, construction is now the better result — more than half the available gap closed. Against the ceiling it is far the worse, because 53% of a 64× gap still leaves thirty-fold. Construction is where the remaining order of magnitude is, and the route to it is unchanged: analyze and plan from the lambda once, resolve sources relative to the argument, and skip `ReplaceParameters` and `Plan` per observation entirely.
+
 ## Status
 
-The mechanism is correct, has a differential fuzzer behind it, and is **roughly twice as fast to construct and 1.2 to 1.6 times faster to propagate**, with equal or less allocation. The remaining performance work — lifting analysis and normalization out of the per-observation path — is now purely a performance change, since its correctness half has landed.
+The mechanism is correct, has a differential fuzzer behind it, and at three launches is **2.1× faster to construct on the selector (2.5–2.9× on the comparison) and 1.3 to 1.6× faster to propagate**, with equal or less allocation. Construction figures carry roughly ±20% run-to-run uncertainty and should be quoted as ranges.
+
+The remaining performance work — lifting analysis and normalization out of the per-observation path — is now purely a performance change, since its correctness half has landed. Against the ceiling it is worth about thirty-fold on construction, which is the largest single item left anywhere in this document.
