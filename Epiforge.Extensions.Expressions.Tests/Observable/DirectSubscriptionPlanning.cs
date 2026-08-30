@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Expressions.Tests.Observable;
+﻿namespace Epiforge.Extensions.Expressions.Tests.Observable;
 
 [TestClass]
 public class DirectSubscriptionPlanning
@@ -145,12 +145,13 @@ public class DirectSubscriptionPlanning
         Analyzer().Plan(null!);
 
     [TestMethod]
-    public void RepeatedMemberPlansOneSubscription()
+    public void RepeatedMemberPlansTheSameSiteTwice()
     {
         var person = TestPerson.CreateEmily();
         var plan = Analyzer().Plan(Bound<long>(subject => subject.NameGets + subject.NameGets, person));
         Assert.IsTrue(plan.IsEligible);
-        Assert.AreEqual(1, plan.Subscriptions.Count);
+        Assert.AreEqual(2, plan.Subscriptions.Count);
+        Assert.AreEqual(plan.Subscriptions[0], plan.Subscriptions[1]);
         Assert.AreEqual(DirectSubscriptionKind.MemberPropertyChanged, plan.Subscriptions[0].Kind);
         Assert.AreEqual(nameof(TestPerson.NameGets), plan.Subscriptions[0].PropertyName);
         Assert.AreSame(person, ValueOf(plan.Subscriptions[0].Source));

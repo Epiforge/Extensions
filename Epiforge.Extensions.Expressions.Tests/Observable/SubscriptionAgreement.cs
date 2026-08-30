@@ -20,7 +20,7 @@ public class SubscriptionAgreement
         using (observer.Observe(lambda, subject))
         {
             var planned = Planned(plan, log);
-            var attached = log.Attachments();
+            var attached = log.Attachments().Distinct().ToList();
             CollectionAssert.AreEqual(planned.ToArray(), attached.ToArray(), $"plan: [{string.Join(", ", planned)}]; graph: [{string.Join(", ", attached)}]");
         }
         Assert.AreEqual(0, log.Outstanding, "the graph did not detach everything it attached");
@@ -42,8 +42,8 @@ public class SubscriptionAgreement
         {
             var subscription = plan.Subscriptions[i];
             var value = Resolve(subscription.Source!);
-            if (subscription.ResolveKind(value) is var kind && kind is not DirectSubscriptionKind.None)
-                planned.Add(log.Describe(value!, EventNameOf(kind)));
+            if (subscription.ResolveKind(value) is var kind && kind is not DirectSubscriptionKind.None && log.Describe(value!, EventNameOf(kind)) is var described && !planned.Contains(described))
+                planned.Add(described);
         }
         planned.Sort(StringComparer.Ordinal);
         return planned;

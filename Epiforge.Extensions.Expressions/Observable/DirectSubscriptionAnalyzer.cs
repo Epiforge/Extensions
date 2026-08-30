@@ -11,9 +11,21 @@
 /// </remarks>
 public sealed class DirectSubscriptionAnalyzer
 {
+    sealed class ExpressionIdentityComparer :
+        IEqualityComparer<Expression>
+    {
+        internal static readonly ExpressionIdentityComparer Default = new();
+
+        public bool Equals(Expression? x, Expression? y) =>
+            ReferenceEquals(x, y);
+
+        public int GetHashCode(Expression obj) =>
+            RuntimeHelpers.GetHashCode(obj);
+    }
+
     sealed class Planner
     {
-        readonly HashSet<Expression> planned = new(ExpressionEqualityComparer.Default);
+        readonly HashSet<Expression> planned = new(ExpressionIdentityComparer.Default);
 
         internal readonly List<DirectSubscription> Subscriptions = [];
 
