@@ -244,6 +244,24 @@ This is also where the convenience anticipated under **The analyser is public** 
 2. The registry and the fast node, wired into the observer.
 3. Differential tests: every case in `SubscriptionAgreement` run down both mechanisms and compared, which is the step the instrument was built to make possible.
 
+## What the fuzzer found on its first run
+
+Two of its three seeded methods failed immediately, on different generated expressions, with one root cause — which is the argument for having built it.
+
+**A faulted expression announced more often on the fast path than on the graph.** Values agreed at every step; the divergence was in notification counts, which is exactly the failure a value-only comparison would have missed.
+
+The cause: an expression re-evaluated while faulted throws a **new exception instance every time**, and the wrapper compared faults with `ReferenceEquals`. So every re-evaluation of a faulted expression looked like a change and was announced. The two mechanisms then re-evaluate at different rates — the graph's intermediate nodes act as filters, so a source notification that leaves an operand's value unchanged never reaches the node that throws, while the fast path re-invokes the whole delegate on any subscribed source. `Recorded.Rank` raises `PropertyChanged` even when set to the value it already held, so this is reached constantly.
+
+This was recorded last night as a hazard of readmitting conditionals — "a faulting taken branch produces a new exception object each time" — and the scope was understated. It needs no conditional. It afflicts **any** faulting eligible expression, because the graph filters through node values and the fast path does not.
+
+**The fix is at the wrapper, and it is a behaviour change for both mechanisms.** Faults are now compared by type and message rather than by identity. Two exceptions of the same type and message are the same fault, so an expression that keeps throwing the same thing announces once and then stays quiet until something actually changes.
+
+That is a change from released behaviour: a consumer watching a faulted observable expression previously received a notification every time any input moved, each reporting the same fault. It is hard to construe that as a feature, and the next release is a major, but it is a change and it is recorded here rather than absorbed.
+
+What it deliberately does not do is make fault identity stable — `Evaluation.Fault` keeps the instance from the first throw of a run, so the stack trace is the first occurrence rather than the latest. Making the fast path reuse its own exception instance was considered and rejected: it would have traded this divergence for the mirror-image one, since the graph does mint a new instance whenever it genuinely re-evaluates.
+
+The node's own `Evaluation` setter still compares faults by reference, so a re-throwing node still notifies its dependents and they still recompute. That is wasted work which the wrapper now absorbs, and it is left alone because changing it would alter when downstream nodes evaluate, which is a larger question than this fix.
+
 ## The evidence required before shipping
 
 The number of fuzzer runs is not the bar. What the generator is *capable of emitting* is.

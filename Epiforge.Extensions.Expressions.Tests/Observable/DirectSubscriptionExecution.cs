@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Expressions.Tests.Observable;
+﻿namespace Epiforge.Extensions.Expressions.Tests.Observable;
 
 [TestClass]
 public class DirectSubscriptionExecution
@@ -59,6 +59,33 @@ public class DirectSubscriptionExecution
             subject.Rank = 2;
             Assert.IsNull(expr.Evaluation.Fault);
             Assert.AreEqual(5, expr.Evaluation.Result);
+        }
+        Assert.AreEqual(0, log.Outstanding);
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void AnUnchangedFaultIsNotAnnouncedAgain(bool useDirectSubscription)
+    {
+        var log = new SubscriptionLog();
+        var subject = new Recorded(log) { Rank = 1, Score = 0 };
+        var observer = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = useDirectSubscription });
+        var announcements = 0;
+        using (var expr = observer.Observe(s => s.Rank / s.Score, subject))
+        {
+            Assert.IsInstanceOfType<DivideByZeroException>(expr.Evaluation.Fault);
+            expr.PropertyChanged += (sender, e) => ++announcements;
+            subject.Rank = 2;
+            subject.Rank = 3;
+            Assert.AreEqual(0, announcements);
+            subject.Score = 1;
+            Assert.AreEqual(1, announcements);
+            Assert.IsNull(expr.Evaluation.Fault);
+            Assert.AreEqual(3, expr.Evaluation.Result);
+            subject.Score = 0;
+            Assert.AreEqual(2, announcements);
+            Assert.IsInstanceOfType<DivideByZeroException>(expr.Evaluation.Fault);
         }
         Assert.AreEqual(0, log.Outstanding);
     }

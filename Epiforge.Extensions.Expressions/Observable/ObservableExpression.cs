@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Expressions.Observable;
+﻿namespace Epiforge.Extensions.Expressions.Observable;
 
 abstract class ObservableExpression :
     PlainSyncDisposable
@@ -200,6 +200,12 @@ abstract class ObservableExpression :
 abstract class ScopedObservableExpression :
     IObservableExpressionDependent
 {
+    /// <summary>
+    /// Determines whether two faults are the same fault, which is by type and message rather than by identity because an expression which is re-evaluated while faulted throws a new exception every time, and announcing that as a change would make the number of notifications a consumer receives depend on how often the mechanism happens to re-evaluate
+    /// </summary>
+    static bool FaultEquals(Exception? x, Exception? y) =>
+        ReferenceEquals(x, y) || (x is not null && y is not null && x.GetType() == y.GetType() && x.Message == y.Message);
+
     protected ScopedObservableExpression(ExpressionObserver observer, Expression expression, ObservableExpression observableExpression, IReadOnlyList<object?> arguments)
     {
         ArgumentNullException.ThrowIfNull(observer);
@@ -286,7 +292,7 @@ abstract class ScopedObservableExpression :
     void RaiseIfEvaluationChanged()
     {
         var current = observableExpression.CurrentEvaluation;
-        if (!notificationForced && ReferenceEquals(evaluation.Fault, current.Fault) && ResultEquals(evaluation.Result, current.Result))
+        if (!notificationForced && FaultEquals(evaluation.Fault, current.Fault) && ResultEquals(evaluation.Result, current.Result))
             return;
         notificationForced = false;
         PropertyChanging?.Invoke(this, ObservableExpression.EvaluationPropertyChangingEventArgs);

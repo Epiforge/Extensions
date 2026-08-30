@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Expressions.Tests.Observable;
+﻿namespace Epiforge.Extensions.Expressions.Tests.Observable;
 
 public sealed class SubscriptionLog
 {
@@ -46,12 +46,23 @@ public sealed class SubscriptionLog
 public class Recorded(SubscriptionLog log) :
     INotifyPropertyChanged
 {
+    Recorded? next;
     PropertyChangedEventHandler? propertyChanged;
     int rank;
     int score;
     string? tag;
 
     internal readonly SubscriptionLog Log = log;
+
+    public Recorded? Next
+    {
+        get => next;
+        set
+        {
+            next = value;
+            propertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Next)));
+        }
+    }
 
     public string? Tag
     {
