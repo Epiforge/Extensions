@@ -116,6 +116,31 @@ Construction is 908 ns against a ceiling of 30. The largest identified component
 
 Propagation is 38.0 ns against a ceiling of 11.0. That gap is the node-and-wrapper path — registry, scope, two intrusive lists, the `Evaluation` setter, `FastEqualityComparer`, the wrapper's compare — and closing it means not reusing the wrapper, which was a deliberate trade and should stay one until something forces it.
 
+## Fourth cut: freezing the closure values
+
+The rewrite that lifts closure field chains into a per-observation values array. Two predictions were stated before the run.
+
+**Propagation: predicted a small rise on the comparison arm, unchanged on the selector. Both held, and the rise was below noise.**
+
+| propagation, per observation, N=1000 | before | after |
+|--- |---: |---: |
+| selector (no closure field) | 38.0 ns | 37.2 ns |
+| comparison (one closure field) | 37.5 ns | 37.3 ns |
+
+An unbox and a bounds check are free against the surrounding forty nanoseconds. The array read costs nothing measurable.
+
+**Allocation: predicted one array per observation. Held, to the byte.** Comparison construction rose 28 B per observation, against 32 B for a one-element `object[]`. Selector rose 33 B for an empty one. This is the kind of prediction that has held all day — a count multiplied by a known unit cost.
+
+**Construction timing moved in ways this change does not explain, and that is the actual finding.**
+
+Selector construction went from 908 ns to 749 ns per observation at N=1000 — 17% *faster* — while going 2% slower at N=100. Adding an empty array allocation cannot make anything 17% faster. Within-run standard deviation is under 2% in both, so the gap is not sampling noise inside a launch; it is variance *between* launches, which `launchCount: 1` does not measure at all.
+
+That reframes several earlier figures. `GraphComparisonObserve` moved 17% between the second and third cuts and was attributed to node-cache warming from a benchmark change; it may simply have been the same between-run variance. **Construction numbers in this document should be read as ranges, not points.** Across the last three runs the fast selector spans 749–908 ns and the graph 1,849–1,919, so the honest statement is *roughly twofold*, not 2.11×.
+
+Propagation is far more stable — the change arms sit within 2% across every run — because they measure a tight loop rather than an allocation-heavy construction path competing with the garbage collector.
+
+**Before quoting a construction ratio for the record, re-run with `launchCount: 3`.** The single launch was chosen deliberately when the question was "fat or thin," and it answered that. It cannot answer "how much."
+
 ## Status
 
-The mechanism is correct and it is now a clear win: **2.1–2.3× on construction with equal or less allocation, and 1.2–1.6× on propagation**. It is worth what it costs. The remaining headroom is real and is concentrated in one identified place, which is a better position than the machinery being of ambiguous value.
+The mechanism is correct, has a differential fuzzer behind it, and is **roughly twice as fast to construct and 1.2 to 1.6 times faster to propagate**, with equal or less allocation. The remaining performance work — lifting analysis and normalization out of the per-observation path — is now purely a performance change, since its correctness half has landed.
