@@ -30,6 +30,20 @@ public readonly record struct DirectSubscription
     /// </summary>
     public Expression? Source { get; }
 
+    /// <summary>
+    /// Determines which event is attached to the specified value of the subscription's source, which is <see cref="DirectSubscriptionKind.None" /> when the value notifies of nothing the subscription wants
+    /// </summary>
+    /// <param name="value">The value of the subscription's source</param>
+    public DirectSubscriptionKind ResolveKind(object? value) =>
+        Kind switch
+        {
+            DirectSubscriptionKind.MemberPropertyChanged or DirectSubscriptionKind.IndexerPropertyChanged => value is INotifyPropertyChanged ? Kind : DirectSubscriptionKind.None,
+            DirectSubscriptionKind.DictionaryChanged => value is INotifyDictionaryChanged ? DirectSubscriptionKind.DictionaryChanged : DirectSubscriptionKind.None,
+            DirectSubscriptionKind.CollectionChanged => value is INotifyCollectionChanged ? DirectSubscriptionKind.CollectionChanged : DirectSubscriptionKind.None,
+            DirectSubscriptionKind.DictionaryOrCollectionChanged => value is INotifyDictionaryChanged ? DirectSubscriptionKind.DictionaryChanged : value is INotifyCollectionChanged ? DirectSubscriptionKind.CollectionChanged : DirectSubscriptionKind.None,
+            _ => DirectSubscriptionKind.None
+        };
+
     /// <inheritdoc/>
     public override string ToString() =>
         PropertyName is null ? $"{Kind} of {Source}" : $"{Kind} ({PropertyName}) of {Source}";

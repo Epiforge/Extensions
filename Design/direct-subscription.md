@@ -8,7 +8,9 @@ This document defines when that substitution is permitted. It governs the work, 
 
 ## The contract
 
-> The fast path must subscribe to exactly the same set of change sources as the graph would, no more and no fewer.
+> The fast path must never subscribe to fewer change sources than the graph, and must subscribe to exactly the set the graph reaches once every deferred branch has been taken.
+
+That sentence used to read "exactly the same set of change sources as the graph would, no more and no fewer," and it was written before anyone knew the graph does not have one set. It has a growing one. The revision, and what forced it, are in **Deferred branches** below; the change is deliberate and it weakens a promise, so it is stated here rather than buried.
 
 It also inherits the sentence established by `wrapper-deferral`:
 
@@ -50,6 +52,31 @@ Found by reading the three node types line by line while building the subscripti
 **A member's property and a member's field subscribe to entirely different things.** A property subscribes `PropertyChanged` on *the target's* value. A field subscribes contents on *its own* value, and only when the target's type is compiler-generated. A field of an ordinary type subscribes to nothing at all, and no member expression ever does both.
 
 There is also an asymmetry in the two `PropertyChanged` handlers which the fast path has to reproduce rather than tidy up: the member's acts when the reported name is its own **or is null or empty**, the index's acts only on an exact name match. That is why the plan names two property-changed kinds instead of one.
+
+### Deferred branches, and why the contract's first sentence changed
+
+The subscription-set instrument found this on its first run, which is the entire argument for having built it before the execution path.
+
+**A node subscribes when it evaluates, not when it is constructed**, and four node types construct children they do not evaluate:
+
+- `ObservableConditionalExpression` creates *both* branches with evaluation deferred, unconditionally
+- `ObservableBinaryExpression` creates its right operand deferred for `Coalesce`, and for `AndAlso` and `OrElse` over `bool`
+
+Reading a deferred node's `Evaluation` forces it, once, and clears the flag for good. So `subject => subject.Rank > 0 ? other.Rank : subject.Score`, observed while `Rank` is zero, subscribes to `subject` twice and **to `other` not at all**. Set `Rank` to one and the graph subscribes to `other` — and never lets go of it when the condition flips back, because the deferral flag is already spent.
+
+The graph's subscription set is therefore not a property of the expression. It is a property of the expression *and its history*: it starts as a subset, grows monotonically as branches are taken, and settles at the full static set. A fast path, which resolves its subscriptions once, would take that full set immediately.
+
+**The decision is to accept the superset, and it weakens the contract.** The reasoning, in the order it matters:
+
+The fatal direction stays closed. The plan is never a proper subset of the graph's set at any moment, so there is no instant at which the fast path is blind to something the graph can see. Silent staleness remains impossible.
+
+The excess is bounded and monotone — exactly the branches not yet taken — and it produces no extra notification to any consumer, because the wrapper compares evaluations before announcing. A change to an input only an untaken branch reads causes the fast path to re-run the lambda and arrive at the same answer, and the answer is not announced.
+
+What it does produce is extra *evaluations*, and eligible expressions are not pure. This repository's own `TestPerson.Name` increments a counter and raises notifications for `NameGets` from its getter. So the excess is observable in principle. It widens the Purity hazard already recorded below rather than introducing a new one.
+
+The alternative was refusing `Conditional`, `Coalesce`, `AndAlso` and `OrElse` outright, which removes conjunctive predicates — which is to say most real predicates — from the eligible set. By this document's own hierarchy a superset costs performance, the same category as refusing; refusing pays that cost always, the superset pays it only until a branch is first taken.
+
+This is the one place where the mechanism is permitted to do more than the graph rather than less, it is named, and it should not be extended to a second place without an argument this explicit.
 
 Two things follow immediately.
 
@@ -150,6 +177,22 @@ Adding the member to `IExpressionObserver` is a breaking change for anyone imple
 The number of fuzzer runs is not the bar. What the generator is *capable of emitting* is.
 
 **Subscription-set equality is the primary instrument**, because it tests the contract's own sentence rather than a downstream consequence of it. A recording notifier logs every `+=` and `-=` performed against it; the same expression is observed once each way; the sets of subscribed pairs of object and event must be equal. This is deterministic. Comparing notification sequences only exposes a wrong subscription set when some generated mutation happens to touch the difference, whereas comparing the sets exposes it always.
+
+### The instrument, built before the execution path
+
+The comparison exists now, ahead of anything that executes a plan, and the sequencing is the point: with no execution path, a divergence has exactly one possible cause. The plan is wrong. Nothing else is in the picture to blame.
+
+`SubscriptionLog` records every `+=` and `-=` performed against the recording types with the target's identity and the event's name. One expression is observed by a real `ExpressionObserver`; the plan for the same expression is computed; each planned subscription's source is resolved to its value, `DirectSubscription.ResolveKind` turns the site into the event actually attached there, and the two sorted multisets must be equal. Disposal must then return the log to zero outstanding, and the observer's cache to empty.
+
+`ResolveKind` lives in the library rather than in the test, because it is the site-to-attachment rule the execution path needs anyway, and it is fully determined by the four corrections above. Writing it twice would be writing the divergence in by hand.
+
+Two limits worth stating plainly.
+
+**The test reproduces parameter replacement rather than obtaining it.** `ReplaceParametersWithoutOptimization` is internal, so the test substitutes `Expression.Constant(argument, parameter.Type)` itself, which is what the observer does. This is sound here only because the comparison is over *resolved objects and event names*, never over expression identity — a structurally different but equivalent tree reaches the same objects and compares equal. The observer-side convenience the analyser section anticipates would remove the reproduction entirely, and gets built with the execution path.
+
+**Expressions with deferred branches are compared at steady state.** The test drives the condition or the short-circuit so that every branch has been taken, then compares — because before that the graph's set is legitimately smaller, and asserting equality against a moving target would only teach the test to expect whichever moment it happened to sample. `AnUnexercisedBranchIsNotSubscribedUntilItIsTaken` pins the pre-steady-state count separately, at two before and three after, so the property cannot change without a test noticing.
+
+**Indexers are outside the instrument, for the reason already recorded.** `collection[0]` reaches the observer as a `get_Item` call which the observer normalizes and the analyser does not, so there is no lambda for which both mechanisms see an index. That is not a coverage gap in the mechanism, since the fast path cannot be reached through an indexer today either. It closes when normalization is shared.
 
 The rest:
 
