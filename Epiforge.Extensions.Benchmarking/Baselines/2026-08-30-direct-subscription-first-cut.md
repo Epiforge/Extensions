@@ -58,6 +58,33 @@ If the diagramming turns out to dominate, the deeper fix is not to make the per-
 
 That is a redesign of the plan's representation, not a tuning pass, and it should not be started before the measurement says it is where the money is.
 
+## Second cut: the dedup set removed
+
+Re-run after replacing the planner's `ExpressionEqualityComparer`-keyed dedup with reference identity, the registry having made structural dedup redundant.
+
+**The regression is gone.** Per-observation selector construction fell from 2,752 ns to 1,840 ns — a drop of 912 ns against the 1,097 ns the isolation benchmark attributed to the dedup set. That is arithmetic holding to within run-to-run noise, which is the kind of prediction that has held all along.
+
+| construction, per observation | graph | fast (first cut) | fast (now) | ceiling |
+|--- |---: |---: |---: |---: |
+| selector, N=100 | 1,509 ns | 2,106 ns | **1,292 ns** | 20 ns |
+| selector, N=1000 | 1,819 ns | 2,752 ns | **1,840 ns** | 30 ns |
+| comparison, N=100 | 2,474 ns | 5,252 ns | **3,423 ns** | 284 ns |
+| comparison, N=1000 | 3,480 ns | 6,601 ns | **3,169 ns** | — (quadratic) |
+
+**But the honest word is parity, not victory.** At a thousand selector observations the two mechanisms are indistinguishable — 1,840 against 1,819, inside a 4.5% standard deviation. At a hundred the fast path is 14% ahead. Allocation is still worse than the graph's: 3,285 bytes against 2,323 on the selector.
+
+Propagation is untouched by this change, as expected, and remains the clearer win: 1.29× on the selector and 1.59× on the comparison, capturing 29% and 46% of the ceiling's advantage.
+
+## What the remaining gap is made of
+
+Selector construction is 1,840 ns against a ceiling of 30. Two named components account for most of the difference, and neither is a mystery:
+
+**The compiled-delegate cache still hashes structurally, ~707 ns per observation.** Measured directly. The fix is to try a reference-keyed weak table first and fall back to the structural dictionary only on a miss, so the query layer — which holds its predicate in a field and reuses the object — never pays. It was not done in this pass because a weak-table hit skips the reference count, and the release would then over-decrement. There is a clean design with a holder object carrying the count in both tables; it has a resurrect-after-eviction race that wants care rather than haste.
+
+**Expression normalization, which the fast path should not need at all.** `ReplaceParameters` rebuilds the whole tree per observation, and the graph pays it too — which is precisely why the fast path cannot beat the graph by much while it also pays. The ceiling never normalizes anything: it holds a delegate and an argument. A plan computed once per lambda, with subscription sources expressed as paths relative to the argument rather than as expression objects, would let an observation skip normalization entirely. That is where the remaining order of magnitude is, and it is the redesign this document's first cut already gestured at.
+
+The order is clear: the delegate cache is a bounded fix worth taking first, because it is measured, contained, and buys roughly 40% of what remains. The normalization redesign is larger and should follow it, with its own measurement.
+
 ## Status
 
-The mechanism is correct — the test suite is green, including the propagation and subscription-agreement work — and it is a performance regression on construction. Those are compatible statements, and the second is the one that matters for shipping.
+The mechanism is correct — the test suite is green, including the propagation and subscription-agreement work — and it is now at parity on construction and 1.3 to 1.6 times faster on propagation. It is not yet worth the machinery it costs; two named, measured changes stand between here and that.
