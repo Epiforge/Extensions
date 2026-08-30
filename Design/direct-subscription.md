@@ -41,7 +41,7 @@ Two things follow immediately.
 
 **Every subscription is to the value of some subexpression.** So the question of whether a fixed set of subscriptions can reproduce the graph's set is exactly the question of whether those particular values can change.
 
-**Eligibility is a property of the observer, not of the expression.** Five options and one ignored-property registry decide whether each of those subscriptions happens at all. The analyser takes the observer's configuration as input, and the same lambda may be eligible under one observer and not under another.
+**Eligibility is a property of the configuration, not only of the expression.** Five options and one ignored-property registry decide whether each of those subscriptions happens at all. The analyser takes `ExpressionObserverOptions` as input — the configuration itself, not an observer holding it — and the same lambda may be eligible under one configuration and not under another.
 
 ## The eligibility rule, as derived
 
@@ -69,6 +69,8 @@ Logging the declined path through `observer.Logger` under its own `EventId` foll
 
 The analyser is a public type a caller can instantiate against an `ExpressionObserverOptions`, and ask about an expression without observing it. An observer holds its own instance and uses it for its own decisions; nothing about that is privileged.
 
+It takes options rather than an observer, and the distinction is not cosmetic. An observer is a live object holding caches, graphs and subscriptions, and requiring one to answer a question about a configuration would mean building a machine to ask about its settings. It would also force a cycle: an observer holding an analyser holding that same observer, established mid-constructor, at the moment the object is least ready to be read.
+
 Three things follow from making it public rather than internal.
 
 **Tests can assert eligibility directly.** Instead of inferring from behaviour that an observation probably took the fast path, a test states that the expression is eligible under these options, and thereby knows what the observer will do with it. Every subsequent assertion in that test is then about the mechanism it intended to exercise, rather than about whichever mechanism happened to be chosen.
@@ -77,7 +79,13 @@ Three things follow from making it public rather than internal.
 
 **It is honest about what the mechanism is.** A caller who can inspect the decision can predict the behaviour of their own code. One who cannot is being asked to trust a heuristic they are not allowed to see.
 
-The analysis takes what `Observe` takes — the lambda and its arguments — because parameters are replaced by constants before observation, and knowing those values makes the analysis more precise rather than less. The result is a structured value: eligible, or ineligible with the offending subexpression and a reason, as the previous section requires.
+The analysis takes an `Expression`: the one which will actually be observed, after parameters have been replaced by constants and any optimizer has run. Producing that expression is the observer's business, not the analyser's.
+
+An earlier draft had the analyser accept a lambda and its arguments and reproduce the pipeline itself — optimize, replace parameters, analyse. That is a standing invitation to divergence. The analyser would have to reproduce the observer's normalization faithfully forever, and if the pipeline ever changed shape the analyser would go on confidently answering about a different expression than the one being built. Handing it the object the observer is about to use makes agreement structural rather than reconstructed, and there is then nothing left to disagree about.
+
+The cost is that a caller holding a lambda cannot ask the question directly. That is a convenience for the observer to offer, at the point where it already computes the normalized expression, and it is not built until the execution path needs it.
+
+The result is a structured value: eligible, or ineligible with the offending subexpression and a reason, as the previous section requires.
 
 ## Turning it off
 
