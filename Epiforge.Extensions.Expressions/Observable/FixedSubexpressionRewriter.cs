@@ -16,7 +16,12 @@ sealed class FixedSubexpressionRewriter :
         fixedSubexpressions;
 
     public override Expression? Visit(Expression? node) =>
-        node is MemberExpression memberExpression && DirectSubscriptionAnalyzer.IsFixed(memberExpression) ? Substitute(memberExpression) : base.Visit(node);
+        node switch
+        {
+            MemberExpression memberExpression when DirectSubscriptionAnalyzer.IsFixed(memberExpression) => Substitute(memberExpression),
+            UnaryExpression { NodeType: ExpressionType.Quote } => node,
+            _ => base.Visit(node)
+        };
 
     Expression Substitute(MemberExpression memberExpression)
     {

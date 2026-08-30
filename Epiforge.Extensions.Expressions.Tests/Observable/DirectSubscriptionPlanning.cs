@@ -176,4 +176,87 @@ public class DirectSubscriptionPlanning
         Assert.IsTrue(plan.IsEligible);
         Assert.AreEqual(0, plan.Subscriptions.Count);
     }
+
+    static List<(DirectSubscriptionKind Kind, string? PropertyName, object Source)> Attachments(DirectSubscriptionPlan plan, ParameterExpression parameter, object? argument)
+    {
+        var attachments = new List<(DirectSubscriptionKind, string?, object)>();
+        for (int i = 0, ii = plan.Subscriptions.Count; i < ii; ++i)
+        {
+            var subscription = plan.Subscriptions[i];
+            var source = subscription.Source!;
+            var value = ReferenceEquals(source, parameter) ? argument : source is ConstantExpression constantExpression ? constantExpression.Value : Expression.Lambda(source).Compile().DynamicInvoke();
+            if (value is not null && subscription.ResolveKind(value) is var kind && kind is not DirectSubscriptionKind.None)
+                attachments.Add((kind, subscription.PropertyName, value));
+        }
+        return attachments;
+    }
+
+    static void AssertPlansAgree<TResult>(Expression<Func<TestPerson, TResult>> lambda, TestPerson person)
+    {
+        var analyzer = Analyzer();
+        var parameter = lambda.Parameters[0];
+        var fromLambda = analyzer.Plan(lambda.Body);
+        var fromNormalized = analyzer.Plan(new ParameterReplacer(parameter, Expression.Constant(person, parameter.Type)).Visit(lambda.Body));
+        Assert.AreEqual(fromNormalized.IsEligible, fromLambda.IsEligible, $"normalized: {fromNormalized}; lambda: {fromLambda}");
+        var normalized = Attachments(fromNormalized, parameter, person);
+        var lambdas = Attachments(fromLambda, parameter, person);
+        Assert.AreEqual(normalized.Count, lambdas.Count, $"{lambda}; normalized: [{string.Join(", ", normalized)}]; lambda: [{string.Join(", ", lambdas)}]");
+        for (var i = 0; i < normalized.Count; ++i)
+        {
+            Assert.AreEqual(normalized[i].Kind, lambdas[i].Kind, $"{lambda}, attachment {i}");
+            Assert.AreEqual(normalized[i].PropertyName, lambdas[i].PropertyName, $"{lambda}, attachment {i}");
+            Assert.AreSame(normalized[i].Source, lambdas[i].Source, $"{lambda}, attachment {i}");
+        }
+    }
+
+    [TestMethod]
+    public void APlanFromALambdaBodyAttachesWhatOneFromTheExpressionItNormalizesToAttaches()
+    {
+        var person = TestPerson.CreateJohn();
+        var other = TestPerson.CreateEmily();
+        var people = new ObservableCollection<TestPerson>(TestPerson.MakePeople());
+        AssertPlansAgree(subject => subject.NameGets, person);
+        AssertPlansAgree(subject => subject.Name, person);
+        AssertPlansAgree(subject => subject.NameGets + subject.NameGets, person);
+        AssertPlansAgree(subject => subject.NameGets > other.NameGets, person);
+        AssertPlansAgree(subject => subject.NameGets + people.Count, person);
+        AssertPlansAgree(subject => subject, person);
+        AssertPlansAgree(subject => -subject, person);
+    }
+
+    [TestMethod]
+    public void APlanFromALambdaBodyListsAContentsSubscriptionTheNormalizedOneCanRuleOut()
+    {
+        var person = TestPerson.CreateJohn();
+        var lambda = (Expression<Func<TestPerson, TestPerson>>)(subject => subject);
+        var parameter = lambda.Parameters[0];
+        var fromLambda = Analyzer().Plan(lambda.Body);
+        var fromNormalized = Analyzer().Plan(new ParameterReplacer(parameter, Expression.Constant(person, parameter.Type)).Visit(lambda.Body));
+        Assert.AreEqual(1, fromLambda.Subscriptions.Count);
+        Assert.AreEqual(0, fromNormalized.Subscriptions.Count);
+        Assert.AreEqual(DirectSubscriptionKind.None, fromLambda.Subscriptions[0].ResolveKind(person));
+    }
+
+    [TestMethod]
+    public void AParameterPlansTheContentsSubscriptionItsArgumentWould()
+    {
+        var people = new ObservableCollection<TestPerson>(TestPerson.MakePeople());
+        var parameter = Expression.Parameter(typeof(ObservableCollection<TestPerson>), "subject");
+        var plan = Analyzer().Plan(parameter);
+        Assert.IsTrue(plan.IsEligible);
+        Assert.AreEqual(1, plan.Subscriptions.Count);
+        Assert.AreEqual(DirectSubscriptionKind.DictionaryOrCollectionChanged, plan.Subscriptions[0].Kind);
+        Assert.AreSame(parameter, plan.Subscriptions[0].Source);
+        Assert.AreEqual(DirectSubscriptionKind.CollectionChanged, plan.Subscriptions[0].ResolveKind(people));
+    }
+
+    [TestMethod]
+    public void AParameterPlansNoContentsSubscriptionWhenConstantsListenForNeither()
+    {
+        var options = new ExpressionObserverOptions { ConstantExpressionsListenForCollectionChanged = false, ConstantExpressionsListenForDictionaryChanged = false };
+        var parameter = Expression.Parameter(typeof(ObservableCollection<TestPerson>), "subject");
+        var plan = Analyzer(options).Plan(parameter);
+        Assert.IsTrue(plan.IsEligible);
+        Assert.AreEqual(0, plan.Subscriptions.Count);
+    }
 }

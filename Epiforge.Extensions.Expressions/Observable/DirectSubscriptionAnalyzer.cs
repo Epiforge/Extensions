@@ -7,7 +7,7 @@
 /// The answer is a property of the options as well as of the expression, since they decide which change sources are subscribed to at all; an expression eligible under one configuration may not be under another
 /// </remarks>
 /// <remarks>
-/// The expression analyzed is the one which will be observed, after its parameters have been replaced and any optimization applied; producing it is the observer's business rather than the analyzer's, so that the two cannot disagree about what was examined
+/// A parameter is analyzed as the argument which will replace it, so that a lambda body and the parameter-replaced expression derived from it yield the same answer and the same subscriptions
 /// </remarks>
 public sealed class DirectSubscriptionAnalyzer
 {
@@ -126,7 +126,7 @@ public sealed class DirectSubscriptionAnalyzer
     /// <summary>
     /// Determines whether the specified expression can be observed by subscribing directly to its change sources
     /// </summary>
-    /// <param name="expression">The expression, as it will be observed, with its parameters already replaced and any optimization already applied</param>
+    /// <param name="expression">The expression, which may be a lambda body or the parameter-replaced expression derived from one</param>
     public DirectSubscriptionAnalysis Analyze(Expression expression)
     {
         ArgumentNullException.ThrowIfNull(expression);
@@ -187,11 +187,18 @@ public sealed class DirectSubscriptionAnalyzer
         return targetAnalysis;
     }
 
+    DirectSubscriptionAnalysis AnalyzeParameter(ParameterExpression parameterExpression, Planner? planner)
+    {
+        if (planner is not null)
+            AddContentsSubscription(planner.Subscriptions, parameterExpression, constantsListenForDictionaryChanged, constantsListenForCollectionChanged);
+        return DirectSubscriptionAnalysis.Eligible;
+    }
+
     DirectSubscriptionAnalysis AnalyzeNode(Expression expression, Planner? planner) =>
         planner is not null && planner.Reached(expression) ? DirectSubscriptionAnalysis.Eligible : expression switch
         {
             ConstantExpression constantExpression => AnalyzeConstant(constantExpression, planner),
-            ParameterExpression => DirectSubscriptionAnalysis.Eligible,
+            ParameterExpression parameterExpression => AnalyzeParameter(parameterExpression, planner),
             MemberExpression memberExpression => AnalyzeMember(memberExpression, planner),
             IndexExpression indexExpression => AnalyzeIndex(indexExpression, planner),
             BinaryExpression binaryExpression when binaryExpression.Method is not null => new(binaryExpression, DirectSubscriptionIneligibility.UserDefinedOperator),
@@ -209,7 +216,7 @@ public sealed class DirectSubscriptionAnalyzer
     /// <summary>
     /// Determines whether the specified expression can be observed by subscribing directly to its change sources and, when it can, which subscriptions that would take
     /// </summary>
-    /// <param name="expression">The expression, as it will be observed, with its parameters already replaced and any optimization already applied</param>
+    /// <param name="expression">The expression, which may be a lambda body or the parameter-replaced expression derived from one</param>
     public DirectSubscriptionPlan Plan(Expression expression)
     {
         ArgumentNullException.ThrowIfNull(expression);

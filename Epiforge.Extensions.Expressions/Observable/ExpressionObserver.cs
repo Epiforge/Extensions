@@ -799,23 +799,49 @@ public class ExpressionObserver :
     {
         if (compiledLambdas.TryGetValue(lambdaExpression, out var evaluator))
             return evaluator;
-        var values = Expression.Parameter(typeof(object[]), "values");
-        var rewriter = new FixedSubexpressionRewriter(values);
-        var body = rewriter.Visit(lambdaExpression.Body)!;
-        evaluator = new DirectEvaluator(Expression.Lambda<Func<TArgument, object?[], TResult>>(body, lambdaExpression.Parameters[0], values).Compile(), [.. rewriter.FixedSubexpressions]);
+        if ((directSubscriptionAnalyzer ??= new DirectSubscriptionAnalyzer(this)).Plan(lambdaExpression.Body) is not { IsEligible: true } plan)
+            evaluator = DirectEvaluator.Ineligible;
+        else
+        {
+            var values = Expression.Parameter(typeof(object[]), "values");
+            var rewriter = new FixedSubexpressionRewriter(values);
+            var body = rewriter.Visit(lambdaExpression.Body)!;
+            var fixedSubexpressions = rewriter.FixedSubexpressions;
+            var subscriptions = plan.Subscriptions;
+            var sites = new DirectSubscriptionSite[subscriptions.Count];
+            for (var i = 0; i < sites.Length; ++i)
+                sites[i] = Site(subscriptions[i], lambdaExpression, fixedSubexpressions);
+            evaluator = new DirectEvaluator(Expression.Lambda<Func<TArgument, object?[], TResult>>(body, lambdaExpression.Parameters[0], values).Compile(), [.. fixedSubexpressions], sites);
+        }
         compiledLambdas.AddOrUpdate(lambdaExpression, evaluator);
         return evaluator;
     }
 
+    static DirectSubscriptionSite Site(DirectSubscription subscription, LambdaExpression lambdaExpression, IReadOnlyList<Expression> fixedSubexpressions)
+    {
+        var source = subscription.Source!;
+        var forcesNotification = ReferenceEquals(source, lambdaExpression.Body);
+        for (int i = 0, ii = fixedSubexpressions.Count; i < ii; ++i)
+            if (ReferenceEquals(fixedSubexpressions[i], source))
+                return new(subscription, i, null, forcesNotification);
+        return source switch
+        {
+            ParameterExpression parameterExpression when ReferenceEquals(parameterExpression, lambdaExpression.Parameters[0]) => new(subscription, DirectSubscriptionSite.Argument, null, forcesNotification),
+            ConstantExpression constantExpression => new(subscription, DirectSubscriptionSite.Constant, constantExpression.Value, forcesNotification),
+            UnaryExpression { NodeType: ExpressionType.Quote } unaryExpression => new(subscription, DirectSubscriptionSite.Constant, unaryExpression.Operand, forcesNotification),
+            _ => throw new NotSupportedException($"the analyzer planned a subscription to {source}, which the execution path cannot resolve once per observation")
+        };
+    }
+
     ObservableExpression GetObservationMechanism<TArgument, TResult>(Expression<Func<TArgument, TResult>> lambdaExpression, Expression parameterReplacedExpression, TArgument argument)
     {
-        if (UseDirectSubscription && (directSubscriptionAnalyzer ??= new DirectSubscriptionAnalyzer(this)).Plan(parameterReplacedExpression) is { IsEligible: true } plan)
+        if (UseDirectSubscription && CompiledLambda(lambdaExpression) is { Sites: { } sites } evaluator)
         {
-            var evaluator = CompiledLambda(lambdaExpression);
-            var values = new object?[evaluator.FixedSubexpressions.Length];
+            var fixedSubexpressions = evaluator.FixedSubexpressions;
+            var values = new object?[fixedSubexpressions.Length];
             for (var i = 0; i < values.Length; ++i)
-                values[i] = DirectObservableExpression.Resolve(evaluator.FixedSubexpressions[i]);
-            var directObservableExpression = new DirectObservableExpression<TArgument, TResult>(this, parameterReplacedExpression, plan, (Func<TArgument, object?[], TResult>)evaluator.Evaluate, argument, values);
+                values[i] = DirectObservableExpression.Resolve(fixedSubexpressions[i]);
+            var directObservableExpression = new DirectObservableExpression<TArgument, TResult>(this, parameterReplacedExpression, sites, (Func<TArgument, object?[], TResult>)evaluator.Evaluate, argument, values);
             directObservableExpression.Initialize();
             directObservableExpression.IsInitialized = true;
             return directObservableExpression;

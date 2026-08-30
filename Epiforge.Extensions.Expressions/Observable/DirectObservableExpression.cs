@@ -34,19 +34,19 @@ abstract class DirectObservableExpression :
         return true;
     }
 
-    private protected void Attach(DirectSubscriptionPlan plan)
+    private protected void Attach(DirectSubscriptionSite[] sites, object? argument, object?[] values)
     {
-        var subscriptions = plan.Subscriptions;
-        var attaching = new List<DirectSubscriptionAttachment>(subscriptions.Count);
-        for (int i = 0, ii = subscriptions.Count; i < ii; ++i)
+        var attaching = new DirectSubscriptionAttachment[sites.Length];
+        var attached = 0;
+        for (var i = 0; i < sites.Length; ++i)
         {
-            var subscription = subscriptions[i];
-            var source = Resolve(subscription.Source!);
-            if (source is null || subscription.ResolveKind(source) is var kind && kind is DirectSubscriptionKind.None)
+            var site = sites[i];
+            var source = site.ResolveSource(argument, values);
+            if (source is null || site.ResolveKind(source) is var kind && kind is DirectSubscriptionKind.None)
                 continue;
-            attaching.Add(observer.DirectSubscriptions.Attach(source, kind, subscription.PropertyName, this, ReferenceEquals(subscription.Source, Expression)));
+            attaching[attached++] = observer.DirectSubscriptions.Attach(source, kind, site.PropertyName, this, site.ForcesNotification);
         }
-        attachments = [.. attaching];
+        attachments = attached == sites.Length ? attaching : attaching[..attached];
     }
 
     internal void OnSourceChanged(bool forcesNotification)
@@ -60,18 +60,18 @@ abstract class DirectObservableExpression :
 sealed class DirectObservableExpression<TArgument, TResult> :
     DirectObservableExpression
 {
-    internal DirectObservableExpression(ExpressionObserver observer, Expression expression, DirectSubscriptionPlan plan, Func<TArgument, object?[], TResult> evaluate, TArgument argument, object?[] values) :
+    internal DirectObservableExpression(ExpressionObserver observer, Expression expression, DirectSubscriptionSite[] sites, Func<TArgument, object?[], TResult> evaluate, TArgument argument, object?[] values) :
         base(observer, expression)
     {
         this.argument = argument;
         this.evaluate = evaluate;
-        this.plan = plan;
+        this.sites = sites;
         this.values = values;
     }
 
     readonly TArgument argument;
     readonly Func<TArgument, object?[], TResult> evaluate;
-    readonly DirectSubscriptionPlan plan;
+    readonly DirectSubscriptionSite[] sites;
     readonly object?[] values;
 
     protected override void Evaluate()
@@ -93,7 +93,7 @@ sealed class DirectObservableExpression<TArgument, TResult> :
     {
         try
         {
-            Attach(plan);
+            Attach(sites, argument, values);
             EvaluateIfNotDeferred();
         }
         catch (Exception ex)

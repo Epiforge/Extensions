@@ -264,11 +264,35 @@ The observer therefore holds a registry keyed by the resolved source object's *i
 
 The list structure is duplicated rather than extracted, and the distinction from the duplications this document has refused elsewhere is deliberate: those duplicated a *decision* — which event, which name, which branch — that could drift into disagreement. An intrusive linked list contains no decision. Extracting it would mean editing the notification walk that `wrapper-deferral` benched, without a benchmark in hand to confirm the added indirection is free. Recorded as a candidate for unification once both are measured.
 
-### Eligibility is decided once, at observation
+### Eligibility is decided once, per lambda
 
-The observer computes the normalized expression already. It asks the analyzer for a plan, and takes the fast node when `UseDirectSubscription` is on and the plan is eligible. There is no per-change re-decision and no fallback mid-life: an observation is one mechanism or the other for its whole lifetime.
+Originally once per *observation*: the observer normalized the lambda, planned the normalized tree, and took the fast node if the plan was eligible. That was correct and it was also the whole per-observation cost, since both the normalization and the plan are functions of the lambda's *shape*, which every observation of one lambda shares.
 
-This is also where the convenience anticipated under **The analyser is public** gets built, since the observer is the only place that holds both the lambda and its normalization.
+Eligibility is now decided once per lambda object and cached beside the compiled delegate. Nothing about the answer depends on the argument: every eligibility test in the analyzer reads the tree's shape, the declared types, and the `PropertyInfo`s — never a value. So the verdict for `person => person.Rank` is the same verdict for every person, and computing it per observation was recomputing a constant.
+
+Making this work required naming an equivalence the analyzer had never had to state, because until now it only ever saw trees whose parameters were already gone:
+
+**A parameter is analyzed as the argument that will replace it.** `ReplaceParameters` turns the parameter into a `ConstantExpression`, and `AnalyzeConstant` plans a contents subscription against it under the *constant* options. So `AnalyzeParameter` must plan the same thing under the same options, or a fast path over a collection argument would silently stop watching that collection's contents.
+
+The two plans are equivalent in what they **attach**, not in what they **list**. A normalized plan can read the constant's value and decline to list a subscription the value cannot satisfy; a lambda plan cannot see the value and lists it, leaving `ResolveKind` to discard it at attach time. `p => p` over a non-collection is the clean example: one listed subscription against zero, and no attachment either way. This is pinned by `APlanFromALambdaBodyListsAContentsSubscriptionTheNormalizedOneCanRuleOut`, because the asymmetry is the sort of thing a later reader would take for a bug.
+
+### Sites: what the plan becomes when it outlives the observation
+
+A plan names sources as `Expression`s, which is right for a plan the consumer inspects and wrong for one cached across observations — the sources it names must resolve to *this* observation's objects. Each subscription is therefore compiled once into a **site**, which is the subscription plus an instruction for finding its source:
+
+- **the argument** — the source was the lambda's parameter
+- **a frozen value** — the source was a closure field chain, so the site holds its index into the same values array `FixedSubexpressionRewriter` built, and reads the value that array froze when the observation began
+- **a constant** — the source was a `ConstantExpression` or a `Quote`, whose value is the same object for every observation of this lambda, so it is resolved once and held
+
+Anything else throws. That is not defensiveness for its own sake: a closure chain that reached the constant branch would be dereferenced at *cache* time and frozen across every observation of the lambda, which is the frozen-input divergence recorded below wearing a new hat and doing more damage. A loud failure is the only acceptable outcome, so the fallback is `NotSupportedException` rather than a call to the general-purpose resolver.
+
+### One consequence worth stating: the plan and the delegate now agree
+
+The fast path has always compiled the **raw** lambda body while planning the **optimized** normalized tree. With no `Optimizer` configured — the default — those are the same expression and nothing was wrong. With one configured they are not, and a plan derived from a tree the delegate does not evaluate can omit a subscription the delegate depends on.
+
+Planning the raw body removes the disagreement by construction. This was a side effect of moving the plan, not the reason for it, and it is recorded here because it changes which of the two trees is authoritative for the fast path: the one that gets evaluated.
+
+An observation is still one mechanism or the other for its whole lifetime, with no per-change re-decision and no fallback mid-life.
 
 ### Order
 
