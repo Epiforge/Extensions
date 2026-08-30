@@ -41,6 +41,9 @@ sealed class ObservableConstantExpression(ExpressionObserver observer, ConstantE
         }
     }
 
-    void ValueChanged(object? sender, EventArgs e) =>
-        NotifyDependentsChanged();
+    void ValueChanged(object? sender, EventArgs e)
+    {
+        using var propagation = new PropagationScope();
+        NotifyDependentsOfValueContentsChanged();
+    }
 }
