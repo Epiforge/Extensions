@@ -57,6 +57,9 @@ public sealed class DirectSubscriptionAnalyzer
             _ => false
         };
 
+    static bool IsShortCircuiting(BinaryExpression binaryExpression) =>
+        binaryExpression.NodeType is ExpressionType.Coalesce || (binaryExpression.NodeType is ExpressionType.AndAlso or ExpressionType.OrElse && binaryExpression.Type == typeof(bool));
+
     static bool IsClosureField(MemberExpression memberExpression) =>
         memberExpression.Member is FieldInfo && IsCompilerGenerated(memberExpression.Expression);
 
@@ -156,9 +159,10 @@ public sealed class DirectSubscriptionAnalyzer
             MemberExpression memberExpression => AnalyzeMember(memberExpression, planner),
             IndexExpression indexExpression => AnalyzeIndex(indexExpression, planner),
             BinaryExpression binaryExpression when binaryExpression.Method is not null => new(binaryExpression, DirectSubscriptionIneligibility.UserDefinedOperator),
+            BinaryExpression binaryExpression when IsShortCircuiting(binaryExpression) => new(binaryExpression, DirectSubscriptionIneligibility.DeferredBranch),
             BinaryExpression binaryExpression when binaryExpression.Conversion is not null => new(binaryExpression, DirectSubscriptionIneligibility.UnsupportedExpressionKind),
             BinaryExpression binaryExpression => AnalyzeNode(binaryExpression.Left, planner) is { IsEligible: false } left ? left : AnalyzeNode(binaryExpression.Right, planner),
-            ConditionalExpression conditionalExpression => AnalyzeNode(conditionalExpression.Test, planner) is { IsEligible: false } test ? test : AnalyzeNode(conditionalExpression.IfTrue, planner) is { IsEligible: false } ifTrue ? ifTrue : AnalyzeNode(conditionalExpression.IfFalse, planner),
+            ConditionalExpression conditionalExpression => new(conditionalExpression, DirectSubscriptionIneligibility.DeferredBranch),
             TypeBinaryExpression typeBinaryExpression when typeBinaryExpression.NodeType is not ExpressionType.TypeAs => AnalyzeNode(typeBinaryExpression.Expression, planner),
             UnaryExpression unaryExpression when unaryExpression.NodeType is ExpressionType.Quote => DirectSubscriptionAnalysis.Eligible,
             UnaryExpression unaryExpression when unaryExpression.Method is not null => new(unaryExpression, DirectSubscriptionIneligibility.UserDefinedOperator),

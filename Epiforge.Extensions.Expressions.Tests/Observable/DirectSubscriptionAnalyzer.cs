@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Expressions.Tests.Observable;
+﻿namespace Epiforge.Extensions.Expressions.Tests.Observable;
 
 [TestClass]
 public class DirectSubscriptionAnalyzer
@@ -13,8 +13,16 @@ public class DirectSubscriptionAnalyzer
         new();
 
     [TestMethod]
-    public void AndAlsoOfMembersIsEligible() =>
-        Assert.IsTrue(Analyzer().Analyze(BodyOf<bool>(person => person.NameGets > 0 && person.NameGets < 100)).IsEligible);
+    public void AndAlsoOfMembersIsIneligible()
+    {
+        var analysis = Analyzer().Analyze(BodyOf<bool>(person => person.NameGets > 0 && person.NameGets < 100));
+        Assert.IsFalse(analysis.IsEligible);
+        Assert.AreEqual(DirectSubscriptionIneligibility.DeferredBranch, analysis.Ineligibility);
+    }
+
+    [TestMethod]
+    public void AndOfMembersIsEligible() =>
+        Assert.IsTrue(Analyzer().Analyze(BodyOf<bool>(person => person.NameGets > 0 & person.NameGets < 100)).IsEligible);
 
     [TestMethod]
     public void ArrayAccessIsIneligible()
@@ -46,12 +54,20 @@ public class DirectSubscriptionAnalyzer
     }
 
     [TestMethod]
-    public void CoalesceOfMembersIsEligible() =>
-        Assert.IsTrue(Analyzer().Analyze(BodyOf<string?>(person => person.Name ?? person.Placeholder)).IsEligible);
+    public void CoalesceOfMembersIsIneligible()
+    {
+        var analysis = Analyzer().Analyze(BodyOf<string?>(person => person.Name ?? person.Placeholder));
+        Assert.IsFalse(analysis.IsEligible);
+        Assert.AreEqual(DirectSubscriptionIneligibility.DeferredBranch, analysis.Ineligibility);
+    }
 
     [TestMethod]
-    public void ConditionalOfMembersIsEligible() =>
-        Assert.IsTrue(Analyzer().Analyze(BodyOf<string?>(person => person.NameGets > 0 ? person.Name : person.Placeholder)).IsEligible);
+    public void ConditionalOfMembersIsIneligible()
+    {
+        var analysis = Analyzer().Analyze(BodyOf<string?>(person => person.NameGets > 0 ? person.Name : person.Placeholder));
+        Assert.IsFalse(analysis.IsEligible);
+        Assert.AreEqual(DirectSubscriptionIneligibility.DeferredBranch, analysis.Ineligibility);
+    }
 
     [TestMethod]
     public void ConstantIsEligible() =>
@@ -146,8 +162,16 @@ public class DirectSubscriptionAnalyzer
         new Epiforge.Extensions.Expressions.Observable.DirectSubscriptionAnalyzer(null!);
 
     [TestMethod]
-    public void OrElseOfMembersIsEligible() =>
-        Assert.IsTrue(Analyzer().Analyze(BodyOf<bool>(person => person.NameGets > 0 || person.NameGets < 100)).IsEligible);
+    public void OrElseOfMembersIsIneligible()
+    {
+        var analysis = Analyzer().Analyze(BodyOf<bool>(person => person.NameGets > 0 || person.NameGets < 100));
+        Assert.IsFalse(analysis.IsEligible);
+        Assert.AreEqual(DirectSubscriptionIneligibility.DeferredBranch, analysis.Ineligibility);
+    }
+
+    [TestMethod]
+    public void OrOfMembersIsEligible() =>
+        Assert.IsTrue(Analyzer().Analyze(BodyOf<bool>(person => person.NameGets > 0 | person.NameGets < 100)).IsEligible);
 
     [TestMethod]
     public void QuotedLambdaIsEligible() =>

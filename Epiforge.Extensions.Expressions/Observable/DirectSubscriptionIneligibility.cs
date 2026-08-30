@@ -26,6 +26,11 @@ public enum DirectSubscriptionIneligibility
     ChangeableIndexTarget,
 
     /// <summary>
+    /// A branch or operand is present which the graph does not evaluate, and therefore does not subscribe to, until it is first taken
+    /// </summary>
+    DeferredBranch,
+
+    /// <summary>
     /// The value produced is registered for disposal, which only the graph performs
     /// </summary>
     ValueRequiresDisposal,

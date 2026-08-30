@@ -10,7 +10,7 @@ public class SubscriptionAgreement
             node == parameter ? replacement : base.VisitParameter(node);
     }
 
-    static void AssertAgreement<TResult>(Expression<Func<Recorded, TResult>> lambda, Recorded subject, ExpressionObserverOptions? options = null, Action? exercise = null)
+    static void AssertAgreement<TResult>(Expression<Func<Recorded, TResult>> lambda, Recorded subject, ExpressionObserverOptions? options = null)
     {
         var log = subject.Log;
         var normalized = new ParameterReplacer(lambda.Parameters[0], Expression.Constant(subject, typeof(Recorded))).Visit(lambda.Body);
@@ -19,7 +19,6 @@ public class SubscriptionAgreement
         var observer = options is null ? new ExpressionObserver() : new ExpressionObserver(options);
         using (observer.Observe(lambda, subject))
         {
-            exercise?.Invoke();
             var planned = Planned(plan, log);
             var attached = log.Attachments();
             CollectionAssert.AreEqual(planned.ToArray(), attached.ToArray(), $"plan: [{string.Join(", ", planned)}]; graph: [{string.Join(", ", attached)}]");
@@ -54,16 +53,7 @@ public class SubscriptionAgreement
         expression is ConstantExpression constantExpression ? constantExpression.Value : Expression.Lambda(expression).Compile().DynamicInvoke();
 
     [TestMethod]
-    public void AndAlsoOverTheArgumentAndAClosure()
-    {
-        var log = new SubscriptionLog();
-        var other = new Recorded(log);
-        var subject = new Recorded(log);
-        AssertAgreement(s => s.Rank > 0 && other.Rank > 0, subject, exercise: () => subject.Rank = 1);
-    }
-
-    [TestMethod]
-    public void AnUnexercisedBranchIsNotSubscribedUntilItIsTaken()
+    public void TheGraphDoesNotSubscribeToAnUntakenBranchUntilItIsTaken()
     {
         var log = new SubscriptionLog();
         var other = new Recorded(log);
@@ -77,24 +67,6 @@ public class SubscriptionAgreement
         }
         Assert.AreEqual(0, log.Outstanding);
         Assert.AreEqual(0, observer.CachedObservableExpressions);
-    }
-
-    [TestMethod]
-    public void CoalesceOverTheArgumentAndAClosure()
-    {
-        var log = new SubscriptionLog();
-        var other = new Recorded(log);
-        var subject = new Recorded(log) { Tag = "present" };
-        AssertAgreement(s => s.Tag ?? other.Tag, subject, exercise: () => subject.Tag = null);
-    }
-
-    [TestMethod]
-    public void ConditionalOverTheArgumentAndAClosure()
-    {
-        var log = new SubscriptionLog();
-        var other = new Recorded(log);
-        var subject = new Recorded(log);
-        AssertAgreement(s => s.Rank > 0 ? other.Rank : s.Score, subject, exercise: () => subject.Rank = 1);
     }
 
     [TestMethod]

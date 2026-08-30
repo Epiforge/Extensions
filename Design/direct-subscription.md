@@ -8,9 +8,9 @@ This document defines when that substitution is permitted. It governs the work, 
 
 ## The contract
 
-> The fast path must never subscribe to fewer change sources than the graph, and must subscribe to exactly the set the graph reaches once every deferred branch has been taken.
+> The fast path must subscribe to exactly the same set of change sources as the graph would, no more and no fewer.
 
-That sentence used to read "exactly the same set of change sources as the graph would, no more and no fewer," and it was written before anyone knew the graph does not have one set. It has a growing one. The revision, and what forced it, are in **Deferred branches** below; the change is deliberate and it weakens a promise, so it is stated here rather than buried.
+This sentence was briefly weakened and has been restored. The reason for both is in **Deferred branches** below.
 
 It also inherits the sentence established by `wrapper-deferral`:
 
@@ -53,30 +53,34 @@ Found by reading the three node types line by line while building the subscripti
 
 There is also an asymmetry in the two `PropertyChanged` handlers which the fast path has to reproduce rather than tidy up: the member's acts when the reported name is its own **or is null or empty**, the index's acts only on an exact name match. That is why the plan names two property-changed kinds instead of one.
 
-### Deferred branches, and why the contract's first sentence changed
+### Deferred branches, and why four node kinds are refused
 
 The subscription-set instrument found this on its first run, which is the entire argument for having built it before the execution path.
 
-**A node subscribes when it evaluates, not when it is constructed**, and four node types construct children they do not evaluate:
+**A node subscribes when it evaluates, not when it is constructed**, and four node kinds construct children they do not evaluate:
 
 - `ObservableConditionalExpression` creates *both* branches with evaluation deferred, unconditionally
-- `ObservableBinaryExpression` creates its right operand deferred for `Coalesce`, and for `AndAlso` and `OrElse` over `bool`
+- `ObservableBinaryExpression` creates its right operand deferred for `Coalesce`, and for `AndAlso` and `OrElse` when the node's type is `bool`
 
-Reading a deferred node's `Evaluation` forces it, once, and clears the flag for good. So `subject => subject.Rank > 0 ? other.Rank : subject.Score`, observed while `Rank` is zero, subscribes to `subject` twice and **to `other` not at all**. Set `Rank` to one and the graph subscribes to `other` — and never lets go of it when the condition flips back, because the deferral flag is already spent.
+Reading a deferred node's `Evaluation` forces it, once, and clears the flag for good. So `subject => subject.Rank > 0 ? other.Rank : subject.Score`, observed while `Rank` is zero, subscribes to `subject` twice and **to `other` not at all**. Set `Rank` to one and the graph subscribes to `other` — and never lets go when the condition flips back, because the deferral is spent. The graph's subscription set is thus a property of the expression *and its history*: a subset at first, growing monotonically, settling at the full static set.
 
-The graph's subscription set is therefore not a property of the expression. It is a property of the expression *and its history*: it starts as a subset, grows monotonically as branches are taken, and settles at the full static set. A fast path, which resolves its subscriptions once, would take that full set immediately.
+The first response to this was to accept the superset and weaken the contract to "never fewer, and equal at steady state." That was wrong, and the reasoning that overturned it is worth keeping, because the flaw was not in the direction of the error but in what counts as an error at all.
 
-**The decision is to accept the superset, and it weakens the contract.** The reasoning, in the order it matters:
+**Extra subscriptions are not extra work. They are extra evaluations of the taken branch, and evaluation is not free of consequence here.** A compiled delegate short-circuits exactly as C# does, so the fast path never evaluates the untaken branch — that much is fine. But when an input only the untaken branch reads changes, the fast path wakes and re-invokes the delegate, which evaluates *the taken branch*, calling its getters. The graph, not subscribed, sleeps through it.
 
-The fatal direction stays closed. The plan is never a proper subset of the graph's set at any moment, so there is no instant at which the fast path is blind to something the graph can see. Silent staleness remains impossible.
+Two consequences follow, and both are visible to consumers:
 
-The excess is bounded and monotone — exactly the branches not yet taken — and it produces no extra notification to any consumer, because the wrapper compares evaluations before announcing. A change to an input only an untaken branch reads causes the fast path to re-run the lambda and arrive at the same answer, and the answer is not announced.
+**Getters have side effects, including notifications of their own.** This repository's `TestPerson.Name` raises `PropertyChanging` and `PropertyChanged` for `NameGets` from inside its getter. An extra evaluation therefore makes the observed object announce a change to anyone watching it — not only to this observation. Nothing about the wrapper's compare-then-notify contains that; it escapes into the application.
 
-What it does produce is extra *evaluations*, and eligible expressions are not pure. This repository's own `TestPerson.Name` increments a counter and raises notifications for `NameGets` from its getter. So the excess is observable in principle. It widens the Purity hazard already recorded below rather than introducing a new one.
+**A faulting taken branch produces a new exception object each time.** The wrapper compares faults by reference, so a re-evaluation that throws afresh is a changed evaluation and *is* announced. An observation whose taken branch faults would therefore raise notifications, at moments the graph is silent, driven by changes to an input the expression is not currently reading.
 
-The alternative was refusing `Conditional`, `Coalesce`, `AndAlso` and `OrElse` outright, which removes conjunctive predicates — which is to say most real predicates — from the eligible set. By this document's own hierarchy a superset costs performance, the same category as refusing; refusing pays that cost always, the superset pays it only until a branch is first taken.
+Neither of these is silent staleness, and both are narrow. But the standard is not "is the failure survivable." It is whether the mechanism can be relied upon to do nothing the graph would not, and here it cannot. **So `Conditional`, `Coalesce`, and `AndAlso` and `OrElse` over `bool` are refused**, reported as `DeferredBranch`, and the contract's original sentence stands unamended.
 
-This is the one place where the mechanism is permitted to do more than the graph rather than less, it is named, and it should not be extended to a second place without an argument this explicit.
+The refusal mirrors the graph's own condition rather than approximating it: `AndAlso` and `OrElse` are refused only when the node's type is `bool`, because that is exactly when `ObservableBinaryExpression` defers. A lifted `bool?` conjunction is not deferred and is not refused.
+
+There is an escape hatch worth telling callers about. The non-short-circuiting `&` and `|` are not deferred by the graph, so `person => person.A > 0 & person.B > 0` remains eligible where the `&&` form does not. That is a real choice a caller can make when they know both operands are cheap and safe to evaluate, and it is the kind of thing a visible cost model exists to let them make.
+
+`TheGraphDoesNotSubscribeToAnUntakenBranchUntilItIsTaken` remains as a test, pinning the graph behaviour at two subscriptions before the branch is taken and three after, so the reason for the refusal cannot quietly stop being true.
 
 Two things follow immediately.
 
@@ -190,8 +194,6 @@ Two limits worth stating plainly.
 
 **The test reproduces parameter replacement rather than obtaining it.** `ReplaceParametersWithoutOptimization` is internal, so the test substitutes `Expression.Constant(argument, parameter.Type)` itself, which is what the observer does. This is sound here only because the comparison is over *resolved objects and event names*, never over expression identity — a structurally different but equivalent tree reaches the same objects and compares equal. The observer-side convenience the analyser section anticipates would remove the reproduction entirely, and gets built with the execution path.
 
-**Expressions with deferred branches are compared at steady state.** The test drives the condition or the short-circuit so that every branch has been taken, then compares — because before that the graph's set is legitimately smaller, and asserting equality against a moving target would only teach the test to expect whichever moment it happened to sample. `AnUnexercisedBranchIsNotSubscribedUntilItIsTaken` pins the pre-steady-state count separately, at two before and three after, so the property cannot change without a test noticing.
-
 **Indexers are outside the instrument, for the reason already recorded.** `collection[0]` reaches the observer as a `get_Item` call which the observer normalizes and the analyser does not, so there is no lambda for which both mechanisms see an index. That is not a coverage gap in the mechanism, since the fast path cannot be reached through an indexer today either. It closes when normalization is shared.
 
 The rest:
@@ -217,6 +219,7 @@ A divergence is not a defect to patch in the analyser. It is evidence that the e
 
 Each of these is a place the mechanism becomes stairs when it might have been an escalator. They are listed so that relaxing one is a deliberate act with evidence behind it, rather than something that drifts in.
 
+- **Conditionals, coalesces, and short-circuiting conjunctions and disjunctions over `bool`** are refused, for the reasons under **Deferred branches**. This is the only entry here refused for a reason found by measurement rather than by reading, and the only one where the relaxation was tried and withdrawn. `&` and `|` remain eligible.
 - **Method calls, invocations, `new`, member init and array init** are refused outright. Their disposal and purity semantics are among the unresolved hazards below.
 - **Operators implemented by a method** are refused, for the same reason: the graph treats them as method calls and may dispose their results. This is far more costly than it sounds. `String` declares `op_Equality` and `op_Inequality`, so every comparison of two strings arrives as a binary expression with a method attached, and `person => person.Name == "Emily"` — as ordinary a predicate as exists — is refused. The relaxation is available and principled: ask `IsMethodReturnValueDisposed` about the operator's method, exactly as members are already asked `IsPropertyValueDisposed`, and refuse only when the answer is yes. It is not taken here because widening the eligible set is the dangerous direction, the fuzzer does not yet exist to check it, and it surfaced as a failing test rather than as a decision. It should be made deliberately, with evidence, and not as a reflex to a red bar.
 - **Members and indexers whose values are registered for disposal** are refused, since disposal is a graph behaviour with nowhere to live on a fast path.
