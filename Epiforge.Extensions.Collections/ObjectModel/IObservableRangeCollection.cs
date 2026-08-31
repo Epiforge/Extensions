@@ -66,14 +66,18 @@ public interface IObservableRangeCollection<T> :
     /// Removes the specified items from the <see cref="IObservableRangeCollection{T}"/>
     /// </summary>
     /// <param name="items">The items to be removed</param>
-    /// <returns>The number of items that were removed</returns>
+    /// <remarks>
+    /// One <see cref="INotifyCollectionChanged.CollectionChanged"/> event is raised for each item removed, since items at scattered positions cannot be described by a single event; to remove many items with one notification instead, build the list of the items to keep and hand it to <see cref="Reset(IEnumerable{T})"/>
+    /// </remarks>
     void RemoveRange(IEnumerable<T> items);
 
     /// <summary>
     /// Removes the specified items from the <see cref="IObservableRangeCollection{T}"/>
     /// </summary>
     /// <param name="items">The items to be removed</param>
-    /// <returns>The number of items that were removed</returns>
+    /// <remarks>
+    /// One <see cref="INotifyCollectionChanged.CollectionChanged"/> event is raised for each item removed, since items at scattered positions cannot be described by a single event; to remove many items with one notification instead, build the list of the items to keep and hand it to <see cref="Reset(IEnumerable{T})"/>
+    /// </remarks>
     void RemoveRange(IList<T> items);
 
     /// <summary>
@@ -118,4 +122,14 @@ public interface IObservableRangeCollection<T> :
     /// </summary>
     /// <param name="newCollection">The collection of items</param>
     void Reset(IEnumerable<T> newCollection);
+
+    /// <summary>
+    /// Removes all objects from the <see cref="IObservableRangeCollection{T}"/> that satisfy the <paramref name="predicate"/>, raising a single <see cref="NotifyCollectionChangedAction.Reset"/> event
+    /// </summary>
+    /// <param name="predicate">A predicate used to determine whether to remove an object from the <see cref="IObservableRangeCollection{T}"/></param>
+    /// <returns>The number of items that were removed</returns>
+    /// <remarks>
+    /// The cost of this method is a single pass over the collection, whereas the cost of <see cref="RemoveAll(Func{T, bool})"/> grows with the product of the size of the collection and the number of items removed; <see cref="RemoveAll(Func{T, bool})"/> allocates less only when removing a very small fraction of the collection, and is the one to use when consumers depend on being told which items left and from where
+    /// </remarks>
+    int ResetRemovingAll(Func<T, bool> predicate);
 }

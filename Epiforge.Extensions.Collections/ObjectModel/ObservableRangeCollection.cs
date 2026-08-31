@@ -336,4 +336,36 @@ public class ObservableRangeCollection<T> :
             NotifyCountChanged();
         NotifyIndexerChanged();
     }
+
+    /// <inheritdoc/>
+    public int ResetRemovingAll(Func<T, bool> predicate)
+    {
+        ArgumentNullException.ThrowIfNull(predicate);
+        var count = Items.Count;
+        var firstRemoved = -1;
+        for (var i = 0; i < count; ++i)
+            if (predicate(Items[i]))
+            {
+                firstRemoved = i;
+                break;
+            }
+        if (firstRemoved < 0)
+            return 0;
+        var survivors = new List<T>(count - 1);
+        for (var i = 0; i < firstRemoved; ++i)
+            survivors.Add(Items[i]);
+        for (var i = firstRemoved + 1; i < count; ++i)
+        {
+            var item = Items[i];
+            if (!predicate(item))
+                survivors.Add(item);
+        }
+        Items.Clear();
+        for (var i = 0; i < survivors.Count; ++i)
+            Items.Add(survivors[i]);
+        OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+        NotifyCountChanged();
+        NotifyIndexerChanged();
+        return count - survivors.Count;
+    }
 }
