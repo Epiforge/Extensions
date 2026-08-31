@@ -60,6 +60,7 @@ sealed class DirectObservableExpression<TArgument, TResult> :
         base(observer, lambdaExpression.Body.Type)
     {
         this.argument = argument;
+        comparesBeforeBoxing = typeof(TResult).IsValueType && lambdaExpression.Body.Type == typeof(TResult);
         this.evaluate = evaluate;
         this.lambdaExpression = lambdaExpression;
         this.sites = sites;
@@ -67,6 +68,7 @@ sealed class DirectObservableExpression<TArgument, TResult> :
     }
 
     readonly TArgument argument;
+    readonly bool comparesBeforeBoxing;
     readonly Func<TArgument, object?[], TResult> evaluate;
     readonly Expression<Func<TArgument, TResult>> lambdaExpression;
     readonly DirectSubscriptionSite[] sites;
@@ -80,7 +82,8 @@ sealed class DirectObservableExpression<TArgument, TResult> :
         try
         {
             var value = evaluate(argument, values);
-            Evaluation = (null, value);
+            if (!IsCurrentResult(value))
+                Evaluation = (null, value);
             observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{Expression} evaluated directly: {Value}", Expression, value);
         }
         catch (Exception ex)
@@ -88,6 +91,14 @@ sealed class DirectObservableExpression<TArgument, TResult> :
             Evaluation = (ex, defaultResult);
             observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, ex, "{Expression} faulted: {Fault}", Expression, ex);
         }
+    }
+
+    bool IsCurrentResult(TResult value)
+    {
+        if (!comparesBeforeBoxing)
+            return false;
+        var current = CurrentEvaluation;
+        return current.Fault is null && current.Result is TResult result && EqualityComparer<TResult>.Default.Equals(result, value);
     }
 
     protected override void OnInitialization()
