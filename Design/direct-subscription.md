@@ -122,9 +122,19 @@ Values that cannot change:
 
 - a `ConstantExpression`'s value, by definition
 - a parameter's value, which is replaced by a constant before observation begins
-- a field of a compiler-generated closure type, reached from either of the above
+- **a field**, whatever declares it, reached from either of the above
 
 The third deserves its reasoning written down, because it is what admits the archetype. `person => person.Rank > threshold.Rank` does not compile to that shape; it compiles to `person => person.Rank > closure.threshold.Rank`, so the comparison's right operand is a member access two deep. A compiler-generated closure does not implement `INotifyPropertyChanged`, so **the graph never subscribes to it either.**
+
+### The third originally said "a field of a compiler-generated closure type", and that was too narrow
+
+A field raises no change notification whatever declares it, and `ObservableMemberExpression` guards both its subscribe and its unsubscribe path entirely on `isFieldOfCompilerGeneratedType`. So for a field of an ordinary object the graph subscribes to nothing, its target is a constant that never changes, and nothing ever wakes it to re-read: it freezes that value exactly as it freezes a closure's. The restriction was conservative rather than necessary.
+
+It also mattered more than it looked. `threshold` is more often a field of a view model or a service than a captured local, and `2026-08-31-wider-eligibility.md` measured what the refusal cost: the one shape it excluded ran at ten to fourteen times the control and fell by up to 5.8× on time and 2.9× on memory once admitted, while the four shapes around it did not move by a kilobyte.
+
+**Two things stay narrow, and for different reasons.** The contents subscription — `CollectionChanged` or `DictionaryChanged` on the field's own value — remains limited to compiler-generated fields, because that is precisely what the graph watches and nothing more. And `IsFixed` still demands a target, so a static field is not a fixed target; nothing about that is principled, it simply has not been examined.
+
+Admitting fields on any target also admits a field of the **argument**, since a parameter was already fixed. That is how `p1 => p1.artist.Name` over a `ValueTuple` becomes eligible — tuple elements are fields — and it is why `DirectObservableExpression.Resolve` now takes the observation's argument, having never before needed to know what a parameter was worth.
 
 An earlier draft continued: "A reassignment of the captured local goes unnoticed by both mechanisms. The fast path is not permitted to be blind to anything the graph can see; it is permitted to be blind to what the graph is already blind to."
 
@@ -352,7 +362,9 @@ The cause is the general shape stated under the eligibility rule. An ignored pro
 
 **The second is fixed by freezing**, since refusal was not available — refusing closure-field targets would refuse the archetype this whole mechanism exists to serve. `FixedSubexpressionRewriter` lifts every closure field chain out of the lambda into an array read, once per lambda, and the observer resolves that array per observation.
 
-Only closure field chains are lifted. A `ConstantExpression`'s value cannot change, so freezing it would buy nothing and cost a boxed array slot; and the parameter is the argument, already fixed at construction by being passed in.
+Only field chains are lifted. A `ConstantExpression`'s value cannot change, so freezing it would buy nothing and cost a boxed array slot; and the parameter is the argument, already fixed at construction by being passed in.
+
+Since fields on ordinary objects became fixed targets, those are lifted too, on the same reasoning: the graph freezes a field of a view model exactly as it freezes a field of a display class, because neither notifies and neither has a target that can wake it.
 
 **What this leaves for the performance redesign.** Freezing was the correctness half of the change identified earlier, and it is the smaller half. The larger one remains: the analysis and the plan are still computed per observation from a freshly normalized tree, and `ReplaceParameters` still runs every time. Determining eligibility and planning from the lambda, cached alongside the evaluator that now lives beside it, would remove both from the per-observation path. That is now purely a performance change, which is a much better position to attempt it from.
 
