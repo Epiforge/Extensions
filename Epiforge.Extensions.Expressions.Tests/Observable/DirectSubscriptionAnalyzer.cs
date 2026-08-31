@@ -182,6 +182,14 @@ public class DirectSubscriptionAnalyzer
         Assert.IsTrue(Analyzer().Analyze(Expression.Quote(Expression.Lambda<Func<int>>(Expression.Constant(3)))).IsEligible);
 
     [TestMethod]
+    public void StaticFieldChainTargetIsEligible() =>
+        Assert.IsTrue(Analyzer().Analyze(BodyOf<int>(person => StaticFieldHolder.Held.Linked!.Rank)).IsEligible);
+
+    [TestMethod]
+    public void StaticFieldTargetIsEligible() =>
+        Assert.IsTrue(Analyzer().Analyze(BodyOf<int>(person => StaticFieldHolder.Held.Rank)).IsEligible);
+
+    [TestMethod]
     public void StaticPropertyIsIneligible()
     {
         var analysis = Analyzer().Analyze(Expression.Property(null, typeof(DateTime).GetProperty(nameof(DateTime.Now))!));

@@ -64,6 +64,32 @@ public class DirectSubscriptionExecution
     }
 
     [TestMethod]
+    public void AStaticFieldIsAFixedTarget()
+    {
+        var log = new SubscriptionLog();
+        var subject = new Recorded(log) { Rank = 3 };
+        var graphObserver = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = false });
+        var directObserver = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = true });
+        using (var graphExpression = graphObserver.Observe(s => StaticFieldHolder.Held.Rank + s.Rank, subject))
+        using (var directExpression = directObserver.Observe(s => StaticFieldHolder.Held.Rank + s.Rank, subject))
+        {
+            Assert.AreEqual(6, directExpression.Evaluation.Result);
+            Assert.AreEqual(graphExpression.Evaluation.Result, directExpression.Evaluation.Result);
+            subject.Rank = 5;
+            Assert.AreEqual(8, directExpression.Evaluation.Result);
+            Assert.AreEqual(graphExpression.Evaluation.Result, directExpression.Evaluation.Result);
+            StaticFieldHolder.Held.Rank = 9;
+            Assert.AreEqual(14, directExpression.Evaluation.Result);
+            Assert.AreEqual(graphExpression.Evaluation.Result, directExpression.Evaluation.Result);
+            StaticFieldHolder.Held = new Recorded(StaticFieldHolder.Log) { Rank = 100 };
+            Assert.AreEqual(14, directExpression.Evaluation.Result);
+            Assert.AreEqual(graphExpression.Evaluation.Result, directExpression.Evaluation.Result);
+        }
+        Assert.AreEqual(0, log.Outstanding);
+        Assert.AreEqual(0, StaticFieldHolder.Log.Outstanding);
+    }
+
+    [TestMethod]
     [DataRow(false)]
     [DataRow(true)]
     public void AStringComparisonIsObservedAndAnnounced(bool useDirectSubscription)

@@ -10,7 +10,7 @@ namespace Epiforge.Extensions.Expressions.Observable;
 /// A parameter is analyzed as the argument which will replace it, so that a lambda body and the parameter-replaced expression derived from it yield the same answer and the same subscriptions
 /// </remarks>
 /// <remarks>
-/// A field is a fixed target whatever declares it, because a field raises no change notification and is therefore read once and held by either mechanism; only the contents of a field of a compiler-generated type are watched, which is what the graph does
+/// A field is a fixed target whatever declares it and whether it is static or an instance field, because a field raises no change notification and is therefore read once and held by either mechanism; only the contents of a field of a compiler-generated type are watched, which is what the graph does
 /// </remarks>
 /// <remarks>
 /// An operator backed by a method is admitted when its return type is sealed and implements neither disposal interface, because the graph's disposal of such a value is a runtime type test which cannot succeed
@@ -73,7 +73,7 @@ public sealed class DirectSubscriptionAnalyzer
         {
             ConstantExpression => true,
             ParameterExpression => true,
-            MemberExpression { Member: FieldInfo } memberExpression => memberExpression.Expression is { } target && IsFixed(target),
+            MemberExpression { Member: FieldInfo } memberExpression => memberExpression.Expression is not { } target || IsFixed(target),
             UnaryExpression unaryExpression when unaryExpression.NodeType is ExpressionType.Quote => true,
             _ => false
         };
