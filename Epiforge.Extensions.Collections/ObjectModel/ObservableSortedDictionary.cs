@@ -152,8 +152,10 @@ public class ObservableSortedDictionary<TKey, TValue> :
         if (!gsd.ContainsKey(key))
             NotifyCountChanging();
         gsd.Add(key, value);
-        OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, key, value));
         NotifyCountChanged();
+        NotifyIndexerChanged();
+        if (IsChangeObserved)
+            OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, key, value));
     }
 
     void ICollection<KeyValuePair<TKey, TValue>>.Add(KeyValuePair<TKey, TValue> item) =>
@@ -173,8 +175,10 @@ public class ObservableSortedDictionary<TKey, TValue> :
         if (key is TKey typedKey && !gsd.ContainsKey(typedKey))
             NotifyCountChanging();
         di.Add(key, value);
-        OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, (TKey)key, (TValue)value!));
         NotifyCountChanged();
+        NotifyIndexerChanged();
+        if (IsChangeObserved)
+            OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, (TKey)key, (TValue)value!));
     }
 
     /// <summary>
@@ -188,8 +192,10 @@ public class ObservableSortedDictionary<TKey, TValue> :
         if (!gsd.ContainsKey(item.Key))
             NotifyCountChanging();
         gci.Add(item);
-        OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, item));
         NotifyCountChanged();
+        NotifyIndexerChanged();
+        if (IsChangeObserved)
+            OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, item));
     }
 
     /// <summary>
@@ -213,8 +219,10 @@ public class ObservableSortedDictionary<TKey, TValue> :
             NotifyCountChanging();
             foreach (var keyValuePair in keyValuePairs)
                 gsd.Add(keyValuePair.Key, keyValuePair.Value);
-            OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, keyValuePairs));
             NotifyCountChanged();
+            NotifyIndexerChanged();
+            if (IsChangeObserved)
+                OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, keyValuePairs));
         }
     }
 
@@ -227,7 +235,9 @@ public class ObservableSortedDictionary<TKey, TValue> :
         ei = gsd;
         gei = gsd;
         grodi = gsd;
-        OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Reset));
+        NotifyIndexerChanged();
+        if (IsChangeObserved)
+            OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Reset));
     }
 
     /// <summary>
@@ -240,8 +250,10 @@ public class ObservableSortedDictionary<TKey, TValue> :
             NotifyCountChanging();
             var currentKeyValuePairs = gsd.ToImmutableArray();
             gsd.Clear();
-            OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Remove, currentKeyValuePairs));
             NotifyCountChanged();
+            NotifyIndexerChanged();
+            if (IsChangeObserved)
+                OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Remove, currentKeyValuePairs));
         }
     }
 
@@ -373,6 +385,9 @@ public class ObservableSortedDictionary<TKey, TValue> :
     protected void NotifyIndexerChanged() =>
         OnPropertyChanged(CommonPropertyChangeNotificationEventArgs.IndexerChanged);
 
+    bool IsChangeObserved =>
+        CollectionChanged is not null || DictionaryChanged is not null || DictionaryChangedBoxed is not null;
+
     /// <summary>
     /// Calls <see cref="OnDictionaryChanged(NotifyDictionaryChangedEventArgs{TKey, TValue})"/> and also calls <see cref="OnCollectionChanged(NotifyCollectionChangedEventArgs)"/>, and <see cref="OnDictionaryChangedBoxed(NotifyDictionaryChangedEventArgs{object, object})"/> when applicable
     /// </summary>
@@ -380,7 +395,6 @@ public class ObservableSortedDictionary<TKey, TValue> :
     protected virtual void OnChanged(NotifyDictionaryChangedEventArgs<TKey, TValue> e)
     {
         ArgumentNullException.ThrowIfNull(e);
-        NotifyIndexerChanged();
         if (CollectionChanged != null)
             switch (e.Action)
             {
@@ -458,8 +472,10 @@ public class ObservableSortedDictionary<TKey, TValue> :
         {
             NotifyCountChanging();
             gsd.Remove(key);
-            OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Remove, key, value));
             NotifyCountChanged();
+            NotifyIndexerChanged();
+            if (IsChangeObserved)
+                OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Remove, key, value));
             return true;
         }
         return false;
@@ -496,8 +512,10 @@ public class ObservableSortedDictionary<TKey, TValue> :
             var value = di[key];
             NotifyCountChanging();
             Remove(typedKey);
-            OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Remove, (TKey)key, (TValue)value!));
             NotifyCountChanged();
+            NotifyIndexerChanged();
+            if (IsChangeObserved)
+                OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Remove, (TKey)key, (TValue)value!));
         }
     }
 
@@ -512,8 +530,10 @@ public class ObservableSortedDictionary<TKey, TValue> :
         {
             NotifyCountChanging();
             gci.Remove(item);
-            OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Remove, item));
             NotifyCountChanged();
+            NotifyIndexerChanged();
+            if (IsChangeObserved)
+                OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Remove, item));
             return true;
         }
         return false;
@@ -538,8 +558,10 @@ public class ObservableSortedDictionary<TKey, TValue> :
             }
         if (removed.Count > 0)
         {
-            OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Remove, removed));
             NotifyCountChanged();
+            NotifyIndexerChanged();
+            if (IsChangeObserved)
+                OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Remove, removed));
         }
         return [..removed];
     }
@@ -565,8 +587,10 @@ public class ObservableSortedDictionary<TKey, TValue> :
                 gsd.Remove(removingKeyValuePair.Key);
                 removedKeys.Add(removingKeyValuePair.Key);
             }
-            OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Remove, removingKeyValuePairs));
             NotifyCountChanged();
+            NotifyIndexerChanged();
+            if (IsChangeObserved)
+                OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Remove, removingKeyValuePairs));
         }
         return [..removedKeys];
     }
@@ -583,7 +607,9 @@ public class ObservableSortedDictionary<TKey, TValue> :
         var oldItems = GetRange(keyValuePairs.Select(kv => kv.Key));
         foreach (var keyValuePair in keyValuePairs)
             gsd[keyValuePair.Key] = keyValuePair.Value;
-        OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Replace, keyValuePairs, oldItems));
+        NotifyIndexerChanged();
+        if (IsChangeObserved)
+            OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Replace, keyValuePairs, oldItems));
     }
 
     /// <summary>
@@ -613,7 +639,9 @@ public class ObservableSortedDictionary<TKey, TValue> :
         }
         foreach (var keyValuePair in newKeyValuePairs)
             gsd.Add(keyValuePair.Key, keyValuePair.Value);
-        OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Replace, newKeyValuePairs, removingKeyValuePairs));
+        NotifyIndexerChanged();
+        if (IsChangeObserved)
+            OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Replace, newKeyValuePairs, removingKeyValuePairs));
         if (countChanging)
             NotifyCountChanged();
         return [..removedKeys];
@@ -657,7 +685,9 @@ public class ObservableSortedDictionary<TKey, TValue> :
     {
         var oldValue = GetValue(key);
         di[key] = value;
-        OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Replace, (TKey)key, (TValue)value!, (TValue)oldValue!));
+        NotifyIndexerChanged();
+        if (IsChangeObserved)
+            OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Replace, (TKey)key, (TValue)value!, (TValue)oldValue!));
     }
 
     /// <summary>
@@ -673,8 +703,10 @@ public class ObservableSortedDictionary<TKey, TValue> :
         {
             NotifyCountChanging();
             gsd.Add(key, value);
-            OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, key, value));
             NotifyCountChanged();
+            NotifyIndexerChanged();
+            if (IsChangeObserved)
+                OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, key, value));
             return true;
         }
         return false;
@@ -715,8 +747,10 @@ public class ObservableSortedDictionary<TKey, TValue> :
         {
             NotifyCountChanging();
             gsd.Remove(key);
-            OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Remove, key, value));
             NotifyCountChanged();
+            NotifyIndexerChanged();
+            if (IsChangeObserved)
+                OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Remove, key, value));
             return (true, value);
         }
         return (false, default!);
@@ -742,14 +776,18 @@ public class ObservableSortedDictionary<TKey, TValue> :
             if (gsd.TryGetValue(key, out var oldValue))
             {
                 gsd[key] = value;
-                OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Replace, key, value, oldValue));
+                NotifyIndexerChanged();
+                if (IsChangeObserved)
+                    OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Replace, key, value, oldValue));
             }
             else
             {
                 NotifyCountChanging();
                 gsd[key] = value;
-                OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, key, value));
                 NotifyCountChanged();
+                NotifyIndexerChanged();
+                if (IsChangeObserved)
+                    OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, key, value));
             }
         }
     }
