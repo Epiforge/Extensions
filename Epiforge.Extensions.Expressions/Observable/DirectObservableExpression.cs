@@ -33,6 +33,11 @@ abstract class DirectObservableExpression(ExpressionObserver observer, Type type
 
     private protected void Attach(DirectSubscriptionSite[] sites, object? argument, object?[] values)
     {
+        if (sites.Length == 0)
+        {
+            attachments = [];
+            return;
+        }
         var attaching = new DirectSubscriptionAttachment[sites.Length];
         var attached = 0;
         for (var i = 0; i < sites.Length; ++i)
@@ -43,7 +48,7 @@ abstract class DirectObservableExpression(ExpressionObserver observer, Type type
                 continue;
             attaching[attached++] = observer.DirectSubscriptions.Attach(source, kind, site.PropertyName, this, site.ForcesNotification);
         }
-        attachments = attached == sites.Length ? attaching : attaching[..attached];
+        attachments = attached == sites.Length ? attaching : attached == 0 ? [] : attaching[..attached];
     }
 
     internal void OnSourceChanged(bool forcesNotification)

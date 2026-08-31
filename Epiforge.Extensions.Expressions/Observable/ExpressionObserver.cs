@@ -847,7 +847,7 @@ public class ExpressionObserver :
         if (!UseDirectSubscription || CompiledLambda(lambdaExpression) is not { Sites: { } sites } evaluator)
             return null;
         var fixedSubexpressions = evaluator.FixedSubexpressions;
-        var values = new object?[fixedSubexpressions.Length];
+        object?[] values = fixedSubexpressions.Length == 0 ? [] : new object?[fixedSubexpressions.Length];
         if (values.Length > 0)
         {
             var resolutionArgument = (object?)argument;
