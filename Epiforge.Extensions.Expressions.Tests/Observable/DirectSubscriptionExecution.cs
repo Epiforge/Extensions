@@ -64,6 +64,31 @@ public class DirectSubscriptionExecution
     }
 
     [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void AStringComparisonIsObservedAndAnnounced(bool useDirectSubscription)
+    {
+        var log = new SubscriptionLog();
+        var subject = new Recorded(log) { Tag = "s" };
+        var observer = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = useDirectSubscription });
+        var announcements = 0;
+        using (var expr = observer.Observe(s => s.Tag == "s", subject))
+        {
+            Assert.AreEqual(true, expr.Evaluation.Result);
+            expr.PropertyChanged += (sender, e) => ++announcements;
+            subject.Tag = "t";
+            Assert.AreEqual(1, announcements);
+            Assert.AreEqual(false, expr.Evaluation.Result);
+            subject.Tag = "u";
+            Assert.AreEqual(1, announcements);
+            subject.Tag = "s";
+            Assert.AreEqual(2, announcements);
+            Assert.AreEqual(true, expr.Evaluation.Result);
+        }
+        Assert.AreEqual(0, log.Outstanding);
+    }
+
+    [TestMethod]
     public void ChangeIsObservedAndAnnouncedOnce()
     {
         var log = new SubscriptionLog();

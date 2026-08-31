@@ -74,6 +74,10 @@ public class DirectSubscriptionAnalyzer
         Assert.IsTrue(Analyzer().Analyze(Expression.Constant(3)).IsEligible);
 
     [TestMethod]
+    public void DecimalComparisonIsEligible() =>
+        Assert.IsTrue(Analyzer().Analyze(BodyOf<bool>(person => person.NameGets > 0m)).IsEligible);
+
+    [TestMethod]
     public void DisposedPropertyValueIsIneligible()
     {
         var options = new ExpressionObserverOptions();
@@ -193,11 +197,11 @@ public class DirectSubscriptionAnalyzer
     }
 
     [TestMethod]
-    public void StringComparisonIsIneligible()
+    public void StringComparisonIsEligible()
     {
-        var analysis = Analyzer().Analyze(BodyOf<bool>(person => person.Name == "Emily"));
-        Assert.IsFalse(analysis.IsEligible);
-        Assert.AreEqual(DirectSubscriptionIneligibility.UserDefinedOperator, analysis.Ineligibility);
+        var body = (BinaryExpression)BodyOf<bool>(person => person.Name == "Emily");
+        Assert.IsNotNull(body.Method);
+        Assert.IsTrue(Analyzer().Analyze(body).IsEligible);
     }
 
     [TestMethod]
@@ -205,7 +209,17 @@ public class DirectSubscriptionAnalyzer
         Assert.IsTrue(Analyzer().Analyze(BodyOf<bool>(person => person.Name is string)).IsEligible);
 
     [TestMethod]
-    public void UserDefinedBinaryOperatorIsIneligible()
+    public void UserDefinedBinaryOperatorReturningSealedDisposableIsIneligible()
+    {
+        var a = new SealedDisposableTestPerson("Emily");
+        var b = new SealedDisposableTestPerson("John");
+        var analysis = Analyzer().Analyze(BodyOf<SealedDisposableTestPerson>(person => a + b));
+        Assert.IsFalse(analysis.IsEligible);
+        Assert.AreEqual(DirectSubscriptionIneligibility.UserDefinedOperator, analysis.Ineligibility);
+    }
+
+    [TestMethod]
+    public void UserDefinedBinaryOperatorReturningUnsealedTypeIsIneligible()
     {
         var other = TestPerson.CreateEmily();
         var analysis = Analyzer().Analyze(BodyOf<TestPerson>(person => person + other));
@@ -214,7 +228,7 @@ public class DirectSubscriptionAnalyzer
     }
 
     [TestMethod]
-    public void UserDefinedUnaryOperatorIsIneligible()
+    public void UserDefinedUnaryOperatorReturningUnsealedTypeIsIneligible()
     {
         var analysis = Analyzer().Analyze(BodyOf<TestPerson>(person => -person));
         Assert.IsFalse(analysis.IsEligible);

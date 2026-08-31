@@ -41,7 +41,7 @@ public enum DirectSubscriptionIneligibility
     ValueRequiresDisposal,
 
     /// <summary>
-    /// An operator implemented by a method is applied, the evaluation of which the graph localizes and disposes
+    /// An operator implemented by a method is applied whose return type could implement a disposal interface, so the graph may dispose of the value it produces
     /// </summary>
     UserDefinedOperator,
 
