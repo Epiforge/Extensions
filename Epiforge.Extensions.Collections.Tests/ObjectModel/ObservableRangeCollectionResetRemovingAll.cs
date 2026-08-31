@@ -31,7 +31,7 @@ public class ObservableRangeCollectionResetRemovingAll
     public void EveryMatchLeavesAndTheSurvivorsKeepTheirOrder()
     {
         var events = EventsRaisedBy(false, collection => collection.ResetRemovingAll(i => i % 3 == 0), out var returned, out var remaining);
-        Assert.AreEqual("Reset, Count, Item[]", events);
+        Assert.AreEqual("Count, Item[], Reset", events);
         Assert.AreEqual(3, returned);
         CollectionAssert.AreEqual(new[] { 1, 2, 4, 5, 7, 8, 10 }, remaining.ToArray());
     }
@@ -40,7 +40,7 @@ public class ObservableRangeCollectionResetRemovingAll
     public void MatchingEverythingEmptiesTheCollection()
     {
         var events = EventsRaisedBy(false, collection => collection.ResetRemovingAll(i => true), out var returned, out var remaining);
-        Assert.AreEqual("Reset, Count, Item[]", events);
+        Assert.AreEqual("Count, Item[], Reset", events);
         Assert.AreEqual(10, returned);
         Assert.AreEqual(0, remaining.Count);
     }
@@ -58,7 +58,7 @@ public class ObservableRangeCollectionResetRemovingAll
     public void MatchingTheFirstItemLeavesTheRest()
     {
         var events = EventsRaisedBy(false, collection => collection.ResetRemovingAll(i => i == 1), out var returned, out var remaining);
-        Assert.AreEqual("Reset, Count, Item[]", events);
+        Assert.AreEqual("Count, Item[], Reset", events);
         Assert.AreEqual(1, returned);
         CollectionAssert.AreEqual(new[] { 2, 3, 4, 5, 6, 7, 8, 9, 10 }, remaining.ToArray());
     }
@@ -67,7 +67,7 @@ public class ObservableRangeCollectionResetRemovingAll
     public void MatchingTheLastItemLeavesTheRest()
     {
         var events = EventsRaisedBy(false, collection => collection.ResetRemovingAll(i => i == 10), out var returned, out var remaining);
-        Assert.AreEqual("Reset, Count, Item[]", events);
+        Assert.AreEqual("Count, Item[], Reset", events);
         Assert.AreEqual(1, returned);
         CollectionAssert.AreEqual(new[] { 1, 2, 3, 4, 5, 6, 7, 8, 9 }, remaining.ToArray());
     }

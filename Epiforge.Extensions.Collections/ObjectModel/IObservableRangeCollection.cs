@@ -24,6 +24,9 @@ public interface IObservableRangeCollection<T> :
     /// </summary>
     /// <param name="predicate">A predicate used to determine whether to remove an object from the <see cref="IObservableRangeCollection{T}"/></param>
     /// <returns>The items that were removed</returns>
+    /// <remarks>
+    /// When individual element events are not being raised, one <see cref="INotifyCollectionChanged.CollectionChanged"/> event is raised for each run of adjacent items removed, so a predicate matching a contiguous block raises one event and a predicate matching alternating items raises one for each; to remove any number of items with exactly one event, use <see cref="ResetRemovingAll(Func{T, bool})"/>
+    /// </remarks>
     IReadOnlyList<T> GetAndRemoveAll(Func<T, bool> predicate);
 
     /// <summary>
@@ -60,6 +63,9 @@ public interface IObservableRangeCollection<T> :
     /// </summary>
     /// <param name="predicate">A predicate used to determine whether to remove an object from the <see cref="IObservableRangeCollection{T}"/></param>
     /// <returns>The number of items that were removed</returns>
+    /// <remarks>
+    /// When individual element events are not being raised, one <see cref="INotifyCollectionChanged.CollectionChanged"/> event is raised for each run of adjacent items removed, so a predicate matching a contiguous block raises one event and a predicate matching alternating items raises one for each; to remove any number of items with exactly one event, use <see cref="ResetRemovingAll(Func{T, bool})"/>
+    /// </remarks>
     int RemoveAll(Func<T, bool> predicate);
 
     /// <summary>
@@ -67,7 +73,7 @@ public interface IObservableRangeCollection<T> :
     /// </summary>
     /// <param name="items">The items to be removed</param>
     /// <remarks>
-    /// One <see cref="INotifyCollectionChanged.CollectionChanged"/> event is raised for each item removed, since items at scattered positions cannot be described by a single event; to remove many items with one notification instead, build the list of the items to keep and hand it to <see cref="Reset(IEnumerable{T})"/>
+    /// When individual element events are being raised, one <see cref="INotifyCollectionChanged.CollectionChanged"/> event is raised for each item removed, in the order the items were supplied; otherwise the items are removed in the order they occur in the collection and one event is raised for each run of adjacent items removed; to remove many items with exactly one event instead, build the list of the items to keep and hand it to <see cref="Reset(IEnumerable{T})"/>
     /// </remarks>
     void RemoveRange(IEnumerable<T> items);
 
@@ -76,7 +82,7 @@ public interface IObservableRangeCollection<T> :
     /// </summary>
     /// <param name="items">The items to be removed</param>
     /// <remarks>
-    /// One <see cref="INotifyCollectionChanged.CollectionChanged"/> event is raised for each item removed, since items at scattered positions cannot be described by a single event; to remove many items with one notification instead, build the list of the items to keep and hand it to <see cref="Reset(IEnumerable{T})"/>
+    /// When individual element events are being raised, one <see cref="INotifyCollectionChanged.CollectionChanged"/> event is raised for each item removed, in the order the items were supplied; otherwise the items are removed in the order they occur in the collection and one event is raised for each run of adjacent items removed; to remove many items with exactly one event instead, build the list of the items to keep and hand it to <see cref="Reset(IEnumerable{T})"/>
     /// </remarks>
     void RemoveRange(IList<T> items);
 

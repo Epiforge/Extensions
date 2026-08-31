@@ -343,7 +343,7 @@ public class ObservableRangeCollection
             ++collectionChanged;
             Assert.AreEqual(NotifyCollectionChangedAction.Remove, e.Action);
             Assert.IsNotNull(e.OldItems);
-            Assert.AreEqual(1, e.OldItems?.Count);
+            Assert.AreEqual(3, e.OldItems?.Count);
             Assert.AreEqual(3, e.OldStartingIndex);
             Assert.IsNull(e.NewItems);
         }
@@ -358,7 +358,7 @@ public class ObservableRangeCollection
         Assert.AreEqual(8, rangeObservableCollection[4]);
         Assert.AreEqual(9, rangeObservableCollection[5]);
         Assert.AreEqual(10, rangeObservableCollection[6]);
-        Assert.AreEqual(3, collectionChanged);
+        Assert.AreEqual(1, collectionChanged);
         rangeObservableCollection.CollectionChanged -= collectionChangedHandler;
     }
 

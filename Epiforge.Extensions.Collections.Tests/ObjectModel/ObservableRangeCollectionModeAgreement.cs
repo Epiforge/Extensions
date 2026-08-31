@@ -30,6 +30,10 @@ public class ObservableRangeCollectionModeAgreement
         AssertModesNotifyTheSameProperties(collection => collection.MoveRange(0, 3, 2));
 
     [TestMethod]
+    public void RemoveAllNotifiesTheSameProperties() =>
+        AssertModesNotifyTheSameProperties(collection => collection.RemoveAll(i => i is 2 or 3));
+
+    [TestMethod]
     public void RemoveRangeNotifiesTheSameProperties() =>
         AssertModesNotifyTheSameProperties(collection => collection.RemoveRange(1, 2));
 
