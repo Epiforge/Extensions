@@ -25,6 +25,8 @@ Supports `net6.0`, `net7.0`, `net8.0`, `net9.0`, and `net10.0`.
     - [Specialized](#specialized)
   - [ Expressions](#-expressions)
     - [Observable](#observable)
+      - [How an Expression Gets Observed](#how-an-expression-gets-observed)
+        - [Fields Are Read Once](#fields-are-read-once)
     - [Observable Queries](#observable-queries)
       - [How Observable Queries Work and When to Use Them](#how-observable-queries-work-and-when-to-use-them)
   - [Platforms](#platforms)
@@ -231,31 +233,19 @@ using (var expr = observer.Observe(e => e.Name.Length, elizabeth))
 ```
 
 #### How an Expression Gets Observed
-There are two mechanisms behind `Observe`. Which one an observation uses is settled when it is created and never changes for the rest of its life.
+`Observe` takes a shortcut when it can and builds a graph when it cannot, deciding once when the observation is created. You receive the same values through the same events either way; the shortcut is just faster and lighter.
 
-The general one builds a small graph: a node per subexpression, each subscribing to its own change sources and telling the nodes above it whenever its value moves. It copes with anything you can write.
+The shortcut handles an expression built from these:
 
-The other skips the graph. It subscribes straight to the change sources and re-invokes a compiled delegate when one of them fires. It is faster to set up and faster to react, but it can only be used when every change source can be found without evaluating something that might change — which in practice means member and indexer access whose target is the argument, a constant, or a field, and the built-in operators over those.
+* the argument, constants, and captured locals
+* fields, on anything above — including static fields
+* properties and indexers whose target is one of the above
+* static properties
+* operators, where one resolved to a method needs a return type nothing could dispose — `==` on strings qualifies
 
-```csharp
-var observer = new ExpressionObserver();
-var threshold = Payroll.GetThreshold();
+Everything else builds the graph: `?:`, `&&`, `||` and `??`; anything read through a property, such as `e => e.Name.Length`; method calls; object and collection construction; and anything you have configured the observer to ignore notifications for or to dispose.
 
-observer.Observe(e => e.Salary, elizabeth);                         // direct
-observer.Observe(e => e.Salary > threshold.Amount, elizabeth);      // direct: a captured local is a field
-observer.Observe(e => e.Salary > this.threshold.Amount, elizabeth); // direct: so is a field of your own class
-observer.Observe(e => e.Name.Length, elizabeth);                    // graph: Name is a property, so Length reads through something that can change
-observer.Observe(e => e.Name == "Elizabeth", elizabeth);            // graph: string equality is a user-defined operator
-observer.Observe(e => e.IsActive ? e.Name : e.Alias, elizabeth);    // graph: a branch is not subscribed to until it is taken
-```
-
-What decides this is field against property, not where the thing is declared. A field raises no change notification, so both mechanisms read it once when the observation begins and hold it, which leaves the fast path free to rely on it. A property can change and announce it, so anything read *through* a property is a moving target and goes to the graph. That is why `e => e.Name.Length` takes the graph while `e => e.Salary > this.threshold.Amount` does not, though both look like two hops.
-
-Conditionals, `&&`, `||`, and `??` always use the graph, because subscribing to a side you have not reached would mean invoking a property getter earlier than the expression says to. So do user-defined operators — which includes `==` on strings — properties whose change notification you have asked the observer to ignore, and properties whose value the observer disposes.
-
-Observing an eligible expression costs between a sixth and a ninth of what the graph costs and about half the memory, and a change to one of its sources arrives in roughly two thirds of the time. An observable query whose selector or predicate qualifies constructs in about a quarter of the time on a third of the memory, measured across ten thousand elements. Nothing about the values you receive or the events you receive them through differs between the two.
-
-Set `UseDirectSubscription` to `false` on your options if you would rather always have the graph; it is `true` by default. And if you are curious why some particular expression is not eligible, you can ask directly:
+To find out about a particular expression, ask:
 
 ```csharp
 var analysis = new DirectSubscriptionAnalyzer(options).Analyze(expression.Body);
@@ -264,10 +254,10 @@ var analysis = new DirectSubscriptionAnalyzer(options).Analyze(expression.Body);
 // analysis.IneligibleExpression is the part responsible
 ```
 
-Because eligibility depends on which change sources the observer subscribes to at all, it is a property of your options as much as of your expression; hand the analyzer the same options you hand the observer.
+Hand the analyzer the same options you hand the observer, since some of them decide what gets subscribed to at all. Set `UseDirectSubscription` to `false` if you would rather always have the graph; it is `true` by default.
 
 ##### Fields Are Read Once
-This one is worth knowing because it is easy to write code that assumes otherwise. Whatever a field held when an observation began is what that observation goes on using — a captured local, which the compiler turns into a field, and a field of your own class alike. Assigning it afterward does not reach an observation that already exists.
+Whatever a field held when an observation began is what that observation goes on using — a captured local, a field of your own class, and a static field alike. Assigning it afterward does not reach an observation that already exists. Static properties behave the same way, so `e => e.Hired < DateTime.Now` compares against the moment it was created for as long as it lives.
 
 ```csharp
 var threshold = low;
@@ -277,7 +267,7 @@ low.Amount = 50000;  // expr re-evaluates
 high.Amount = 90000; // expr does not
 ```
 
-This has always been how the graph behaves, since it reads the field once when it builds the node and has nothing that could ever wake it to read again, and direct subscription behaves the same way. If you want the comparison to follow the value, do not assign the field — make the thing it points at a property of an object that notifies, and read that instead.
+If you want the comparison to follow the value, do not assign the field — make the thing it points at a property of an object that notifies, and read that instead.
 
 Observable expressions will also try to automatically dispose of disposable objects they create in the course of their evaluation when and where it makes sense. Use the `ExpressionObserverOptions` class for more direct control over this behavior.
 You can use the `Optimizer` property to specify an optimization method to invoke automatically during the observable expression creation process.
