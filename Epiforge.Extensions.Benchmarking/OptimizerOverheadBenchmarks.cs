@@ -17,6 +17,20 @@ public class OptimizerOverheadBenchmarks
     ExpressionObserver plainGraphObserver = null!;
     BenchmarkPerson subject = null!;
 
+    static Expression<Func<BenchmarkPerson, int>> BuildSelector()
+    {
+        var person = Expression.Parameter(typeof(BenchmarkPerson), "person");
+        return Expression.Lambda<Func<BenchmarkPerson, int>>(Expression.Multiply(Expression.Property(person, nameof(BenchmarkPerson.Rank)), Expression.Constant(2)), person);
+    }
+
+    [Benchmark]
+    public void FreshLambdaObservationWithOptimizer() =>
+        optimizedGraphObserver.Observe(BuildSelector(), subject).Dispose();
+
+    [Benchmark]
+    public void FreshLambdaObservationWithoutOptimizer() =>
+        plainGraphObserver.Observe(BuildSelector(), subject).Dispose();
+
     [Benchmark]
     public void GraphObservationWithOptimizer() =>
         optimizedGraphObserver.Observe(selector, subject).Dispose();
