@@ -224,6 +224,36 @@ public class DirectSubscriptionPlanning
         AssertPlansAgree(subject => -subject, person);
     }
 
+    public sealed class Holder
+    {
+        public ObservableCollection<TestPerson>? People;
+        public TestPerson? Person;
+    }
+
+    [TestMethod]
+    public void AFieldOfAnOrdinaryObjectIsAFixedTargetAndItsPropertyIsPlanned()
+    {
+        var holder = new Holder { Person = TestPerson.CreateJohn() };
+        var field = Expression.Field(Expression.Constant(holder), nameof(Holder.Person));
+        var plan = Analyzer().Plan(Expression.MakeMemberAccess(field, typeof(TestPerson).GetProperty(nameof(TestPerson.NameGets))!));
+        Assert.IsTrue(plan.IsEligible, plan.ToString());
+        Assert.AreEqual(1, plan.Subscriptions.Count, $"[{string.Join(", ", plan.Subscriptions)}]");
+        Assert.AreEqual(DirectSubscriptionKind.MemberPropertyChanged, plan.Subscriptions[0].Kind);
+        Assert.AreEqual(nameof(TestPerson.NameGets), plan.Subscriptions[0].PropertyName);
+        Assert.AreSame(field, plan.Subscriptions[0].Source);
+    }
+
+    [TestMethod]
+    public void AFieldOfAnOrdinaryObjectHoldingACollectionPlansNoContentsSubscription()
+    {
+        var holder = new Holder { People = new ObservableCollection<TestPerson>(TestPerson.MakePeople()) };
+        var field = Expression.Field(Expression.Constant(holder), nameof(Holder.People));
+        var plan = Analyzer().Plan(Expression.MakeMemberAccess(field, typeof(ObservableCollection<TestPerson>).GetProperty(nameof(ObservableCollection<TestPerson>.Count))!));
+        Assert.IsTrue(plan.IsEligible, plan.ToString());
+        foreach (var subscription in plan.Subscriptions)
+            Assert.AreNotEqual(DirectSubscriptionKind.DictionaryOrCollectionChanged, subscription.Kind, "the graph watches the contents of a compiler-generated type's field, and of nothing else");
+    }
+
     [TestMethod]
     public void APlanFromALambdaBodyListsAContentsSubscriptionTheNormalizedOneCanRuleOut()
     {

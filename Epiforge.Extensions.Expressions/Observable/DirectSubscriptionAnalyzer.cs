@@ -9,6 +9,9 @@ namespace Epiforge.Extensions.Expressions.Observable;
 /// <remarks>
 /// A parameter is analyzed as the argument which will replace it, so that a lambda body and the parameter-replaced expression derived from it yield the same answer and the same subscriptions
 /// </remarks>
+/// <remarks>
+/// A field is a fixed target whatever declares it, because a field raises no change notification and is therefore read once and held by either mechanism; only the contents of a field of a compiler-generated type are watched, which is what the graph does
+/// </remarks>
 public sealed class DirectSubscriptionAnalyzer
 {
     sealed class ExpressionIdentityComparer :
@@ -64,16 +67,13 @@ public sealed class DirectSubscriptionAnalyzer
         {
             ConstantExpression => true,
             ParameterExpression => true,
-            MemberExpression memberExpression => IsClosureField(memberExpression) && memberExpression.Expression is { } target && IsFixed(target),
+            MemberExpression { Member: FieldInfo } memberExpression => memberExpression.Expression is { } target && IsFixed(target),
             UnaryExpression unaryExpression when unaryExpression.NodeType is ExpressionType.Quote => true,
             _ => false
         };
 
     static bool IsShortCircuiting(BinaryExpression binaryExpression) =>
         binaryExpression.NodeType is ExpressionType.Coalesce || binaryExpression.NodeType is ExpressionType.AndAlso or ExpressionType.OrElse && binaryExpression.Type == typeof(bool);
-
-    static bool IsClosureField(MemberExpression memberExpression) =>
-        memberExpression.Member is FieldInfo && IsCompilerGenerated(memberExpression.Expression);
 
     static bool IsCompilerGenerated(Expression? expression) =>
         expression?.Type.Name.StartsWith('<') ?? false;

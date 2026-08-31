@@ -26,7 +26,7 @@ public class DifferentialFuzz
             Log = log;
             Items = [];
             Other = new Recorded(log) { Rank = 3, Score = 5, Tag = "o" };
-            Subject = new Recorded(log) { Rank = 7, Score = 2, Tag = "s" };
+            Subject = new Recorded(log) { Rank = 7, Score = 2, Tag = "s", Linked = new Recorded(log) { Rank = 2, Score = 6, Tag = "l" } };
             Holder = new FieldHolder { Held = new Recorded(log) { Rank = 1, Score = 4, Tag = "h" } };
             Observer = new ExpressionObserver(Configured(seed, useDirectSubscription));
             (OtherMember, ItemsMember) = CaptureOf(Other, Items);
@@ -55,6 +55,7 @@ public class DifferentialFuzz
     static readonly PropertyInfo count = typeof(ObservableRangeCollection<Recorded>).GetProperty(nameof(ObservableRangeCollection<Recorded>.Count))!;
     static readonly FieldInfo held = typeof(FieldHolder).GetField(nameof(FieldHolder.Held))!;
     static readonly FieldInfo heldItems = typeof(FieldHolder).GetField(nameof(FieldHolder.HeldItems))!;
+    static readonly FieldInfo linked = typeof(Recorded).GetField(nameof(Recorded.Linked))!;
     static readonly PropertyInfo next = typeof(Recorded).GetProperty(nameof(Recorded.Next))!;
     static readonly PropertyInfo rank = typeof(Recorded).GetProperty(nameof(Recorded.Rank))!;
     static readonly PropertyInfo score = typeof(Recorded).GetProperty(nameof(Recorded.Score))!;
@@ -111,7 +112,7 @@ public class DifferentialFuzz
         });
 
     static Expression Leaf(Random rng, Sources sources) =>
-        rng.Next(9) switch
+        rng.Next(10) switch
         {
             0 => Expression.MakeMemberAccess(sources.Subject, rank),
             1 => Expression.MakeMemberAccess(sources.Subject, score),
@@ -121,6 +122,7 @@ public class DifferentialFuzz
             5 => Expression.MakeMemberAccess(sources.Items, count),
             6 => Expression.MakeMemberAccess(sources.Held, rank),
             7 => Expression.MakeMemberAccess(sources.HeldItems, count),
+            8 => Expression.MakeMemberAccess(Expression.Field(sources.Subject, linked), rank),
             _ => Expression.Constant(rng.Next(1, 5))
         };
 
@@ -162,7 +164,7 @@ public class DifferentialFuzz
     static void Mutate(World world, Random rng, int step)
     {
         var target = world.Chosen(rng.Next(2));
-        switch (rng.Next(11))
+        switch (rng.Next(13))
         {
             case 5:
                 world.Items.Add(new Recorded(world.Log) { Rank = rng.Next(0, 4) });
@@ -197,6 +199,12 @@ public class DifferentialFuzz
                 break;
             case 10:
                 world.Holder.Held = new Recorded(world.Log) { Rank = rng.Next(0, 4), Score = rng.Next(0, 4), Tag = "r" };
+                break;
+            case 11:
+                world.Subject.Linked!.Rank = rng.Next(0, 4);
+                break;
+            case 12:
+                world.Subject.Linked = new Recorded(world.Log) { Rank = rng.Next(0, 4), Score = rng.Next(0, 4), Tag = "k" };
                 break;
             default:
                 target.Rank ^= 1;

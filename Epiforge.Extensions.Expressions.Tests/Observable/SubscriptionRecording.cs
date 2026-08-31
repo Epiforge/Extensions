@@ -54,6 +54,8 @@ public class Recorded(SubscriptionLog log) :
 
     internal readonly SubscriptionLog Log = log;
 
+    public Recorded? Linked;
+
     public Recorded? Next
     {
         get => next;

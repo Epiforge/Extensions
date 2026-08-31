@@ -836,8 +836,12 @@ public class ExpressionObserver :
             return null;
         var fixedSubexpressions = evaluator.FixedSubexpressions;
         var values = new object?[fixedSubexpressions.Length];
-        for (var i = 0; i < values.Length; ++i)
-            values[i] = DirectObservableExpression.Resolve(fixedSubexpressions[i]);
+        if (values.Length > 0)
+        {
+            var resolutionArgument = (object?)argument;
+            for (var i = 0; i < values.Length; ++i)
+                values[i] = DirectObservableExpression.Resolve(fixedSubexpressions[i], resolutionArgument);
+        }
         var directObservableExpression = new DirectObservableExpression<TArgument, TResult>(this, lambdaExpression, sites, (Func<TArgument, object?[], TResult>)evaluator.Evaluate, argument, values);
         directObservableExpression.Initialize();
         directObservableExpression.IsInitialized = true;
