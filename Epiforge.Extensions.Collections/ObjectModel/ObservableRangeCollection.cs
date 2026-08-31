@@ -197,14 +197,17 @@ public class ObservableRangeCollection<T> :
             NotifyCountChanged();
         NotifyIndexerChanged();
         if (oldItems.Length == newItems.Count)
-            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, newItems, oldItems, index));
-        else
         {
-            if (oldItems.Length > 0)
-                OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, oldItems, index));
-            if (newItems.Count > 0)
-                OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, newItems, index));
+            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, newItems, oldItems, index));
+            return;
         }
+        var replaced = Math.Min(oldItems.Length, newItems.Count);
+        if (replaced > 0)
+            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, newItems.GetRange(0, replaced), oldItems[..replaced], index));
+        if (oldItems.Length > replaced)
+            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, oldItems[replaced..], index + replaced));
+        else
+            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, newItems.GetRange(replaced, newItems.Count - replaced), index + replaced));
     }
 
     /// <inheritdoc/>

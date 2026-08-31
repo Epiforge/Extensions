@@ -16,12 +16,12 @@ public class ObservableRangeCollectionReplacementShape
     }
 
     [TestMethod]
-    public void FewerItemsThanItReplacesIsARemovalAndAnAddition() =>
-        Assert.AreEqual("Remove 4@2 0@-1, Add 0@-1 2@2", EventsRaisedBy(collection => collection.ReplaceRange(2, 4, new[] { 11, 12 }), Enumerable.Range(1, 10)));
+    public void FewerItemsThanItReplacesReplacesWhatItCanAndRemovesTheRest() =>
+        Assert.AreEqual("Replace 2@2 2@2, Remove 2@4 0@-1", EventsRaisedBy(collection => collection.ReplaceRange(2, 4, new[] { 11, 12 }), Enumerable.Range(1, 10)));
 
     [TestMethod]
-    public void MoreItemsThanItReplacesIsARemovalAndAnAddition() =>
-        Assert.AreEqual("Remove 2@2 0@-1, Add 0@-1 4@2", EventsRaisedBy(collection => collection.ReplaceRange(2, 2, new[] { 11, 12, 13, 14 }), Enumerable.Range(1, 10)));
+    public void MoreItemsThanItReplacesReplacesWhatItCanAndAddsTheRest() =>
+        Assert.AreEqual("Replace 2@2 2@2, Add 0@-1 2@4", EventsRaisedBy(collection => collection.ReplaceRange(2, 2, new[] { 11, 12, 13, 14 }), Enumerable.Range(1, 10)));
 
     [TestMethod]
     public void NoItemsAtAllIsSilent() =>

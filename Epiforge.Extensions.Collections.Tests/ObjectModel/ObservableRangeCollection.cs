@@ -382,7 +382,7 @@ public class ObservableRangeCollection
         Assert.AreEqual(17, rangeObservableCollection[6]);
         Assert.AreEqual(18, rangeObservableCollection[7]);
         Assert.AreEqual(19, rangeObservableCollection[8]);
-        Assert.AreEqual("Remove 10@0 0@-1, Add 0@-1 9@0", string.Join(", ", events));
+        Assert.AreEqual("Replace 9@0 9@0, Remove 1@9 0@-1", string.Join(", ", events));
         rangeObservableCollection.CollectionChanged -= collectionChangedHandler;
     }
 
@@ -406,7 +406,7 @@ public class ObservableRangeCollection
         Assert.AreEqual(8, rangeObservableCollection[6]);
         Assert.AreEqual(9, rangeObservableCollection[7]);
         Assert.AreEqual(10, rangeObservableCollection[8]);
-        Assert.AreEqual("Remove 4@3 0@-1, Add 0@-1 3@3", string.Join(", ", events));
+        Assert.AreEqual("Replace 3@3 3@3, Remove 1@6 0@-1", string.Join(", ", events));
         rangeObservableCollection.CollectionChanged -= collectionChangedHandler;
     }
 
