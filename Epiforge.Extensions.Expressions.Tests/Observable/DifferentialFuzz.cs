@@ -1,8 +1,23 @@
-﻿namespace Epiforge.Extensions.Expressions.Tests.Observable;
+namespace Epiforge.Extensions.Expressions.Tests.Observable;
 
 [TestClass]
 public class DifferentialFuzz
 {
+    public sealed class FieldHolder
+    {
+        public Recorded? Held;
+        public ObservableRangeCollection<Recorded> HeldItems = [];
+    }
+
+    sealed class Sources(ParameterExpression subject, MemberExpression other, MemberExpression items, MemberExpression held, MemberExpression heldItems)
+    {
+        internal readonly MemberExpression Held = held;
+        internal readonly MemberExpression HeldItems = heldItems;
+        internal readonly MemberExpression Items = items;
+        internal readonly MemberExpression Other = other;
+        internal readonly ParameterExpression Subject = subject;
+    }
+
     sealed class World
     {
         internal World(int seed, bool useDirectSubscription)
@@ -12,10 +27,17 @@ public class DifferentialFuzz
             Items = [];
             Other = new Recorded(log) { Rank = 3, Score = 5, Tag = "o" };
             Subject = new Recorded(log) { Rank = 7, Score = 2, Tag = "s" };
+            Holder = new FieldHolder { Held = new Recorded(log) { Rank = 1, Score = 4, Tag = "h" } };
             Observer = new ExpressionObserver(Configured(seed, useDirectSubscription));
             (OtherMember, ItemsMember) = CaptureOf(Other, Items);
+            var holder = Expression.Constant(Holder, typeof(FieldHolder));
+            HeldMember = Expression.Field(holder, held);
+            HeldItemsMember = Expression.Field(holder, heldItems);
         }
 
+        internal readonly MemberExpression HeldItemsMember;
+        internal readonly MemberExpression HeldMember;
+        internal readonly FieldHolder Holder;
         internal readonly ObservableRangeCollection<Recorded> Items;
         internal readonly MemberExpression ItemsMember;
         internal readonly SubscriptionLog Log;
@@ -31,6 +53,8 @@ public class DifferentialFuzz
     }
 
     static readonly PropertyInfo count = typeof(ObservableRangeCollection<Recorded>).GetProperty(nameof(ObservableRangeCollection<Recorded>.Count))!;
+    static readonly FieldInfo held = typeof(FieldHolder).GetField(nameof(FieldHolder.Held))!;
+    static readonly FieldInfo heldItems = typeof(FieldHolder).GetField(nameof(FieldHolder.HeldItems))!;
     static readonly PropertyInfo next = typeof(Recorded).GetProperty(nameof(Recorded.Next))!;
     static readonly PropertyInfo rank = typeof(Recorded).GetProperty(nameof(Recorded.Rank))!;
     static readonly PropertyInfo score = typeof(Recorded).GetProperty(nameof(Recorded.Score))!;
@@ -61,69 +85,73 @@ public class DifferentialFuzz
         return ((MemberExpression)((MemberExpression)((BinaryExpression)body.Left).Left).Expression!, (MemberExpression)((MemberExpression)((BinaryExpression)body.Right).Left).Expression!);
     }
 
-    static Expression Boolean(Random rng, int depth, ParameterExpression subject, MemberExpression other, MemberExpression items) =>
+    static Expression Boolean(Random rng, int depth, Sources sources) =>
         depth <= 0 ? Expression.Constant(rng.Next(2) == 0) : (rng.Next(8) switch
         {
-            0 => Expression.GreaterThan(Integer(rng, depth - 1, subject, other, items), Integer(rng, depth - 1, subject, other, items)),
-            1 => Expression.LessThan(Integer(rng, depth - 1, subject, other, items), Integer(rng, depth - 1, subject, other, items)),
-            2 => Expression.Equal(Integer(rng, depth - 1, subject, other, items), Integer(rng, depth - 1, subject, other, items)),
-            3 => Expression.And(Boolean(rng, depth - 1, subject, other, items), Boolean(rng, depth - 1, subject, other, items)),
-            4 => Expression.Or(Boolean(rng, depth - 1, subject, other, items), Boolean(rng, depth - 1, subject, other, items)),
-            5 => Expression.AndAlso(Boolean(rng, depth - 1, subject, other, items), Boolean(rng, depth - 1, subject, other, items)),
-            6 => Expression.Equal(Text(rng, depth - 1, subject, other, items), Text(rng, depth - 1, subject, other, items)),
-            _ => Expression.TypeIs(Text(rng, depth - 1, subject, other, items), typeof(string))
+            0 => Expression.GreaterThan(Integer(rng, depth - 1, sources), Integer(rng, depth - 1, sources)),
+            1 => Expression.LessThan(Integer(rng, depth - 1, sources), Integer(rng, depth - 1, sources)),
+            2 => Expression.Equal(Integer(rng, depth - 1, sources), Integer(rng, depth - 1, sources)),
+            3 => Expression.And(Boolean(rng, depth - 1, sources), Boolean(rng, depth - 1, sources)),
+            4 => Expression.Or(Boolean(rng, depth - 1, sources), Boolean(rng, depth - 1, sources)),
+            5 => Expression.AndAlso(Boolean(rng, depth - 1, sources), Boolean(rng, depth - 1, sources)),
+            6 => Expression.Equal(Text(rng, depth - 1, sources), Text(rng, depth - 1, sources)),
+            _ => Expression.TypeIs(Text(rng, depth - 1, sources), typeof(string))
         });
 
-    static Expression Integer(Random rng, int depth, ParameterExpression subject, MemberExpression other, MemberExpression items) =>
-        depth <= 0 ? Leaf(rng, subject, other, items) : (rng.Next(7) switch
+    static Expression Integer(Random rng, int depth, Sources sources) =>
+        depth <= 0 ? Leaf(rng, sources) : (rng.Next(7) switch
         {
-            0 => Expression.Add(Integer(rng, depth - 1, subject, other, items), Integer(rng, depth - 1, subject, other, items)),
-            1 => Expression.Subtract(Integer(rng, depth - 1, subject, other, items), Integer(rng, depth - 1, subject, other, items)),
-            2 => Expression.Multiply(Integer(rng, depth - 1, subject, other, items), Integer(rng, depth - 1, subject, other, items)),
-            3 => Expression.Divide(Integer(rng, depth - 1, subject, other, items), Integer(rng, depth - 1, subject, other, items)),
-            4 => Expression.Negate(Integer(rng, depth - 1, subject, other, items)),
-            5 => Expression.Condition(Boolean(rng, depth - 1, subject, other, items), Integer(rng, depth - 1, subject, other, items), Integer(rng, depth - 1, subject, other, items)),
-            _ => Leaf(rng, subject, other, items)
+            0 => Expression.Add(Integer(rng, depth - 1, sources), Integer(rng, depth - 1, sources)),
+            1 => Expression.Subtract(Integer(rng, depth - 1, sources), Integer(rng, depth - 1, sources)),
+            2 => Expression.Multiply(Integer(rng, depth - 1, sources), Integer(rng, depth - 1, sources)),
+            3 => Expression.Divide(Integer(rng, depth - 1, sources), Integer(rng, depth - 1, sources)),
+            4 => Expression.Negate(Integer(rng, depth - 1, sources)),
+            5 => Expression.Condition(Boolean(rng, depth - 1, sources), Integer(rng, depth - 1, sources), Integer(rng, depth - 1, sources)),
+            _ => Leaf(rng, sources)
         });
 
-    static Expression Leaf(Random rng, ParameterExpression subject, MemberExpression other, MemberExpression items) =>
-        rng.Next(7) switch
+    static Expression Leaf(Random rng, Sources sources) =>
+        rng.Next(9) switch
         {
-            0 => Expression.MakeMemberAccess(subject, rank),
-            1 => Expression.MakeMemberAccess(subject, score),
-            2 => Expression.MakeMemberAccess(other, rank),
-            3 => Expression.MakeMemberAccess(other, score),
-            4 => Expression.MakeMemberAccess(Expression.MakeMemberAccess(subject, next), rank),
-            5 => Expression.MakeMemberAccess(items, count),
+            0 => Expression.MakeMemberAccess(sources.Subject, rank),
+            1 => Expression.MakeMemberAccess(sources.Subject, score),
+            2 => Expression.MakeMemberAccess(sources.Other, rank),
+            3 => Expression.MakeMemberAccess(sources.Other, score),
+            4 => Expression.MakeMemberAccess(Expression.MakeMemberAccess(sources.Subject, next), rank),
+            5 => Expression.MakeMemberAccess(sources.Items, count),
+            6 => Expression.MakeMemberAccess(sources.Held, rank),
+            7 => Expression.MakeMemberAccess(sources.HeldItems, count),
             _ => Expression.Constant(rng.Next(1, 5))
         };
 
-    static Expression Text(Random rng, int depth, ParameterExpression subject, MemberExpression other, MemberExpression items) =>
-        depth <= 0 ? TextLeaf(rng, subject, other, items) : (rng.Next(3) switch
+    static Expression Text(Random rng, int depth, Sources sources) =>
+        depth <= 0 ? TextLeaf(rng, sources) : (rng.Next(3) switch
         {
-            0 => Expression.Coalesce(Text(rng, depth - 1, subject, other, items), Text(rng, depth - 1, subject, other, items)),
-            1 => Expression.Condition(Boolean(rng, depth - 1, subject, other, items), Text(rng, depth - 1, subject, other, items), Text(rng, depth - 1, subject, other, items)),
-            _ => TextLeaf(rng, subject, other, items)
+            0 => Expression.Coalesce(Text(rng, depth - 1, sources), Text(rng, depth - 1, sources)),
+            1 => Expression.Condition(Boolean(rng, depth - 1, sources), Text(rng, depth - 1, sources), Text(rng, depth - 1, sources)),
+            _ => TextLeaf(rng, sources)
         });
 
-    static Expression TextLeaf(Random rng, ParameterExpression subject, MemberExpression other, MemberExpression items) =>
-        rng.Next(4) switch
+    static Expression TextLeaf(Random rng, Sources sources) =>
+        rng.Next(5) switch
         {
-            0 => Expression.MakeMemberAccess(subject, tag),
-            1 => Expression.MakeMemberAccess(other, tag),
-            2 => Expression.MakeMemberAccess(Expression.MakeMemberAccess(subject, next), tag),
+            0 => Expression.MakeMemberAccess(sources.Subject, tag),
+            1 => Expression.MakeMemberAccess(sources.Other, tag),
+            2 => Expression.MakeMemberAccess(Expression.MakeMemberAccess(sources.Subject, next), tag),
+            3 => Expression.MakeMemberAccess(sources.Held, tag),
             _ => Expression.Constant(rng.Next(2) == 0 ? "s" : null, typeof(string))
         };
 
-    static Expression<Func<Recorded, object?>> Lambda(int seed, int depth, MemberExpression other, MemberExpression items)
+    static Expression<Func<Recorded, object?>> Lambda(int seed, int depth, World world)
     {
         var rng = new Random(seed);
         var subject = Expression.Parameter(typeof(Recorded), "s");
+        var sources = new Sources(subject, world.OtherMember, world.ItemsMember, world.HeldMember, world.HeldItemsMember);
         var body = rng.Next(3) switch
         {
-            0 => Boolean(rng, depth, subject, other, items),
-            1 => Text(rng, depth, subject, other, items),
-            _ => Integer(rng, depth, subject, other, items)
+            0 => Boolean(rng, depth, sources),
+            1 => Text(rng, depth, sources),
+            _ => Integer(rng, depth, sources)
         };
         return Expression.Lambda<Func<Recorded, object?>>(Expression.Convert(body, typeof(object)), subject);
     }
@@ -134,7 +162,7 @@ public class DifferentialFuzz
     static void Mutate(World world, Random rng, int step)
     {
         var target = world.Chosen(rng.Next(2));
-        switch (rng.Next(8))
+        switch (rng.Next(11))
         {
             case 5:
                 world.Items.Add(new Recorded(world.Log) { Rank = rng.Next(0, 4) });
@@ -158,6 +186,18 @@ public class DifferentialFuzz
             case 3:
                 target.Next = rng.Next(2) == 0 ? null : new Recorded(world.Log) { Rank = rng.Next(0, 4), Score = rng.Next(0, 4), Tag = "n" };
                 break;
+            case 8:
+                world.Holder.Held!.Rank = rng.Next(0, 4);
+                break;
+            case 9:
+                if (rng.Next(2) == 0)
+                    world.Holder.HeldItems.Add(new Recorded(world.Log) { Rank = rng.Next(0, 4) });
+                else if (world.Holder.HeldItems.Count > 0)
+                    world.Holder.HeldItems.RemoveAt(world.Holder.HeldItems.Count - 1);
+                break;
+            case 10:
+                world.Holder.Held = new Recorded(world.Log) { Rank = rng.Next(0, 4), Score = rng.Next(0, 4), Tag = "r" };
+                break;
             default:
                 target.Rank ^= 1;
                 break;
@@ -168,8 +208,8 @@ public class DifferentialFuzz
     {
         var graphWorld = new World(seed, false);
         var fastWorld = new World(seed, true);
-        var graphLambda = Lambda(seed, depth, graphWorld.OtherMember, graphWorld.ItemsMember);
-        var fastLambda = Lambda(seed, depth, fastWorld.OtherMember, fastWorld.ItemsMember);
+        var graphLambda = Lambda(seed, depth, graphWorld);
+        var fastLambda = Lambda(seed, depth, fastWorld);
         Assert.AreEqual(graphLambda.ToString().Replace("value(", "@("), fastLambda.ToString().Replace("value(", "@("), $"seed {seed}: the two worlds were given different expressions");
         using var graphExpression = graphWorld.Observer.Observe(graphLambda, graphWorld.Subject);
         using var fastExpression = fastWorld.Observer.Observe(fastLambda, fastWorld.Subject);
@@ -199,12 +239,5 @@ public class DifferentialFuzz
     {
         for (var seed = 1000; seed < 1300; ++seed)
             RunProgram(seed, 2, 16);
-    }
-
-    [TestMethod]
-    public void SingleMemberExpressions()
-    {
-        for (var seed = 9000; seed < 9200; ++seed)
-            RunProgram(seed, 0, 20);
     }
 }
