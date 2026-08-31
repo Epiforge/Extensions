@@ -70,11 +70,24 @@ Typing the result end to end would meet it fully. It is not recommended on the e
 
 Parked with the reasoning recorded, as the multi-tier structural cache was.
 
-## 192 bytes not accounted for
+## 192 bytes not accounted for — since resolved
 
-Of the 264, this document can name 72: one box and two `EventArgs` from `SetBackedProperty`. The remaining **192 bytes are unexplained**. They were roughly 190 before this change as well, so they are not per-observation and not something this change created. `PropagationScope` is a `readonly ref struct` whose pending list is thread-static and handed back to itself after flushing, so it is not that either.
+Of the 264, this document could name 72: one box and two `EventArgs` from `SetBackedProperty`. The remaining 192 were left open rather than folded into a figure presented as understood.
 
-Recorded as open rather than folded into a figure presented as understood.
+They are not propagation. `PropagationFloorBenchmarks` puts a thousand observations behind two thresholds and moves each one: the first between −1 and −2, where every person outranks both and **no verdict changes**; the second between 0 and 1, which is what this arm does and which flips exactly one person.
+
+| arm | mean | allocated |
+|--- |---: |---: |
+| `ChangeAffectingNoElement` | 4.103 μs | **48 B** |
+| `ChangeAffectingOneElement` | 4.088 μs | 264 B |
+
+**Forty-eight bytes for a thousand observations re-evaluating** — the two source `EventArgs` and nothing per observation at all. The prediction written before the run was 48, from the arithmetic of two 24-byte objects.
+
+So the 192 is the consequence of an element crossing the predicate and joining or leaving the query's result, not a cost the expression machinery pays to propagate. The two arms are also the same speed, so it costs no measurable time; the whole 4.09 μs is the thousand re-evaluations, about 4.1 ns each.
+
+What remains unseparated is *which* part of that response spends it — the `NotifyCollectionChangedEventArgs` and the single-item list it carries, or the query's own bookkeeping. That is a measurement inside the query layer rather than this one.
+
+Worth one note for whoever takes it: nothing in that benchmark subscribes to either query's `CollectionChanged`, and the 192 bytes are spent anyway.
 
 ## How this was found
 
