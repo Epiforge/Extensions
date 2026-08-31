@@ -37,9 +37,15 @@ public sealed class NotifyDictionaryChangedEventArgs<TKey, TValue> :
     /// </summary>
     /// <param name="action">The action that caused the event (this must be set to <see cref="NotifyDictionaryChangedAction.Add"/> or <see cref="NotifyDictionaryChangedAction.Remove"/>)</param>
     /// <param name="changedItem">The item that is affected by the change</param>
-    public NotifyDictionaryChangedEventArgs(NotifyDictionaryChangedAction action, KeyValuePair<TKey, TValue> changedItem) :
-        this(action, [changedItem])
+    public NotifyDictionaryChangedEventArgs(NotifyDictionaryChangedAction action, KeyValuePair<TKey, TValue> changedItem)
     {
+        if (action is not (NotifyDictionaryChangedAction.Add or NotifyDictionaryChangedAction.Remove))
+            throw new ArgumentOutOfRangeException(nameof(action));
+        Action = action;
+        if (action is NotifyDictionaryChangedAction.Add)
+            NewItems = [changedItem];
+        else
+            OldItems = [changedItem];
     }
 
     /// <summary>
@@ -81,9 +87,13 @@ public sealed class NotifyDictionaryChangedEventArgs<TKey, TValue> :
     /// <param name="action">The action that caused the event (this must be set to <see cref="NotifyDictionaryChangedAction.Replace"/>)</param>
     /// <param name="newItem">The new key-value pair that is replacing the original key-value pair</param>
     /// <param name="oldItem">The original key-value pair that is replaced</param>
-    public NotifyDictionaryChangedEventArgs(NotifyDictionaryChangedAction action, KeyValuePair<TKey, TValue> newItem, KeyValuePair<TKey, TValue> oldItem) :
-        this(action, [newItem], [oldItem])
+    public NotifyDictionaryChangedEventArgs(NotifyDictionaryChangedAction action, KeyValuePair<TKey, TValue> newItem, KeyValuePair<TKey, TValue> oldItem)
     {
+        if (action != NotifyDictionaryChangedAction.Replace)
+            throw new ArgumentOutOfRangeException(nameof(action));
+        Action = action;
+        NewItems = [newItem];
+        OldItems = [oldItem];
     }
 
     /// <summary>

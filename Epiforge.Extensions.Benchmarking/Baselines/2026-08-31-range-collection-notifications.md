@@ -39,7 +39,7 @@ One static `PropertyChangedEventArgs("Item[]")` on `CommonPropertyChangeNotifica
 
 **`ReplaceAll` and `ReplaceRange` can raise a `Replace` whose new and old item counts differ.** The code knows they can — `if (oldItems.Length != list.Count)` decides whether to announce a count change — and a consumer may reasonably read `Replace` as a same-size swap.
 
-**`RemoveRange(IEnumerable<T>)` ignores the flag entirely** where every sibling honours it. This was nearly reported as a defect and is not one: removing items at scattered positions cannot be expressed as a single event, because `NotifyCollectionChangedEventArgs` carries one starting index. It is undocumented, though, and the flag's own summary implies otherwise.
+**`RemoveRange(IEnumerable<T>)` ignores the flag entirely** where every sibling honors it. This was nearly reported as a defect and is not one: removing items at scattered positions cannot be expressed as a single event, because `NotifyCollectionChangedEventArgs` carries one starting index. It is undocumented, though, and the flag's own summary implies otherwise.
 
 ## Why 24 KB of tests did not catch it
 

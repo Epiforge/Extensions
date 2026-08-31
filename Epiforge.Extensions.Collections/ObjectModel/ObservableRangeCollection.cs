@@ -189,6 +189,24 @@ public class ObservableRangeCollection<T> :
     void NotifyIndexerChanged() =>
         OnPropertyChanged(CommonPropertyChangeNotificationEventArgs.IndexerChanged);
 
+    void NotifyReplacement(T[] oldItems, List<T> newItems, int index)
+    {
+        if (oldItems.Length is 0 && newItems.Count is 0)
+            return;
+        if (oldItems.Length != newItems.Count)
+            NotifyCountChanged();
+        NotifyIndexerChanged();
+        if (oldItems.Length == newItems.Count)
+            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, newItems, oldItems, index));
+        else
+        {
+            if (oldItems.Length > 0)
+                OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, oldItems, index));
+            if (newItems.Count > 0)
+                OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, newItems, index));
+        }
+    }
+
     /// <inheritdoc/>
     protected override void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
     {
@@ -345,10 +363,7 @@ public class ObservableRangeCollection<T> :
                 Items.Add(element);
                 list.Add(element);
             }
-            if (oldItems.Length != list.Count)
-                NotifyCountChanged();
-            NotifyIndexerChanged();
-            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, list, oldItems, 0));
+            NotifyReplacement(oldItems, list, 0);
         }
     }
 
@@ -384,13 +399,7 @@ public class ObservableRangeCollection<T> :
                     Items.Insert(++index, element);
                     list.Add(element);
                 }
-            if (oldItems.Length != list.Count)
-                NotifyCountChanged();
-            NotifyIndexerChanged();
-            if (list.Count > 0)
-                OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, list, oldItems, originalIndex));
-            else
-                OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, oldItems, originalIndex));
+            NotifyReplacement(oldItems, list, originalIndex);
             return [..oldItems];
         }
     }

@@ -366,18 +366,9 @@ public class ObservableRangeCollection
     public void ObservedReplaceAll()
     {
         var rangeObservableCollection = new ObservableRangeCollection<int>(Enumerable.Range(1, 10));
-        var collectionChanged = 0;
-        void collectionChangedHandler(object? sender, NotifyCollectionChangedEventArgs e)
-        {
-            ++collectionChanged;
-            Assert.AreEqual(NotifyCollectionChangedAction.Replace, e.Action);
-            Assert.IsNotNull(e.OldItems);
-            Assert.AreEqual(10, e.OldItems?.Count);
-            Assert.AreEqual(0, e.OldStartingIndex);
-            Assert.IsNotNull(e.NewItems);
-            Assert.AreEqual(9, e.NewItems?.Count);
-            Assert.AreEqual(0, e.NewStartingIndex);
-        }
+        var events = new List<string>();
+        void collectionChangedHandler(object? sender, NotifyCollectionChangedEventArgs e) =>
+            events.Add($"{e.Action} {e.OldItems?.Count ?? 0}@{e.OldStartingIndex} {e.NewItems?.Count ?? 0}@{e.NewStartingIndex}");
         rangeObservableCollection.CollectionChanged += collectionChangedHandler;
         Assert.AreEqual(10, rangeObservableCollection.Count);
         rangeObservableCollection.ReplaceAll(Enumerable.Range(11, 9));
@@ -391,7 +382,7 @@ public class ObservableRangeCollection
         Assert.AreEqual(17, rangeObservableCollection[6]);
         Assert.AreEqual(18, rangeObservableCollection[7]);
         Assert.AreEqual(19, rangeObservableCollection[8]);
-        Assert.AreEqual(1, collectionChanged);
+        Assert.AreEqual("Remove 10@0 0@-1, Add 0@-1 9@0", string.Join(", ", events));
         rangeObservableCollection.CollectionChanged -= collectionChangedHandler;
     }
 
@@ -399,18 +390,9 @@ public class ObservableRangeCollection
     public void ObservedReplaceRange()
     {
         var rangeObservableCollection = new ObservableRangeCollection<int>(Enumerable.Range(1, 10));
-        var collectionChanged = 0;
-        void collectionChangedHandler(object? sender, NotifyCollectionChangedEventArgs e)
-        {
-            ++collectionChanged;
-            Assert.AreEqual(NotifyCollectionChangedAction.Replace, e.Action);
-            Assert.IsNotNull(e.OldItems);
-            Assert.AreEqual(4, e.OldItems?.Count);
-            Assert.AreEqual(3, e.OldStartingIndex);
-            Assert.IsNotNull(e.NewItems);
-            Assert.AreEqual(3, e.NewItems?.Count);
-            Assert.AreEqual(3, e.NewStartingIndex);
-        }
+        var events = new List<string>();
+        void collectionChangedHandler(object? sender, NotifyCollectionChangedEventArgs e) =>
+            events.Add($"{e.Action} {e.OldItems?.Count ?? 0}@{e.OldStartingIndex} {e.NewItems?.Count ?? 0}@{e.NewStartingIndex}");
         rangeObservableCollection.CollectionChanged += collectionChangedHandler;
         Assert.AreEqual(10, rangeObservableCollection.Count);
         rangeObservableCollection.ReplaceRange(3, 4, Enumerable.Range(11, 3).ToList());
@@ -424,7 +406,7 @@ public class ObservableRangeCollection
         Assert.AreEqual(8, rangeObservableCollection[6]);
         Assert.AreEqual(9, rangeObservableCollection[7]);
         Assert.AreEqual(10, rangeObservableCollection[8]);
-        Assert.AreEqual(1, collectionChanged);
+        Assert.AreEqual("Remove 4@3 0@-1, Add 0@-1 3@3", string.Join(", ", events));
         rangeObservableCollection.CollectionChanged -= collectionChangedHandler;
     }
 

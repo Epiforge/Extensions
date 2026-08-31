@@ -450,12 +450,19 @@ public class ObservableDictionary<TKey, TValue> :
         OnPropertyChanging(CommonPropertyChangeNotificationEventArgs.CountChanging);
 
     /// <summary>
+    /// Raises the <see cref="INotifyPropertyChanged.PropertyChanged"/> event for the indexer
+    /// </summary>
+    protected void NotifyIndexerChanged() =>
+        OnPropertyChanged(CommonPropertyChangeNotificationEventArgs.IndexerChanged);
+
+    /// <summary>
     /// Calls <see cref="OnDictionaryChanged(NotifyDictionaryChangedEventArgs{TKey, TValue})"/> and also calls <see cref="OnCollectionChanged(NotifyCollectionChangedEventArgs)"/>, and <see cref="OnDictionaryChangedBoxed(NotifyDictionaryChangedEventArgs{object, object})"/> when applicable
     /// </summary>
     /// <param name="e">The event arguments for <see cref="INotifyDictionaryChanged{TKey, TValue}.DictionaryChanged"/></param>
     protected virtual void OnChanged(NotifyDictionaryChangedEventArgs<TKey, TValue> e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NotifyIndexerChanged();
         if (CollectionChanged is not null)
             switch (e.Action)
             {

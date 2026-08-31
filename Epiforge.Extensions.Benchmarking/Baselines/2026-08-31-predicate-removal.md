@@ -34,9 +34,9 @@ At 16,000 elements the member wins by 1.36× to 1.59× — the predicted directi
 
 At 1,000 elements the member is consistently **slower** than the arm it was derived from, by about 4 μs. The difference is roughly 5σ on the means and so is not noise, and I have no mechanism for it. Every configuration at that size sits within 8 μs of the ~20 μs harness floor, where a 4 μs ordering is 20% of the measurement and the thing being measured is a fifth of it. Recorded as unexplained rather than explained badly; the member exists for large collections and wins decisively there.
 
-## An optimisation this benchmark never exercises
+## An optimization this benchmark never exercises
 
-The implementation scans for the first matching element before allocating the survivor list, so a predicate that matches nothing allocates nothing. In this benchmark the predicate is `value % 100 < RemovedPercent` over values starting at zero, so element zero matches in all six configurations and the scan breaks immediately. **The optimisation is never entered and its cost is unmeasured.**
+The implementation scans for the first matching element before allocating the survivor list, so a predicate that matches nothing allocates nothing. In this benchmark the predicate is `value % 100 < RemovedPercent` over values starting at zero, so element zero matches in all six configurations and the scan breaks immediately. **The optimization is never entered and its cost is unmeasured.**
 
 Its cost is bounded by inspection: element reads become n + f where f is the index of the first match, against n without it, while predicate calls stay at exactly n either way. A collection whose only matching element is last therefore pays about twice the reads, in exchange for allocating nothing in the no-match case.
 
@@ -82,7 +82,7 @@ So the allocation crossover is 108k against 4.1n, or **k/n ≈ 3.8%**. Below tha
 
 ## Decisions taken
 
-**It returns `int` and there is no `GetAndResetRemovingAll`.** Materialising the removed items is precisely the cost this member exists to avoid; a caller who wants them should call `GetAndRemoveAll`. The asymmetry with `RemoveAll`/`GetAndRemoveAll` is deliberate.
+**It returns `int` and there is no `GetAndResetRemovingAll`.** Materializing the removed items is precisely the cost this member exists to avoid; a caller who wants them should call `GetAndRemoveAll`. The asymmetry with `RemoveAll`/`GetAndRemoveAll` is deliberate.
 
 **It ignores `RaiseCollectionChangedEventsForIndividualElements`.** The member's name says what it does; a flag that turned `ResetRemovingAll` into per-element events would make the name a lie. A test pins that both settings produce identical event sequences.
 
@@ -102,9 +102,9 @@ The alternatives were a default interface method, rejected because a default is 
 
 ## Found and not fixed
 
-**`RemoveAll` builds a list it only measures.** It is `GetAndRemoveAll(predicate).Count` — a `List<T>` grown to k and then copied into an array, to take a length. That is roughly 12 of the 108 bytes per element removed. A private counting loop would remove it without changing any behaviour.
+**`RemoveAll` builds a list it only measures.** It is `GetAndRemoveAll(predicate).Count` — a `List<T>` grown to k and then copied into an array, to take a length. That is roughly 12 of the 108 bytes per element removed. A private counting loop would remove it without changing any behavior.
 
-**`RemoveAll`, `GetAndRemoveAll` and `RemoveRange(IEnumerable<T>)` ignore the constructor flag entirely.** They raise one event per element removed whatever the collection was told. Fixed the same day; `2026-08-31-honouring-the-flag.md` carries the correction and the measurements.
+**`RemoveAll`, `GetAndRemoveAll` and `RemoveRange(IEnumerable<T>)` ignore the constructor flag entirely.** They raise one event per element removed whatever the collection was told. Fixed the same day; `2026-08-31-honoring-the-flag.md` carries the correction and the measurements.
 
 What that means depends on what the flag is for, and I had it backwards. I read `RaiseCollectionChangedEventsForIndividualElements` as a performance switch — false meaning "batch for speed", true meaning "stay compatible". It is not. It exists so that a collection can be bound to a consumer that cannot process a `NotifyCollectionChangedEventArgs` carrying more than one item at all; WPF's `ListCollectionView` is the canonical one, and it throws rather than degrading. So `true` is a **prohibition** on multi-item events, and `false` is a **permission** to emit them.
 
@@ -116,7 +116,7 @@ Under that reading the audit comes out differently, and better:
 | `RemoveAll`, `GetAndRemoveAll`, `RemoveRange(IEnumerable<T>)` | per element | **per element** |
 | `Reset(IEnumerable<T>)` | one `Reset` | one `Reset` |
 
-The three offending methods are already **correct** under the prohibition — they never emit a multi-item event, so no consumer of a flag-`true` collection can be harmed by them or would see any change if they were fixed. They are wrong only in never taking the permission they are granted. That makes the fix cheaper than first assessed: the behaviour change reaches only consumers who explicitly asked for multi-item events.
+The three offending methods are already **correct** under the prohibition — they never emit a multi-item event, so no consumer of a flag-`true` collection can be harmed by them or would see any change if they were fixed. They are wrong only in never taking the permission they are granted. That makes the fix cheaper than first assessed: the behavior change reaches only consumers who explicitly asked for multi-item events.
 
 It also changes the shape of the fix. If `false` is permission to be descriptive rather than an instruction to be terse, the right event is not a single `Reset` — it is one `Remove` per contiguous run of removed elements. Runs never emit more events than today, never emit an event a flag-`false` consumer did not permit, preserve the indices such a consumer wants, and need no threshold or magic number. A single `Reset` throws away information that the permission was granted precisely to carry, and would make `ResetRemovingAll` largely redundant; runs leave it a distinct purpose, for the caller who wants exactly one event whatever the clustering.
 

@@ -31,7 +31,7 @@ Note also that the clustered case is *slower in absolute terms* than the scatter
 
 The first version allocated a `T[1]` for every run, including runs of one. Scattered removal therefore allocated 7% more than the code it replaced, at both sizes — a real regression, small, and caught only because the benchmark had a scattered arm. The core now takes a single-item path when a run is one long, which restores exact parity.
 
-The clustered ratio improved from 0.12 to 0.05 in the same pass, because `RemoveAll` stopped materialising the items it was only counting. Both arms benefited: the baseline itself fell from 26.64 KB to 23.44 KB at a thousand elements and from 422.95 KB to 375 KB at sixteen thousand, which is about twelve bytes per element removed.
+The clustered ratio improved from 0.12 to 0.05 in the same pass, because `RemoveAll` stopped materializing the items it was only counting. Both arms benefited: the baseline itself fell from 26.64 KB to 23.44 KB at a thousand elements and from 422.95 KB to 375 KB at sixteen thousand, which is about twelve bytes per element removed.
 
 ## `RemoveRange` visits the collection once
 
@@ -53,4 +53,4 @@ Seven call sites reordered. The test does not assert anything about the base cla
 
 The test suite caught it, but not the tests written for this change: those all called `GetAndRemoveAll`, which passes a non-null list and takes the working path. Nothing exercised the method with the bug. `RemoveAllCountsWithoutCollectingInEitherMode` now does, with a five-second timeout so a regression fails rather than wedging the run.
 
-**A single item which is itself a list, pre-existing.** `new NotifyCollectionChangedEventArgs(action, item, index)` where `T` implements `IList` binds to the `changedItems` overload rather than the `changedItem` one. An `ObservableRangeCollection<int[]>` removing one array raised an event describing two integers. `RemoveRange` had this already; the new core would have inherited it. Both cast to `object?` now, and a test fails loudly on the old behaviour.
+**A single item which is itself a list, pre-existing.** `new NotifyCollectionChangedEventArgs(action, item, index)` where `T` implements `IList` binds to the `changedItems` overload rather than the `changedItem` one. An `ObservableRangeCollection<int[]>` removing one array raised an event describing two integers. `RemoveRange` had this already; the new core would have inherited it. Both cast to `object?` now, and a test fails loudly on the old behavior.
