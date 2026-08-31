@@ -19,6 +19,7 @@
 
     <ItemGroup>
         <PackageReference Include="BenchmarkDotNet" Version="0.15.8" />
+        <PackageReference Include="Linq.Expression.Optimizer" Version="1.0.29" />
     </ItemGroup>
 
 </Project>

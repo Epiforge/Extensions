@@ -3,11 +3,12 @@ namespace Epiforge.Extensions.Expressions.Observable;
 abstract class DirectObservableExpression(ExpressionObserver observer, Type type) :
     ObservableExpression(observer, type, false)
 {
-    internal static object? Resolve(Expression expression) =>
+    internal static object? Resolve(Expression expression, object? argument) =>
         expression switch
         {
             ConstantExpression constantExpression => constantExpression.Value,
-            MemberExpression { Member: FieldInfo field } memberExpression => field.GetValue(memberExpression.Expression is { } target ? Resolve(target) : null),
+            ParameterExpression => argument,
+            MemberExpression { Member: FieldInfo field } memberExpression => field.GetValue(memberExpression.Expression is { } target ? Resolve(target, argument) : null),
             UnaryExpression { NodeType: ExpressionType.Quote } unaryExpression => unaryExpression.Operand,
             _ => throw new NotSupportedException($"the analyzer planned a subscription to {expression}, whose value the execution path cannot resolve without invoking something")
         };
