@@ -6,7 +6,7 @@ Two eligibility rules, one API guard, and one bug introduced and caught in betwe
 
 Separately, a static property's getter is a static method, so `DisposeStaticMethodReturnValues` — true by default — registered its value for disposal, and the analyzer refused it. `DateTime.Now` was ineligible. This is the same rule that refused method-backed operators until yesterday, and it yields to the same argument: `ObservableMemberExpression.GetShouldValueBeDisposed` is read only by `DisposeIfNecessaryAndPossible`, whose whole body is three runtime type tests, so when the type cannot implement either interface the graph's disposal is not a disposal.
 
-That argument covers a blanket default nobody asked for. It does not cover a property a consumer *registered* through `AddPropertyValueDisposal`, where overriding them would be a judgement about their intent. So the options now refuse that registration instead: every path — properties, indexers, operators, `AddExpressionValueDisposal` — routes through `AddMethodReturnValueDisposal`, and it throws when the return type cannot implement a disposal interface. With the ambiguous registration impossible, the analyzer's rule needs no exception for it.
+That argument covers a blanket default nobody asked for. It does not cover a property a consumer *registered* through `AddPropertyValueDisposal`, where overriding them would be a judgement about their intent. So the options now refuse that registration instead: every path — properties, indexers, operators, `AddExpressionValueDisposal` — routes through `AddMethodReturnValueDisposal`, and it refuses the registration and returns `false` when the return type cannot implement a disposal interface. With the ambiguous registration impossible, the analyzer's rule needs no exception for it.
 
 ## Environment
 
@@ -67,11 +67,13 @@ Two lines fixed it, one in each half of the mechanism: `IsFixed` admits `MemberE
 
 The lesson is not new, which is what makes it worth writing down again. The analyzer tests asserted eligibility and nothing else, and eligibility is not behavior. The same gap produced the argument-rooted-field `NotSupportedException` two changes ago, and it was described in `2026-08-31-wider-eligibility.md` under the heading of what a generator's grammar does not know. It was then walked into again, in the same session, by the same author.
 
-## The break
+## The registration guard, and the break that was avoided
 
-`AddMethodReturnValueDisposal` and both `AddConstructedTypeDisposal` overloads now throw `ArgumentException` for a type that cannot implement a disposal interface. Package validation will not report this: no signature changed.
+`AddMethodReturnValueDisposal` and both `AddConstructedTypeDisposal` overloads now return `false` for a type that cannot implement a disposal interface, rather than recording a registration which the graph's disposal — three failing type tests — could never act on.
 
-What it can break is narrow — a call that has never had any effect, since the graph's disposal of such a value was already three failing type tests. The blast radius in this repository was **one call site of sixteen**, and it was `DisposedPropertyValueIsIneligible` registering `TestPerson.Name`, a `string`. That test pinned the disposal rule using an input which could never reach it. It now uses a property whose value the graph really does dispose.
+This began as an `ArgumentException`, which is the more useful behavior: it tells a consumer their registration cannot work rather than letting them find out never. It was softened before release, deliberately. No public signature changed either way, so package validation would not have reported the throw; a consumer would have met it at startup, in registration code, with nothing in the toolchain having warned them. That is a break worth a major version, and this release is not one — so the guard says `false` and the `<returns>` documentation says why.
+
+The blast radius, had it thrown, was **one call site of sixteen** in this repository: `DisposedPropertyValueIsIneligible`, registering `TestPerson.Name`, a `string`. That test pinned the disposal rule using an input which could never reach it. It now uses a property whose value the graph really does dispose.
 
 `StaticPropertyIsEligibleWhenStaticDisposalIsExcluded` had the same problem in the other direction: it used `DateTime.Now`, which is now eligible either way, so the test would have passed without testing anything. It uses `Console.Out` — `TextWriter`, unsealed and `IDisposable` — so the option is once again the only thing deciding the outcome.
 

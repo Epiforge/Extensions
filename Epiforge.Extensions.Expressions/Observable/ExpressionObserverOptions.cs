@@ -81,8 +81,7 @@ public class ExpressionObserverOptions
     /// </summary>
     /// <param name="type">The type of object created</param>
     /// <param name="constuctorParameterTypes">The types of the arguments passed to the constructor, in order</param>
-    /// <returns><c>true</c> if this has resulted in a change in the options; otherwise, <c>false</c></returns>
-    /// <exception cref="ArgumentException">The type is sealed and implements neither disposal interface, so no value of it could ever be disposed</exception>
+    /// <returns><c>true</c> if this has resulted in a change in the options; otherwise, <c>false</c>, which includes a type sealed and implementing neither disposal interface, since no value of it could ever be disposed</returns>
     public bool AddConstructedTypeDisposal(Type type, params Type[] constuctorParameterTypes)
     {
         ArgumentNullException.ThrowIfNull(type);
@@ -90,7 +89,7 @@ public class ExpressionObserverOptions
         if (constuctorParameterTypes.Any(constructorParameterType => constructorParameterType is null))
             throw new ArgumentException("One or more constructor parameter types are null", nameof(constuctorParameterTypes));
         if (CannotBeDisposed(type))
-            throw new ArgumentException("the type specified cannot implement a disposal interface", nameof(type));
+            return false;
         return DisposeConstructedTypes.TryAdd((type, new EquatableList<Type>(constuctorParameterTypes)), 1);
     }
 
@@ -98,15 +97,14 @@ public class ExpressionObserverOptions
     /// Specifies that the expression observer will dispose of objects they have created using the specified constructor when the objects are replaced or otherwise discarded
     /// </summary>
     /// <param name="constructor">The constructor</param>
-    /// <returns><c>true</c> if this has resulted in a change in the options; otherwise, <c>false</c></returns>
-    /// <exception cref="ArgumentException">The declaring type is sealed and implements neither disposal interface, so no value of it could ever be disposed</exception>
+    /// <returns><c>true</c> if this has resulted in a change in the options; otherwise, <c>false</c>, which includes a declaring type sealed and implementing neither disposal interface, since no value of it could ever be disposed</returns>
     public bool AddConstructedTypeDisposal(ConstructorInfo constructor)
     {
         ArgumentNullException.ThrowIfNull(constructor);
         if (constructor.DeclaringType is not { } declaringType)
             throw new ArgumentException("The constructor does not have a declaring type", nameof(constructor));
         if (CannotBeDisposed(declaringType))
-            throw new ArgumentException("the declaring type of the constructor specified cannot implement a disposal interface", nameof(constructor));
+            return false;
         return DisposeConstructedTypes.TryAdd((declaringType, new EquatableList<Type>([..constructor.GetParameters().Select(parameterInfo => parameterInfo.ParameterType)])), 1);
     }
 
@@ -163,8 +161,7 @@ public class ExpressionObserverOptions
     /// </summary>
     /// <param name="method">The method yielding the objects</param>
     /// <param name="useGenericDefinition">Whether or not objects created by the method will be disposed regardless of generic type arguments used to make the method</param>
-    /// <returns><c>true</c> if this has resulted in a change in the options; otherwise, <c>false</c></returns>
-    /// <exception cref="ArgumentException">The return type is sealed and implements neither disposal interface, so no value of it could ever be disposed</exception>
+    /// <returns><c>true</c> if this has resulted in a change in the options; otherwise, <c>false</c>, which includes a return type sealed and implementing neither disposal interface, since no value of it could ever be disposed</returns>
     public bool AddMethodReturnValueDisposal(MethodInfo method, bool useGenericDefinition)
     {
         ArgumentNullException.ThrowIfNull(method);
@@ -175,7 +172,7 @@ public class ExpressionObserverOptions
             method = GenericMethodToGenericMethodDefinition.GetOrAdd(method, GetGenericMethodDefinitionFromGenericMethod);
         }
         if (CannotBeDisposed(method.ReturnType))
-            throw new ArgumentException("the return type of the method specified cannot implement a disposal interface", nameof(method));
+            return false;
         return DisposeMethodReturnValues.TryAdd(method, 1);
     }
 
@@ -192,8 +189,7 @@ public class ExpressionObserverOptions
     /// </summary>
     /// <param name="property">The property yielding the objects</param>
     /// <param name="useGenericDefinition">Whether or not objects created by the property getter will be disposed regardless of generic type arguments used to make the property getter</param>
-    /// <returns><c>true</c> if this has resulted in a change in the options; otherwise, <c>false</c></returns>
-    /// <exception cref="ArgumentException">The property has no getter, or its type is sealed and implements neither disposal interface, so no value of it could ever be disposed</exception>
+    /// <returns><c>true</c> if this has resulted in a change in the options; otherwise, <c>false</c>, which includes a property type sealed and implementing neither disposal interface, since no value of it could ever be disposed</returns>
     public bool AddPropertyValueDisposal(PropertyInfo property, bool useGenericDefinition)
     {
         ArgumentNullException.ThrowIfNull(property);

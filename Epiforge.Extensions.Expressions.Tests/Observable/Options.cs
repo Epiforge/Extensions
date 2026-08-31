@@ -106,9 +106,8 @@ public class Options
     }
 
     [TestMethod]
-    [ExpectedException(typeof(ArgumentException))]
-    public void DisposeConstructedTypeThatCannotBeDisposedFails() =>
-        new ExpressionObserverOptions().AddConstructedTypeDisposal(typeof(string));
+    public void DisposeConstructedTypeThatCannotBeDisposedIsRefused() =>
+        Assert.IsFalse(new ExpressionObserverOptions().AddConstructedTypeDisposal(typeof(string)));
 
     [TestMethod]
     public void DisposeConstructor()
@@ -174,9 +173,8 @@ public class Options
     }
 
     [TestMethod]
-    [ExpectedException(typeof(ArgumentException))]
-    public void DisposeMethodReturnValueThatCannotBeDisposedFails() =>
-        new ExpressionObserverOptions().AddMethodReturnValueDisposal(typeof(object).GetMethod(nameof(GetHashCode))!);
+    public void DisposeMethodReturnValueThatCannotBeDisposedIsRefused() =>
+        Assert.IsFalse(new ExpressionObserverOptions().AddMethodReturnValueDisposal(typeof(object).GetMethod(nameof(GetHashCode))!));
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentException))]
@@ -204,9 +202,8 @@ public class Options
     }
 
     [TestMethod]
-    [ExpectedException(typeof(ArgumentException))]
-    public void DisposePropertyValueThatCannotBeDisposedFails() =>
-        new ExpressionObserverOptions().AddPropertyValueDisposal(typeof(TestPerson).GetProperty(nameof(TestPerson.Name))!);
+    public void DisposePropertyValueThatCannotBeDisposedIsRefused() =>
+        Assert.IsFalse(new ExpressionObserverOptions().AddPropertyValueDisposal(typeof(TestPerson).GetProperty(nameof(TestPerson.Name))!));
 
     [TestMethod]
     public void DisposeUnaryResult()
