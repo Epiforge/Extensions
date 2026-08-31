@@ -235,18 +235,25 @@ There are two mechanisms behind `Observe`. Which one an observation uses is sett
 
 The general one builds a small graph: a node per subexpression, each subscribing to its own change sources and telling the nodes above it whenever its value moves. It copes with anything you can write.
 
-The other skips the graph. It subscribes straight to the change sources and re-invokes a compiled delegate when one of them fires. It is faster to set up and faster to react, but it can only be used when every change source can be found without evaluating something that might change — which in practice means member and indexer access whose target is the argument, a constant, or a variable you closed over, and the operators over those.
+The other skips the graph. It subscribes straight to the change sources and re-invokes a compiled delegate when one of them fires. It is faster to set up and faster to react, but it can only be used when every change source can be found without evaluating something that might change — which in practice means member and indexer access whose target is the argument, a constant, or a local variable you captured, and the built-in operators over those.
 
 ```csharp
 var observer = new ExpressionObserver();
-observer.Observe(e => e.Name.Length > minimum, elizabeth);       // direct
-observer.Observe(e => e.Manager.Name.Length, elizabeth);         // graph: Manager itself can change
-observer.Observe(e => e.IsActive ? e.Name : e.Alias, elizabeth); // graph: a branch is not subscribed to until it is taken
+var threshold = Payroll.GetThreshold();
+
+observer.Observe(e => e.Salary, elizabeth);                         // direct
+observer.Observe(e => e.Salary > threshold.Amount, elizabeth);      // direct: threshold is a captured local
+observer.Observe(e => e.Salary > this.threshold.Amount, elizabeth); // graph: reading through a field of your own class
+observer.Observe(e => e.Name.Length, elizabeth);                    // graph: Name can change, so Length reads through something changeable
+observer.Observe(e => e.Name == "Elizabeth", elizabeth);            // graph: string equality is a user-defined operator
+observer.Observe(e => e.IsActive ? e.Name : e.Alias, elizabeth);    // graph: a branch is not subscribed to until it is taken
 ```
 
-Conditionals, `&&`, `||`, and `??` always use the graph, because subscribing to a side you have not reached would mean invoking a property getter earlier than the expression says to. So do user-defined operators, properties whose change notification you have asked the observer to ignore, and properties whose value the observer disposes.
+That third line is the one that catches people out, and the distinction is finer than it first appears. *Reading* a field of your own class is fine — `e => e.Salary > this.minimum` takes the fast path, because the field is a value the expression uses. *Reading through* one is not, because only a local captured into a compiler-generated class is recognized as a target that cannot change underneath the observation. If you want the fast path for something you keep in a field, copy it into a local first; that changes nothing about what the expression means, since both mechanisms read it exactly once either way.
 
-Observing an eligible expression costs between a sixth and a ninth of what the graph costs and about half the memory, and a change to one of its sources arrives in roughly two thirds of the time. Nothing about the values you receive or the events you receive them through differs between the two.
+Conditionals, `&&`, `||`, and `??` always use the graph, because subscribing to a side you have not reached would mean invoking a property getter earlier than the expression says to. So do user-defined operators — which includes `==` on strings — properties whose change notification you have asked the observer to ignore, and properties whose value the observer disposes.
+
+Observing an eligible expression costs between a sixth and a ninth of what the graph costs and about half the memory, and a change to one of its sources arrives in roughly two thirds of the time. An observable query whose selector or predicate qualifies constructs in about a quarter of the time on a third of the memory, measured across ten thousand elements. Nothing about the values you receive or the events you receive them through differs between the two.
 
 Set `UseDirectSubscription` to `false` on your options if you would rather always have the graph; it is `true` by default. And if you are curious why some particular expression is not eligible, you can ask directly:
 
