@@ -25,7 +25,7 @@ public class DifferentialFuzz
             var log = new SubscriptionLog();
             Log = log;
             Items = [];
-            Other = new Recorded(log) { Rank = 3, Score = 5, Tag = "o" };
+            Other = new Recorded(log) { Rank = 3, Score = 5, Tag = "o", Linked = new Recorded(log) { Rank = 4, Score = 1, Tag = "ol" } };
             Subject = new Recorded(log) { Rank = 7, Score = 2, Tag = "s", Linked = new Recorded(log) { Rank = 2, Score = 6, Tag = "l" } };
             Holder = new FieldHolder { Held = new Recorded(log) { Rank = 1, Score = 4, Tag = "h" } };
             Observer = new ExpressionObserver(Configured(seed, useDirectSubscription));
@@ -112,8 +112,9 @@ public class DifferentialFuzz
         });
 
     static Expression Leaf(Random rng, Sources sources) =>
-        rng.Next(10) switch
+        rng.Next(11) switch
         {
+            9 => Expression.MakeMemberAccess(Expression.Field(sources.Other, linked), rank),
             0 => Expression.MakeMemberAccess(sources.Subject, rank),
             1 => Expression.MakeMemberAccess(sources.Subject, score),
             2 => Expression.MakeMemberAccess(sources.Other, rank),

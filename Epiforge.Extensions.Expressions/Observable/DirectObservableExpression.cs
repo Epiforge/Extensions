@@ -8,7 +8,8 @@ abstract class DirectObservableExpression(ExpressionObserver observer, Type type
         {
             ConstantExpression constantExpression => constantExpression.Value,
             ParameterExpression => argument,
-            MemberExpression { Member: FieldInfo field } memberExpression => field.GetValue(memberExpression.Expression is { } target ? Resolve(target, argument) : null),
+            MemberExpression { Member: FieldInfo field, Expression: null } => field.GetValue(null),
+            MemberExpression { Member: FieldInfo field } memberExpression => Resolve(memberExpression.Expression!, argument) is { } target ? field.GetValue(target) : null,
             MemberExpression { Member: PropertyInfo property, Expression: null } => property.GetValue(null),
             UnaryExpression { NodeType: ExpressionType.Quote } unaryExpression => unaryExpression.Operand,
             _ => throw new NotSupportedException($"the analyzer planned a subscription to {expression}, whose value the execution path cannot resolve without invoking something")

@@ -826,7 +826,7 @@ public class ExpressionObserver :
         return evaluator;
     }
 
-    static DirectSubscriptionSite Site(DirectSubscription subscription, LambdaExpression lambdaExpression, IReadOnlyList<Expression> fixedSubexpressions)
+    static DirectSubscriptionSite Site(DirectSubscription subscription, LambdaExpression lambdaExpression, List<Expression> fixedSubexpressions)
     {
         var source = subscription.Source!;
         var forcesNotification = ReferenceEquals(source, lambdaExpression.Body);
@@ -838,8 +838,15 @@ public class ExpressionObserver :
             ParameterExpression parameterExpression when ReferenceEquals(parameterExpression, lambdaExpression.Parameters[0]) => new(subscription, DirectSubscriptionSite.Argument, null, forcesNotification),
             ConstantExpression constantExpression => new(subscription, DirectSubscriptionSite.Constant, constantExpression.Value, forcesNotification),
             UnaryExpression { NodeType: ExpressionType.Quote } unaryExpression => new(subscription, DirectSubscriptionSite.Constant, unaryExpression.Operand, forcesNotification),
+            MemberExpression memberExpression when DirectSubscriptionAnalyzer.IsFixed(memberExpression) => Frozen(subscription, memberExpression, fixedSubexpressions, forcesNotification),
             _ => throw new NotSupportedException($"the analyzer planned a subscription to {source}, which the execution path cannot resolve once per observation")
         };
+    }
+
+    static DirectSubscriptionSite Frozen(DirectSubscription subscription, MemberExpression memberExpression, List<Expression> fixedSubexpressions, bool forcesNotification)
+    {
+        fixedSubexpressions.Add(memberExpression);
+        return new(subscription, fixedSubexpressions.Count - 1, null, forcesNotification);
     }
 
     DirectObservableExpression<TArgument, TResult>? DirectObservation<TArgument, TResult>(Expression<Func<TArgument, TResult>> lambdaExpression, TArgument argument)
