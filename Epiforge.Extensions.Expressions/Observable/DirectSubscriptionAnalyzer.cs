@@ -12,6 +12,9 @@ namespace Epiforge.Extensions.Expressions.Observable;
 /// <remarks>
 /// A field is a fixed target whatever declares it, because a field raises no change notification and is therefore read once and held by either mechanism; only the contents of a field of a compiler-generated type are watched, which is what the graph does
 /// </remarks>
+/// <remarks>
+/// An operator backed by a method is admitted when its return type is sealed and implements neither disposal interface, because the graph's disposal of such a value is a runtime type test which cannot succeed
+/// </remarks>
 public sealed class DirectSubscriptionAnalyzer
 {
     sealed class ExpressionIdentityComparer :
@@ -61,6 +64,9 @@ public sealed class DirectSubscriptionAnalyzer
             return;
         subscriptions.Add(new(source, kind, propertyName));
     }
+
+    static bool CannotBeDisposed(Type type) =>
+        type.IsSealed && !typeof(IDisposable).IsAssignableFrom(type) && !typeof(IAsyncDisposable).IsAssignableFrom(type);
 
     internal static bool IsFixed(Expression expression) =>
         expression switch
@@ -201,14 +207,14 @@ public sealed class DirectSubscriptionAnalyzer
             ParameterExpression parameterExpression => AnalyzeParameter(parameterExpression, planner),
             MemberExpression memberExpression => AnalyzeMember(memberExpression, planner),
             IndexExpression indexExpression => AnalyzeIndex(indexExpression, planner),
-            BinaryExpression binaryExpression when binaryExpression.Method is not null => new(binaryExpression, DirectSubscriptionIneligibility.UserDefinedOperator),
+            BinaryExpression binaryExpression when binaryExpression.Method is { } binaryOperator && !CannotBeDisposed(binaryOperator.ReturnType) => new(binaryExpression, DirectSubscriptionIneligibility.UserDefinedOperator),
             BinaryExpression binaryExpression when IsShortCircuiting(binaryExpression) => new(binaryExpression, DirectSubscriptionIneligibility.DeferredBranch),
             BinaryExpression binaryExpression when binaryExpression.Conversion is not null => new(binaryExpression, DirectSubscriptionIneligibility.UnsupportedExpressionKind),
             BinaryExpression binaryExpression => AnalyzeNode(binaryExpression.Left, planner) is { IsEligible: false } left ? left : AnalyzeNode(binaryExpression.Right, planner),
             ConditionalExpression conditionalExpression => new(conditionalExpression, DirectSubscriptionIneligibility.DeferredBranch),
             TypeBinaryExpression typeBinaryExpression when typeBinaryExpression.NodeType is not ExpressionType.TypeAs => AnalyzeNode(typeBinaryExpression.Expression, planner),
             UnaryExpression unaryExpression when unaryExpression.NodeType is ExpressionType.Quote => DirectSubscriptionAnalysis.Eligible,
-            UnaryExpression unaryExpression when unaryExpression.Method is not null => new(unaryExpression, DirectSubscriptionIneligibility.UserDefinedOperator),
+            UnaryExpression unaryExpression when unaryExpression.Method is { } unaryOperator && !CannotBeDisposed(unaryOperator.ReturnType) => new(unaryExpression, DirectSubscriptionIneligibility.UserDefinedOperator),
             UnaryExpression unaryExpression => AnalyzeNode(unaryExpression.Operand, planner),
             _ => new(expression, DirectSubscriptionIneligibility.UnsupportedExpressionKind)
         };
