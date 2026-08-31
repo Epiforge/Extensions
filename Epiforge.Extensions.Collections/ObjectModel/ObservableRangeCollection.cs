@@ -141,6 +141,7 @@ public class ObservableRangeCollection<T> :
             {
                 OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, list, originalIndex));
                 NotifyCountChanged();
+                NotifyIndexerChanged();
             }
         }
     }
@@ -181,12 +182,16 @@ public class ObservableRangeCollection<T> :
                 foreach (var item in movedItems)
                     Items.Insert(++insertionIndex, item);
                 OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Move, movedItems, newStartIndex, oldStartIndex));
+                NotifyIndexerChanged();
             }
         }
     }
 
     void NotifyCountChanged() =>
         OnPropertyChanged(CommonPropertyChangeNotificationEventArgs.CountChanged);
+
+    void NotifyIndexerChanged() =>
+        OnPropertyChanged(CommonPropertyChangeNotificationEventArgs.IndexerChanged);
 
     /// <inheritdoc/>
     protected override void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
@@ -214,6 +219,7 @@ public class ObservableRangeCollection<T> :
                 Items.RemoveAt(index);
                 OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, item, index));
                 NotifyCountChanged();
+                NotifyIndexerChanged();
             }
         }
     }
@@ -239,6 +245,7 @@ public class ObservableRangeCollection<T> :
                 }
                 OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, removedItems, index));
                 NotifyCountChanged();
+                NotifyIndexerChanged();
             }
     }
 
@@ -265,6 +272,7 @@ public class ObservableRangeCollection<T> :
             OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, list, oldItems, 0));
             if (oldItems.Length != list.Count)
                 NotifyCountChanged();
+            NotifyIndexerChanged();
         }
     }
 
@@ -306,6 +314,7 @@ public class ObservableRangeCollection<T> :
                 OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, oldItems, originalIndex));
             if (oldItems.Length != list.Count)
                 NotifyCountChanged();
+            NotifyIndexerChanged();
             return [..oldItems];
         }
     }
@@ -325,5 +334,6 @@ public class ObservableRangeCollection<T> :
         OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
         if (previousCount != Items.Count)
             NotifyCountChanged();
+        NotifyIndexerChanged();
     }
 }

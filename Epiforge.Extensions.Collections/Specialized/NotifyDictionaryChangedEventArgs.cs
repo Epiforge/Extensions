@@ -49,6 +49,7 @@ public sealed class NotifyDictionaryChangedEventArgs<TKey, TValue> :
     /// <param name="changedItems">The items that are affected by the change</param>
     public NotifyDictionaryChangedEventArgs(NotifyDictionaryChangedAction action, IEnumerable<KeyValuePair<TKey, TValue>> changedItems)
     {
+        ArgumentNullException.ThrowIfNull(changedItems);
         switch (action)
         {
             case NotifyDictionaryChangedAction.Add:
@@ -102,14 +103,14 @@ public sealed class NotifyDictionaryChangedEventArgs<TKey, TValue> :
     void InitializeAdd(NotifyDictionaryChangedAction action, IEnumerable<KeyValuePair<TKey, TValue>>? newItems = null)
     {
         Action = action;
-        if (newItems is IEnumerable<KeyValuePair<TKey, TValue>> actualNewItems)
+        if (newItems is { } actualNewItems)
             NewItems = [..actualNewItems];
     }
 
     void InitializeRemove(NotifyDictionaryChangedAction action, IEnumerable<KeyValuePair<TKey, TValue>>? oldItems)
     {
         Action = action;
-        if (oldItems is IEnumerable<KeyValuePair<TKey, TValue>> actualOldItems)
+        if (oldItems is { } actualOldItems)
             OldItems = [..actualOldItems];
     }
 
