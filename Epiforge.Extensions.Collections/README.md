@@ -1,4 +1,4 @@
-﻿This library provides a number of extension methods for collections and dictionaries:
+This library provides a number of extension methods for collections and dictionaries:
 
 * `EnumerableExtensions`, providing:
   * `FindIndex` - Finds the index of the first element in the source that satisfies the specified predicate
@@ -33,6 +33,7 @@
   * `ReplaceAll` - Replace all items in the collection with the items in the specified collection
   * `ReplaceRange` - Replaces the specified range of items from the collection with the items in the specified collection
   * `Reset` - Resets the collection with the specified collection of items
+  * `ResetRemovingAll` - Removes all objects from the collection that satisfy a predicate, announcing it with a single event
 * `ReadOnlyObservableRangeDictionary<TKey, TValue>` is a read-only wrapper for any classes implementing `IReadOnlyObservableRangeDictionary<TKey, TValue>`. It subscribes to what it wraps, so dispose of it when you are done with it.
 * `ReadOnlyObservableRangeCollection<T>` is a read-only wrapper for any classes implementing `IReadOnlyObservableRangeCollection<T>`. It subscribes to what it wraps, so dispose of it when you are done with it.
 

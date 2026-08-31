@@ -17,6 +17,8 @@ Both arms measured before either was written: the second is the proposed impleme
 
 Three quarters of sixteen thousand elements: **73.6 ms against 76 μs, 971×.**
 
+**Every `RemoveAll` figure on this page is superseded.** It was measured before that method coalesced adjacent removals into one event and before it stopped materializing the items it only counts; both changes landed the same day and both reduce it. `2026-08-31-honoring-the-flag.md` carries the later measurements. The `ResetRemovingAll` figures are unaffected — nothing in that work touched its path.
+
 ## What shipped, measured against what was proposed
 
 The member walks `Items` directly and re-adds the survivors by index; the user-space arm goes through `Collection<T>`'s public indexer, re-reads `Count` every iteration, and hands `Reset` an `IEnumerable<T>` that has to be enumerated through a boxed enumerator. Predicted: the member wins slightly.
