@@ -54,4 +54,4 @@ Recovering the rest means what `2026-08-30-queries-after-direct-subscription.md`
 
 Not recommended. Four percent of memory on a shape nobody writes deliberately, bought with shared mutable lifetime state, is the wrong trade — and it is the same class of machinery that produced the static-property freezing bug recorded in `2026-08-31-static-members-and-disposal.md` earlier the same day.
 
-The framing this inherited was also wrong and should stop being repeated. Three times the speed for four percent of the memory is not a regression awaiting a fix. It is a trade, and it has moved decisively in the fast path's favour since it was first recorded from a cross-run comparison that put the time difference at thirteen percent.
+The framing this inherited was also wrong and should stop being repeated. Three times the speed for four percent of the memory is not a regression awaiting a fix. It is a trade, and it has moved decisively in the fast path's favor since it was first recorded from a cross-run comparison that put the time difference at thirteen percent.

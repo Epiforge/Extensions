@@ -23,6 +23,7 @@ public class ObservableDictionary
     {
         public DerivationWithNullOnChangedArgs()
         {
+            DictionaryChanged += (sender, e) => { };
         }
 
         protected override void OnChanged(NotifyDictionaryChangedEventArgs<TKey, TValue> e) =>
@@ -35,6 +36,7 @@ public class ObservableDictionary
     {
         public DerivationWithUnsupportedNotifyDictionaryChangedAction()
         {
+            DictionaryChanged += (sender, e) => { };
         }
 
         protected override void OnChanged(NotifyDictionaryChangedEventArgs<TKey, TValue> e) =>

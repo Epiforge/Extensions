@@ -4,4 +4,5 @@ static class CommonPropertyChangeNotificationEventArgs
 {
     public static readonly PropertyChangedEventArgs CountChanged = new("Count");
     public static readonly PropertyChangingEventArgs CountChanging = new("Count");
+    public static readonly PropertyChangedEventArgs IndexerChanged = new("Item[]");
 }

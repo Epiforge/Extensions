@@ -11,6 +11,7 @@ public class ObservableConcurrentDictionary
     {
         public DerivationWithNullOnChangedArgs()
         {
+            DictionaryChanged += (sender, e) => { };
         }
 
         protected override void OnChanged(NotifyDictionaryChangedEventArgs<TKey, TValue> e) =>

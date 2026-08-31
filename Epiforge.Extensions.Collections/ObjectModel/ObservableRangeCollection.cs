@@ -95,11 +95,7 @@ public class ObservableRangeCollection<T> :
     {
         ArgumentNullException.ThrowIfNull(predicate);
         var removed = new List<T>();
-        for (var i = 0; i < Items.Count;)
-            if (predicate(Items[i]))
-                removed.Add(GetAndRemoveAt(i));
-            else
-                ++i;
+        RemoveAllCore(predicate, removed);
         return [..removed];
     }
 
@@ -139,8 +135,9 @@ public class ObservableRangeCollection<T> :
             }
             if (list.Count > 0)
             {
-                OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, list, originalIndex));
                 NotifyCountChanged();
+                NotifyIndexerChanged();
+                OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, list, originalIndex));
             }
         }
     }
@@ -180,6 +177,7 @@ public class ObservableRangeCollection<T> :
                 }
                 foreach (var item in movedItems)
                     Items.Insert(++insertionIndex, item);
+                NotifyIndexerChanged();
                 OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Move, movedItems, newStartIndex, oldStartIndex));
             }
         }
@@ -187,6 +185,30 @@ public class ObservableRangeCollection<T> :
 
     void NotifyCountChanged() =>
         OnPropertyChanged(CommonPropertyChangeNotificationEventArgs.CountChanged);
+
+    void NotifyIndexerChanged() =>
+        OnPropertyChanged(CommonPropertyChangeNotificationEventArgs.IndexerChanged);
+
+    void NotifyReplacement(T[] oldItems, List<T> newItems, int index)
+    {
+        if (oldItems.Length is 0 && newItems.Count is 0)
+            return;
+        if (oldItems.Length != newItems.Count)
+            NotifyCountChanged();
+        NotifyIndexerChanged();
+        if (oldItems.Length == newItems.Count)
+        {
+            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, newItems, oldItems, index));
+            return;
+        }
+        var replaced = Math.Min(oldItems.Length, newItems.Count);
+        if (replaced > 0)
+            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, newItems.GetRange(0, replaced), oldItems[..replaced], index));
+        if (oldItems.Length > replaced)
+            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, oldItems[replaced..], index + replaced));
+        else
+            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, newItems.GetRange(replaced, newItems.Count - replaced), index + replaced));
+    }
 
     /// <inheritdoc/>
     protected override void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
@@ -199,23 +221,104 @@ public class ObservableRangeCollection<T> :
     }
 
     /// <inheritdoc/>
-    public int RemoveAll(Func<T, bool> predicate) =>
-        GetAndRemoveAll(predicate).Count;
+    public int RemoveAll(Func<T, bool> predicate)
+    {
+        ArgumentNullException.ThrowIfNull(predicate);
+        return RemoveAllCore(predicate, null);
+    }
+
+    int RemoveAllCore(Func<T, bool> predicate, List<T>? removed)
+    {
+        var removedCount = 0;
+        if (RaiseCollectionChangedEventsForIndividualElements)
+        {
+            for (var i = 0; i < Items.Count;)
+                if (predicate(Items[i]))
+                {
+                    var item = GetAndRemoveAt(i);
+                    removed?.Add(item);
+                    ++removedCount;
+                }
+                else
+                    ++i;
+            return removedCount;
+        }
+        var count = Items.Count;
+        var index = 0;
+        while (index < count)
+        {
+            if (!predicate(Items[index]))
+            {
+                ++index;
+                continue;
+            }
+            var runLength = 1;
+            while (index + runLength < count && predicate(Items[index + runLength]))
+                ++runLength;
+            NotifyCollectionChangedEventArgs eventArgs;
+            if (runLength == 1)
+            {
+                var item = Items[index];
+                Items.RemoveAt(index);
+                removed?.Add(item);
+                eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, (object?)item, index);
+            }
+            else
+            {
+                var run = new T[runLength];
+                for (var i = 0; i < runLength; ++i)
+                {
+                    run[i] = Items[index];
+                    Items.RemoveAt(index);
+                }
+                removed?.AddRange(run);
+                eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, run, index);
+            }
+            count -= runLength;
+            removedCount += runLength;
+            NotifyCountChanged();
+            NotifyIndexerChanged();
+            OnCollectionChanged(eventArgs);
+            ++index;
+        }
+        return removedCount;
+    }
 
     /// <inheritdoc/>
     public void RemoveRange(IEnumerable<T> items)
     {
         ArgumentNullException.ThrowIfNull(items);
+        if (RaiseCollectionChangedEventsForIndividualElements)
+        {
+            foreach (var item in items)
+            {
+                var index = Items.IndexOf(item);
+                if (index >= 0)
+                {
+                    Items.RemoveAt(index);
+                    NotifyCountChanged();
+                    NotifyIndexerChanged();
+                    OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, (object?)item, index));
+                }
+            }
+            return;
+        }
+        var wanted = new NullableKeyDictionary<T, int>();
+        var any = false;
         foreach (var item in items)
         {
-            var index = Items.IndexOf(item);
-            if (index >= 0)
-            {
-                Items.RemoveAt(index);
-                OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, item, index));
-                NotifyCountChanged();
-            }
+            wanted[item] = wanted.TryGetValue(item, out var sought) ? sought + 1 : 1;
+            any = true;
         }
+        if (!any)
+            return;
+        RemoveAllCore(item =>
+        {
+            if (!wanted.TryGetValue(item, out var sought) || sought is 0)
+                return false;
+            wanted[item] = sought - 1;
+            return true;
+        }, null);
     }
 
     /// <inheritdoc/>
@@ -237,8 +340,9 @@ public class ObservableRangeCollection<T> :
                     removedItems[removalIndex] = Items[index];
                     Items.RemoveAt(index);
                 }
-                OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, removedItems, index));
                 NotifyCountChanged();
+                NotifyIndexerChanged();
+                OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, removedItems, index));
             }
     }
 
@@ -262,9 +366,7 @@ public class ObservableRangeCollection<T> :
                 Items.Add(element);
                 list.Add(element);
             }
-            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, list, oldItems, 0));
-            if (oldItems.Length != list.Count)
-                NotifyCountChanged();
+            NotifyReplacement(oldItems, list, 0);
         }
     }
 
@@ -300,12 +402,7 @@ public class ObservableRangeCollection<T> :
                     Items.Insert(++index, element);
                     list.Add(element);
                 }
-            if (list.Count > 0)
-                OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, list, oldItems, originalIndex));
-            else
-                OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, oldItems, originalIndex));
-            if (oldItems.Length != list.Count)
-                NotifyCountChanged();
+            NotifyReplacement(oldItems, list, originalIndex);
             return [..oldItems];
         }
     }
@@ -322,8 +419,41 @@ public class ObservableRangeCollection<T> :
         Items.Clear();
         foreach (var element in newCollection)
             Items.Add(element);
-        OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
         if (previousCount != Items.Count)
             NotifyCountChanged();
+        NotifyIndexerChanged();
+        OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+    }
+
+    /// <inheritdoc/>
+    public int ResetRemovingAll(Func<T, bool> predicate)
+    {
+        ArgumentNullException.ThrowIfNull(predicate);
+        var count = Items.Count;
+        var firstRemoved = -1;
+        for (var i = 0; i < count; ++i)
+            if (predicate(Items[i]))
+            {
+                firstRemoved = i;
+                break;
+            }
+        if (firstRemoved < 0)
+            return 0;
+        var survivors = new List<T>(count - 1);
+        for (var i = 0; i < firstRemoved; ++i)
+            survivors.Add(Items[i]);
+        for (var i = firstRemoved + 1; i < count; ++i)
+        {
+            var item = Items[i];
+            if (!predicate(item))
+                survivors.Add(item);
+        }
+        Items.Clear();
+        for (var i = 0; i < survivors.Count; ++i)
+            Items.Add(survivors[i]);
+        NotifyCountChanged();
+        NotifyIndexerChanged();
+        OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+        return count - survivors.Count;
     }
 }

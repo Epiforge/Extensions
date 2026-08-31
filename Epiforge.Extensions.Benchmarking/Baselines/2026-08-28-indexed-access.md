@@ -142,7 +142,7 @@ The rule is expressed without a tuned constant and scales with the collection. I
 
 ## What an indexed access is made of
 
-On `ObserveSelect` at 10,000 elements, a sequential indexed access costs 18.72 ns. The `EnumerateThenSweepByIndexer` row is the same access served from a materialised snapshot with no tree involved, at 14.22 ns. The search is therefore about 4.5 ns and everything else — the interface dispatch, the lock the query takes for every access, the bounds check — is about 14.2.
+On `ObserveSelect` at 10,000 elements, a sequential indexed access costs 18.72 ns. The `EnumerateThenSweepByIndexer` row is the same access served from a materialized snapshot with no tree involved, at 14.22 ns. The search is therefore about 4.5 ns and everything else — the interface dispatch, the lock the query takes for every access, the bounds check — is about 14.2.
 
 **Roughly three quarters of an indexed access on a select query is now overhead that has nothing to do with finding the element.** Before this change the split was closer to even. Further work on the search alone cannot win back more than that quarter.
 

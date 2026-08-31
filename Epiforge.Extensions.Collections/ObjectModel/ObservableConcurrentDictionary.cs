@@ -217,11 +217,17 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
                 return value;
             });
             if (updated)
-                OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Replace, key, newValue, oldValue));
+            {
+                NotifyIndexerChanged();
+                if (IsChangeObserved)
+                    OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Replace, key, newValue, oldValue));
+            }
             else
             {
                 NotifyCountChanged();
-                OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, key, newValue));
+                NotifyIndexerChanged();
+                if (IsChangeObserved)
+                    OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, key, newValue));
             }
         }
     }
@@ -375,11 +381,17 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
             return updateValueFactory(k, v);
         });
         if (updated)
-            OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Replace, key, newValue, oldValue));
+        {
+            NotifyIndexerChanged();
+            if (IsChangeObserved)
+                OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Replace, key, newValue, oldValue));
+        }
         else
         {
             NotifyCountChanged();
-            OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, key, newValue));
+            NotifyIndexerChanged();
+            if (IsChangeObserved)
+                OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, key, newValue));
         }
         return newValue;
     }
@@ -406,11 +418,17 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
             return updateValueFactory(k, v);
         });
         if (updated)
-            OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Replace, key, newValue, oldValue));
+        {
+            NotifyIndexerChanged();
+            if (IsChangeObserved)
+                OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Replace, key, newValue, oldValue));
+        }
         else
         {
             NotifyCountChanged();
-            OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, key, newValue));
+            NotifyIndexerChanged();
+            if (IsChangeObserved)
+                OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, key, newValue));
         }
         return newValue;
     }
@@ -439,11 +457,17 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
             return updateValueFactory(k, v, a);
         }, factoryArgument);
         if (updated)
-            OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Replace, key, newValue, oldValue));
+        {
+            NotifyIndexerChanged();
+            if (IsChangeObserved)
+                OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Replace, key, newValue, oldValue));
+        }
         else
         {
             NotifyCountChanged();
-            OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, key, newValue));
+            NotifyIndexerChanged();
+            if (IsChangeObserved)
+                OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, key, newValue));
         }
         return newValue;
     }
@@ -456,7 +480,9 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
         // somewhere, George is clutching his chest like Yoda during Attack of the Clones
         var currentCd = Interlocked.Exchange(ref cd, comparer is not null ? concurrencyLevel is { } comparerCl ? capacity is { } comparerC ? new ConcurrentDictionary<TKey, TValue>(comparerCl, comparerC, comparer) : new ConcurrentDictionary<TKey, TValue>(comparerCl, [], comparer) : new ConcurrentDictionary<TKey, TValue>(comparer) : concurrencyLevel is { } cl && capacity is { } c ? new ConcurrentDictionary<TKey, TValue>(cl, c) : new ConcurrentDictionary<TKey, TValue>());
         NotifyCountChanged();
-        OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Remove, [..currentCd]));
+        NotifyIndexerChanged();
+        if (IsChangeObserved)
+            OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Remove, [..currentCd]));
     }
 
     bool ICollection<KeyValuePair<TKey, TValue>>.Contains(KeyValuePair<TKey, TValue> item) =>
@@ -512,7 +538,9 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
         if (added)
         {
             NotifyCountChanged();
-            OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, key, retrievedOrAddedValue));
+            NotifyIndexerChanged();
+            if (IsChangeObserved)
+                OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, key, retrievedOrAddedValue));
         }
         return retrievedOrAddedValue;
     }
@@ -537,7 +565,9 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
         if (added)
         {
             NotifyCountChanged();
-            OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, key, retrievedOrAddedValue));
+            NotifyIndexerChanged();
+            if (IsChangeObserved)
+                OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, key, retrievedOrAddedValue));
         }
         return retrievedOrAddedValue;
     }
@@ -564,7 +594,9 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
         if (added)
         {
             NotifyCountChanged();
-            OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, key, retrievedOrAddedValue));
+            NotifyIndexerChanged();
+            if (IsChangeObserved)
+                OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, key, retrievedOrAddedValue));
         }
         return retrievedOrAddedValue;
     }
@@ -574,6 +606,15 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
     /// </summary>
     protected virtual void NotifyCountChanged() =>
         OnPropertyChanged(CommonPropertyChangeNotificationEventArgs.CountChanged);
+
+    /// <summary>
+    /// Raises the <see cref="INotifyPropertyChanged.PropertyChanged"/> event for the indexer
+    /// </summary>
+    protected void NotifyIndexerChanged() =>
+        OnPropertyChanged(CommonPropertyChangeNotificationEventArgs.IndexerChanged);
+
+    bool IsChangeObserved =>
+        CollectionChanged is not null || DictionaryChanged is not null || DictionaryChangedBoxed is not null;
 
     /// <summary>
     /// Calls <see cref="OnDictionaryChanged(NotifyDictionaryChangedEventArgs{TKey, TValue})"/> and also calls <see cref="OnCollectionChanged(NotifyCollectionChangedEventArgs)"/>, and <see cref="OnDictionaryChangedBoxed(NotifyDictionaryChangedEventArgs{object, object})"/> when applicable
@@ -670,7 +711,9 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
     {
         Interlocked.Exchange(ref cd, comparer is not null ? concurrencyLevel is { } comparerCl ? capacity is { } comparerC ? new ConcurrentDictionary<TKey, TValue>(comparerCl, comparerC, comparer) : new ConcurrentDictionary<TKey, TValue>(comparerCl, [], comparer) : new ConcurrentDictionary<TKey, TValue>(comparer) : concurrencyLevel is { } cl && capacity is { } c ? new ConcurrentDictionary<TKey, TValue>(cl, c) : new ConcurrentDictionary<TKey, TValue>());
         NotifyCountChanged();
-        OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Reset));
+        NotifyIndexerChanged();
+        if (IsChangeObserved)
+            OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Reset));
     }
 
     /// <summary>
@@ -681,7 +724,9 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
     {
         Interlocked.Exchange(ref cd, comparer is { } c ? concurrencyLevel is { } cl ? new ConcurrentDictionary<TKey, TValue>(cl, keyValuePairs, c) : new ConcurrentDictionary<TKey, TValue>(keyValuePairs, c) : new ConcurrentDictionary<TKey, TValue>(keyValuePairs));
         NotifyCountChanged();
-        OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Reset));
+        NotifyIndexerChanged();
+        if (IsChangeObserved)
+            OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Reset));
     }
 
     /// <summary>
@@ -704,7 +749,9 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
         if (Cd.TryAdd(key, value))
         {
             NotifyCountChanged();
-            OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, key, value));
+            NotifyIndexerChanged();
+            if (IsChangeObserved)
+                OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, key, value));
             return true;
         }
         return false;
@@ -732,7 +779,9 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
         if (Cd.TryRemove(key, out value!))
         {
             NotifyCountChanged();
-            OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Remove, key, value));
+            NotifyIndexerChanged();
+            if (IsChangeObserved)
+                OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Remove, key, value));
             return true;
         }
         return false;
@@ -754,7 +803,9 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
                 return false;
             if (currentCd.TryUpdate(key, newValue, oldValue))
             {
-                OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Replace, key, newValue, oldValue));
+                NotifyIndexerChanged();
+                if (IsChangeObserved)
+                    OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Replace, key, newValue, oldValue));
                 return true;
             }
         }

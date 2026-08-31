@@ -135,7 +135,7 @@ Consolidating the scope's two thread-static fields into one object, and merging 
 
 This document first claimed the root set was five handlers in two files, and that claim was wrong. `ObservableConstantExpression` subscribes to a constant value's collection and dictionary events under `ConstantExpressionsListenForCollectionChanged` and `ConstantExpressionsListenForDictionaryChanged`, and it was missed. The enumeration that produced the original figure came from a search whose output had been truncated at a result limit, and the count was taken from the visible portion without checking whether anything had been cut.
 
-The consequence was not cosmetic. That root was left unbracketed, so deferral never applied to it, and — worse — it continued to announce a contents change as though it were a value change. Once the wrapper began comparing before announcing, a constant whose observable value's contents changed without its reference moving went silent. That behaviour reached `main` and was corrected before release.
+The consequence was not cosmetic. That root was left unbracketed, so deferral never applied to it, and — worse — it continued to announce a contents change as though it were a value change. Once the wrapper began comparing before announcing, a constant whose observable value's contents changed without its reference moving went silent. That behavior reached `main` and was corrected before release.
 
 The failure has a shape worth naming, because it is not the same one recorded below. It was not a wrong prediction; it was an unverified premise treated as a finding, and then cited repeatedly as though it had been established. When a search is truncated, its count is not a result.
 
