@@ -28,6 +28,15 @@ public class ExpressionObserver :
     static bool DisposeWhenDiscardedAttributeExistsByMethodInfoValueFactory(MethodInfo method) =>
         method.ReturnParameter.GetCustomAttributes(true).OfType<DisposeWhenDiscardedAttribute>().Any();
 
+    static Func<Expression, Expression>? Memoizing(Func<Expression, Expression>? optimizer)
+    {
+        if (optimizer is null)
+            return null;
+        var optimized = new ConditionalWeakTable<Expression, Expression>();
+        var optimize = new ConditionalWeakTable<Expression, Expression>.CreateValueCallback(optimizer);
+        return expression => optimized.GetValue(expression, optimize);
+    }
+
     static PropertyInfo? GetPropertyFromGetMethod(MethodInfo getMethod) =>
         getMethod.DeclaringType?.GetProperties().FirstOrDefault(property => property.GetMethod == getMethod);
 
@@ -104,7 +113,7 @@ public class ExpressionObserver :
         DisposeStaticMethodReturnValues = options.DisposeStaticMethodReturnValues;
         MemberExpressionsListenToGeneratedTypesFieldValuesForCollectionChanged = options.MemberExpressionsListenToGeneratedTypesFieldValuesForCollectionChanged;
         MemberExpressionsListenToGeneratedTypesFieldValuesForDictionaryChanged = options.MemberExpressionsListenToGeneratedTypesFieldValuesForDictionaryChanged;
-        Optimizer = options.Optimizer;
+        Optimizer = Memoizing(options.Optimizer);
         PreferAsyncDisposal = options.PreferAsyncDisposal;
         UseDirectSubscription = options.UseDirectSubscription;
         disposeConstructedTypes = [..options.DisposeConstructedTypes.Keys];
@@ -224,6 +233,9 @@ public class ExpressionObserver :
     public bool MemberExpressionsListenToGeneratedTypesFieldValuesForDictionaryChanged { get; }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// This is the method supplied by the options wrapped in a memoization of its result per expression instance, so that an expression optimized once is not optimized again; it is therefore not reference equal to the method supplied
+    /// </remarks>
     public Func<Expression, Expression>? Optimizer { get; }
 
     /// <inheritdoc/>
