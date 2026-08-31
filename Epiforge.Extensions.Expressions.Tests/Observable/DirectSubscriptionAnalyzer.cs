@@ -81,8 +81,9 @@ public class DirectSubscriptionAnalyzer
     public void DisposedPropertyValueIsIneligible()
     {
         var options = new ExpressionObserverOptions();
-        options.AddPropertyValueDisposal(typeof(TestPerson).GetProperty(nameof(TestPerson.Name))!);
-        var analysis = new Epiforge.Extensions.Expressions.Observable.DirectSubscriptionAnalyzer(options).Analyze(BodyOf<string?>(person => person.Name));
+        var property = typeof(Options.TestObject).GetProperty(nameof(Options.TestObject.SyncDisposable))!;
+        options.AddPropertyValueDisposal(property);
+        var analysis = new Epiforge.Extensions.Expressions.Observable.DirectSubscriptionAnalyzer(options).Analyze(Expression.Property(Expression.Constant(new Options.TestObject()), property));
         Assert.IsFalse(analysis.IsEligible);
         Assert.AreEqual(DirectSubscriptionIneligibility.ValueRequiresDisposal, analysis.Ineligibility);
     }
@@ -190,19 +191,27 @@ public class DirectSubscriptionAnalyzer
         Assert.IsTrue(Analyzer().Analyze(BodyOf<int>(person => StaticFieldHolder.Held.Rank)).IsEligible);
 
     [TestMethod]
-    public void StaticPropertyIsIneligible()
+    public void StaticPropertyIsEligibleWhenStaticDisposalIsExcluded()
     {
-        var analysis = Analyzer().Analyze(Expression.Property(null, typeof(DateTime).GetProperty(nameof(DateTime.Now))!));
+        var options = new ExpressionObserverOptions { DisposeStaticMethodReturnValues = false };
+        Assert.IsTrue(new Epiforge.Extensions.Expressions.Observable.DirectSubscriptionAnalyzer(options).Analyze(Expression.Property(null, typeof(Console).GetProperty(nameof(Console.Out))!)).IsEligible);
+    }
+
+    [TestMethod]
+    public void StaticPropertyChainTargetIsEligible() =>
+        Assert.IsTrue(Analyzer().Analyze(BodyOf<int>(person => StaticPropertyHolder.Label.Length)).IsEligible);
+
+    [TestMethod]
+    public void StaticPropertyOfDisposableTypeIsIneligible()
+    {
+        var analysis = Analyzer().Analyze(Expression.Property(null, typeof(Console).GetProperty(nameof(Console.Out))!));
         Assert.IsFalse(analysis.IsEligible);
         Assert.AreEqual(DirectSubscriptionIneligibility.ValueRequiresDisposal, analysis.Ineligibility);
     }
 
     [TestMethod]
-    public void StaticPropertyIsEligibleWhenStaticDisposalIsExcluded()
-    {
-        var options = new ExpressionObserverOptions { DisposeStaticMethodReturnValues = false };
-        Assert.IsTrue(new Epiforge.Extensions.Expressions.Observable.DirectSubscriptionAnalyzer(options).Analyze(Expression.Property(null, typeof(DateTime).GetProperty(nameof(DateTime.Now))!)).IsEligible);
-    }
+    public void StaticPropertyOfValueTypeIsEligible() =>
+        Assert.IsTrue(Analyzer().Analyze(Expression.Property(null, typeof(DateTime).GetProperty(nameof(DateTime.Now))!)).IsEligible);
 
     [TestMethod]
     public void StringComparisonIsEligible()

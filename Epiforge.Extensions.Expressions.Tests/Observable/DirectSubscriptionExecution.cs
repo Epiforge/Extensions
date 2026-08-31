@@ -90,6 +90,25 @@ public class DirectSubscriptionExecution
     }
 
     [TestMethod]
+    public void AStaticPropertyIsReadOnce()
+    {
+        var log = new SubscriptionLog();
+        var subject = new Recorded(log) { Rank = 3 };
+        var graphObserver = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = false });
+        var directObserver = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = true });
+        StaticPropertyHolder.Counter = 10;
+        using (var graphExpression = graphObserver.Observe(s => StaticPropertyHolder.Counter + s.Rank, subject))
+        using (var directExpression = directObserver.Observe(s => StaticPropertyHolder.Counter + s.Rank, subject))
+        {
+            Assert.AreEqual(graphExpression.Evaluation.Result, directExpression.Evaluation.Result);
+            StaticPropertyHolder.Counter = 100;
+            subject.Rank = 5;
+            Assert.AreEqual(graphExpression.Evaluation.Result, directExpression.Evaluation.Result, "the two mechanisms disagreed after a static property changed behind them");
+        }
+        Assert.AreEqual(0, log.Outstanding);
+    }
+
+    [TestMethod]
     [DataRow(false)]
     [DataRow(true)]
     public void AStringComparisonIsObservedAndAnnounced(bool useDirectSubscription)
