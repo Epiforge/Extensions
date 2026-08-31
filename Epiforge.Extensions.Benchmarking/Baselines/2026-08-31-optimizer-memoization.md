@@ -53,6 +53,29 @@ The reason it survived is worth recording: **not one benchmark in this repositor
 
 Every graph-versus-fast-path ratio recorded before this document is a lower bound for a consumer who follows the README, because the fast path skips `ReplaceParameters` and so never paid the per-observation pass at all.
 
+## The direction this does not help, measured afterwards
+
+The measurement above priced the case the memoization helps and not the case it cannot, which another session's review made plain: memoization is keyed on the expression instance, so a caller that hands `Observe` a freshly built lambda every call gets nothing from it.
+
+| | mean | allocated |
+|--- |---: |---: |
+| fresh lambda, optimizer configured | 6,058.9 ns | 4,498 B |
+| fresh lambda, no optimizer | 2,119.5 ns | 3,995 B |
+| held lambda, optimizer configured | 2,606.1 ns | 3,271 B |
+| held lambda, no optimizer | 2,585.6 ns | 3,271 B |
+
+**Held: 20.5 nanoseconds and no allocation, down from 3,106 and 383 bytes. Fresh: 3,939.4 nanoseconds and 503 bytes, unmitigated.** The optimizer's whole cost, still paid, every call.
+
+Note what cannot be concluded from this table. The two no-optimizer arms differ by 466 ns — the fresh-lambda one is the *faster* of the two, which building a lambda first should not make it — so the two pairs are not on a common baseline and subtracting across them is invalid. That rules out the arithmetic worth wanting, which would have priced the now-wasted weak-table insert a fresh caller pays. Within each pair the comparison is sound, because both sides build the same thing; across pairs it is not, and the difference is unexplained.
+
+What the number is good for is counting. A consumer that builds a fresh expression per cell over eight columns and fifty rows pays four hundred optimizer passes where eight would do, and at 3,939 ns each that is about 1.6 milliseconds of a page render reducible to about 31 microseconds — a floor, since a display formula is a larger expression than `person => person.Rank * 2`. The fix for that is on the caller's side: hold the expression per column. No instance-keyed cache in this library can reach a caller who never reuses an instance.
+
+## The structural fallback, reconsidered on evidence
+
+A second cache keyed by structural equality would reach exactly that caller, and it was ruled out earlier on the judgement that rebuilding the same expression at a different address is too rare to carry machinery for. Two numbers measured since bear on it: the pass it would avoid costs 3,939 ns, and a structural lookup costs roughly what diagram generation costs, measured at 1,013 ns for a three-node tree in `2026-08-31-graph-construction-share.md`.
+
+So it would pay for itself on time, which the earlier judgement assumed it would not. It is still not recommended. Structural keys mean a real dictionary holding expressions alive rather than a weak table, so it needs an eviction policy nothing else here needs; and where a caller can hold its expression, the caller-side fix is both cheaper and simpler. Recorded because the judgement was sound on the evidence available then and the evidence has changed.
+
 ## A public behavior note
 
 `ExpressionObserver.Optimizer` is no longer reference equal to the method supplied through the options — it is that method wrapped. It behaves identically otherwise, and the memoization assumes what the structural cache key already assumed: that optimizing the same expression twice yields the same answer.

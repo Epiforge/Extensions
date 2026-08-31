@@ -235,21 +235,21 @@ There are two mechanisms behind `Observe`. Which one an observation uses is sett
 
 The general one builds a small graph: a node per subexpression, each subscribing to its own change sources and telling the nodes above it whenever its value moves. It copes with anything you can write.
 
-The other skips the graph. It subscribes straight to the change sources and re-invokes a compiled delegate when one of them fires. It is faster to set up and faster to react, but it can only be used when every change source can be found without evaluating something that might change — which in practice means member and indexer access whose target is the argument, a constant, or a local variable you captured, and the built-in operators over those.
+The other skips the graph. It subscribes straight to the change sources and re-invokes a compiled delegate when one of them fires. It is faster to set up and faster to react, but it can only be used when every change source can be found without evaluating something that might change — which in practice means member and indexer access whose target is the argument, a constant, or a field, and the built-in operators over those.
 
 ```csharp
 var observer = new ExpressionObserver();
 var threshold = Payroll.GetThreshold();
 
 observer.Observe(e => e.Salary, elizabeth);                         // direct
-observer.Observe(e => e.Salary > threshold.Amount, elizabeth);      // direct: threshold is a captured local
-observer.Observe(e => e.Salary > this.threshold.Amount, elizabeth); // graph: reading through a field of your own class
-observer.Observe(e => e.Name.Length, elizabeth);                    // graph: Name can change, so Length reads through something changeable
+observer.Observe(e => e.Salary > threshold.Amount, elizabeth);      // direct: a captured local is a field
+observer.Observe(e => e.Salary > this.threshold.Amount, elizabeth); // direct: so is a field of your own class
+observer.Observe(e => e.Name.Length, elizabeth);                    // graph: Name is a property, so Length reads through something that can change
 observer.Observe(e => e.Name == "Elizabeth", elizabeth);            // graph: string equality is a user-defined operator
 observer.Observe(e => e.IsActive ? e.Name : e.Alias, elizabeth);    // graph: a branch is not subscribed to until it is taken
 ```
 
-That third line is the one that catches people out, and the distinction is finer than it first appears. *Reading* a field of your own class is fine — `e => e.Salary > this.minimum` takes the fast path, because the field is a value the expression uses. *Reading through* one is not, because only a local captured into a compiler-generated class is recognized as a target that cannot change underneath the observation. If you want the fast path for something you keep in a field, copy it into a local first; that changes nothing about what the expression means, since both mechanisms read it exactly once either way.
+What decides this is field against property, not where the thing is declared. A field raises no change notification, so both mechanisms read it once when the observation begins and hold it, which leaves the fast path free to rely on it. A property can change and announce it, so anything read *through* a property is a moving target and goes to the graph. That is why `e => e.Name.Length` takes the graph while `e => e.Salary > this.threshold.Amount` does not, though both look like two hops.
 
 Conditionals, `&&`, `||`, and `??` always use the graph, because subscribing to a side you have not reached would mean invoking a property getter earlier than the expression says to. So do user-defined operators — which includes `==` on strings — properties whose change notification you have asked the observer to ignore, and properties whose value the observer disposes.
 
@@ -266,8 +266,8 @@ var analysis = new DirectSubscriptionAnalyzer(options).Analyze(expression.Body);
 
 Because eligibility depends on which change sources the observer subscribes to at all, it is a property of your options as much as of your expression; hand the analyzer the same options you hand the observer.
 
-##### Variables You Close Over Are Read Once
-This one is worth knowing because it is easy to write code that assumes otherwise. The value a variable held when an observation began is the value that observation goes on using. Reassigning the variable afterward does not reach an observation that already exists.
+##### Fields Are Read Once
+This one is worth knowing because it is easy to write code that assumes otherwise. Whatever a field held when an observation began is what that observation goes on using — a captured local, which the compiler turns into a field, and a field of your own class alike. Assigning it afterward does not reach an observation that already exists.
 
 ```csharp
 var threshold = low;
@@ -277,7 +277,7 @@ low.Amount = 50000;  // expr re-evaluates
 high.Amount = 90000; // expr does not
 ```
 
-This has always been how the graph behaves, since it reads the variable once when it builds the node, and direct subscription behaves the same way. If you want the comparison to follow the variable, do not reassign the variable — make the thing it points at a property of an object that notifies, and close over that object instead.
+This has always been how the graph behaves, since it reads the field once when it builds the node and has nothing that could ever wake it to read again, and direct subscription behaves the same way. If you want the comparison to follow the value, do not assign the field — make the thing it points at a property of an object that notifies, and read that instead.
 
 Observable expressions will also try to automatically dispose of disposable objects they create in the course of their evaluation when and where it makes sense. Use the `ExpressionObserverOptions` class for more direct control over this behavior.
 You can use the `Optimizer` property to specify an optimization method to invoke automatically during the observable expression creation process.

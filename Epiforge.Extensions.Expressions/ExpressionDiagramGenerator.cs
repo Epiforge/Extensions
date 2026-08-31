@@ -57,11 +57,17 @@ static class ExpressionDiagramGenerator
     internal static void NoteConstantSubstitutedForArgument(ConstantExpression constantExpression) =>
         constantsSubstitutedForArguments.AddOrUpdate(constantExpression, constantSubstitutedForArgument);
 
+    [ThreadStatic]
+    static List<object?>? scratch;
+
     public static IReadOnlyList<object?> GenerateDiagram(Expression? node)
     {
-        var diagram = new List<object?>();
+        var diagram = scratch ??= [];
+        diagram.Clear();
         GenerateDiagram(node, new IterationState(), diagram);
-        return diagram;
+        var elements = diagram.ToArray();
+        diagram.Clear();
+        return elements;
     }
 
     static void GenerateDiagram(MemberBinding binding, IterationState iterationState, List<object?> diagram)
