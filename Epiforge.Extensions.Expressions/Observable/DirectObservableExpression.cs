@@ -8,7 +8,9 @@ abstract class DirectObservableExpression(ExpressionObserver observer, Type type
         {
             ConstantExpression constantExpression => constantExpression.Value,
             ParameterExpression => argument,
-            MemberExpression { Member: FieldInfo field } memberExpression => field.GetValue(memberExpression.Expression is { } target ? Resolve(target, argument) : null),
+            MemberExpression { Member: FieldInfo field, Expression: null } => field.GetValue(null),
+            MemberExpression { Member: FieldInfo field } memberExpression => Resolve(memberExpression.Expression!, argument) is { } target ? field.GetValue(target) : null,
+            MemberExpression { Member: PropertyInfo property, Expression: null } => property.GetValue(null),
             UnaryExpression { NodeType: ExpressionType.Quote } unaryExpression => unaryExpression.Operand,
             _ => throw new NotSupportedException($"the analyzer planned a subscription to {expression}, whose value the execution path cannot resolve without invoking something")
         };
@@ -32,6 +34,11 @@ abstract class DirectObservableExpression(ExpressionObserver observer, Type type
 
     private protected void Attach(DirectSubscriptionSite[] sites, object? argument, object?[] values)
     {
+        if (sites.Length == 0)
+        {
+            attachments = [];
+            return;
+        }
         var attaching = new DirectSubscriptionAttachment[sites.Length];
         var attached = 0;
         for (var i = 0; i < sites.Length; ++i)
@@ -42,7 +49,7 @@ abstract class DirectObservableExpression(ExpressionObserver observer, Type type
                 continue;
             attaching[attached++] = observer.DirectSubscriptions.Attach(source, kind, site.PropertyName, this, site.ForcesNotification);
         }
-        attachments = attached == sites.Length ? attaching : attaching[..attached];
+        attachments = attached == sites.Length ? attaching : attached == 0 ? [] : attaching[..attached];
     }
 
     internal void OnSourceChanged(bool forcesNotification)

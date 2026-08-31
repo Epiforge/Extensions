@@ -10,10 +10,13 @@ namespace Epiforge.Extensions.Expressions.Observable;
 /// A parameter is analyzed as the argument which will replace it, so that a lambda body and the parameter-replaced expression derived from it yield the same answer and the same subscriptions
 /// </remarks>
 /// <remarks>
-/// A field is a fixed target whatever declares it, because a field raises no change notification and is therefore read once and held by either mechanism; only the contents of a field of a compiler-generated type are watched, which is what the graph does
+/// A field is a fixed target whatever declares it and whether it is static or an instance field, because a field raises no change notification and is therefore read once and held by either mechanism; only the contents of a field of a compiler-generated type are watched, which is what the graph does
 /// </remarks>
 /// <remarks>
-/// An operator backed by a method is admitted when its return type is sealed and implements neither disposal interface, because the graph's disposal of such a value is a runtime type test which cannot succeed
+/// An operator, property or indexer backed by a method is admitted when its return type is sealed and implements neither disposal interface, because the graph's disposal of such a value is a runtime type test which cannot succeed; a registration of such a member for disposal is refused by the options, so only the blanket disposal of static method return values reaches this rule
+/// </remarks>
+/// <remarks>
+/// A static property is a fixed target, because the graph gives it a node with no dependency which is therefore evaluated once and held; reading it afresh on every evaluation would make the two mechanisms disagree the moment it changed
 /// </remarks>
 public sealed class DirectSubscriptionAnalyzer
 {
@@ -65,15 +68,13 @@ public sealed class DirectSubscriptionAnalyzer
         subscriptions.Add(new(source, kind, propertyName));
     }
 
-    static bool CannotBeDisposed(Type type) =>
-        type.IsSealed && !typeof(IDisposable).IsAssignableFrom(type) && !typeof(IAsyncDisposable).IsAssignableFrom(type);
-
     internal static bool IsFixed(Expression expression) =>
         expression switch
         {
             ConstantExpression => true,
             ParameterExpression => true,
-            MemberExpression { Member: FieldInfo } memberExpression => memberExpression.Expression is { } target && IsFixed(target),
+            MemberExpression { Member: FieldInfo } memberExpression => memberExpression.Expression is not { } target || IsFixed(target),
+            MemberExpression { Member: PropertyInfo, Expression: null } => true,
             UnaryExpression unaryExpression when unaryExpression.NodeType is ExpressionType.Quote => true,
             _ => false
         };
@@ -150,7 +151,7 @@ public sealed class DirectSubscriptionAnalyzer
     {
         if (indexExpression.Indexer is not { } indexer)
             return new(indexExpression, DirectSubscriptionIneligibility.UnsupportedExpressionKind);
-        if (isPropertyValueDisposed(indexer))
+        if (isPropertyValueDisposed(indexer) && !ExpressionObserverOptions.CannotBeDisposed(indexer.PropertyType))
             return new(indexExpression, DirectSubscriptionIneligibility.ValueRequiresDisposal);
         if (indexExpression.Object is not { } target)
             return new(indexExpression, DirectSubscriptionIneligibility.UnsupportedExpressionKind);
@@ -175,7 +176,7 @@ public sealed class DirectSubscriptionAnalyzer
 
     DirectSubscriptionAnalysis AnalyzeMember(MemberExpression memberExpression, Planner? planner)
     {
-        if (memberExpression.Member is PropertyInfo disposedProperty && isPropertyValueDisposed(disposedProperty))
+        if (memberExpression.Member is PropertyInfo disposedProperty && isPropertyValueDisposed(disposedProperty) && !ExpressionObserverOptions.CannotBeDisposed(disposedProperty.PropertyType))
             return new(memberExpression, DirectSubscriptionIneligibility.ValueRequiresDisposal);
         if (memberExpression.Member is PropertyInfo ignoredProperty && isIgnoredPropertyChangeNotification(ignoredProperty))
             return new(memberExpression, DirectSubscriptionIneligibility.IgnoredChangeNotification);
@@ -207,14 +208,14 @@ public sealed class DirectSubscriptionAnalyzer
             ParameterExpression parameterExpression => AnalyzeParameter(parameterExpression, planner),
             MemberExpression memberExpression => AnalyzeMember(memberExpression, planner),
             IndexExpression indexExpression => AnalyzeIndex(indexExpression, planner),
-            BinaryExpression binaryExpression when binaryExpression.Method is { } binaryOperator && !CannotBeDisposed(binaryOperator.ReturnType) => new(binaryExpression, DirectSubscriptionIneligibility.UserDefinedOperator),
+            BinaryExpression binaryExpression when binaryExpression.Method is { } binaryOperator && !ExpressionObserverOptions.CannotBeDisposed(binaryOperator.ReturnType) => new(binaryExpression, DirectSubscriptionIneligibility.UserDefinedOperator),
             BinaryExpression binaryExpression when IsShortCircuiting(binaryExpression) => new(binaryExpression, DirectSubscriptionIneligibility.DeferredBranch),
             BinaryExpression binaryExpression when binaryExpression.Conversion is not null => new(binaryExpression, DirectSubscriptionIneligibility.UnsupportedExpressionKind),
             BinaryExpression binaryExpression => AnalyzeNode(binaryExpression.Left, planner) is { IsEligible: false } left ? left : AnalyzeNode(binaryExpression.Right, planner),
             ConditionalExpression conditionalExpression => new(conditionalExpression, DirectSubscriptionIneligibility.DeferredBranch),
             TypeBinaryExpression typeBinaryExpression when typeBinaryExpression.NodeType is not ExpressionType.TypeAs => AnalyzeNode(typeBinaryExpression.Expression, planner),
             UnaryExpression unaryExpression when unaryExpression.NodeType is ExpressionType.Quote => DirectSubscriptionAnalysis.Eligible,
-            UnaryExpression unaryExpression when unaryExpression.Method is { } unaryOperator && !CannotBeDisposed(unaryOperator.ReturnType) => new(unaryExpression, DirectSubscriptionIneligibility.UserDefinedOperator),
+            UnaryExpression unaryExpression when unaryExpression.Method is { } unaryOperator && !ExpressionObserverOptions.CannotBeDisposed(unaryOperator.ReturnType) => new(unaryExpression, DirectSubscriptionIneligibility.UserDefinedOperator),
             UnaryExpression unaryExpression => AnalyzeNode(unaryExpression.Operand, planner),
             _ => new(expression, DirectSubscriptionIneligibility.UnsupportedExpressionKind)
         };

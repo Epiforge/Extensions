@@ -26,6 +26,10 @@ public class Options
         }
 
         [SuppressMessage("Performance", "CA1822:Mark members as static")]
+        public T GetDefaultOfType<T>() =>
+            default!;
+
+        [SuppressMessage("Performance", "CA1822:Mark members as static")]
         public SyncDisposableTestPerson GetPersonNamedAfterType(Type type) =>
             new(type.Name);
 
@@ -102,6 +106,11 @@ public class Options
     }
 
     [TestMethod]
+    [ExpectedException(typeof(ArgumentException))]
+    public void DisposeConstructedTypeThatCannotBeDisposedFails() =>
+        new ExpressionObserverOptions().AddConstructedTypeDisposal(typeof(string));
+
+    [TestMethod]
     public void DisposeConstructor()
     {
         var options = new ExpressionObserverOptions();
@@ -141,6 +150,10 @@ public class Options
     }
 
     [TestMethod]
+    public void DisposeGenericMethodReturnValueWithOpenReturnType() =>
+        Assert.IsTrue(new ExpressionObserverOptions().AddMethodReturnValueDisposal(typeof(TestObject).GetMethod(nameof(TestObject.GetDefaultOfType))!.MakeGenericMethod(typeof(int)), true));
+
+    [TestMethod]
     public void DisposeIndexerValue()
     {
         var collectionType = typeof(ObservableCollection<SyncDisposableTestPerson>);
@@ -159,6 +172,11 @@ public class Options
         Assert.IsTrue(options.IsExpressionValueDisposed(() => new TestObject().GetSyncDisposableMethod()));
         Assert.IsTrue(options.RemoveExpressionValueDisposal(() => new TestObject().GetSyncDisposableMethod()));
     }
+
+    [TestMethod]
+    [ExpectedException(typeof(ArgumentException))]
+    public void DisposeMethodReturnValueThatCannotBeDisposedFails() =>
+        new ExpressionObserverOptions().AddMethodReturnValueDisposal(typeof(object).GetMethod(nameof(GetHashCode))!);
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentException))]
@@ -184,6 +202,11 @@ public class Options
         Assert.IsTrue(options.IsExpressionValueDisposed(Expression.Lambda<Func<SyncDisposableTestPerson>>(Expression.MakeMemberAccess(Expression.New(testObjectType), property))));
         Assert.IsTrue(options.RemoveExpressionValueDisposal(Expression.Lambda<Func<SyncDisposableTestPerson>>(Expression.MakeMemberAccess(Expression.New(testObjectType), property))));
     }
+
+    [TestMethod]
+    [ExpectedException(typeof(ArgumentException))]
+    public void DisposePropertyValueThatCannotBeDisposedFails() =>
+        new ExpressionObserverOptions().AddPropertyValueDisposal(typeof(TestPerson).GetProperty(nameof(TestPerson.Name))!);
 
     [TestMethod]
     public void DisposeUnaryResult()

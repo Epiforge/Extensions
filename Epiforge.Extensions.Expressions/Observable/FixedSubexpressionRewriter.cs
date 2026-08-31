@@ -12,7 +12,7 @@ sealed class FixedSubexpressionRewriter :
     readonly List<Expression> fixedSubexpressions = [];
     readonly ParameterExpression values;
 
-    internal IReadOnlyList<Expression> FixedSubexpressions =>
+    internal List<Expression> FixedSubexpressions =>
         fixedSubexpressions;
 
     public override Expression? Visit(Expression? node) =>

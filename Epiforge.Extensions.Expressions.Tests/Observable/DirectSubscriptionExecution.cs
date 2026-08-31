@@ -64,6 +64,68 @@ public class DirectSubscriptionExecution
     }
 
     [TestMethod]
+    public void ANullInAFixedChainFaultsRatherThanThrows()
+    {
+        var log = new SubscriptionLog();
+        var subject = new Recorded(log) { Rank = 3 };
+        var outer = new Recorded(log) { Rank = 1 };
+        var graphObserver = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = false });
+        var directObserver = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = true });
+        using (var graphExpression = graphObserver.Observe(s => outer.Linked!.Linked!.Rank + s.Rank, subject))
+        using (var directExpression = directObserver.Observe(s => outer.Linked!.Linked!.Rank + s.Rank, subject))
+        {
+            Assert.IsNotNull(graphExpression.Evaluation.Fault);
+            Assert.IsNotNull(directExpression.Evaluation.Fault);
+        }
+        Assert.AreEqual(0, log.Outstanding);
+    }
+
+    [TestMethod]
+    public void AStaticFieldIsAFixedTarget()
+    {
+        var log = new SubscriptionLog();
+        var subject = new Recorded(log) { Rank = 3 };
+        var graphObserver = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = false });
+        var directObserver = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = true });
+        using (var graphExpression = graphObserver.Observe(s => StaticFieldHolder.Held.Rank + s.Rank, subject))
+        using (var directExpression = directObserver.Observe(s => StaticFieldHolder.Held.Rank + s.Rank, subject))
+        {
+            Assert.AreEqual(6, directExpression.Evaluation.Result);
+            Assert.AreEqual(graphExpression.Evaluation.Result, directExpression.Evaluation.Result);
+            subject.Rank = 5;
+            Assert.AreEqual(8, directExpression.Evaluation.Result);
+            Assert.AreEqual(graphExpression.Evaluation.Result, directExpression.Evaluation.Result);
+            StaticFieldHolder.Held.Rank = 9;
+            Assert.AreEqual(14, directExpression.Evaluation.Result);
+            Assert.AreEqual(graphExpression.Evaluation.Result, directExpression.Evaluation.Result);
+            StaticFieldHolder.Held = new Recorded(StaticFieldHolder.Log) { Rank = 100 };
+            Assert.AreEqual(14, directExpression.Evaluation.Result);
+            Assert.AreEqual(graphExpression.Evaluation.Result, directExpression.Evaluation.Result);
+        }
+        Assert.AreEqual(0, log.Outstanding);
+        Assert.AreEqual(0, StaticFieldHolder.Log.Outstanding);
+    }
+
+    [TestMethod]
+    public void AStaticPropertyIsReadOnce()
+    {
+        var log = new SubscriptionLog();
+        var subject = new Recorded(log) { Rank = 3 };
+        var graphObserver = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = false });
+        var directObserver = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = true });
+        StaticPropertyHolder.Counter = 10;
+        using (var graphExpression = graphObserver.Observe(s => StaticPropertyHolder.Counter + s.Rank, subject))
+        using (var directExpression = directObserver.Observe(s => StaticPropertyHolder.Counter + s.Rank, subject))
+        {
+            Assert.AreEqual(graphExpression.Evaluation.Result, directExpression.Evaluation.Result);
+            StaticPropertyHolder.Counter = 100;
+            subject.Rank = 5;
+            Assert.AreEqual(graphExpression.Evaluation.Result, directExpression.Evaluation.Result, "the two mechanisms disagreed after a static property changed behind them");
+        }
+        Assert.AreEqual(0, log.Outstanding);
+    }
+
+    [TestMethod]
     [DataRow(false)]
     [DataRow(true)]
     public void AStringComparisonIsObservedAndAnnounced(bool useDirectSubscription)
