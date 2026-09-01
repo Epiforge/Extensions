@@ -31,7 +31,10 @@ abstract class ObservableQuery :
     }
 
     protected readonly CollectionObserver collectionObserver;
-    object? deferredNotifications;
+    object? firstDeferredNotification;
+    List<object>? manyDeferredNotifications;
+    object? secondDeferredNotification;
+    object? thirdDeferredNotification;
 #if IS_NET_9_0_OR_GREATER
     readonly Lock initializationAccess = new();
 #else
@@ -75,26 +78,35 @@ abstract class ObservableQuery :
     {
         if (notificationDeferralDepth == 0)
             return false;
-        if (deferredNotifications is null)
-            deferredNotifications = eventArguments;
-        else if (deferredNotifications is List<object> manyDeferredNotifications)
-            manyDeferredNotifications.Add(eventArguments);
+        if (firstDeferredNotification is null)
+            firstDeferredNotification = eventArguments;
+        else if (secondDeferredNotification is null)
+            secondDeferredNotification = eventArguments;
+        else if (thirdDeferredNotification is null)
+            thirdDeferredNotification = eventArguments;
         else
-            deferredNotifications = new List<object> { deferredNotifications, eventArguments };
+            (manyDeferredNotifications ??= []).Add(eventArguments);
         return true;
     }
 
     void EndNotificationDeferral()
     {
-        object? deferred = null;
+        object? first = null, second = null, third = null;
+        List<object>? many = null;
         if (--notificationDeferralDepth == 0)
         {
-            deferred = deferredNotifications;
-            deferredNotifications = null;
+            first = firstDeferredNotification;
+            second = secondDeferredNotification;
+            third = thirdDeferredNotification;
+            many = manyDeferredNotifications;
+            firstDeferredNotification = null;
+            secondDeferredNotification = null;
+            thirdDeferredNotification = null;
+            manyDeferredNotifications = null;
         }
         try
         {
-            RaiseDeferredNotifications(deferred);
+            RaiseDeferredNotifications(first, second, third, many);
         }
         finally
         {
@@ -132,13 +144,20 @@ abstract class ObservableQuery :
             base.OnPropertyChanging(e);
     }
 
-    void RaiseDeferredNotifications(object? deferred)
+    void RaiseDeferredNotifications(object? first, object? second, object? third, List<object>? many)
     {
-        if (deferred is List<object> manyDeferredNotifications)
-            for (int i = 0, ii = manyDeferredNotifications.Count; i < ii; ++i)
-                RaiseNotification(manyDeferredNotifications[i]);
-        else if (deferred is not null)
-            RaiseNotification(deferred);
+        if (first is null)
+            return;
+        RaiseNotification(first);
+        if (second is null)
+            return;
+        RaiseNotification(second);
+        if (third is null)
+            return;
+        RaiseNotification(third);
+        if (many is not null)
+            for (int i = 0, ii = many.Count; i < ii; ++i)
+                RaiseNotification(many[i]);
     }
 
     /// <summary>
