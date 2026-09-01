@@ -67,7 +67,7 @@ sealed class ObservableDictionaryUsingSynchronizationContextQuery<TKey, TValue>(
     }
 
     public override IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator() =>
-        SynchronizationContext.Send(() => dictionary!.ToList().AsReadOnly().GetEnumerator());
+        SynchronizationContext.Send(() => (IEnumerator<KeyValuePair<TKey, TValue>>)dictionary!.ToList().GetEnumerator());
 
     public override IReadOnlyList<KeyValuePair<TKey, TValue>> GetRange(IEnumerable<TKey> keys) =>
         SynchronizationContext.Send(() => dictionary!.GetRange(keys));

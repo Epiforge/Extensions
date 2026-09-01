@@ -208,7 +208,7 @@ sealed class ObservableCollectionLookupQuery<TKey, TElement> :
     IEnumerator<KeyValuePair<TKey, IObservableGrouping<TKey, TElement>>> IEnumerable<KeyValuePair<TKey, IObservableGrouping<TKey, TElement>>>.GetEnumerator()
     {
         lock (access)
-            return groupingByKey.ToList().AsReadOnly().GetEnumerator();
+            return groupingByKey.ToList().GetEnumerator();
     }
 
     public IReadOnlyList<KeyValuePair<TKey, IObservableGrouping<TKey, TElement>>> GetRange(IEnumerable<TKey> keys)

@@ -144,6 +144,56 @@ public class OrderedHashSet
     }
 
     [TestMethod]
+    [ExpectedException(typeof(ArgumentException))]
+    public void CopyToWithArrayIndexAndCountArrayTooSmall() =>
+        new OrderedHashSet<int>(new[] { 1, 2, 3 }).CopyTo(new int[2], 0, 3);
+
+    [TestMethod]
+    public void CopyToWithArrayIndexAndCountExceedingSetCount()
+    {
+        var set = new OrderedHashSet<int>(new[] { 1, 2, 3 });
+        var array = new int[5];
+        set.CopyTo(array, 1, 10);
+        Assert.AreEqual(0, array[0]);
+        Assert.AreEqual(1, array[1]);
+        Assert.AreEqual(2, array[2]);
+        Assert.AreEqual(3, array[3]);
+        Assert.AreEqual(0, array[4]);
+    }
+
+    [TestMethod]
+    [ExpectedException(typeof(ArgumentOutOfRangeException))]
+    public void CopyToWithArrayIndexAndCountNegativeArrayIndex() =>
+        new OrderedHashSet<int>(new[] { 1, 2, 3 }).CopyTo(new int[3], -1, 2);
+
+    [TestMethod]
+    public void CopyToWithArrayIndexAndCountOfNegative()
+    {
+        var set = new OrderedHashSet<int>(new[] { 1, 2, 3 });
+        var array = new int[3];
+        set.CopyTo(array, 0, -1);
+        Assert.AreEqual(0, array[0]);
+        Assert.AreEqual(0, array[1]);
+        Assert.AreEqual(0, array[2]);
+    }
+
+    [TestMethod]
+    public void CopyToWithArrayIndexAndCountOfZero()
+    {
+        var set = new OrderedHashSet<int>(new[] { 1, 2, 3 });
+        var array = new int[3];
+        set.CopyTo(array, 0, 0);
+        Assert.AreEqual(0, array[0]);
+        Assert.AreEqual(0, array[1]);
+        Assert.AreEqual(0, array[2]);
+    }
+
+    [TestMethod]
+    [ExpectedException(typeof(ArgumentNullException))]
+    public void CopyToWithArrayIndexAndCountNullArray() =>
+        new OrderedHashSet<int>(new[] { 1, 2, 3 }).CopyTo(null!, 0, 2);
+
+    [TestMethod]
     public void EnsureCapacity()
     {
         var set = new OrderedHashSet<int>(new[] { 1, 2, 3 });

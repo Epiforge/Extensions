@@ -18,6 +18,9 @@ namespace Epiforge.Extensions.Expressions.Observable;
 /// <remarks>
 /// A static property is a fixed target, because the graph gives it a node with no dependency which is therefore evaluated once and held; reading it afresh on every evaluation would make the two mechanisms disagree the moment it changed
 /// </remarks>
+/// <remarks>
+/// A property read through a target is never fixed, so a chain which passes through one can never be direct; the target's value can change, while the plan is decided once when the observation is constructed, so admitting it would mean deciding subscriptions after evaluation, which is what the graph exists to do
+/// </remarks>
 public sealed class DirectSubscriptionAnalyzer
 {
     sealed class ExpressionIdentityComparer :

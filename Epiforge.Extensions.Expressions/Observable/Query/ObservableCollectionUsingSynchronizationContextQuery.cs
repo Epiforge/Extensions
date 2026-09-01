@@ -37,7 +37,7 @@ sealed class ObservableCollectionUsingSynchronizationContextQuery<TElement>(Coll
     }
 
     public override IEnumerator<TElement> GetEnumerator() =>
-        SynchronizationContext.Send(() => elements!.ToList().AsReadOnly().GetEnumerator());
+        SynchronizationContext.Send(() => (IEnumerator<TElement>)elements!.ToList().GetEnumerator());
 
     protected override void OnInitialization()
     {
