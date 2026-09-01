@@ -115,6 +115,42 @@ public class DirectSubscriptionExecution
     }
 
     [TestMethod]
+    public void ANullFieldTargetFaultsAlikeInBothMechanisms()
+    {
+        var log = new SubscriptionLog();
+        var subject = new Recorded(log) { Rank = 3 };
+        var outer = new Recorded(log) { Rank = 1 };
+        var graphObserver = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = false });
+        var directObserver = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = true });
+        using (var graphExpression = graphObserver.Observe(s => outer.Linked!.Linked!.Rank + s.Rank, subject))
+        using (var directExpression = directObserver.Observe(s => outer.Linked!.Linked!.Rank + s.Rank, subject))
+        {
+            Assert.IsNotNull(graphExpression.Evaluation.Fault);
+            Assert.IsNotNull(directExpression.Evaluation.Fault);
+            Assert.AreEqual(graphExpression.Evaluation.Fault!.GetType(), directExpression.Evaluation.Fault!.GetType(), $"graph: {graphExpression.Evaluation.Fault}; direct: {directExpression.Evaluation.Fault}");
+        }
+        Assert.AreEqual(0, log.Outstanding);
+    }
+
+    [TestMethod]
+    public void ANullPropertyTargetFaultsAlikeInBothMechanisms()
+    {
+        var log = new SubscriptionLog();
+        var subject = new Recorded(log) { Rank = 3 };
+        var outer = new Recorded(log) { Rank = 1 };
+        var graphObserver = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = false });
+        var directObserver = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = true });
+        using (var graphExpression = graphObserver.Observe(s => outer.Linked!.Rank + s.Rank, subject))
+        using (var directExpression = directObserver.Observe(s => outer.Linked!.Rank + s.Rank, subject))
+        {
+            Assert.IsNotNull(graphExpression.Evaluation.Fault);
+            Assert.IsNotNull(directExpression.Evaluation.Fault);
+            Assert.AreEqual(graphExpression.Evaluation.Fault!.GetType(), directExpression.Evaluation.Fault!.GetType(), $"graph: {graphExpression.Evaluation.Fault}; direct: {directExpression.Evaluation.Fault}");
+        }
+        Assert.AreEqual(0, log.Outstanding);
+    }
+
+    [TestMethod]
     public void AStaticFieldIsAFixedTarget()
     {
         var log = new SubscriptionLog();

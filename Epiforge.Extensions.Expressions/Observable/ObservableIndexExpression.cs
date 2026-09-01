@@ -64,9 +64,18 @@ sealed class ObservableIndexExpression(ExpressionObserver observer, IndexExpress
                     this.objectResult = objectResult;
                     SubscribeToObjectValueNotifications();
                 }
-                var value = getMethod?.FastInvoke(this.objectResult, arguments?.Select(argument => argument.Evaluation.Result).ToArray() ?? []);
-                Evaluation = (null, value);
-                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{IndexExpression} evaluated: {Value}", IndexExpression, value);
+                if (getMethod is { IsStatic: false } && this.objectResult is null)
+                {
+                    var nullReference = new NullReferenceException();
+                    Evaluation = (nullReference, defaultResult);
+                    observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, nullReference, "{IndexExpression} object was null: {Fault}", IndexExpression, nullReference);
+                }
+                else
+                {
+                    var value = getMethod?.FastInvoke(this.objectResult, arguments?.Select(argument => argument.Evaluation.Result).ToArray() ?? []);
+                    Evaluation = (null, value);
+                    observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{IndexExpression} evaluated: {Value}", IndexExpression, value);
+                }
             }
         }
         catch (Exception ex)

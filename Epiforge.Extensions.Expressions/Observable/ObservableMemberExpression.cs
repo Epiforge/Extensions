@@ -55,9 +55,24 @@ sealed class ObservableMemberExpression(ExpressionObserver observer, MemberExpre
                     this.observableExpressionResult = observableExpressionResult;
                     SubscribeToExpressionValueNotifications();
                 }
-                var value = getMethod.FastInvoke(observableExpressionResult, []);
-                Evaluation = (null, value);
-                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{MemberExpression} evaluated: {Value}", MemberExpression, value);
+                if (!getMethod.IsStatic && observableExpressionResult is null)
+                {
+                    var nullReference = new NullReferenceException();
+                    Evaluation = (nullReference, defaultResult);
+                    observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, nullReference, "{MemberExpression} object was null: {Fault}", MemberExpression, nullReference);
+                }
+                else
+                {
+                    var value = getMethod.FastInvoke(observableExpressionResult, []);
+                    Evaluation = (null, value);
+                    observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{MemberExpression} evaluated: {Value}", MemberExpression, value);
+                }
+            }
+            else if (field is { IsStatic: false } && observableExpressionResult is null)
+            {
+                var nullReference = new NullReferenceException();
+                Evaluation = (nullReference, defaultResult);
+                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, nullReference, "{MemberExpression} object was null: {Fault}", MemberExpression, nullReference);
             }
             else if (field is not null)
             {
