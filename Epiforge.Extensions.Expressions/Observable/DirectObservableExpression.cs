@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Expressions.Observable;
+﻿namespace Epiforge.Extensions.Expressions.Observable;
 
 abstract class DirectObservableExpression(ExpressionObserver observer, Type type) :
     ObservableExpression(observer, type, false)
@@ -63,6 +63,11 @@ abstract class DirectObservableExpression(ExpressionObserver observer, Type type
 sealed class DirectObservableExpression<TArgument, TResult> :
     DirectObservableExpression
 {
+    static readonly object boxedFalse = false;
+    static readonly object boxedTrue = true;
+    static readonly bool sharesBooleanBoxes = typeof(TResult) == typeof(bool);
+    static readonly TResult trueResult = typeof(TResult) == typeof(bool) ? (TResult)(object)true : default!;
+
     internal DirectObservableExpression(ExpressionObserver observer, Expression<Func<TArgument, TResult>> lambdaExpression, DirectSubscriptionSite[] sites, Func<TArgument, object?[], TResult> evaluate, TArgument argument, object?[] values) :
         base(observer, lambdaExpression.Body.Type)
     {
@@ -84,13 +89,19 @@ sealed class DirectObservableExpression<TArgument, TResult> :
     private protected override Expression Materialize() =>
         ExpressionObserver.ReplaceParametersWithoutOptimization(lambdaExpression, argument)!;
 
+    /// <summary>
+    /// Yields the result as a reference, which for a boolean is one of two shared boxes rather than a new allocation, since nothing which consumes a result distinguishes boxes of equal value
+    /// </summary>
+    static object? Box(TResult value) =>
+        sharesBooleanBoxes ? EqualityComparer<TResult>.Default.Equals(value, trueResult) ? boxedTrue : boxedFalse : value;
+
     protected override void Evaluate()
     {
         try
         {
             var value = evaluate(argument, values);
             if (!IsCurrentResult(value))
-                Evaluation = (null, value);
+                Evaluation = (null, Box(value));
             observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{Expression} evaluated directly: {Value}", Expression, value);
         }
         catch (Exception ex)

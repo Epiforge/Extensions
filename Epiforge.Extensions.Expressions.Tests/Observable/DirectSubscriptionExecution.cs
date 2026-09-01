@@ -6,6 +6,29 @@ public class DirectSubscriptionExecution
     [TestMethod]
     [DataRow(false)]
     [DataRow(true)]
+    public void ABooleanResultIsAnnouncedOnEveryCrossing(bool useDirectSubscription)
+    {
+        var log = new SubscriptionLog();
+        var subject = new Recorded(log) { Rank = 0 };
+        var observer = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = useDirectSubscription });
+        var announcements = 0;
+        using (var expr = observer.Observe(s => (s.Rank & 1) == 0, subject))
+        {
+            Assert.AreEqual(true, expr.Evaluation.Result);
+            expr.PropertyChanged += (sender, e) => ++announcements;
+            for (var rank = 1; rank <= 8; ++rank)
+            {
+                subject.Rank = rank;
+                Assert.AreEqual(rank % 2 == 0, expr.Evaluation.Result);
+                Assert.AreEqual(rank, announcements);
+            }
+        }
+        Assert.AreEqual(0, log.Outstanding);
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
     public void AContentsChangeIsAnnouncedWhenTheValueIsTheCollectionItself(bool useDirectSubscription)
     {
         var log = new SubscriptionLog();
