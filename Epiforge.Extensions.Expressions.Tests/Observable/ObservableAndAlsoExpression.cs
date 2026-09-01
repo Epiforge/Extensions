@@ -4,6 +4,40 @@ namespace Epiforge.Extensions.Expressions.Tests.Observable;
 public class ObservableAndAlsoExpression
 {
     [TestMethod]
+    public void ACountGuardHoldsWhenTheCollectionShrinksInOneEvent()
+    {
+        var numbers = new ObservableRangeCollection<int>(new[] { 0, 1, 2, 3 });
+        var observer = ExpressionObserverHelpers.Create();
+        using (var expr = observer.Observe(() => numbers.Count == 4 && numbers[2] == 2))
+        {
+            Assert.IsNull(expr.Evaluation.Fault);
+            Assert.AreEqual(true, expr.Evaluation.Result);
+            numbers.RemoveRange(2, 2);
+            Assert.IsNull(expr.Evaluation.Fault, $"the guard was defeated: {expr.Evaluation.Fault}");
+            Assert.AreEqual(false, expr.Evaluation.Result);
+        }
+        Assert.AreEqual(0, observer.CachedObservableExpressions);
+    }
+
+    [TestMethod]
+    public void ACountGuardHoldsWhenTheCollectionShrinksOneElementAtATime()
+    {
+        var numbers = new ObservableRangeCollection<int>(new[] { 0, 1, 2, 3 });
+        var observer = ExpressionObserverHelpers.Create();
+        using (var expr = observer.Observe(() => numbers.Count == 4 && numbers[2] == 2))
+        {
+            Assert.IsNull(expr.Evaluation.Fault);
+            Assert.AreEqual(true, expr.Evaluation.Result);
+            numbers.RemoveAt(3);
+            Assert.IsNull(expr.Evaluation.Fault, $"the guard was defeated removing the last element: {expr.Evaluation.Fault}");
+            numbers.RemoveAt(2);
+            Assert.IsNull(expr.Evaluation.Fault, $"the guard was defeated removing the indexed element: {expr.Evaluation.Fault}");
+            Assert.AreEqual(false, expr.Evaluation.Result);
+        }
+        Assert.AreEqual(0, observer.CachedObservableExpressions);
+    }
+
+    [TestMethod]
     public void FaultPropagation()
     {
         var john = TestPerson.CreateJohn();
