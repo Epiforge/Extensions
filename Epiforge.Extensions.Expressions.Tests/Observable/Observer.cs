@@ -24,11 +24,7 @@ public class Observer
         var johnsNameIsSixCharacters = observer.ConditionAsync(() => john.Name!.Length == 6);
         Assert.IsTrue(johnsNameIsSixCharacters.IsCompleted);
         Assert.IsInstanceOfType(johnsNameIsSixCharacters.Exception, typeof(AggregateException));
-#if IS_NET_7_0_OR_GREATER
-        Assert.IsInstanceOfType(johnsNameIsSixCharacters.Exception!.InnerExceptions[0], typeof(TargetException));
-#else
         Assert.IsInstanceOfType(johnsNameIsSixCharacters.Exception!.InnerExceptions[0], typeof(NullReferenceException));
-#endif
     }
 
     [TestMethod]
@@ -63,11 +59,7 @@ public class Observer
         john.Name = null;
         Assert.IsTrue(johnsNameIsSixCharacters.IsCompleted);
         Assert.IsInstanceOfType(johnsNameIsSixCharacters.Exception, typeof(AggregateException));
-#if IS_NET_7_0_OR_GREATER
-        Assert.IsInstanceOfType(johnsNameIsSixCharacters.Exception!.InnerExceptions[0], typeof(TargetException));
-#else
         Assert.IsInstanceOfType(johnsNameIsSixCharacters.Exception!.InnerExceptions[0], typeof(NullReferenceException));
-#endif
     }
 
     [TestMethod]
