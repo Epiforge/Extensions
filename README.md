@@ -242,8 +242,9 @@ The shortcut handles an expression built from these:
 * properties and indexers whose target is one of the above
 * static properties
 * operators, where one resolved to a method needs a return type nothing could dispose — `==` on strings qualifies
+* method calls, on that same condition, where the target and every argument are themselves handled — `string.IsNullOrEmpty(e.Name)` qualifies
 
-Everything else builds the graph: `?:`, `&&`, `||` and `??`; anything read through a property, such as `e => e.Name.Length`; method calls; object and collection construction; and anything you have configured the observer to ignore notifications for or to dispose.
+Everything else builds the graph: `?:`, `&&`, `||` and `??`; anything read through a property, such as `e => e.Name.Length`; a call to the get method of a property or an indexer, which is how an indexer written in C# arrives; object and collection construction; and anything you have configured the observer to ignore notifications for or to dispose.
 
 To find out about a particular expression, ask:
 
@@ -366,6 +367,8 @@ Three things that might otherwise look like arbitrary restrictions fall straight
 3. Faults reach you through `OperationFault` instead of being thrown, because the evaluation that failed happened later, on whatever thread raised the change. By then there is no call of yours left on the stack to throw out of.
 
 What is not free is construction. Building the machine means building an observable expression for every element the query touches, and that is proportional to the size of the collection. So build a query once and hold onto it. Do not build one per frame, per request, or per keystroke. The bargain is that you pay up front and then stop paying to read.
+
+Reading is also cheaper than being told. A query subscribes to the one it is built on only while something is subscribed to it, and a filtered query works out where a change landed, and describes it, only when something will receive that description. So subscribe when you need to be told what changed, and simply read the query when you only need its answer to be right.
 
 Which is also how to decide whether you want one. If you compute a result once and move on, plain LINQ is cheaper and simpler, and you should use it. If a result has to stay correct across a long run of small changes, such as a list someone is looking at, a running total, or a filter someone is typing into, that is what these are for.
 
