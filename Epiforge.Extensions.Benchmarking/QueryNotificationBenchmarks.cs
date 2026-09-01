@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Benchmarking;
+﻿namespace Epiforge.Extensions.Benchmarking;
 
 using System.Collections.Specialized;
 using System.Linq.Expressions;
@@ -10,6 +10,8 @@ public class QueryNotificationBenchmarks
 
     static readonly Expression<Func<BenchmarkPerson, bool>> predicate = person => (person.Rank & 1) == 0;
 
+    ExpressionObserver expressionObserver = null!;
+    IObservableExpression<BenchmarkPerson, bool>[] observations = null!;
     CollectionObserver observer = null!;
     BenchmarkPerson[] people = null!;
     ObservableRangeCollection<BenchmarkPerson> source = null!;
@@ -23,6 +25,13 @@ public class QueryNotificationBenchmarks
         sourceQuery.Dispose();
     }
 
+    [GlobalCleanup(Target = nameof(FlipEveryRankObservedWithoutAQuery))]
+    public void CleanupObservations()
+    {
+        for (var i = 0; i < elementCount; ++i)
+            observations[i].Dispose();
+    }
+
     [Benchmark]
     public void FlipEveryMembershipWithASubscriber()
     {
@@ -32,6 +41,13 @@ public class QueryNotificationBenchmarks
 
     [Benchmark]
     public void FlipEveryMembershipWithNothingObserving()
+    {
+        for (var i = 0; i < elementCount; ++i)
+            people[i].Rank ^= 1;
+    }
+
+    [Benchmark]
+    public void FlipEveryRankObservedWithoutAQuery()
     {
         for (var i = 0; i < elementCount; ++i)
             people[i].Rank ^= 1;
@@ -51,6 +67,16 @@ public class QueryNotificationBenchmarks
     [GlobalSetup(Target = nameof(FlipEveryRankWithNoQuery))]
     public void SetupBare() =>
         SetupPeople();
+
+    [GlobalSetup(Target = nameof(FlipEveryRankObservedWithoutAQuery))]
+    public void SetupExpressions()
+    {
+        SetupPeople();
+        expressionObserver = new ExpressionObserver();
+        observations = new IObservableExpression<BenchmarkPerson, bool>[elementCount];
+        for (var i = 0; i < elementCount; ++i)
+            observations[i] = expressionObserver.ObserveWithoutOptimization(predicate, people[i]);
+    }
 
     [GlobalSetup(Target = nameof(FlipEveryMembershipWithASubscriber))]
     public void SetupObserved()
