@@ -34,6 +34,8 @@ public class PrefixWeightedSequence
         for (var i = 0; i < boundary; ++i)
             expectedPrefix += reference[i].Weight;
         Assert.AreEqual(expectedPrefix, sequence.PrefixWeightBefore(boundary), $"{context}: PrefixWeightBefore({boundary}) diverged");
+        if (boundary < reference.Count)
+            Assert.AreEqual(expectedPrefix, sequence.PrefixWeightBefore(nodes[boundary]), $"{context}: PrefixWeightBefore(node) diverged at {boundary}");
 
         var totalWeight = reference.Sum(entry => entry.Weight);
         if (totalWeight > 0)
@@ -261,6 +263,13 @@ public class PrefixWeightedSequence
 
     [TestMethod]
     [Timeout(300000)]
+    public void APrefixWeightBeforeANullNodeIsRejected()
+    {
+        var sequence = new PrefixWeightedSequence<int>();
+        Assert.ThrowsException<ArgumentNullException>(() => _ = sequence.PrefixWeightBefore(null!));
+    }
+
+    [TestMethod]
     public void FingerSearchValidatesItsArguments()
     {
         var sequence = new PrefixWeightedSequence<int>();

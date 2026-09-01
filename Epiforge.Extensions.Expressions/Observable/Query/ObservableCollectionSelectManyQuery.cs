@@ -27,7 +27,7 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
                 if (positions.NodeAtWeight(index) is not { } node || node.Item is not { } spanningEnumerable)
                     throw new IndexOutOfRangeException();
                 enumerable = spanningEnumerable;
-                offset = index - positions.PrefixWeightBefore(positions.IndexOf(node));
+                offset = index - positions.PrefixWeightBefore(node);
             }
             return enumerable.ElementAt(offset);
         }
@@ -261,7 +261,7 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
 
     void TranslateInnerChangeWithAccess(PrefixWeightedSequenceNode<IEnumerable<TResult>?> node, int newWeight, NotifyCollectionChangedEventArgs e)
     {
-        var reducedIndex = positions.PrefixWeightBefore(positions.IndexOf(node));
+        var reducedIndex = positions.PrefixWeightBefore(node);
         positions.SetWeight(node, newWeight);
         OnCollectionChanged(e.Action switch
         {

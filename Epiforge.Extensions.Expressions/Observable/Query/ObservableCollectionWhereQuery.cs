@@ -112,7 +112,7 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
         var newWeight = newResult ? 1 : 0;
         if (node.Weight == newWeight)
             return;
-        var translatedIndex = memberships.PrefixWeightBefore(memberships.IndexOf(node));
+        var translatedIndex = memberships.PrefixWeightBefore(node);
         memberships.SetWeight(node, newWeight);
         cursorNode = null;
         if (TryBeginEnumerationSnapshotPatchWithAccess(out var snapshot))

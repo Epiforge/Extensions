@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Collections.Generic;
+﻿namespace Epiforge.Extensions.Collections.Generic;
 
 /// <summary>
 /// Represents a sequence of items, each carrying a non-negative weight, in which positional insertion and removal, the total weight preceding a position, and the item occupying a weight offset are all logarithmic in the number of items
@@ -383,6 +383,22 @@ public sealed class PrefixWeightedSequence<T>
                 current = current.Right;
             }
         }
+        return prefixWeight;
+    }
+
+    /// <summary>
+    /// Gets the sum of the weights of the items preceding the specified node
+    /// </summary>
+    /// <param name="node">A node belonging to this sequence</param>
+    /// <returns>The total weight of the items before <paramref name="node"/></returns>
+    /// <remarks>This climbs from the node to the root, where taking the position first and then descending from the root would traverse the sequence twice</remarks>
+    public int PrefixWeightBefore(PrefixWeightedSequenceNode<T> node)
+    {
+        ArgumentNullException.ThrowIfNull(node);
+        var prefixWeight = WeightOf(node.Left);
+        for (var child = node; child.Parent is not null; child = child.Parent)
+            if (ReferenceEquals(child, child.Parent.Right))
+                prefixWeight += WeightOf(child.Parent.Left) + child.Parent.Weight;
         return prefixWeight;
     }
 

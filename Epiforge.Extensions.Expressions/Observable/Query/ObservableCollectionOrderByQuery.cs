@@ -186,7 +186,7 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
             return;
         var startingIndex = positions.PrefixWeightBefore(currentIndex);
         positions.MoveRange(currentIndex, destinationIndex, 1);
-        results.MoveRange(startingIndex, positions.PrefixWeightBefore(positions.IndexOf(node)), node.Weight);
+        results.MoveRange(startingIndex, positions.PrefixWeightBefore(node), node.Weight);
     }
 
     void ResultsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -254,7 +254,7 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
                             if (!nodesByElement.TryGetValue(element, out var node))
                                 continue;
                             var removedCount = elements.Count();
-                            results.RemoveRange(positions.PrefixWeightBefore(positions.IndexOf(node)), removedCount);
+                            results.RemoveRange(positions.PrefixWeightBefore(node), removedCount);
                             if (removedCount < node.Weight)
                                 positions.SetWeight(node, node.Weight - removedCount);
                             else
@@ -279,7 +279,7 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
                             var count = elements.Count();
                             if (nodesByElement.TryGetValue(element, out var node))
                             {
-                                results.InsertRange(positions.PrefixWeightBefore(positions.IndexOf(node)), elements);
+                                results.InsertRange(positions.PrefixWeightBefore(node), elements);
                                 positions.SetWeight(node, node.Weight + count);
                             }
                             else
