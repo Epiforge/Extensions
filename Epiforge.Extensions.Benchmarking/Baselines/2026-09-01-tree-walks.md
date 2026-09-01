@@ -121,9 +121,38 @@ So the accumulation costs **two and a half times the climb it rides on**, and a 
 
 `FlipMembershipWithAccess` decides up front whether anything will read the position — a subscriber, or a snapshot a live enumeration holds — and calls the overload which accumulates only then.
 
-Predicted: `FlipEveryMembershipWithNothingObserving` back to **86–88 μs**, `FlipEveryMembershipWithASubscriber` **unmoved at 119–122 μs**, both controls unmoved, allocation byte-identical. If both land, the day's two best figures hold at the same time, which no single act has managed.
+Predicted: `FlipEveryMembershipWithNothingObserving` back to **86–88 μs**, `FlipEveryMembershipWithASubscriber` **unmoved at 119–122 μs**, both controls unmoved, allocation byte-identical.
 
-*(Results to be recorded on the next run.)*
+| arm | before | after | |
+|--- |---: |---: |---: |
+| `FlipEveryMembershipWithASubscriber` | 120.874 μs | **121.851 μs** | unmoved, as predicted |
+| `FlipEveryMembershipWithNothingObserving` | 102.043 μs | **87.386 μs** | 14.4%, inside the range |
+| `FlipEveryRankObservedWithoutAQuery` | 30.059 μs | 30.362 μs | control |
+| `FlipEveryRankWithNoQuery` | 8.260 μs | 8.205 μs | control |
+
+**Both landed, and the two best figures of the day now hold at the same time.**
+
+The C and B constants were fitted to four runs and then predicted a fifth. The unobserved query share came back at **57.02 ns** against the 57.0 the model said, and the observed at **91.5** against 90.8. A model built out of arithmetic rather than a story about which code is slow.
+
+## Where a flip stands
+
+Per element crossing the predicate, across the whole day:
+
+| | start of day | now |
+|--- |---: |---: |
+| bytes, nothing subscribed | 216 | 80 |
+| the query's share of the time, nothing subscribed | 103.3 ns | 57.0 ns |
+| the query's share of the time, something subscribed | 103.3 ns | 91.5 ns |
+
+## What was learned that outlasts the change
+
+**A second traversal of a path the first one just walked costs 6 ns; carrying an unpredictable branch along a traversal costs 15.** Fusing two walks over the same path is therefore worth much less than it looks, and adding conditional work to a walk that every caller pays for is worth much less than nothing. Act one was the large win because the walk it removed was a descent from the root — a different path, and a cold one.
+
+The general form: **the expensive thing is touching memory that is not already in cache, not doing the work twice.**
+
+## Not done
+
+`ObservableCollectionOrderByQuery` still composes `PrefixWeightBefore` with a separate `SetWeight` in two places. Fusing them would move a mutation of `positions` ahead of a `results` change a subscriber can observe. That is a behavior question, the path is cold, and by the model above it is worth six nanoseconds. Left alone deliberately.
 
 ## Where a flip stands
 
