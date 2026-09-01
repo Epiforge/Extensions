@@ -59,6 +59,8 @@ public class DifferentialFuzz
     static readonly PropertyInfo next = typeof(Recorded).GetProperty(nameof(Recorded.Next))!;
     static readonly PropertyInfo rank = typeof(Recorded).GetProperty(nameof(Recorded.Rank))!;
     static readonly PropertyInfo score = typeof(Recorded).GetProperty(nameof(Recorded.Score))!;
+    static readonly MethodInfo stringIsNullOrEmpty = typeof(string).GetMethod(nameof(string.IsNullOrEmpty), [typeof(string)])!;
+    static readonly MethodInfo stringTrim = typeof(string).GetMethod(nameof(string.Trim), Type.EmptyTypes)!;
     static readonly PropertyInfo tag = typeof(Recorded).GetProperty(nameof(Recorded.Tag))!;
 
     static ExpressionObserverOptions Configured(int seed, bool useDirectSubscription)
@@ -87,7 +89,7 @@ public class DifferentialFuzz
     }
 
     static Expression Boolean(Random rng, int depth, Sources sources) =>
-        depth <= 0 ? Expression.Constant(rng.Next(2) == 0) : (rng.Next(8) switch
+        depth <= 0 ? Expression.Constant(rng.Next(2) == 0) : (rng.Next(9) switch
         {
             0 => Expression.GreaterThan(Integer(rng, depth - 1, sources), Integer(rng, depth - 1, sources)),
             1 => Expression.LessThan(Integer(rng, depth - 1, sources), Integer(rng, depth - 1, sources)),
@@ -96,7 +98,8 @@ public class DifferentialFuzz
             4 => Expression.Or(Boolean(rng, depth - 1, sources), Boolean(rng, depth - 1, sources)),
             5 => Expression.AndAlso(Boolean(rng, depth - 1, sources), Boolean(rng, depth - 1, sources)),
             6 => Expression.Equal(Text(rng, depth - 1, sources), Text(rng, depth - 1, sources)),
-            _ => Expression.TypeIs(Text(rng, depth - 1, sources), typeof(string))
+            7 => Expression.TypeIs(Text(rng, depth - 1, sources), typeof(string)),
+            _ => Expression.Call(stringIsNullOrEmpty, Text(rng, depth - 1, sources))
         });
 
     static Expression Integer(Random rng, int depth, Sources sources) =>
@@ -136,12 +139,13 @@ public class DifferentialFuzz
         });
 
     static Expression TextLeaf(Random rng, Sources sources) =>
-        rng.Next(5) switch
+        rng.Next(6) switch
         {
             0 => Expression.MakeMemberAccess(sources.Subject, tag),
             1 => Expression.MakeMemberAccess(sources.Other, tag),
             2 => Expression.MakeMemberAccess(Expression.MakeMemberAccess(sources.Subject, next), tag),
             3 => Expression.MakeMemberAccess(sources.Held, tag),
+            4 => Expression.Call(Expression.MakeMemberAccess(sources.Subject, tag), stringTrim),
             _ => Expression.Constant(rng.Next(2) == 0 ? "s" : null, typeof(string))
         };
 
