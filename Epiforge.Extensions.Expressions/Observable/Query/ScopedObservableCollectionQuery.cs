@@ -9,9 +9,14 @@ class ScopedObservableCollectionQuery<TElement> :
         this.query = query;
         this.query.PropertyChanged += QueryPropertyChanged;
         this.query.PropertyChanging += QueryPropertyChanging;
-        this.query.CollectionChanged += QueryCollectionChanged;
     }
 
+    NotifyCollectionChangedEventHandler? collectionChanged;
+#if IS_NET_9_0_OR_GREATER
+    readonly Lock collectionChangedAccess = new();
+#else
+    readonly object collectionChangedAccess = new();
+#endif
     internal readonly ObservableCollectionQuery<TElement> query;
     int disposed;
 
@@ -28,7 +33,27 @@ class ScopedObservableCollectionQuery<TElement> :
 
     public event PropertyChangingEventHandler? PropertyChanging;
 
-    public event NotifyCollectionChangedEventHandler? CollectionChanged;
+    public event NotifyCollectionChangedEventHandler? CollectionChanged
+    {
+        add
+        {
+            lock (collectionChangedAccess)
+            {
+                if (collectionChanged is null)
+                    query.CollectionChanged += QueryCollectionChanged;
+                collectionChanged += value;
+            }
+        }
+        remove
+        {
+            lock (collectionChangedAccess)
+            {
+                collectionChanged -= value;
+                if (collectionChanged is null)
+                    query.CollectionChanged -= QueryCollectionChanged;
+            }
+        }
+    }
 
     public event EventHandler? Disposed;
 
@@ -42,13 +67,20 @@ class ScopedObservableCollectionQuery<TElement> :
         Disposing?.Invoke(this, e);
         query.PropertyChanged -= QueryPropertyChanged;
         query.PropertyChanging -= QueryPropertyChanging;
-        query.CollectionChanged -= QueryCollectionChanged;
+        lock (collectionChangedAccess)
+        {
+            if (collectionChanged is not null)
+            {
+                query.CollectionChanged -= QueryCollectionChanged;
+                collectionChanged = null;
+            }
+        }
         query.Dispose();
         Disposed?.Invoke(this, e);
     }
 
     void QueryCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
-        CollectionChanged?.Invoke(this, e);
+        collectionChanged?.Invoke(this, e);
 
     void QueryPropertyChanged(object? sender, PropertyChangedEventArgs e) =>
         PropertyChanged?.Invoke(this, e);
