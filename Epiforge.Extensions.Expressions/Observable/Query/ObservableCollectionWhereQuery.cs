@@ -112,19 +112,20 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
         var newWeight = newResult ? 1 : 0;
         if (node.Weight == newWeight)
             return;
-        var translatedIndex = memberships.PrefixWeightBefore(node);
         memberships.SetWeight(node, newWeight);
         cursorNode = null;
+        int? translatedIndex = null;
         if (TryBeginEnumerationSnapshotPatchWithAccess(out var snapshot))
         {
+            translatedIndex = memberships.PrefixWeightBefore(node);
             if (newResult)
-                snapshot.Insert(translatedIndex, node.Item.Argument);
+                snapshot.Insert(translatedIndex.Value, node.Item.Argument);
             else
-                snapshot.RemoveAt(translatedIndex);
+                snapshot.RemoveAt(translatedIndex.Value);
         }
         SetCount(count + (newResult ? 1 : -1));
         if (IsChangeObserved)
-            OnCollectionChanged(new NotifyCollectionChangedEventArgs(newResult ? NotifyCollectionChangedAction.Add : NotifyCollectionChangedAction.Remove, node.Item.Argument, translatedIndex));
+            OnCollectionChanged(new NotifyCollectionChangedEventArgs(newResult ? NotifyCollectionChangedAction.Add : NotifyCollectionChangedAction.Remove, node.Item.Argument, translatedIndex ?? memberships.PrefixWeightBefore(node)));
     }
 
     public override IEnumerator<TElement> GetEnumerator()
