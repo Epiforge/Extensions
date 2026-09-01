@@ -189,6 +189,11 @@ public class OrderedHashSet
     }
 
     [TestMethod]
+    [ExpectedException(typeof(ArgumentException))]
+    public void CopyToWithArrayIndexAndCountOfZeroBeyondTheArray() =>
+        new OrderedHashSet<int>(new[] { 1, 2, 3 }).CopyTo(new int[3], 5, 0);
+
+    [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
     public void CopyToWithArrayIndexAndCountNullArray() =>
         new OrderedHashSet<int>(new[] { 1, 2, 3 }).CopyTo(null!, 0, 2);

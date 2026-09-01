@@ -176,8 +176,22 @@ public sealed class OrderedHashSet<T> :
     /// <param name="array">The one-dimensional array that is the destination of the elements copied from the <see cref="OrderedHashSet{T}"/> object (the array must have zero-based indexing)</param>
     /// <param name="arrayIndex">The zero-based index in array at which copying begins</param>
     /// <param name="count">The number of elements to copy to array</param>
-    public void CopyTo(T[] array, int arrayIndex, int count) =>
-        list.Take(count).ToList().CopyTo(array, arrayIndex);
+    public void CopyTo(T[] array, int arrayIndex, int count)
+    {
+        ArgumentNullException.ThrowIfNull(array);
+#if IS_NET_8_0_OR_GREATER
+        ArgumentOutOfRangeException.ThrowIfNegative(arrayIndex);
+#else
+        if (arrayIndex < 0)
+            throw new ArgumentOutOfRangeException(nameof(arrayIndex), "The array index cannot be negative");
+#endif
+        var copyCount = count > list.Count ? list.Count : count;
+        if (copyCount > array.Length - arrayIndex)
+            throw new ArgumentException("The number of elements to copy is greater than the available space in the destination array", nameof(array));
+        var copied = 0;
+        for (var node = list.First; node is not null && copied < copyCount; node = node.Next)
+            array[arrayIndex + copied++] = node.Value;
+    }
 
     /// <summary>
     /// Ensures that this hash set can hold the specified number of elements without growing
