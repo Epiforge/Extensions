@@ -261,7 +261,7 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
 
     void TranslateInnerChangeWithAccess(PrefixWeightedSequenceNode<IEnumerable<TResult>?> node, int newWeight, NotifyCollectionChangedEventArgs e)
     {
-        var reducedIndex = positions.SetWeight(node, newWeight);
+        positions.SetWeight(node, newWeight, out var reducedIndex);
         OnCollectionChanged(e.Action switch
         {
             NotifyCollectionChangedAction.Add => new NotifyCollectionChangedEventArgs(e.Action, e.NewItems, reducedIndex + e.NewStartingIndex),

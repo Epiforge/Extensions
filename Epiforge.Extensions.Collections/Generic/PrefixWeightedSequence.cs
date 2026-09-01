@@ -427,15 +427,35 @@ public sealed class PrefixWeightedSequence<T>
     /// </summary>
     /// <param name="node">A node belonging to this sequence</param>
     /// <param name="weight">The weight to assign</param>
-    /// <returns>The total weight of the items before <paramref name="node"/>, which the assignment does not affect</returns>
-    /// <remarks>Repairing the tree climbs from the node to the root along the same path the preceding weight accumulates over, so a caller needing both pays for one climb</remarks>
-    public int SetWeight(PrefixWeightedSequenceNode<T> node, int weight)
+    public void SetWeight(PrefixWeightedSequenceNode<T> node, int weight)
     {
         ArgumentNullException.ThrowIfNull(node);
         if (weight < 0)
             throw new ArgumentOutOfRangeException(nameof(weight));
         if (node.Weight == weight)
-            return PrefixWeightBefore(node);
+            return;
+        node.Weight = weight;
+        for (var ancestor = node; ancestor is not null; ancestor = ancestor.Parent)
+            ancestor.SubtreeWeight = ancestor.Weight + WeightOf(ancestor.Left) + WeightOf(ancestor.Right);
+    }
+
+    /// <summary>
+    /// Assigns a new weight to the specified node, reporting the total weight of the items before it
+    /// </summary>
+    /// <param name="node">A node belonging to this sequence</param>
+    /// <param name="weight">The weight to assign</param>
+    /// <param name="prefixWeightBefore">The total weight of the items before <paramref name="node"/>, which the assignment does not affect</param>
+    /// <remarks>Accumulating that total over the climb which repairs the tree spares a caller which needs it a second climb, and costs a caller which does not more than the climb it rides on, which is why the two are separate methods</remarks>
+    public void SetWeight(PrefixWeightedSequenceNode<T> node, int weight, out int prefixWeightBefore)
+    {
+        ArgumentNullException.ThrowIfNull(node);
+        if (weight < 0)
+            throw new ArgumentOutOfRangeException(nameof(weight));
+        if (node.Weight == weight)
+        {
+            prefixWeightBefore = PrefixWeightBefore(node);
+            return;
+        }
         node.Weight = weight;
         var prefixWeight = WeightOf(node.Left);
         for (var ancestor = node; ancestor is not null; ancestor = ancestor.Parent)
@@ -444,6 +464,6 @@ public sealed class PrefixWeightedSequence<T>
             if (ancestor.Parent is { } parent && ReferenceEquals(ancestor, parent.Right))
                 prefixWeight += WeightOf(parent.Left) + parent.Weight;
         }
-        return prefixWeight;
+        prefixWeightBefore = prefixWeight;
     }
 }

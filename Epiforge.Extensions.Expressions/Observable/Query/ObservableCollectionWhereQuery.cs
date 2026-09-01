@@ -112,17 +112,23 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
         var newWeight = newResult ? 1 : 0;
         if (node.Weight == newWeight)
             return;
-        var translatedIndex = memberships.SetWeight(node, newWeight);
+        var isPatchingSnapshot = TryBeginEnumerationSnapshotPatchWithAccess(out var snapshot);
+        var isChangeObserved = IsChangeObserved;
+        var translatedIndex = 0;
+        if (isPatchingSnapshot || isChangeObserved)
+            memberships.SetWeight(node, newWeight, out translatedIndex);
+        else
+            memberships.SetWeight(node, newWeight);
         cursorNode = null;
-        if (TryBeginEnumerationSnapshotPatchWithAccess(out var snapshot))
+        if (isPatchingSnapshot)
         {
             if (newResult)
-                snapshot.Insert(translatedIndex, node.Item.Argument);
+                snapshot!.Insert(translatedIndex, node.Item.Argument);
             else
-                snapshot.RemoveAt(translatedIndex);
+                snapshot!.RemoveAt(translatedIndex);
         }
         SetCount(count + (newResult ? 1 : -1));
-        if (IsChangeObserved)
+        if (isChangeObserved)
             OnCollectionChanged(new NotifyCollectionChangedEventArgs(newResult ? NotifyCollectionChangedAction.Add : NotifyCollectionChangedAction.Remove, node.Item.Argument, translatedIndex));
     }
 

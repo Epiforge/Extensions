@@ -88,7 +88,40 @@ This makes the position **free** rather than merely cheaper, so act two's lazine
 
 Two `SetWeight` calls in the ordered query were left composed with a separate `PrefixWeightBefore`. Fusing them would reorder a mutation of `positions` ahead of a `results` change that a subscriber can observe, which is a behavior question rather than a performance one, and the path is cold.
 
-Predicted: `FlipEveryMembershipWithASubscriber` to **102–108 μs**, `FlipEveryMembershipWithNothingObserving` **unmoved or a hair slower** since it now computes a position it may not read, both controls unmoved, allocation byte-identical.
+Predicted: `FlipEveryMembershipWithASubscriber` to **102–108 μs**, `FlipEveryMembershipWithNothingObserving` **unmoved or a hair slower**, both controls unmoved, allocation byte-identical.
+
+| arm | before | after | |
+|--- |---: |---: |---: |
+| `FlipEveryMembershipWithASubscriber` | 126.440 μs | 120.874 μs | 4.4%, not the 15% predicted |
+| `FlipEveryMembershipWithNothingObserving` | 86.672 μs | 102.043 μs | **17.7% slower** |
+| `FlipEveryRankObservedWithoutAQuery` | 29.638 μs | 30.059 μs | control |
+| `FlipEveryRankWithNoQuery` | 8.430 μs | 8.260 μs | control |
+
+**Both predictions wrong, and in opposite directions.** "Costs arithmetic and no memory traffic at all" was the claim, and it was worth fifteen nanoseconds a flip.
+
+### What the four runs price, once they are read together
+
+Let C be a climb from a node to the root over a path already in cache, and B the accumulation carried along it — a `parent.Right` load and a branch which the shape of a treap makes unpredictable, at every level.
+
+| | shape | query's share of a flip |
+|--- |--- |---: |
+| act one, unobserved | C + B | 77.6 ns |
+| act two, unobserved | C | 57.0 ns |
+| act three, unobserved | C + B | 72.0 ns |
+| act two, observed | 2C + B | 96.8 ns |
+| act three, observed | C + B | 90.8 ns |
+
+From the observed pair, **C = 6.0 ns**. From the unobserved pair, **B = 15.0 ns**. Act one to act two removed C + B from the unobserved case and measured 20.6 against the 21.0 those two constants predict — the model closes to four tenths of a nanosecond across four runs it was not fitted to.
+
+So the accumulation costs **two and a half times the climb it rides on**, and a second climb over a path the first one just walked is nearly free. That is the reverse of the assumption act three was built on. It also explains act one, which was the large win precisely because the walk it removed was a *descent from the root* — a different path, and a cold one.
+
+### Act four — pay for it only where it is read
+
+`SetWeight` returns to `void` and gains an overload taking `out int prefixWeightBefore`. The binary break is withdrawn; the change is additive again and `CompatibilitySuppressions.xml` can go.
+
+`FlipMembershipWithAccess` decides up front whether anything will read the position — a subscriber, or a snapshot a live enumeration holds — and calls the overload which accumulates only then.
+
+Predicted: `FlipEveryMembershipWithNothingObserving` back to **86–88 μs**, `FlipEveryMembershipWithASubscriber` **unmoved at 119–122 μs**, both controls unmoved, allocation byte-identical. If both land, the day's two best figures hold at the same time, which no single act has managed.
 
 *(Results to be recorded on the next run.)*
 
