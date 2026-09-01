@@ -8,7 +8,7 @@ public class QueryNotificationBenchmarks
 {
     const int elementCount = 1000;
 
-    static readonly Expression<Func<BenchmarkPerson, bool>> predicate = person => person.Rank > 0;
+    static readonly Expression<Func<BenchmarkPerson, bool>> predicate = person => (person.Rank & 1) == 0;
 
     CollectionObserver observer = null!;
     BenchmarkPerson[] people = null!;
@@ -16,7 +16,7 @@ public class QueryNotificationBenchmarks
     IObservableCollectionQuery<BenchmarkPerson> sourceQuery = null!;
     IObservableCollectionQuery<BenchmarkPerson> where = null!;
 
-    [GlobalCleanup]
+    [GlobalCleanup(Targets = [nameof(FlipEveryMembershipWithASubscriber), nameof(FlipEveryMembershipWithNothingObserving)])]
     public void Cleanup()
     {
         where.Dispose();
@@ -30,8 +30,15 @@ public class QueryNotificationBenchmarks
             people[i].Rank ^= 1;
     }
 
-    [Benchmark(Baseline = true)]
+    [Benchmark]
     public void FlipEveryMembershipWithNothingObserving()
+    {
+        for (var i = 0; i < elementCount; ++i)
+            people[i].Rank ^= 1;
+    }
+
+    [Benchmark(Baseline = true)]
+    public void FlipEveryRankWithNoQuery()
     {
         for (var i = 0; i < elementCount; ++i)
             people[i].Rank ^= 1;
@@ -41,25 +48,34 @@ public class QueryNotificationBenchmarks
     {
     }
 
+    [GlobalSetup(Target = nameof(FlipEveryRankWithNoQuery))]
+    public void SetupBare() =>
+        SetupPeople();
+
     [GlobalSetup(Target = nameof(FlipEveryMembershipWithASubscriber))]
     public void SetupObserved()
     {
-        SetupSource();
+        SetupQuery();
         where.CollectionChanged += Ignore;
     }
 
-    void SetupSource()
+    void SetupPeople()
     {
-        observer = new CollectionObserver();
         source = BenchmarkPerson.CreateCollection(elementCount);
         people = new BenchmarkPerson[elementCount];
         for (var i = 0; i < elementCount; ++i)
             people[i] = source[i];
+    }
+
+    void SetupQuery()
+    {
+        SetupPeople();
+        observer = new CollectionObserver();
         sourceQuery = observer.ObserveReadOnlyList(source);
         where = sourceQuery.ObserveWhere(predicate);
     }
 
     [GlobalSetup(Target = nameof(FlipEveryMembershipWithNothingObserving))]
     public void SetupUnobserved() =>
-        SetupSource();
+        SetupQuery();
 }
