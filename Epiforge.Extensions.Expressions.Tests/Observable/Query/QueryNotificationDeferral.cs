@@ -40,7 +40,7 @@ public class QueryNotificationDeferral
     }
 
     [TestMethod]
-    public void AnElementAppearingTwiceDefersSixNotificationsInOrder()
+    public void AnElementAppearingTwiceIsAnnouncedTwiceInOrder()
     {
         var alice = new TestPerson("A");
         var source = new ObservableRangeCollection<TestPerson>(new[] { alice, new TestPerson("BBB"), alice });
@@ -54,7 +54,7 @@ public class QueryNotificationDeferral
     }
 
     [TestMethod]
-    public void AnElementAppearingTwiceLeavesTogether()
+    public void AnElementAppearingTwiceLeavesInTwoAnnouncements()
     {
         var alice = new TestPerson("AAAA");
         var source = new ObservableRangeCollection<TestPerson>(new[] { alice, new TestPerson("BBB"), alice });
@@ -82,7 +82,7 @@ public class QueryNotificationDeferral
     }
 
     [TestMethod]
-    public void EveryDeferredNotificationArrivesAfterTheQueryIsConsistent()
+    public void EachNotificationCarriesTheCountAsOfTheChangeItDescribes()
     {
         var alice = new TestPerson("A");
         var source = new ObservableRangeCollection<TestPerson>(new[] { alice, new TestPerson("BBB"), alice });
@@ -94,6 +94,6 @@ public class QueryNotificationDeferral
         whereQuery.CollectionChanged += collectionChanged;
         alice.Name = "AAAA";
         whereQuery.CollectionChanged -= collectionChanged;
-        Assert.IsTrue(new[] { 3, 3 }.SequenceEqual(countsSeen), string.Join(", ", countsSeen));
+        Assert.IsTrue(new[] { 2, 3 }.SequenceEqual(countsSeen), string.Join(", ", countsSeen));
     }
 }
