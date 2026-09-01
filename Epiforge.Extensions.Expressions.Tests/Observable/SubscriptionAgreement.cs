@@ -180,4 +180,39 @@ public class SubscriptionAgreement
     [TestMethod]
     public void TwoMembersOnTheArgument() =>
         AssertAgreement(subject => subject.Rank + subject.Score, new Recorded(new SubscriptionLog()));
+
+    static IReadOnlyList<string> GraphAttachmentsFor<TResult>(Expression<Func<Recorded, TResult>> lambda, Recorded subject, SubscriptionLog log)
+    {
+        var observer = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = false });
+        List<string> attached;
+        using (observer.Observe(lambda, subject))
+            attached = log.Attachments().Distinct().ToList();
+        Assert.AreEqual(0, log.Outstanding, "the graph did not detach everything it attached");
+        Assert.AreEqual(0, observer.CachedObservableExpressions);
+        return attached;
+    }
+
+    [TestMethod]
+    public void TheGraphAttachesNothingForAnInstanceCallBeyondItsObject()
+    {
+        var memberLog = new SubscriptionLog();
+        var withoutCall = GraphAttachmentsFor(subject => subject.Tag, new Recorded(memberLog) { Tag = "x" }, memberLog);
+        var callLog = new SubscriptionLog();
+        var withCall = GraphAttachmentsFor(subject => subject.Tag!.ToString(), new Recorded(callLog) { Tag = "x" }, callLog);
+        CollectionAssert.AreEqual(withoutCall.ToArray(), withCall.ToArray(), $"member: [{string.Join(", ", withoutCall)}]; call: [{string.Join(", ", withCall)}]");
+    }
+
+    [TestMethod]
+    public void TheGraphAttachesNothingForAStaticCallBeyondItsArguments()
+    {
+        var memberLog = new SubscriptionLog();
+        var withoutCall = GraphAttachmentsFor(subject => subject.Tag, new Recorded(memberLog) { Tag = "x" }, memberLog);
+        var callLog = new SubscriptionLog();
+        var withCall = GraphAttachmentsFor(subject => string.IsNullOrEmpty(subject.Tag), new Recorded(callLog) { Tag = "x" }, callLog);
+        CollectionAssert.AreEqual(withoutCall.ToArray(), withCall.ToArray(), $"member: [{string.Join(", ", withoutCall)}]; call: [{string.Join(", ", withCall)}]");
+    }
+
+    [TestMethod]
+    public void AStaticCallOverAMemberOnTheArgument() =>
+        AssertAgreement(subject => string.IsNullOrEmpty(subject.Tag), new Recorded(new SubscriptionLog()));
 }

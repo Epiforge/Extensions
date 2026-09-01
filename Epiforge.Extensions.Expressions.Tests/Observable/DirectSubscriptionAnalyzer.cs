@@ -141,6 +141,44 @@ public class DirectSubscriptionAnalyzer
     }
 
     [TestMethod]
+    public void MethodCallOnAChangeableTargetIsEligible() =>
+        Assert.IsTrue(Analyzer().Analyze(BodyOf<string>(person => person.Placeholder!.ToString())).IsEligible);
+
+    [TestMethod]
+    public void MethodCallReturningSealedTypeIsEligible()
+    {
+        var body = (MethodCallExpression)BodyOf<string>(person => person.ToString());
+        Assert.IsTrue(body.Method.ReturnType.IsSealed);
+        Assert.IsTrue(Analyzer().Analyze(body).IsEligible);
+    }
+
+    [TestMethod]
+    public void MethodCallReturningUnsealedTypeIsIneligible()
+    {
+        var body = (MethodCallExpression)BodyOf<object>(person => person.Name!.Clone());
+        Assert.IsFalse(body.Method.ReturnType.IsSealed);
+        var analysis = Analyzer().Analyze(body);
+        Assert.IsFalse(analysis.IsEligible);
+        Assert.AreEqual(DirectSubscriptionIneligibility.ValueRequiresDisposal, analysis.Ineligibility);
+    }
+
+    [TestMethod]
+    public void MethodCallReturningValueTypeIsEligible()
+    {
+        var body = (MethodCallExpression)BodyOf<bool>(person => string.IsNullOrEmpty(person.Name));
+        Assert.IsTrue(body.Method.IsStatic);
+        Assert.IsTrue(Analyzer().Analyze(body).IsEligible);
+    }
+
+    [TestMethod]
+    public void MethodCallWithALambdaArgumentIsIneligible()
+    {
+        var analysis = Analyzer().Analyze(BodyOf<bool>(person => person.Name!.ToCharArray().Any(character => character == 'x')));
+        Assert.IsFalse(analysis.IsEligible);
+        Assert.AreEqual(DirectSubscriptionIneligibility.UnsupportedExpressionKind, analysis.Ineligibility);
+    }
+
+    [TestMethod]
     public void NewArrayInitIsIneligible()
     {
         var analysis = Analyzer().Analyze(BodyOf<long[]>(person => new[] { person.NameGets }));
