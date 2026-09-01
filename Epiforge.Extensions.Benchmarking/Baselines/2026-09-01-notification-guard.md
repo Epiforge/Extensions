@@ -52,11 +52,40 @@ Recorded before the run: *"around 80 bytes per flip, taking 257.81 KB to roughly
 
 That number is worth having on its own terms. A `NotifyCollectionChangedEventArgs` for a single item with an index costs **72 bytes**, measured. The handoff said 192.
 
+## Act three: the deferral holds three before it builds anything
+
+`ObservableQuery.DeferNotification` held the first notification in a field and promoted to a `List<object>` on the second. It now holds three in fields and promotes on the fourth.
+
+Three, not two, because three is the modal case. A mutation defers `PropertyChanging`, `PropertyChanged` and one collection event; the guard removes the third for an unobserved query, leaving two. A survey of every method holding a deferral found the maximum reached is six, in `ObservableCollectionSelectManyQuery.CollectionChangedNotifierCollectionChanged`, so the list has to remain — three slots skip it, they do not replace it.
+
+| arm | before the day | after the guard | after the slots | |
+|--- |---: |---: |---: |---: |
+| `FlipEveryMembershipWithNothingObserving` | 257.81 KB | 187.50 KB | **101.56 KB** | **2.54x** |
+| `FlipEveryMembershipWithASubscriber` | 257.81 KB | 257.81 KB | **171.88 KB** | **1.50x** |
+| `FlipEveryRankWithNoQuery` | 46.88 KB | 46.88 KB | 46.88 KB | control |
+
+Times fell from 160.83 to 133.84 microseconds unobserved and from 159.05 to 149.59 subscribed.
+
+**The subscriber arm moved for the first time today.** Every earlier change was built to leave it alone, which is what made those results readable. This one was meant to hit it, and did, by the same 88 bytes per flip as the other arm — both were building a list, one for two entries and one for three, and a list costs the same either way.
+
+Predicted before the run: about 88 bytes per flip, near 100 KB and near 170 KB. Measured 88 bytes, 101.56 KB and 171.88 KB.
+
+## The original 216 bytes, fully accounted for
+
+| part | bytes per flip | |
+|--- |---: |--- |
+| the deferral list | 88 | gone for every query, observed or not |
+| the collection event arguments | 72 | gone when nothing is listening |
+| everything else | 56 | expression re-evaluation and the rest |
+| **total** | **216** | matches the first measurement exactly |
+
+Three measurements taken hours apart sum to the figure the instrument gave at the start. That is the strongest evidence available that the account of this path is right rather than merely plausible, and it is the reason for predicting a number before each run rather than reading one afterward.
+
 ## What remains, unattempted
 
-144 bytes per flip survive. `ObservableQuery.DeferNotification` holds the first notification in a field and promotes to a `List<object>` on the second, so a flip which raises `PropertyChanging`, `PropertyChanged` and nothing else still builds a list and its array to hold two cached statics. A second field, or a small inline pair, would avoid that for the common case and would help every query rather than this one.
+56 bytes per flip survive on an unobserved query and 128 on a subscribed one. The 72 bytes between them are the collection event arguments at the thirty-seven construction sites this work did not touch.
 
-Not attempted here, and it should not ride along with anything. It is a change to a mechanism every notification in the library passes through.
+`ObservableCollectionWhereQuery.SourceCollectionChanged` needs a restructure before its four can be guarded: its `eventArgs` local doubles as "something changed" and gates `SetCount`, so guarding construction there would skip the count notification — the exact bug the Collections work shipped and had to fix.
 
 ## What made the difference
 
