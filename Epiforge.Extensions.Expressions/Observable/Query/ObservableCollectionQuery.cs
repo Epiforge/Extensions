@@ -386,9 +386,6 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     int IList.IndexOf(object? value) =>
         value is TElement element ? IndexOf(element) : -1;
 
-    private protected bool IsChangeObserved =>
-        CollectionChanged is not null;
-
     protected void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
     {
         if (!DeferNotification(e))

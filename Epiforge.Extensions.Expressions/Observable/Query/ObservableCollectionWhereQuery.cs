@@ -123,8 +123,7 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
                 snapshot.RemoveAt(translatedIndex);
         }
         SetCount(count + (newResult ? 1 : -1));
-        if (IsChangeObserved)
-            OnCollectionChanged(new NotifyCollectionChangedEventArgs(newResult ? NotifyCollectionChangedAction.Add : NotifyCollectionChangedAction.Remove, node.Item.Argument, translatedIndex));
+        OnCollectionChanged(new NotifyCollectionChangedEventArgs(newResult ? NotifyCollectionChangedAction.Add : NotifyCollectionChangedAction.Remove, node.Item.Argument, translatedIndex));
     }
 
     public override IEnumerator<TElement> GetEnumerator()
