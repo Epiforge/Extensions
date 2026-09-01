@@ -64,3 +64,27 @@ They are not measurably faster. At this scale the wrapper is either free or belo
 They were still worth making — a wrapper that protects a private local from nobody is dead work, and the `Cast<T>()` removed alongside it was applied to a `LinkedList<T>` that already satisfies `IEnumerable<T>`. But no performance claim should be attached to them, and the release note for them, if one is written, should say what they are rather than what they save.
 
 The prize was always the intermediate list, and the benchmark says so plainly.
+
+## The walk, measured after it landed
+
+`CopyTo(array, arrayIndex, count)` now walks the linked list and writes straight into the destination. The same three arms were re-run against it, so `CountedCopyToThroughTheSet` is now the walk rather than the materialization.
+
+| arm | mean | standard deviation | allocated |
+|--- |---: |---: |---: |
+| `CountedCopyToThroughTheSet` | **4.141 μs** | 0.0132 μs | **0 B** |
+| `CountedCopyToByWalk` | 4.355 μs | 0.0127 μs | 0 B |
+| `CountedCopyToWrapped` | 9.091 μs | 0.0706 μs | 20,160 B |
+
+The public method went from **9.160 μs and 20,160 bytes to 4.141 μs and nothing** — 2.21×, and the whole of the intermediate list gone. That is the change this document was opened to justify, and it delivered slightly more than the 2.11× the reconstruction predicted.
+
+Two observations recorded without explanation.
+
+`CountedCopyToThroughTheSet` is now **faster than the reconstruction it was modeled on**, 4.141 against 4.355. The deviations are 0.013 on both, so the 5% gap is real rather than noise, and it runs the wrong way: the library method adds `arrayIndex` to every write and the benchmark arm does not, so the library does strictly more work per element. The likeliest cause is the memory layout of the two separate linked lists, the mirror having been built second. Not worth an instrument.
+
+`CountedCopyToWrapped` is unchanged code and moved from 9.505 μs to 9.091 μs between the two runs, 4.4% apart, though its deviation tightened from 0.2088 to 0.0706. Worth remembering the next time a timing difference of a few percent looks like a result.
+
+## Correction
+
+The first version of the walk called `ArgumentOutOfRangeException.ThrowIfNegative` unguarded. That is a .NET 8 API and these packages target `net6.0` upward; Daniel corrected it to an `#if IS_NET_8_0_OR_GREATER` block with an explicit throw underneath, which is the convention already used eleven times across the libraries.
+
+The claim offered in its defense — that the same family was already used on `net6.0` in `DisposalExtensions` — came from grepping for the method name without reading the lines around it, where the guard was sitting in plain view.
