@@ -103,7 +103,10 @@ public class PrefixWeightedSequence
             {
                 var index = random.Next(count);
                 var weight = random.Next(4);
-                sequence.SetWeight(nodes[index], weight);
+                var precedingWeight = 0;
+                for (var i = 0; i < index; ++i)
+                    precedingWeight += reference[i].Weight;
+                Assert.AreEqual(precedingWeight, sequence.SetWeight(nodes[index], weight), $"seed {seed}, operation {operation}: SetWeight({index}, {weight}) reported the wrong preceding weight");
                 reference[index] = (reference[index].Item, weight);
                 performed = $"set the weight at {index} to {weight}";
             }

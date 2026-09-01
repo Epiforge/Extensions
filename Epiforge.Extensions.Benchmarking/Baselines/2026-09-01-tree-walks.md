@@ -63,7 +63,32 @@ This computes the prefix weight *after* `SetWeight` rather than before, which is
 - `WeightOf(ancestor.Left)` is accumulated only for ancestors reached from the right, whose left subtrees therefore exclude the node.
 - `ancestor.Weight` is a node's own weight; `SetWeight` changes `Weight` on the target only, and `SubtreeWeight` on the rest.
 
-Predicted: `FlipEveryMembershipWithNothingObserving` to **82–86 μs**, `FlipEveryMembershipWithASubscriber` **unmoved** because a subscriber is exactly the condition that still needs the position, both controls unmoved, and every allocation figure byte-identical.
+| arm | before | after | |
+|--- |---: |---: |---: |
+| `FlipEveryMembershipWithASubscriber` | 123.907 μs | 126.440 μs | unmoved |
+| `FlipEveryMembershipWithNothingObserving` | 107.629 μs | **86.672 μs** | 19.5% |
+| `FlipEveryRankObservedWithoutAQuery` | 30.034 μs | 29.638 μs | control |
+| `FlipEveryRankWithNoQuery` | 8.302 μs | 8.430 μs | control |
+
+Predicted: 82–86 μs unobserved, the subscriber arm unmoved, both controls unmoved, allocation byte-identical.
+
+**Measured 86.672**, which is 0.672 outside the top of the range rather than inside it — recorded as a miss, small and in the conservative direction.
+
+The subscriber arm reads 2.0% slower, which is not a movement. The control moved 1.5% in the same run, and against it the ratio went 14.93 to 15.00. That is what a control is for: without it, two microseconds on the subscriber arm would have looked like a change I had made.
+
+The query's share of an unobserved flip is now **57.0 ns**, from 103.3 at the start of the day.
+
+## Act three — the assignment already walks that path
+
+`SetWeight` climbs from the node to the root repairing subtree weights. `PrefixWeightBefore(node)` climbs the same path accumulating. The second climb reads exactly the fields the first one already loads — `parent.Left` and `parent.Weight` — so the accumulation costs arithmetic and no memory traffic at all.
+
+`SetWeight` now returns the preceding weight. Daniel authorized altering the type: *"It's okay to alter a type to increase performance if you think it will."* The signature change is source-compatible and binary-breaking, and is noted for release.
+
+This makes the position **free** rather than merely cheaper, so act two's laziness is gone again: `FlipMembershipWithAccess` takes a plain local from the assignment. The reducing query's `TranslateInnerChangeWithAccess` asked the same pair and now asks once.
+
+Two `SetWeight` calls in the ordered query were left composed with a separate `PrefixWeightBefore`. Fusing them would reorder a mutation of `positions` ahead of a `results` change that a subscriber can observe, which is a behavior question rather than a performance one, and the path is cold.
+
+Predicted: `FlipEveryMembershipWithASubscriber` to **102–108 μs**, `FlipEveryMembershipWithNothingObserving` **unmoved or a hair slower** since it now computes a position it may not read, both controls unmoved, allocation byte-identical.
 
 *(Results to be recorded on the next run.)*
 

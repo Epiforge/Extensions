@@ -1,4 +1,4 @@
-﻿namespace Epiforge.Extensions.Expressions.Observable;
+namespace Epiforge.Extensions.Expressions.Observable;
 
 /// <summary>
 /// Represents an observer of expressions
@@ -854,7 +854,7 @@ public class ExpressionObserver :
         if (!UseDirectSubscription || CompiledLambda(lambdaExpression) is not { Sites: { } sites } evaluator)
             return null;
         var fixedSubexpressions = evaluator.FixedSubexpressions;
-        object?[] values = fixedSubexpressions.Length == 0 ? [] : new object?[fixedSubexpressions.Length];
+        var values = fixedSubexpressions.Length == 0 ? [] : new object?[fixedSubexpressions.Length];
         if (values.Length > 0)
         {
             var resolutionArgument = (object?)argument;
