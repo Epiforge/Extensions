@@ -133,11 +133,12 @@ public static class ReflectionExtensions
     /// <param name="property">The property of which to get the value</param>
     /// <param name="instance">The object from which to get the value (if the property is static, this argument is ignored)</param>
     /// <param name="index">Optional index values for indexed properties</param>
+    /// <remarks>An exception thrown by the property's get method is propagated as it was thrown rather than wrapped</remarks>
     public static object? FastGetValue(this PropertyInfo property, object? instance, params object?[] index)
     {
         ArgumentNullException.ThrowIfNull(property);
 #if IS_NET_7_0_OR_GREATER
-        return property.GetValue(instance, index);
+        return property.GetValue(instance, BindingFlags.DoNotWrapExceptions, null, index, null);
 #else
         if (property.GetMethod is not { } getMethod)
             throw new ArgumentException("Cannot handle properties without getters");
@@ -150,11 +151,12 @@ public static class ReflectionExtensions
     /// </summary>
     /// <param name="constructor">The constructor to invoke</param>
     /// <param name="arguments">An argument list for the invoked constructor</param>
+    /// <remarks>An exception thrown by the constructor is propagated as it was thrown rather than wrapped</remarks>
     public static object? FastInvoke(this ConstructorInfo constructor, params object?[] arguments)
     {
         ArgumentNullException.ThrowIfNull(constructor);
 #if IS_NET_7_0_OR_GREATER
-        return constructor.Invoke(arguments);
+        return constructor.Invoke(BindingFlags.DoNotWrapExceptions, null, arguments, null);
 #else
         return invokeConstructorDelegateByConstructor.GetOrAdd(constructor, InvokeConstructorDelegateByConstructorValueFactory)(arguments);
 #endif
@@ -184,11 +186,12 @@ public static class ReflectionExtensions
     /// <param name="instance">The object on which to set the value (if the property is static, this argument is ignored)</param>
     /// <param name="value">The value to set</param>
     /// <param name="index">Optional index values for indexed properties</param>
+    /// <remarks>An exception thrown by the property's set method is propagated as it was thrown rather than wrapped</remarks>
     public static void FastSetValue(this PropertyInfo property, object? instance, object? value, params object?[] index)
     {
         ArgumentNullException.ThrowIfNull(property);
 #if IS_NET_7_0_OR_GREATER
-        property.SetValue(instance, value, index);
+        property.SetValue(instance, value, BindingFlags.DoNotWrapExceptions, null, index, null);
 #else
         if (property.SetMethod is not { } setMethod)
             throw new ArgumentException("Cannot handle properties without setters");
