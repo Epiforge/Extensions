@@ -166,11 +166,12 @@ public static class ReflectionExtensions
     /// <param name="method">The method to invoke</param>
     /// <param name="instance">The object on which to invoke the method (if the method is static, this argument is ignored)</param>
     /// <param name="arguments">An argument list for the invoked method</param>
+    /// <remarks>An exception thrown by the method is propagated as it was thrown rather than wrapped</remarks>
     public static object? FastInvoke(this MethodInfo method, object? instance, params object?[] arguments)
     {
         ArgumentNullException.ThrowIfNull(method);
 #if IS_NET_7_0_OR_GREATER
-        return method.Invoke(instance, arguments);
+        return method.Invoke(instance, BindingFlags.DoNotWrapExceptions, null, arguments, null);
 #else
         return invokeMethodDelegateByMethod.GetOrAdd(method, InvokeMethodDelegateByMethodValueFactory)(instance, arguments);
 #endif

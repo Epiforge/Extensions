@@ -81,6 +81,40 @@ public class DirectSubscriptionExecution
     }
 
     [TestMethod]
+    public void ACallOnANullReceiverFaultsAlikeInBothMechanisms()
+    {
+        var log = new SubscriptionLog();
+        var subject = new Recorded(log) { Tag = null };
+        var graphObserver = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = false });
+        var directObserver = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = true });
+        using (var graphExpression = graphObserver.Observe(s => s.Tag!.Trim(), subject))
+        using (var directExpression = directObserver.Observe(s => s.Tag!.Trim(), subject))
+        {
+            Assert.IsNotNull(graphExpression.Evaluation.Fault);
+            Assert.IsNotNull(directExpression.Evaluation.Fault);
+            Assert.AreEqual(graphExpression.Evaluation.Fault!.GetType(), directExpression.Evaluation.Fault!.GetType(), $"graph: {graphExpression.Evaluation.Fault}; direct: {directExpression.Evaluation.Fault}");
+        }
+        Assert.AreEqual(0, log.Outstanding);
+    }
+
+    [TestMethod]
+    public void ACallWhichThrowsFaultsAlikeInBothMechanisms()
+    {
+        var log = new SubscriptionLog();
+        var subject = new Recorded(log) { Tag = "s" };
+        var graphObserver = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = false });
+        var directObserver = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = true });
+        using (var graphExpression = graphObserver.Observe(s => s.Tag!.Substring(100), subject))
+        using (var directExpression = directObserver.Observe(s => s.Tag!.Substring(100), subject))
+        {
+            Assert.IsNotNull(graphExpression.Evaluation.Fault);
+            Assert.IsNotNull(directExpression.Evaluation.Fault);
+            Assert.AreEqual(graphExpression.Evaluation.Fault!.GetType(), directExpression.Evaluation.Fault!.GetType(), $"graph: {graphExpression.Evaluation.Fault}; direct: {directExpression.Evaluation.Fault}");
+        }
+        Assert.AreEqual(0, log.Outstanding);
+    }
+
+    [TestMethod]
     public void AStaticFieldIsAFixedTarget()
     {
         var log = new SubscriptionLog();

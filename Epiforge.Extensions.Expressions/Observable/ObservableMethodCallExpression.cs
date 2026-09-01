@@ -53,6 +53,12 @@ sealed class ObservableMethodCallExpression(ExpressionObserver observer, MethodC
                 Evaluation = (argumentFault, defaultResult);
                 observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, argumentFault, "{MethodCallExpression} argument faulted: {Fault}", MethodCallExpression, argumentFault);
             }
+            else if (method is { IsStatic: false } && objectResult is null)
+            {
+                var nullReference = new NullReferenceException();
+                Evaluation = (nullReference, defaultResult);
+                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, nullReference, "{MethodCallExpression} object was null: {Fault}", MethodCallExpression, nullReference);
+            }
             else
             {
                 var value = method?.FastInvoke(objectResult, arguments?.Select(argument => argument.Evaluation.Result).ToArray() ?? []);
