@@ -19,6 +19,12 @@ namespace Epiforge.Extensions.Expressions.Observable;
 /// A static property is a fixed target, because the graph gives it a node with no dependency which is therefore evaluated once and held; reading it afresh on every evaluation would make the two mechanisms disagree the moment it changed
 /// </remarks>
 /// <remarks>
+/// A method call is admitted when its return type is sealed and implements neither disposal interface, decided by the return type alone rather than by whether the call is registered for disposal, so that the rule holds whatever the options say; it contributes only the subscriptions its object and its arguments contribute, the graph's node for a call subscribing to nothing itself and re-evaluating when one of those changes
+/// </remarks>
+/// <remarks>
+/// A call to the get method of a property or an indexer is refused, because the graph rewrites such a call into the member or index access it stands for and watches that instead; an indexer written in C# reaches this analysis as a call, so admitting it here would plan none of the subscriptions the rewritten form plans
+/// </remarks>
+/// <remarks>
 /// A property read through a target is never fixed, so a chain which passes through one can never be direct; the target's value can change, while the plan is decided once when the observation is constructed, so admitting it would mean deciding subscriptions after evaluation, which is what the graph exists to do
 /// </remarks>
 public sealed class DirectSubscriptionAnalyzer
@@ -197,6 +203,25 @@ public sealed class DirectSubscriptionAnalyzer
         return targetAnalysis;
     }
 
+    DirectSubscriptionAnalysis AnalyzeMethodCall(MethodCallExpression methodCallExpression, Planner? planner)
+    {
+        if (!ExpressionObserverOptions.CannotBeDisposed(methodCallExpression.Method.ReturnType))
+            return new(methodCallExpression, DirectSubscriptionIneligibility.ValueRequiresDisposal);
+        if (methodCallExpression.Object is { } target)
+        {
+            var targetAnalysis = AnalyzeNode(target, planner);
+            if (!targetAnalysis.IsEligible)
+                return targetAnalysis;
+        }
+        for (int i = 0, ii = methodCallExpression.Arguments.Count; i < ii; ++i)
+        {
+            var argumentAnalysis = AnalyzeNode(methodCallExpression.Arguments[i], planner);
+            if (!argumentAnalysis.IsEligible)
+                return argumentAnalysis;
+        }
+        return DirectSubscriptionAnalysis.Eligible;
+    }
+
     DirectSubscriptionAnalysis AnalyzeParameter(ParameterExpression parameterExpression, Planner? planner)
     {
         if (planner is not null)
@@ -211,6 +236,8 @@ public sealed class DirectSubscriptionAnalyzer
             ParameterExpression parameterExpression => AnalyzeParameter(parameterExpression, planner),
             MemberExpression memberExpression => AnalyzeMember(memberExpression, planner),
             IndexExpression indexExpression => AnalyzeIndex(indexExpression, planner),
+            MethodCallExpression methodCallExpressionForPropertyGet when ExpressionObserverOptions.PropertyGetMethodToProperty.GetOrAdd(methodCallExpressionForPropertyGet.Method, ExpressionObserverOptions.GetPropertyFromGetMethod) is not null => new(methodCallExpressionForPropertyGet, DirectSubscriptionIneligibility.UnsupportedExpressionKind),
+            MethodCallExpression methodCallExpression => AnalyzeMethodCall(methodCallExpression, planner),
             BinaryExpression binaryExpression when binaryExpression.Method is { } binaryOperator && !ExpressionObserverOptions.CannotBeDisposed(binaryOperator.ReturnType) => new(binaryExpression, DirectSubscriptionIneligibility.UserDefinedOperator),
             BinaryExpression binaryExpression when IsShortCircuiting(binaryExpression) => new(binaryExpression, DirectSubscriptionIneligibility.DeferredBranch),
             BinaryExpression binaryExpression when binaryExpression.Conversion is not null => new(binaryExpression, DirectSubscriptionIneligibility.UnsupportedExpressionKind),

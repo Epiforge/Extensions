@@ -133,14 +133,6 @@ public class DirectSubscriptionAnalyzer
         Assert.IsTrue(Analyzer().Analyze(BodyOf<string?>(person => person.Name)).IsEligible);
 
     [TestMethod]
-    public void MethodCallIsIneligible()
-    {
-        var analysis = Analyzer().Analyze(BodyOf<string>(person => person.ToString()));
-        Assert.IsFalse(analysis.IsEligible);
-        Assert.AreEqual(DirectSubscriptionIneligibility.UnsupportedExpressionKind, analysis.Ineligibility);
-    }
-
-    [TestMethod]
     public void MethodCallOnAChangeableTargetIsEligible() =>
         Assert.IsTrue(Analyzer().Analyze(BodyOf<string>(person => person.Placeholder!.ToString())).IsEligible);
 
@@ -215,6 +207,17 @@ public class DirectSubscriptionAnalyzer
     [TestMethod]
     public void OrOfMembersIsEligible() =>
         Assert.IsTrue(Analyzer().Analyze(BodyOf<bool>(person => person.NameGets > 0 | person.NameGets < 100)).IsEligible);
+
+    [TestMethod]
+    public void PropertyGetMethodCallIsIneligible()
+    {
+        var body = BodyOfPeople<TestPerson>(people => people[0]);
+        Assert.IsInstanceOfType<MethodCallExpression>(body);
+        Assert.IsNotNull(typeof(ObservableCollection<TestPerson>).GetProperty("Item"));
+        var analysis = Analyzer().Analyze(body);
+        Assert.IsFalse(analysis.IsEligible);
+        Assert.AreEqual(DirectSubscriptionIneligibility.UnsupportedExpressionKind, analysis.Ineligibility);
+    }
 
     [TestMethod]
     public void QuotedLambdaIsEligible() =>
