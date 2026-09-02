@@ -6,6 +6,17 @@ abstract class ObservableExpression :
     internal static readonly PropertyChangedEventArgs EvaluationPropertyChangedEventArgs = new(nameof(Evaluation));
     internal static readonly PropertyChangingEventArgs EvaluationPropertyChangingEventArgs = new(nameof(Evaluation));
 
+    static readonly ConcurrentDictionary<Type, object?> sharedDefaults = new();
+
+    /// <summary>
+    /// Yields the default value of a type, which for a value type is a box shared by every node of that type, since a default is never mutated and is only ever compared by value; a null entry means the type is not one for which a box may be shared, in which case a fresh one is made, and a type whose default is itself null costs nothing to make again
+    /// </summary>
+    static object? DefaultResult(Type type) =>
+        type.IsValueType && sharedDefaults.GetOrAdd(type, SharedDefaultsValueFactory) is { } shared ? shared : type.FastDefault();
+
+    static object? SharedDefaultsValueFactory(Type type) =>
+        ExpressionObserverOptions.CannotBeDisposed(type) ? type.FastDefault() : null;
+
     static Expression Validated(Expression expression)
     {
         ArgumentNullException.ThrowIfNull(expression);
@@ -20,7 +31,7 @@ abstract class ObservableExpression :
     {
         ArgumentNullException.ThrowIfNull(observer);
         this.observer = observer;
-        defaultResult = type.FastDefault();
+        defaultResult = DefaultResult(type);
         resultEqualityComparer = FastEqualityComparer.Get(type);
         deferringEvaluation = deferEvaluation ? 1 : 0;
         evaluation = (null, defaultResult);

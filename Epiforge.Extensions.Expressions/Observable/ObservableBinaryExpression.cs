@@ -20,7 +20,8 @@ class ObservableBinaryExpression(ExpressionObserver observer, BinaryExpression b
         var rightParameter = Expression.Parameter(typeof(object));
         var leftConversion = Expression.Convert(leftParameter, key.LeftType);
         var rightConversion = Expression.Convert(rightParameter, key.RightType);
-        return Expression.Lambda<BinaryOperationDelegate>(Expression.Convert(key.Method is null ? Expression.MakeBinary(key.NodeType, leftConversion, rightConversion) : Expression.MakeBinary(key.NodeType, leftConversion, rightConversion, key.IsLiftedToNull, key.Method), typeof(object)), leftParameter, rightParameter).Compile();
+        var operation = key.Method is null ? Expression.MakeBinary(key.NodeType, leftConversion, rightConversion) : Expression.MakeBinary(key.NodeType, leftConversion, rightConversion, key.IsLiftedToNull, key.Method);
+        return Expression.Lambda<BinaryOperationDelegate>(BooleanBoxes.Convert(operation), leftParameter, rightParameter).Compile();
     }
 
     BinaryOperationDelegate? @delegate;

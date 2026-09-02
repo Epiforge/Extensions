@@ -13,7 +13,7 @@ sealed class ObservableOrElseExpression(ExpressionObserver observer, BinaryExpre
         }
         else if (leftResult is bool leftBool && leftBool)
         {
-            Evaluation = (null, true);
+            Evaluation = (null, BooleanBoxes.True);
             observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{BinaryExpression} evaluated: {Value}", BinaryExpression, true);
         }
         else
@@ -27,7 +27,7 @@ sealed class ObservableOrElseExpression(ExpressionObserver observer, BinaryExpre
             else
             {
                 var value = rightResult is bool rightBool && rightBool;
-                Evaluation = (null, value);
+                Evaluation = (null, BooleanBoxes.Box(value));
                 observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{BinaryExpression} evaluated: {Value}", BinaryExpression, value);
             }
         }

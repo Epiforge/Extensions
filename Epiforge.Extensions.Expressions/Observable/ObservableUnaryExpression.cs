@@ -18,7 +18,8 @@ sealed class ObservableUnaryExpression(ExpressionObserver observer, UnaryExpress
     {
         var operandParameter = Expression.Parameter(typeof(object));
         var operandConversion = Expression.Convert(operandParameter, key.OperandType);
-        return Expression.Lambda<UnaryOperationDelegate>(Expression.Convert(key.Method is null ? Expression.MakeUnary(key.NodeType, operandConversion, key.ReturnValueType) : Expression.MakeUnary(key.NodeType, operandConversion, key.ReturnValueType, key.Method), typeof(object)), operandParameter).Compile();
+        var operation = key.Method is null ? Expression.MakeUnary(key.NodeType, operandConversion, key.ReturnValueType) : Expression.MakeUnary(key.NodeType, operandConversion, key.ReturnValueType, key.Method);
+        return Expression.Lambda<UnaryOperationDelegate>(BooleanBoxes.Convert(operation), operandParameter).Compile();
     }
 
     UnaryOperationDelegate? @delegate;

@@ -1,0 +1,2 @@
+Observing an expression whose result is a boolean no longer allocates a box for that result on every evaluation. The two boxes a boolean can need are now shared across every observation, in both the graph and the direct-subscription path.
+Observing an expression also allocates less to construct. Each node held its own box for the default value of its type; those boxes are now shared, except where the type is one the observer could be asked to dispose of.

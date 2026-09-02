@@ -6,7 +6,7 @@ sealed class ObservableTypeBinaryExpression(ExpressionObserver observer, TypeBin
 {
     #region Delegates
 
-    delegate bool TypeIsDelegate(object? obj);
+    delegate object? TypeIsDelegate(object? obj);
 
     #endregion Delegates
 
@@ -15,7 +15,7 @@ sealed class ObservableTypeBinaryExpression(ExpressionObserver observer, TypeBin
     static TypeIsDelegate CreateDelegate(Type type)
     {
         var parameter = Expression.Parameter(typeof(object));
-        return Expression.Lambda<TypeIsDelegate>(Expression.TypeIs(parameter, type), parameter).Compile();
+        return Expression.Lambda<TypeIsDelegate>(BooleanBoxes.Convert(Expression.TypeIs(parameter, type)), parameter).Compile();
     }
 
     TypeIsDelegate? @delegate;
