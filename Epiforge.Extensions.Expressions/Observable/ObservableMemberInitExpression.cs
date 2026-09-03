@@ -45,7 +45,7 @@ sealed class ObservableMemberInitExpression(ExpressionObserver observer, MemberI
                 Evaluation = (newObservableExpressionFault, defaultResult);
                 observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, newObservableExpressionFault, "{MemberInitExpression} new faulted: {Fault}", MemberInitExpression, newObservableExpressionFault);
             }
-            else if (memberAssignmentObservableExpressions?.Keys.Select(memberAssignmentObservableExpression => memberAssignmentObservableExpression.Evaluation.Fault).FirstOrDefault(fault => fault is not null) is { } memberAssignmentObservableExpressionFault)
+            else if (FirstMemberAssignmentFault() is { } memberAssignmentObservableExpressionFault)
             {
                 Evaluation = (memberAssignmentObservableExpressionFault, defaultResult);
                 observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, memberAssignmentObservableExpressionFault, "{MemberInitExpression} member assignment faulted: {Fault}", MemberInitExpression, memberAssignmentObservableExpressionFault);
@@ -71,6 +71,19 @@ sealed class ObservableMemberInitExpression(ExpressionObserver observer, MemberI
             Evaluation = (ex, defaultResult);
             observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, ex, "{MemberInitExpression} faulted: {Fault}", MemberInitExpression, ex);
         }
+    }
+
+    /// <summary>
+    /// Yields the fault of the first member assignment which has one, written as a loop here rather than through the shared helper because these expressions are the keys of a dictionary rather than a list
+    /// </summary>
+    Exception? FirstMemberAssignmentFault()
+    {
+        if (memberAssignmentObservableExpressions is null)
+            return null;
+        foreach (var memberAssignmentObservableExpression in memberAssignmentObservableExpressions.Keys)
+            if (memberAssignmentObservableExpression.Evaluation.Fault is { } fault)
+                return fault;
+        return null;
     }
 
     void IObservableExpressionDependent.OnDependencyEvaluationChanged(ObservableExpression dependency)

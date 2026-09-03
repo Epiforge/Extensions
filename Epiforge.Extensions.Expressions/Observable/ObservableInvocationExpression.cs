@@ -20,7 +20,7 @@ sealed class ObservableInvocationExpression(ExpressionObserver observer, Invocat
         switch (InvocationExpression.Expression)
         {
             case LambdaExpression lambdaExpression when observableArguments is not null:
-                observableExpression = observer.GetObservableExpression(ExpressionObserver.ReplaceParametersWithoutOptimization(lambdaExpression, observableArguments.Select(observableArgument => observableArgument.Evaluation.Result).ToArray() ?? [])!, IsDeferringEvaluation);
+                observableExpression = observer.GetObservableExpression(ExpressionObserver.ReplaceParametersWithoutOptimization(lambdaExpression, EvaluationResults(observableArguments))!, IsDeferringEvaluation);
                 break;
             case Expression expression when typeof(Delegate).IsAssignableFrom(expression.Type):
                 var observableDelegateExpressionCreated = false;
@@ -80,7 +80,7 @@ sealed class ObservableInvocationExpression(ExpressionObserver observer, Invocat
             Evaluation = (observableExpressionFault, defaultResult);
             observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, observableExpressionFault, "{InvocationExpression} is faulted: {Fault}", InvocationExpression, observableExpressionFault);
         }
-        else if (observableArguments?.Select(observableArgument => observableArgument.Evaluation.Fault).FirstOrDefault(fault => fault is not null) is { } observableArgumentFault)
+        else if (observableArguments is { } faultedArguments && FirstFault(faultedArguments) is { } observableArgumentFault)
         {
             Evaluation = (observableArgumentFault, defaultResult);
             observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, observableArgumentFault, "{InvocationExpression} argument is faulted: {Fault}", InvocationExpression, observableArgumentFault);
@@ -102,7 +102,7 @@ sealed class ObservableInvocationExpression(ExpressionObserver observer, Invocat
             observableExpression.Dispose();
             observableExpression = null;
         }
-        if (observableArguments?.All(observableArgument => observableArgument.Evaluation.Fault is null) ?? true)
+        if (observableArguments is not { } faultCheckedArguments || FirstFault(faultCheckedArguments) is null)
             CreateObservableExpression();
         else if (!IsDeferringEvaluation)
             Evaluate();

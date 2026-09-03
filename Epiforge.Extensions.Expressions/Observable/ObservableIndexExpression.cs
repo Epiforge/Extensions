@@ -51,7 +51,7 @@ sealed class ObservableIndexExpression(ExpressionObserver observer, IndexExpress
                 Evaluation = (objectFault, defaultResult);
                 observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, objectFault, "{IndexExpression} object expression faulted: {Fault}", IndexExpression, objectFault);
             }
-            else if (arguments?.Select(argument => argument.Evaluation.Fault).FirstOrDefault(fault => fault is not null) is { } argumentFault)
+            else if (arguments is { } faultedArguments && FirstFault(faultedArguments) is { } argumentFault)
             {
                 Evaluation = (argumentFault, defaultResult);
                 observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, argumentFault, "{IndexExpression} argument expression faulted: {Fault}", IndexExpression, argumentFault);
@@ -72,7 +72,7 @@ sealed class ObservableIndexExpression(ExpressionObserver observer, IndexExpress
                 }
                 else
                 {
-                    var value = getMethod?.FastInvoke(this.objectResult, arguments?.Select(argument => argument.Evaluation.Result).ToArray() ?? []);
+                    var value = getMethod?.FastInvoke(this.objectResult, arguments is { } argumentValues ? EvaluationResults(argumentValues) : []);
                     Evaluation = (null, value);
                     observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{IndexExpression} evaluated: {Value}", IndexExpression, value);
                 }

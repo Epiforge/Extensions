@@ -34,14 +34,15 @@ sealed class ObservableNewExpression(ExpressionObserver observer, NewExpression 
     {
         try
         {
-            if (arguments?.Select(argument => argument.Evaluation.Fault).FirstOrDefault(fault => fault is not null) is { } argumentFault)
+            if (arguments is { } faultedArguments && FirstFault(faultedArguments) is { } argumentFault)
             {
                 Evaluation = (argumentFault, defaultResult);
                 observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, argumentFault, "{NewExpression} argument faulted: {Fault}", NewExpression, argumentFault);
             }
             else
             {
-                var value = constructor is not null ? constructor.FastInvoke(arguments?.Select(argument => argument.Evaluation.Result).ToArray() ?? []) : Activator.CreateInstance(NewExpression.Type, arguments?.Select(argument => argument.Evaluation.Result).ToArray() ?? []);
+                object?[] argumentValues = arguments is { } evaluatedArguments ? EvaluationResults(evaluatedArguments) : [];
+                var value = constructor is not null ? constructor.FastInvoke(argumentValues) : Activator.CreateInstance(NewExpression.Type, argumentValues);
                 Evaluation = (null, value);
                 observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{NewExpression} evaluated: {Value}", NewExpression, value);
             }

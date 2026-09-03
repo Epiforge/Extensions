@@ -48,7 +48,7 @@ sealed class ObservableMethodCallExpression(ExpressionObserver observer, MethodC
                 Evaluation = (objectFault, defaultResult);
                 observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, objectFault, "{MethodCallExpression} object faulted: {Fault}", MethodCallExpression, objectFault);
             }
-            else if (arguments?.Select(argument => argument.Evaluation.Fault).FirstOrDefault(fault => fault is not null) is { } argumentFault)
+            else if (arguments is { } faultedArguments && FirstFault(faultedArguments) is { } argumentFault)
             {
                 Evaluation = (argumentFault, defaultResult);
                 observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, argumentFault, "{MethodCallExpression} argument faulted: {Fault}", MethodCallExpression, argumentFault);
@@ -61,7 +61,7 @@ sealed class ObservableMethodCallExpression(ExpressionObserver observer, MethodC
             }
             else
             {
-                var value = method?.FastInvoke(objectResult, arguments?.Select(argument => argument.Evaluation.Result).ToArray() ?? []);
+                var value = method?.FastInvoke(objectResult, arguments is { } argumentValues ? EvaluationResults(argumentValues) : []);
                 Evaluation = (null, value);
                 observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{MethodCallExpression} evaluated: {Value}", MethodCallExpression, value);
             }

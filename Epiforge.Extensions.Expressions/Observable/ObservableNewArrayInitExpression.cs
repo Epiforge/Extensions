@@ -30,7 +30,7 @@ sealed class ObservableNewArrayInitExpression(ExpressionObserver observer, NewAr
 
     protected override void Evaluate()
     {
-        if (initializers?.Select(initializer => initializer.Evaluation.Fault).FirstOrDefault(fault => fault is not null) is { } initializerFault)
+        if (initializers is { } faultedInitializers && FirstFault(faultedInitializers) is { } initializerFault)
         {
             Evaluation = (initializerFault, defaultResult);
             observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, initializerFault, "{NewArrayExpression} initializer faulted: {Fault}", NewArrayExpression, initializerFault);

@@ -14,6 +14,33 @@ abstract class ObservableExpression :
     static object? DefaultResult(Type type) =>
         type.IsValueType && sharedDefaults.GetOrAdd(type, SharedDefaultsValueFactory) is { } shared ? shared : type.FastDefault();
 
+    /// <summary>
+    /// Yields the results of the specified expressions as an array, generic over the list rather than taking the interface so that a list which is a value type is not boxed to be read
+    /// </summary>
+    internal static object?[] EvaluationResults<TExpressions>(TExpressions expressions)
+        where TExpressions : IReadOnlyList<ObservableExpression>
+    {
+        var count = expressions.Count;
+        if (count == 0)
+            return [];
+        var results = new object?[count];
+        for (var i = 0; i < count; ++i)
+            results[i] = expressions[i].Evaluation.Result;
+        return results;
+    }
+
+    /// <summary>
+    /// Yields the fault of the first of the specified expressions which has one, reading no further, which is what makes this equivalent to the lazy sequence it replaces
+    /// </summary>
+    internal static Exception? FirstFault<TExpressions>(TExpressions expressions)
+        where TExpressions : IReadOnlyList<ObservableExpression>
+    {
+        for (int i = 0, ii = expressions.Count; i < ii; ++i)
+            if (expressions[i].Evaluation.Fault is { } fault)
+                return fault;
+        return null;
+    }
+
     static object? SharedDefaultsValueFactory(Type type) =>
         ExpressionObserverOptions.CannotBeDisposed(type) ? type.FastDefault() : null;
 
