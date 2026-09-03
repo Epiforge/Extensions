@@ -9,19 +9,7 @@ class FaultList
         var replacedFault = oldFault is not null && newFault is not null && !ReferenceEquals(oldFault, newFault);
         if (addedFault || removedFault || replacedFault)
         {
-            var faultList = new FaultList();
-            if (operationFault is not null)
-                faultList.Add(operationFault);
-            var exceptionGroups = faultList.exceptions.ToLookup(exception => exception is EvaluationFaultException);
-            var evaluationFaults = exceptionGroups[true].Cast<EvaluationFaultException>().ToList();
-            if (removedFault || replacedFault)
-                evaluationFaults.RemoveAll(elementFault => elementFault.Element is TElement faultElement && elementComparer.Equals(faultElement, element));
-            if (addedFault || replacedFault)
-                evaluationFaults.Add(new EvaluationFaultException(element, newFault!));
-            faultList.Clear();
-            faultList.AddRange(exceptionGroups[false]);
-            faultList.AddRange(evaluationFaults);
-            newOperationFault = faultList.Fault;
+            newOperationFault = NewOperationFaultForElement(operationFault, element, elementComparer, removedFault || replacedFault, addedFault || replacedFault, newFault);
             return true;
         }
         newOperationFault = operationFault;
@@ -35,23 +23,51 @@ class FaultList
         var replacedFault = oldFault is not null && newFault is not null && !ReferenceEquals(oldFault, newFault);
         if (addedFault || removedFault || replacedFault)
         {
-            var faultList = new FaultList();
-            if (operationFault is not null)
-                faultList.Add(operationFault);
-            var exceptionGroups = faultList.exceptions.ToLookup(exception => exception is EvaluationFaultException);
-            var evaluationFaults = exceptionGroups[true].Cast<EvaluationFaultException>().ToList();
-            if (removedFault || replacedFault)
-                evaluationFaults.RemoveAll(elementFault => elementFault.Element is TKey faultKey && keyComparer.Equals(faultKey, key));
-            if (addedFault || replacedFault)
-                evaluationFaults.Add(new EvaluationFaultException(key, newFault!));
-            faultList.Clear();
-            faultList.AddRange(exceptionGroups[false]);
-            faultList.AddRange(evaluationFaults);
-            newOperationFault = faultList.Fault;
+            newOperationFault = NewOperationFaultForKey(operationFault, key, keyComparer, removedFault || replacedFault, addedFault || replacedFault, newFault);
             return true;
         }
         newOperationFault = operationFault;
         return false;
+    }
+
+    /// <summary>
+    /// Rebuilds the operation fault around a change to one element's fault, in a method of its own because the lambda below captures the element and its comparer, and a captured parameter is copied into a closure the moment its method is entered, whether or not the branch which uses it is taken
+    /// </summary>
+    static Exception? NewOperationFaultForElement<TElement>(Exception? operationFault, TElement element, IEqualityComparer<TElement> elementComparer, bool removeExisting, bool addNew, Exception? newFault)
+    {
+        var faultList = new FaultList();
+        if (operationFault is not null)
+            faultList.Add(operationFault);
+        var exceptionGroups = faultList.exceptions.ToLookup(exception => exception is EvaluationFaultException);
+        var evaluationFaults = exceptionGroups[true].Cast<EvaluationFaultException>().ToList();
+        if (removeExisting)
+            evaluationFaults.RemoveAll(elementFault => elementFault.Element is TElement faultElement && elementComparer.Equals(faultElement, element));
+        if (addNew)
+            evaluationFaults.Add(new EvaluationFaultException(element, newFault!));
+        faultList.Clear();
+        faultList.AddRange(exceptionGroups[false]);
+        faultList.AddRange(evaluationFaults);
+        return faultList.Fault;
+    }
+
+    /// <summary>
+    /// Rebuilds the operation fault around a change to one key's fault, separated from its caller for the reason given on <see cref="NewOperationFaultForElement"/>
+    /// </summary>
+    static Exception? NewOperationFaultForKey<TKey>(Exception? operationFault, TKey key, IEqualityComparer<TKey> keyComparer, bool removeExisting, bool addNew, Exception? newFault)
+    {
+        var faultList = new FaultList();
+        if (operationFault is not null)
+            faultList.Add(operationFault);
+        var exceptionGroups = faultList.exceptions.ToLookup(exception => exception is EvaluationFaultException);
+        var evaluationFaults = exceptionGroups[true].Cast<EvaluationFaultException>().ToList();
+        if (removeExisting)
+            evaluationFaults.RemoveAll(elementFault => elementFault.Element is TKey faultKey && keyComparer.Equals(faultKey, key));
+        if (addNew)
+            evaluationFaults.Add(new EvaluationFaultException(key, newFault!));
+        faultList.Clear();
+        faultList.AddRange(exceptionGroups[false]);
+        faultList.AddRange(evaluationFaults);
+        return faultList.Fault;
     }
 
     public FaultList()
