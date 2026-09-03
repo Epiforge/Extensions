@@ -21,13 +21,16 @@ Three things are established by this and should not need measuring again.
 
 **Observing a predicate per key-value pair costs 48 bytes above the floor**, which is exactly the two boxed integers the model predicts for `pair.Value.Rank` and `& 1`, the boolean being a shared box. The expression machinery is not the problem.
 
-**The dictionary query layer adds 568 bytes per value change**, and it is byte-identical for a scalar `All` query and a storage-holding `Where` query. That identity is the strongest single clue available: whatever it is, both share it.
+**The dictionary query layer adds 568 bytes per value change.**
 
 An observed indexer costs a further 808 bytes per dictionary change, against a control of zero. That is a separate figure and is not diagnosed here.
 
 For comparison, the equivalent collection query costs **nothing at all** per crossing as of `2026-09-02-the-thirty-two-bytes.md`.
 
+**A warning about the `All` arm, which misled this document's first draft.** `ObservableDictionaryAllQuery.OnInitialization` builds a `Where` query and wraps it: `where = observableDictionaryQuery.ObserveWhere(Predicate)`. The two query arms are therefore **not two implementations which happen to agree** — one calls the other, and their byte-identical figures carry no information about a shared mechanism. Anything inferred from that identity is worthless. In particular, the inference that the `Where` query's inner `ObservableDictionary` storage is innocent because a scalar query without storage costs the same **does not hold**: the scalar query has that storage too, one layer down.
+
 ## The prediction, which was wrong, and the change which was reverted
+
 
 The hypothesis: every dictionary query adapts the caller's `(key, value) => …` lambda to a key-value-pair lambda by wrapping it in `Expression.Invoke`, which puts an `ObservableInvocationExpression` in every per-element observation — a node which disposes and rebuilds its whole inner expression whenever an argument changes — and which also hides the expression from `DirectSubscriptionAnalyzer`, since the analyzer has no arm for an invocation and refuses everything wrapped in one.
 
@@ -41,6 +44,10 @@ The change was correct — the full suite passed on every target, including `Dif
 
 ## What to try next, and what not to
 
-Not another hypothesis from reading. This path has now defeated reading three times in one day, and the technique which worked each time was bisection: `CrossingCostBenchmarks` found the thirty-two bytes by peeling one layer at a time until the arms disagreed.
+Not another hypothesis from reading. This path has now defeated reading four times in one day, and the technique which worked each time was bisection.
 
-One candidate is worth an arm rather than an argument. `ScopedObservableDictionaryQuery`'s constructor subscribes to the inner query's `PropertyChanged`, `CollectionChanged` and `DictionaryChanged` eagerly, and every dictionary query reaches a caller as one of these scopes. That is the condition which made the collection-side notification guard a no-op until `ScopedObservableCollectionQuery` was made lazy in `2026-09-01-notification-guard.md` — *"it is not that nothing is subscribed, it is that something always is."* An arm holding an unscoped query would settle whether the same is true here, and settle it without changing anything.
+The live candidate is the one this document's first draft wrongly dismissed. `ObservableDictionaryWhereQuery` keeps an `ObservableDictionary` as its storage and subscribes to five of its events in `OnInitialization` to learn what it changed and forward it; and `ScopedObservableDictionaryQuery`, which is what every caller actually holds, subscribes to the inner query's `PropertyChanged`, `CollectionChanged` and `DictionaryChanged` in its constructor. Between them, something is always listening at every level, so nothing is ever guarded — which is the collection side's position before `2026-09-01-notification-guard.md`, verbatim: *"it is not that nothing is subscribed, it is that something always is."*
+
+`ChangeEveryValueInAWhereQueryWithASubscriber` tests that by measurement rather than by argument. On the collection side a subscriber costs 72 bytes per flip more than no subscriber, because the scope there attaches lazily. If the dictionary scope attaches eagerly, adding a real subscriber should cost **nothing at all**, because the arguments are already being built for a scope nobody is listening to. Equal figures confirm the diagnosis; a rise refutes it.
+
+Whichever way it lands, the snapshot trap noted below applies to any fix. `ResultCollectionChanged` and `ResultDictionaryChanged` do not only forward — they call `DiscardSnapshots`. Detaching them when nothing is subscribed would leave `Keys`, `Values` and `GetEnumerator` serving stale snapshots. Snapshot invalidation has to move to the query's own mutation sites first; only then is lazy forwarding safe.

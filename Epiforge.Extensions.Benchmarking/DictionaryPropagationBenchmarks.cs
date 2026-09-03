@@ -1,5 +1,7 @@
 namespace Epiforge.Extensions.Benchmarking;
 
+using Epiforge.Extensions.Collections.Specialized;
+
 [MemoryDiagnoser]
 public class DictionaryPropagationBenchmarks
 {
@@ -20,6 +22,7 @@ public class DictionaryPropagationBenchmarks
     ObservableDictionary<int, BenchmarkPerson> source = null!;
     IObservableDictionaryQuery<int, BenchmarkPerson> sourceQuery = null!;
     IObservableDictionaryQuery<int, BenchmarkPerson> where = null!;
+    IObservableDictionaryQuery<int, BenchmarkPerson> whereWithSubscriber = null!;
 
     [Benchmark]
     public void ChangeEveryValueInAnAllQuery() =>
@@ -31,6 +34,10 @@ public class DictionaryPropagationBenchmarks
 
     [Benchmark]
     public void ChangeEveryValueInAWhereQuery() =>
+        ChangeEveryValue();
+
+    [Benchmark]
+    public void ChangeEveryValueInAWhereQueryWithASubscriber() =>
         ChangeEveryValue();
 
     void ChangeEveryValue()
@@ -65,6 +72,14 @@ public class DictionaryPropagationBenchmarks
     public void CleanupWhereQuery()
     {
         where.Dispose();
+        sourceQuery.Dispose();
+    }
+
+    [GlobalCleanup(Target = nameof(ChangeEveryValueInAWhereQueryWithASubscriber))]
+    public void CleanupWhereQueryWithSubscriber()
+    {
+        ((INotifyDictionaryChanged<int, BenchmarkPerson>)whereWithSubscriber).DictionaryChanged -= Ignore;
+        whereWithSubscriber.Dispose();
         sourceQuery.Dispose();
     }
 
@@ -126,6 +141,20 @@ public class DictionaryPropagationBenchmarks
         observer = new CollectionObserver();
         sourceQuery = observer.ObserveReadOnlyDictionary(source);
         all = sourceQuery.ObserveAll(predicate);
+    }
+
+    static void Ignore(object? sender, NotifyDictionaryChangedEventArgs<int, BenchmarkPerson> e)
+    {
+    }
+
+    [GlobalSetup(Target = nameof(ChangeEveryValueInAWhereQueryWithASubscriber))]
+    public void SetupWhereQueryWithSubscriber()
+    {
+        SetupDictionary();
+        observer = new CollectionObserver();
+        sourceQuery = observer.ObserveReadOnlyDictionary(source);
+        whereWithSubscriber = sourceQuery.ObserveWhere(predicate);
+        ((INotifyDictionaryChanged<int, BenchmarkPerson>)whereWithSubscriber).DictionaryChanged += Ignore;
     }
 
     [GlobalSetup(Target = nameof(ChangeEveryValueInAWhereQuery))]
