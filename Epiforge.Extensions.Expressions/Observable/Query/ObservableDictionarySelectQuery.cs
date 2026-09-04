@@ -71,6 +71,7 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
         else
         {
             claimantsByProjectedKey.Add(key, [sourceKey]);
+            DiscardSnapshots();
             into.Add(key, projection.Value);
         }
     }
@@ -149,7 +150,7 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
             {
                 observableExpressions[sourceKey] = (observableExpression, newFault, newProjection);
                 if (isApplied && newKey is not null && !valueEqualityComparer.Equals(committedProjection.Value, newProjection.Value) && IsFirstClaimantWithAccess(newKey, sourceKey))
-                    result[newKey] = newProjection.Value;
+                    SetInResultWithAccess(newKey, newProjection.Value);
             }
             else
             {
@@ -177,15 +178,44 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
         observableExpressions.Add(sourceKeyValuePair.Key, (observableExpression, fault, projection));
     }
 
+    private protected override void OnChangeObservationBegan(ObservableDictionaryChangeObservation observation)
+    {
+        switch (observation)
+        {
+            case ObservableDictionaryChangeObservation.BoxedDictionary:
+                ((INotifyDictionaryChanged)result).DictionaryChanged += ResultDictionaryChangedBoxed;
+                break;
+            case ObservableDictionaryChangeObservation.Collection:
+                result.CollectionChanged += ResultCollectionChanged;
+                break;
+            case ObservableDictionaryChangeObservation.Dictionary:
+                result.DictionaryChanged += ResultDictionaryChanged;
+                break;
+        }
+    }
+
+    private protected override void OnChangeObservationEnded(ObservableDictionaryChangeObservation observation)
+    {
+        switch (observation)
+        {
+            case ObservableDictionaryChangeObservation.BoxedDictionary:
+                ((INotifyDictionaryChanged)result).DictionaryChanged -= ResultDictionaryChangedBoxed;
+                break;
+            case ObservableDictionaryChangeObservation.Collection:
+                result.CollectionChanged -= ResultCollectionChanged;
+                break;
+            case ObservableDictionaryChangeObservation.Dictionary:
+                result.DictionaryChanged -= ResultDictionaryChanged;
+                break;
+        }
+    }
+
     protected override void OnInitialization()
     {
         foreach (var sourceKeyValuePair in source)
             ObserveSourceKeyValuePairWithAccess(sourceKeyValuePair, result);
         SetOperationFault();
         source.DictionaryChanged += SourceDictionaryChanged;
-        result.CollectionChanged += ResultCollectionChanged;
-        ((INotifyDictionaryChanged)result).DictionaryChanged += ResultDictionaryChangedBoxed;
-        result.DictionaryChanged += ResultDictionaryChanged;
     }
 
     void DiscardSnapshots()
@@ -195,17 +225,11 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
         valuesSnapshot = null;
     }
 
-    void ResultCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
-    {
-        DiscardSnapshots();
+    void ResultCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
         OnCollectionChanged(e);
-    }
 
-    void ResultDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e)
-    {
-        DiscardSnapshots();
+    void ResultDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e) =>
         OnDictionaryChanged(e);
-    }
 
     void ResultDictionaryChangedBoxed(object? sender, NotifyDictionaryChangedEventArgs<object?, object?> e) =>
         OnDictionaryChangedBoxed(e);
@@ -227,12 +251,19 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
         if (claimants.Count == 0)
         {
             claimantsByProjectedKey.Remove(key);
+            DiscardSnapshots();
             result.Remove(key);
             return;
         }
         --duplicateClaims;
         if (claimantIndex == 0 && observableExpressions.TryGetValue(claimants[0], out var promoted))
-            result[key] = promoted.CommittedProjection.Value;
+            SetInResultWithAccess(key, promoted.CommittedProjection.Value);
+    }
+
+    void SetInResultWithAccess(TKey key, TValue value)
+    {
+        DiscardSnapshots();
+        result[key] = value;
     }
 
     void SetOperationFault()
@@ -268,6 +299,7 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
                 var newResult = new ObservableDictionary<TKey, TValue>(EqualityComparer);
                 foreach (var sourceKeyValuePair in source)
                     ObserveSourceKeyValuePairWithAccess(sourceKeyValuePair, newResult);
+                DiscardSnapshots();
                 result.Reset(newResult);
 
                 claimantsByProjectedKey.TrimExcess();
