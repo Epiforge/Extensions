@@ -823,9 +823,9 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
         var keyValuePairParameter = Expression.Parameter(typeof(KeyValuePair<TKey, TValue>));
         var keyExpression = Expression.Property(keyValuePairParameter, nameof(KeyValuePair<,>.Key));
         var valueExpression = Expression.Property(keyValuePairParameter, nameof(KeyValuePair<,>.Value));
-        var invokeSelectorExpression = Expression.Invoke(selector, keyExpression, valueExpression);
+        var selectorExpression = LambdaInvocationRewriter.Apply(selector, keyExpression, valueExpression) ?? Expression.Invoke(selector, keyExpression, valueExpression);
         ObservableQuery toCollectionQuery;
-        var key = Expression.Lambda<Func<KeyValuePair<TKey, TValue>, TElement>>(invokeSelectorExpression, keyValuePairParameter);
+        var key = Expression.Lambda<Func<KeyValuePair<TKey, TValue>, TElement>>(selectorExpression, keyValuePairParameter);
         if (collectionObserver.ExpressionObserver.Optimizer is { } optimizer)
             key = (Expression<Func<KeyValuePair<TKey, TValue>, TElement>>)optimizer(key);
         lock (cachedToCollectionQueriesAccess)
@@ -911,9 +911,9 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
         var keyValuePairParameter = Expression.Parameter(typeof(KeyValuePair<TKey, TValue>));
         var keyExpression = Expression.Property(keyValuePairParameter, nameof(KeyValuePair<,>.Key));
         var valueExpression = Expression.Property(keyValuePairParameter, nameof(KeyValuePair<,>.Value));
-        var invokePredicateExpression = Expression.Invoke(predicate, keyExpression, valueExpression);
+        var predicateExpression = LambdaInvocationRewriter.Apply(predicate, keyExpression, valueExpression) ?? Expression.Invoke(predicate, keyExpression, valueExpression);
         ObservableQuery whereQuery;
-        var key = Expression.Lambda<Func<KeyValuePair<TKey, TValue>, bool>>(invokePredicateExpression, keyValuePairParameter);
+        var key = Expression.Lambda<Func<KeyValuePair<TKey, TValue>, bool>>(predicateExpression, keyValuePairParameter);
         if (collectionObserver.ExpressionObserver.Optimizer is { } optimizer)
             key = (Expression<Func<KeyValuePair<TKey, TValue>, bool>>)optimizer(key);
         lock (cachedWhereQueriesAccess)

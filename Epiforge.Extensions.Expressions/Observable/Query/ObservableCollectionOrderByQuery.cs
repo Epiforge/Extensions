@@ -8,7 +8,7 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
     static Expression<Func<TElement, Tuple<TElement, IComparable>>> CachedWrappedSelectorsValueFactory(Expression<Func<TElement, IComparable>> selector)
     {
         var parameter = Expression.Parameter(typeof(TElement), "element");
-        return Expression.Lambda<Func<TElement, Tuple<TElement, IComparable>>>(Expression.New(typeof(Tuple<TElement, IComparable>).GetConstructor([typeof(TElement), typeof(IComparable)])!, parameter, Expression.Invoke(selector, parameter)), parameter);
+        return Expression.Lambda<Func<TElement, Tuple<TElement, IComparable>>>(Expression.New(typeof(Tuple<TElement, IComparable>).GetConstructor([typeof(TElement), typeof(IComparable)])!, parameter, LambdaInvocationRewriter.Apply(selector, parameter) ?? Expression.Invoke(selector, parameter)), parameter);
     }
 
     public ObservableCollectionOrderByQuery(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> source, IReadOnlyList<(Expression<Func<TElement, IComparable>> keySelectorExpression, bool isDescending)> selectorsAndDirections) :

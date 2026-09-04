@@ -6,7 +6,7 @@ sealed class ObservableCollectionGroupByQuery<TKey, TElement> :
     static Expression<Func<TElement, Tuple<TElement, TKey>>> WrapSelector(Expression<Func<TElement, TKey>> selector)
     {
         var parameter = Expression.Parameter(typeof(TElement), "element");
-        return Expression.Lambda<Func<TElement, Tuple<TElement, TKey>>>(Expression.New(typeof(Tuple<TElement, TKey>).GetConstructor([typeof(TElement), typeof(TKey)])!, parameter, Expression.Invoke(selector, parameter)), parameter);
+        return Expression.Lambda<Func<TElement, Tuple<TElement, TKey>>>(Expression.New(typeof(Tuple<TElement, TKey>).GetConstructor([typeof(TElement), typeof(TKey)])!, parameter, LambdaInvocationRewriter.Apply(selector, parameter) ?? Expression.Invoke(selector, parameter)), parameter);
     }
 
     public ObservableCollectionGroupByQuery(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> source, Expression<Func<TElement, TKey>> keySelector, IEqualityComparer<TKey> keyEqualityComparer) :
