@@ -59,7 +59,9 @@ Same change, two more sites, measured on the same instrument. `ObserveAll` build
 
 Controls held within 2.2% on this pair of runs, tighter than the previous pair. The three changed arms fell 12–15%. Not one byte moved anywhere, again.
 
-**The model now has five arms behind it and predicted all five.** Removing an invocation node that adapts a caller's lambda costs zero allocation, saves between a tenth and a quarter of the propagation time, and does not change which mechanism evaluates the expression. The saving is one node's traversal per evaluation, nothing more and nothing less.
+**The model now has five arms behind it and predicted all five.** Removing an invocation node that adapts a caller's lambda costs zero allocation *on the propagation path*, saves between a tenth and a quarter of the propagation time, and does not change which mechanism evaluates the expression. The saving is one node's traversal per evaluation, nothing more and nothing less.
+
+**That last sentence was too confident, and the order-by and group-by run below shows why.** Every arm in this instrument re-evaluates existing observations; none of them constructs one. A claim about what a node costs cannot be settled by arms which never build the node.
 
 ## The census of wrapping sites
 
@@ -100,7 +102,55 @@ Taken on unchanged code, in the same session as the run above.
 
 `KeyChange` is the arm the rewrite should move, since that is the one which re-evaluates the selector. `Count` and `Enumerate` are controls. Both instruments use `[Params]` on element count, which is not how instruments are built here any more; they predate the convention and were not rewritten for this measurement, because changing an instrument in the same pass as the code it measures destroys the before.
 
+## The order-by and group-by result, and the part of it I did not predict
+
+`ObserveOrderByBenchmarks`, before → after:
+
+| arm | 100 | 1,000 | 10,000 |
+|--- |---: |---: |---: |
+| `Enumerate` (control) | 98.83 → 99.14 ns | 817.69 → 814.29 ns | 8,221.02 → 8,198.83 ns |
+| `KeyChange` | 1,484.43 → 1,477.03 ns | 2,359.17 → **2,255.90 ns** | 5,943.67 → **5,455.36 ns** |
+| `KeyChange` allocated | 813 → 813 B | 816 → 816 B | 816 → 816 B |
+| `SourceAddAndRemove` | 5,638.37 → **4,269.45 ns** | 6,512.11 → **5,792.15 ns** | 13,919.43 → **8,772.42 ns** |
+| `SourceAddAndRemove` allocated | 9,756 → **7,102 B** | 9,776 → **7,105 B** | 9,926 → **7,252 B** |
+
+`ObserveGroupByBenchmarks`, before → after:
+
+| arm | 100 | 1,000 | 10,000 |
+|--- |---: |---: |---: |
+| `Count` (control) | 12.85 → 13.67 ns | 12.80 → 12.82 ns | 12.81 → 12.80 ns |
+| `Enumerate` (control) | 23.95 → 24.17 ns | 24.41 → 24.08 ns | 27.89 → 26.17 ns |
+| `KeyChange` | 399.27 → 398.40 ns | 479.97 → **450.23 ns** | 1,375.78 → **1,071.49 ns** |
+| `KeyChange` allocated | 724 → 725 B | 711 → 711 B | 711 → 711 B |
+| `SourceAddAndRemove` | 4,701.90 → **4,440.28 ns** | 6,903.16 → **3,851.77 ns** | 8,255.26 → **6,147.51 ns** |
+| `SourceAddAndRemove` allocated | 7,821 → **5,111 B** | 7,947 → **5,213 B** | 8,026 → **5,438 B** |
+
+`DictionaryPropagationBenchmarks` was run as a pure control — nothing in this pass touches dictionary queries — and every one of its nine arms landed within about 1% of the previous run, in time and to the byte in allocation. That is the tightest control this arc has had, so the movements below are not drift.
+
+### The allocation finding, which I said would not happen
+
+**`SourceAddAndRemove` allocation fell by roughly 2,650 bytes in order-by and 2,700 in group-by, at every element count — 27% and 35%.** I predicted no allocation change anywhere. I was wrong, and wrong in a way the previous instrument could not have caught.
+
+An `ObservableInvocationExpression` is a node, and a node is an object. Constructing an observation of a wrapped selector allocates it; re-evaluating that observation does not. Every arm in `DictionaryPropagationBenchmarks` re-evaluates existing observations and none of them builds one, so it measured the propagation half of the story and I generalized from it to the whole. `SourceAddAndRemove` adds and removes elements, which constructs and destroys observations, and there the node's own footprint shows up immediately.
+
+The propagation half still holds exactly: `KeyChange` allocation is unchanged to the byte at every element count in both instruments, as it was in all nine dictionary arms.
+
+**Corrected model.** Removing an invocation node that adapts a caller's lambda:
+
+- costs **zero allocation on the propagation path** — six instruments, fifteen arms, not one byte;
+- saves **roughly 2,700 bytes per observation constructed**, which is a quarter to a third of what building one of these queries' per-element observations costs;
+- saves **a tenth to a quarter of propagation time**;
+- does **not** change which mechanism evaluates the expression.
+
+### One thing left unexplained
+
+The `KeyChange` time saving grows with element count — 0.5%, 4.4%, 8.2% in order-by and 0.2%, 6.2%, 22% in group-by. If the saving were one node's traversal per evaluation and a key change caused one evaluation, the *absolute* saving should be constant: it is 7 ns, 103 ns, 488 ns instead. Something about a key change in a larger collection re-evaluates more, or costs more per evaluation, and this instrument does not say which. Recorded as open rather than guessed at.
+
+Group-by's controls drifted up to 6% on the smallest counts, where `Count` is a 13-nanosecond measurement sitting on the noise floor; the movements called out above are all well beyond that.
+
 ## Still untouched
+
+`ObservableCollectionLookupQuery` and `ObservableCollectionToDictionaryQuery` are still wrapped. No instrument covers either — `QueryFootprintBenchmarks` measures node-count footprints, not these queries — so they stay wrapped until one does.
 
 The 808-byte observed indexer.
 
