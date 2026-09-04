@@ -53,7 +53,6 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     readonly Dictionary<SynchronizationContext, ObservableDictionaryUsingSynchronizationContextQuery<TKey, TValue>> cachedUsingSynchronizationContextQueries = [];
     readonly Dictionary<(TKey key, bool notFoundIsDefault), ObservableDictionaryValueForQuery<TKey, TValue>> cachedValueForQueries = [];
     readonly Dictionary<Expression<Func<KeyValuePair<TKey, TValue>, bool>>, ObservableQuery> cachedWhereQueries = new(ExpressionEqualityComparer.Default);
-    int changeObservers;
     NotifyCollectionChangedEventHandler? collectionChanged;
     EventHandler<NotifyDictionaryChangedEventArgs<TKey, TValue>>? dictionaryChanged;
     EventHandler<NotifyDictionaryChangedEventArgs<object?, object?>>? dictionaryChangedBoxed;
@@ -70,7 +69,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     readonly Lock cachedUsingSynchronizationContextQueriesAccess = new();
     readonly Lock cachedValueForQueriesAccess = new();
     readonly Lock cachedWhereQueriesAccess = new();
-    readonly Lock changeObserversAccess = new();
+    readonly Lock changeAccess = new();
 #else
     readonly object cachedAggregateQueriesAccess = new();
     readonly object cachedAllQueriesAccess = new();
@@ -84,7 +83,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     readonly object cachedUsingSynchronizationContextQueriesAccess = new();
     readonly object cachedValueForQueriesAccess = new();
     readonly object cachedWhereQueriesAccess = new();
-    readonly object changeObserversAccess = new();
+    readonly object changeAccess = new();
 #endif
     Exception? operationFault;
 
@@ -166,18 +165,20 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     {
         add
         {
-            lock (changeObserversAccess)
+            lock (changeAccess)
             {
+                if (dictionaryChanged is null)
+                    OnChangeObservationBegan(ObservableDictionaryChangeObservation.Dictionary);
                 dictionaryChanged += value;
-                ChangeObserverAdded();
             }
         }
         remove
         {
-            lock (changeObserversAccess)
+            lock (changeAccess)
             {
                 dictionaryChanged -= value;
-                ChangeObserverRemoved();
+                if (dictionaryChanged is null)
+                    OnChangeObservationEnded(ObservableDictionaryChangeObservation.Dictionary);
             }
         }
     }
@@ -186,18 +187,20 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     {
         add
         {
-            lock (changeObserversAccess)
+            lock (changeAccess)
             {
+                if (dictionaryChangedBoxed is null)
+                    OnChangeObservationBegan(ObservableDictionaryChangeObservation.BoxedDictionary);
                 dictionaryChangedBoxed += value;
-                ChangeObserverAdded();
             }
         }
         remove
         {
-            lock (changeObserversAccess)
+            lock (changeAccess)
             {
                 dictionaryChangedBoxed -= value;
-                ChangeObserverRemoved();
+                if (dictionaryChangedBoxed is null)
+                    OnChangeObservationEnded(ObservableDictionaryChangeObservation.BoxedDictionary);
             }
         }
     }
@@ -206,18 +209,20 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     {
         add
         {
-            lock (changeObserversAccess)
+            lock (changeAccess)
             {
+                if (collectionChanged is null)
+                    OnChangeObservationBegan(ObservableDictionaryChangeObservation.Collection);
                 collectionChanged += value;
-                ChangeObserverAdded();
             }
         }
         remove
         {
-            lock (changeObserversAccess)
+            lock (changeAccess)
             {
                 collectionChanged -= value;
-                ChangeObserverRemoved();
+                if (collectionChanged is null)
+                    OnChangeObservationEnded(ObservableDictionaryChangeObservation.Collection);
             }
         }
     }
@@ -226,18 +231,6 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     {
         add => DictionaryChangedBoxed += value;
         remove => DictionaryChangedBoxed -= value;
-    }
-
-    void ChangeObserverAdded()
-    {
-        if (++changeObservers == 1)
-            OnChangeObservationBegan();
-    }
-
-    void ChangeObserverRemoved()
-    {
-        if (--changeObservers == 0)
-            OnChangeObservationEnded();
     }
 
     public abstract bool Contains(KeyValuePair<TKey, TValue> item);
@@ -292,16 +285,16 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     }
 
     /// <summary>
-    /// Called when this query gains a subscriber to any of the events which describe a change while it had none, so that a query which produces those events at a cost may produce them only while somebody is listening
+    /// Called when one of the events with which this query describes a change gains its first subscriber, so that a query which produces that event's arguments at a cost may produce only the ones somebody is listening for
     /// </summary>
-    private protected virtual void OnChangeObservationBegan()
+    private protected virtual void OnChangeObservationBegan(ObservableDictionaryChangeObservation observation)
     {
     }
 
     /// <summary>
-    /// Called when this query loses its last subscriber to the events which describe a change
+    /// Called when one of the events with which this query describes a change loses its last subscriber
     /// </summary>
-    private protected virtual void OnChangeObservationEnded()
+    private protected virtual void OnChangeObservationEnded(ObservableDictionaryChangeObservation observation)
     {
     }
 

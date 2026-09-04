@@ -106,18 +106,36 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue>(CollectionObserver col
             return result.GetRange(keys);
     }
 
-    private protected override void OnChangeObservationBegan()
+    private protected override void OnChangeObservationBegan(ObservableDictionaryChangeObservation observation)
     {
-        result.CollectionChanged += ResultCollectionChanged;
-        ((INotifyDictionaryChanged)result).DictionaryChanged += ResultDictionaryChangedBoxed;
-        result.DictionaryChanged += ResultDictionaryChanged;
+        switch (observation)
+        {
+            case ObservableDictionaryChangeObservation.BoxedDictionary:
+                ((INotifyDictionaryChanged)result).DictionaryChanged += ResultDictionaryChangedBoxed;
+                break;
+            case ObservableDictionaryChangeObservation.Collection:
+                result.CollectionChanged += ResultCollectionChanged;
+                break;
+            case ObservableDictionaryChangeObservation.Dictionary:
+                result.DictionaryChanged += ResultDictionaryChanged;
+                break;
+        }
     }
 
-    private protected override void OnChangeObservationEnded()
+    private protected override void OnChangeObservationEnded(ObservableDictionaryChangeObservation observation)
     {
-        result.CollectionChanged -= ResultCollectionChanged;
-        ((INotifyDictionaryChanged)result).DictionaryChanged -= ResultDictionaryChangedBoxed;
-        result.DictionaryChanged -= ResultDictionaryChanged;
+        switch (observation)
+        {
+            case ObservableDictionaryChangeObservation.BoxedDictionary:
+                ((INotifyDictionaryChanged)result).DictionaryChanged -= ResultDictionaryChangedBoxed;
+                break;
+            case ObservableDictionaryChangeObservation.Collection:
+                result.CollectionChanged -= ResultCollectionChanged;
+                break;
+            case ObservableDictionaryChangeObservation.Dictionary:
+                result.DictionaryChanged -= ResultDictionaryChanged;
+                break;
+        }
     }
 
     protected override void OnInitialization()

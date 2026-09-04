@@ -9,7 +9,9 @@ public class DictionaryPropagationBenchmarks
     const int watchedKey = 0;
 
     static readonly Expression<Func<KeyValuePair<int, BenchmarkPerson>, bool>> pairPredicate = pair => (pair.Value.Rank & 1) == 0;
+    static readonly Expression<Func<int, BenchmarkPerson, int>> keySelector = (key, person) => key;
     static readonly Expression<Func<int, BenchmarkPerson, bool>> predicate = (key, person) => (person.Rank & 1) == 0;
+    static readonly Expression<Func<int, BenchmarkPerson, int>> valueSelector = (key, person) => person.Rank;
 
     IObservableScalarQuery<bool> all = null!;
     bool alternate;
@@ -19,6 +21,8 @@ public class DictionaryPropagationBenchmarks
     CollectionObserver observer = null!;
     BenchmarkPerson[] people = null!;
     BenchmarkPerson replacement = null!;
+    IObservableDictionaryQuery<int, int> select = null!;
+    IObservableDictionaryQuery<int, int> selectWithSubscriber = null!;
     ObservableDictionary<int, BenchmarkPerson> source = null!;
     IObservableDictionaryQuery<int, BenchmarkPerson> sourceQuery = null!;
     IObservableDictionaryQuery<int, BenchmarkPerson> where = null!;
@@ -30,6 +34,14 @@ public class DictionaryPropagationBenchmarks
 
     [Benchmark]
     public void ChangeEveryValueObservedWithoutAQuery() =>
+        ChangeEveryValue();
+
+    [Benchmark]
+    public void ChangeEveryValueInASelectQuery() =>
+        ChangeEveryValue();
+
+    [Benchmark]
+    public void ChangeEveryValueInASelectQueryWithASubscriber() =>
         ChangeEveryValue();
 
     [Benchmark]
@@ -65,6 +77,21 @@ public class DictionaryPropagationBenchmarks
     public void CleanupAllQuery()
     {
         all.Dispose();
+        sourceQuery.Dispose();
+    }
+
+    [GlobalCleanup(Target = nameof(ChangeEveryValueInASelectQuery))]
+    public void CleanupSelectQuery()
+    {
+        select.Dispose();
+        sourceQuery.Dispose();
+    }
+
+    [GlobalCleanup(Target = nameof(ChangeEveryValueInASelectQueryWithASubscriber))]
+    public void CleanupSelectQueryWithSubscriber()
+    {
+        ((INotifyDictionaryChanged<int, int>)selectWithSubscriber).DictionaryChanged -= IgnoreSelected;
+        selectWithSubscriber.Dispose();
         sourceQuery.Dispose();
     }
 
@@ -147,6 +174,10 @@ public class DictionaryPropagationBenchmarks
     {
     }
 
+    static void IgnoreSelected(object? sender, NotifyDictionaryChangedEventArgs<int, int> e)
+    {
+    }
+
     [GlobalSetup(Target = nameof(ChangeEveryValueInAWhereQueryWithASubscriber))]
     public void SetupWhereQueryWithSubscriber()
     {
@@ -155,6 +186,25 @@ public class DictionaryPropagationBenchmarks
         sourceQuery = observer.ObserveReadOnlyDictionary(source);
         whereWithSubscriber = sourceQuery.ObserveWhere(predicate);
         ((INotifyDictionaryChanged<int, BenchmarkPerson>)whereWithSubscriber).DictionaryChanged += Ignore;
+    }
+
+    [GlobalSetup(Target = nameof(ChangeEveryValueInASelectQuery))]
+    public void SetupSelectQuery()
+    {
+        SetupDictionary();
+        observer = new CollectionObserver();
+        sourceQuery = observer.ObserveReadOnlyDictionary(source);
+        select = sourceQuery.ObserveSelect(keySelector, valueSelector);
+    }
+
+    [GlobalSetup(Target = nameof(ChangeEveryValueInASelectQueryWithASubscriber))]
+    public void SetupSelectQueryWithSubscriber()
+    {
+        SetupDictionary();
+        observer = new CollectionObserver();
+        sourceQuery = observer.ObserveReadOnlyDictionary(source);
+        selectWithSubscriber = sourceQuery.ObserveSelect(keySelector, valueSelector);
+        ((INotifyDictionaryChanged<int, int>)selectWithSubscriber).DictionaryChanged += IgnoreSelected;
     }
 
     [GlobalSetup(Target = nameof(ChangeEveryValueInAWhereQuery))]
