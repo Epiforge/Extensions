@@ -727,8 +727,8 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
         var sourceKeyValuePairParameter = Expression.Parameter(typeof(KeyValuePair<TKey, TValue>));
         var sourceKeyExpression = Expression.Property(sourceKeyValuePairParameter, nameof(KeyValuePair<,>.Key));
         var sourceValueExpression = Expression.Property(sourceKeyValuePairParameter, nameof(KeyValuePair<,>.Value));
-        var keyExpression = Expression.Invoke(keySelector, sourceKeyExpression, sourceValueExpression);
-        var valueExpression = Expression.Invoke(valueSelector, sourceKeyExpression, sourceValueExpression);
+        var keyExpression = LambdaInvocationRewriter.Apply(keySelector, sourceKeyExpression, sourceValueExpression) ?? Expression.Invoke(keySelector, sourceKeyExpression, sourceValueExpression);
+        var valueExpression = LambdaInvocationRewriter.Apply(valueSelector, sourceKeyExpression, sourceValueExpression) ?? Expression.Invoke(valueSelector, sourceKeyExpression, sourceValueExpression);
         var keyValuePairExpression = Expression.New(typeof(KeyValuePair<TResultKey, TResultValue>).GetConstructor([typeof(TResultKey), typeof(TResultValue)])!, keyExpression, valueExpression);
         var keyValuePairSelector = Expression.Lambda<Func<KeyValuePair<TKey, TValue>, KeyValuePair<TResultKey, TResultValue>>>(keyValuePairExpression, sourceKeyValuePairParameter);
 
