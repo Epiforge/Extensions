@@ -47,7 +47,7 @@ The two unoptimized arms did not move, which is what makes the other two attribu
 
 ## How this was found, and why it was invisible
 
-Another Claude instance, reviewing an unrelated codebase that consumes this library, noticed the optimize-before-probe pattern while reading the query layer. It was not found here.
+While reviewing an unrelated codebase that consumes this library, the optimize-before-probe pattern was noticed while reading the query layer. It was not found here.
 
 The reason it survived is worth recording: **not one benchmark in this repository configured an optimizer.** Every construction figure in every baseline document in this directory was measured with `Optimizer` null, while the *test* suite sets one on every observer it builds through `ExpressionObserverHelpers`. The suite that checks correctness used the recommended configuration; the suite that measures speed did not. A cost paid only under the documented recommendation was therefore unmeasurable by construction.
 

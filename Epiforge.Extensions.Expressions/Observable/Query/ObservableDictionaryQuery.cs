@@ -53,6 +53,10 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     readonly Dictionary<SynchronizationContext, ObservableDictionaryUsingSynchronizationContextQuery<TKey, TValue>> cachedUsingSynchronizationContextQueries = [];
     readonly Dictionary<(TKey key, bool notFoundIsDefault), ObservableDictionaryValueForQuery<TKey, TValue>> cachedValueForQueries = [];
     readonly Dictionary<Expression<Func<KeyValuePair<TKey, TValue>, bool>>, ObservableQuery> cachedWhereQueries = new(ExpressionEqualityComparer.Default);
+    int changeObservers;
+    NotifyCollectionChangedEventHandler? collectionChanged;
+    EventHandler<NotifyDictionaryChangedEventArgs<TKey, TValue>>? dictionaryChanged;
+    EventHandler<NotifyDictionaryChangedEventArgs<object?, object?>>? dictionaryChangedBoxed;
 #if IS_NET_9_0_OR_GREATER
     readonly Lock cachedAggregateQueriesAccess = new();
     readonly Lock cachedAllQueriesAccess = new();
@@ -66,6 +70,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     readonly Lock cachedUsingSynchronizationContextQueriesAccess = new();
     readonly Lock cachedValueForQueriesAccess = new();
     readonly Lock cachedWhereQueriesAccess = new();
+    readonly Lock changeObserversAccess = new();
 #else
     readonly object cachedAggregateQueriesAccess = new();
     readonly object cachedAllQueriesAccess = new();
@@ -79,6 +84,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     readonly object cachedUsingSynchronizationContextQueriesAccess = new();
     readonly object cachedValueForQueriesAccess = new();
     readonly object cachedWhereQueriesAccess = new();
+    readonly object changeObserversAccess = new();
 #endif
     Exception? operationFault;
 
@@ -156,14 +162,82 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     ICollection<TValue> IDictionary<TKey, TValue>.Values =>
         Values.ToList().AsReadOnly();
 
-    public event EventHandler<NotifyDictionaryChangedEventArgs<TKey, TValue>>? DictionaryChanged;
-    public event EventHandler<NotifyDictionaryChangedEventArgs<object?, object?>>? DictionaryChangedBoxed;
-    public event NotifyCollectionChangedEventHandler? CollectionChanged;
+    public event EventHandler<NotifyDictionaryChangedEventArgs<TKey, TValue>>? DictionaryChanged
+    {
+        add
+        {
+            lock (changeObserversAccess)
+            {
+                dictionaryChanged += value;
+                ChangeObserverAdded();
+            }
+        }
+        remove
+        {
+            lock (changeObserversAccess)
+            {
+                dictionaryChanged -= value;
+                ChangeObserverRemoved();
+            }
+        }
+    }
+
+    public event EventHandler<NotifyDictionaryChangedEventArgs<object?, object?>>? DictionaryChangedBoxed
+    {
+        add
+        {
+            lock (changeObserversAccess)
+            {
+                dictionaryChangedBoxed += value;
+                ChangeObserverAdded();
+            }
+        }
+        remove
+        {
+            lock (changeObserversAccess)
+            {
+                dictionaryChangedBoxed -= value;
+                ChangeObserverRemoved();
+            }
+        }
+    }
+
+    public event NotifyCollectionChangedEventHandler? CollectionChanged
+    {
+        add
+        {
+            lock (changeObserversAccess)
+            {
+                collectionChanged += value;
+                ChangeObserverAdded();
+            }
+        }
+        remove
+        {
+            lock (changeObserversAccess)
+            {
+                collectionChanged -= value;
+                ChangeObserverRemoved();
+            }
+        }
+    }
 
     event EventHandler<NotifyDictionaryChangedEventArgs<object?, object?>>? INotifyDictionaryChanged.DictionaryChanged
     {
         add => DictionaryChangedBoxed += value;
         remove => DictionaryChangedBoxed -= value;
+    }
+
+    void ChangeObserverAdded()
+    {
+        if (++changeObservers == 1)
+            OnChangeObservationBegan();
+    }
+
+    void ChangeObserverRemoved()
+    {
+        if (--changeObservers == 0)
+            OnChangeObservationEnded();
     }
 
     public abstract bool Contains(KeyValuePair<TKey, TValue> item);
@@ -182,7 +256,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     protected virtual void OnChanged(NotifyDictionaryChangedEventArgs<TKey, TValue> e)
     {
         ArgumentNullException.ThrowIfNull(e);
-        if (CollectionChanged is not null)
+        if (collectionChanged is not null)
             switch (e.Action)
             {
                 case NotifyDictionaryChangedAction.Add:
@@ -198,7 +272,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
                     OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
                     break;
             }
-        if (DictionaryChangedBoxed is not null)
+        if (dictionaryChangedBoxed is not null)
             switch (e.Action)
             {
                 case NotifyDictionaryChangedAction.Add:
@@ -215,6 +289,20 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
                     break;
             }
         OnDictionaryChanged(e);
+    }
+
+    /// <summary>
+    /// Called when this query gains a subscriber to any of the events which describe a change while it had none, so that a query which produces those events at a cost may produce them only while somebody is listening
+    /// </summary>
+    private protected virtual void OnChangeObservationBegan()
+    {
+    }
+
+    /// <summary>
+    /// Called when this query loses its last subscriber to the events which describe a change
+    /// </summary>
+    private protected virtual void OnChangeObservationEnded()
+    {
     }
 
     protected virtual void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
@@ -240,19 +328,19 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     {
         var eventArgs = Logger?.IsEnabled(LogLevel.Trace) ?? false ? e.ToStringForLogging() : null;
         Logger?.LogTrace(Collections.EventIds.Epiforge_Extensions_Collections_RaisingCollectionChanged, "Raising CollectionChanged: {EventArgs}", eventArgs);
-        CollectionChanged?.Invoke(this, e);
+        collectionChanged?.Invoke(this, e);
         Logger?.LogTrace(Collections.EventIds.Epiforge_Extensions_Collections_RaisedCollectionChanged, "Raised CollectionChanged: {EventArgs}", eventArgs);
     }
 
     void RaiseDictionaryChanged(NotifyDictionaryChangedEventArgs<TKey, TValue> e)
     {
         Logger?.LogTrace(Collections.EventIds.Epiforge_Extensions_Collections_RaisingDictionaryChanged, "Raising DictionaryChanged: {EventArgs}", e);
-        DictionaryChanged?.Invoke(this, e);
+        dictionaryChanged?.Invoke(this, e);
         Logger?.LogTrace(Collections.EventIds.Epiforge_Extensions_Collections_RaisedDictionaryChanged, "Raised DictionaryChanged: {EventArgs}", e);
     }
 
     void RaiseDictionaryChangedBoxed(NotifyDictionaryChangedEventArgs<object?, object?> e) =>
-        DictionaryChangedBoxed?.Invoke(this, e);
+        dictionaryChangedBoxed?.Invoke(this, e);
 
     private protected override void RaiseNotification(object eventArguments)
     {

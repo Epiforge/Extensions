@@ -108,6 +108,26 @@ public class DictionaryNotificationDelivery
     }
 
     [TestMethod]
+    public void TheEnumerationKeysAndValuesOfAnUnobservedQueryAreNeverStale()
+    {
+        var source = People();
+        var collectionObserver = CollectionObserverHelpers.Create();
+        using var sourceQuery = collectionObserver.ObserveReadOnlyDictionary(source);
+        using var whereQuery = sourceQuery.ObserveWhere((key, person) => person.Name!.Length > 2);
+        Assert.IsTrue(new[] { 2, 3 }.SequenceEqual(whereQuery.Keys.OrderBy(key => key)));
+        Assert.IsTrue(new[] { "CCC", "DDDD" }.SequenceEqual(whereQuery.Values.Select(person => person.Name).OrderBy(name => name)));
+        Assert.AreEqual(2, whereQuery.Count());
+        source[0].Name = "AAAAA";
+        Assert.IsTrue(new[] { 0, 2, 3 }.SequenceEqual(whereQuery.Keys.OrderBy(key => key)));
+        Assert.IsTrue(new[] { "AAAAA", "CCC", "DDDD" }.SequenceEqual(whereQuery.Values.Select(person => person.Name).OrderBy(name => name)));
+        Assert.AreEqual(3, whereQuery.Count());
+        source[3].Name = "D";
+        Assert.IsTrue(new[] { 0, 2 }.SequenceEqual(whereQuery.Keys.OrderBy(key => key)));
+        Assert.IsTrue(new[] { "AAAAA", "CCC" }.SequenceEqual(whereQuery.Values.Select(person => person.Name).OrderBy(name => name)));
+        Assert.AreEqual(2, whereQuery.Count());
+    }
+
+    [TestMethod]
     public void TheCollectionChangedEventIsStillDelivered()
     {
         var source = People();

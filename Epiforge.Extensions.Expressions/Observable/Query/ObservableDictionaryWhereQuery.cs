@@ -106,6 +106,20 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue>(CollectionObserver col
             return result.GetRange(keys);
     }
 
+    private protected override void OnChangeObservationBegan()
+    {
+        result.CollectionChanged += ResultCollectionChanged;
+        ((INotifyDictionaryChanged)result).DictionaryChanged += ResultDictionaryChangedBoxed;
+        result.DictionaryChanged += ResultDictionaryChanged;
+    }
+
+    private protected override void OnChangeObservationEnded()
+    {
+        result.CollectionChanged -= ResultCollectionChanged;
+        ((INotifyDictionaryChanged)result).DictionaryChanged -= ResultDictionaryChangedBoxed;
+        result.DictionaryChanged -= ResultDictionaryChanged;
+    }
+
     protected override void OnInitialization()
     {
         var faultList = new FaultList();
@@ -116,17 +130,20 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue>(CollectionObserver col
             var (fault, predicateResult) = observableExpression.Evaluation;
             var isIncluded = fault is null && predicateResult;
             if (!faultList.Check(observableExpression) && isIncluded)
-                result.Add(keyValuePair.Key, keyValuePair.Value);
+                AddToResultWithAccess(keyValuePair.Key, keyValuePair.Value);
             observableExpression.PropertyChanged += ObservableExpressionPropertyChanged;
             observableExpressions.Add(keyValuePair.Key, (observableExpression, fault, isIncluded));
         }
         OperationFault = faultList.Fault;
         source.DictionaryChanged += SourceDictionaryChanged;
-        result.CollectionChanged += ResultCollectionChanged;
-        ((INotifyDictionaryChanged)result).DictionaryChanged += ResultDictionaryChangedBoxed;
-        result.DictionaryChanged += ResultDictionaryChanged;
         result.PropertyChanging += ResultPropertyChanging;
         result.PropertyChanged += ResultPropertyChanged;
+    }
+
+    void AddToResultWithAccess(TKey key, TValue value)
+    {
+        DiscardSnapshots();
+        result.Add(key, value);
     }
 
     void DiscardSnapshots()
@@ -136,17 +153,23 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue>(CollectionObserver col
         valuesSnapshot = null;
     }
 
-    void ResultCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    void RemoveFromResultWithAccess(TKey key)
     {
         DiscardSnapshots();
-        OnCollectionChanged(e);
+        result.Remove(key);
     }
 
-    void ResultDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e)
+    void ResetResultWithAccess(ObservableDictionary<TKey, TValue> newResult)
     {
         DiscardSnapshots();
-        OnDictionaryChanged(e);
+        result.Reset(newResult);
     }
+
+    void ResultCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
+        OnCollectionChanged(e);
+
+    void ResultDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e) =>
+        OnDictionaryChanged(e);
 
     void ResultDictionaryChangedBoxed(object? sender, NotifyDictionaryChangedEventArgs<object?, object?> e) =>
         OnDictionaryChangedBoxed(e);
@@ -171,9 +194,9 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue>(CollectionObserver col
             var (newFault, newPredicateResult) = observableExpression.Evaluation;
             var isIncluded = newFault is null && newPredicateResult;
             if (!committed.IsIncluded && isIncluded)
-                result.Add(key, keyValuePair.Value);
+                AddToResultWithAccess(key, keyValuePair.Value);
             else if (committed.IsIncluded && !isIncluded)
-                result.Remove(key);
+                RemoveFromResultWithAccess(key);
             observableExpressions[key] = (observableExpression, newFault, isIncluded);
             if (FaultList.ExchangeKeyFault(OperationFault, key, source.KeyComparer, committed.CommittedFault, newFault, out var newOperationFault))
                 OperationFault = newOperationFault;
@@ -206,7 +229,7 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue>(CollectionObserver col
                     observableExpression.PropertyChanged += ObservableExpressionPropertyChanged;
                     observableExpressions.Add(keyValuePair.Key, (observableExpression, fault, isIncluded));
                 }
-                result.Reset(newResult);
+                ResetResultWithAccess(newResult);
                 OperationFault = faultList.Fault;
             }
             else
@@ -223,7 +246,7 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue>(CollectionObserver col
                         faultList.RemoveKey(key, source.KeyComparer);
                     }
                     else if (committed.IsIncluded)
-                        result.Remove(key);
+                        RemoveFromResultWithAccess(key);
                     committed.ObservableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
                     committed.ObservableExpression.Dispose();
                     observableExpressions.Remove(key);
@@ -240,7 +263,7 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue>(CollectionObserver col
                         faultList.Check(observableExpression);
                     }
                     else if (isIncluded)
-                        result.Add(key, keyValuePair.Value);
+                        AddToResultWithAccess(key, keyValuePair.Value);
                     observableExpression.PropertyChanged += ObservableExpressionPropertyChanged;
                     observableExpressions.Add(key, (observableExpression, fault, isIncluded));
                 }
