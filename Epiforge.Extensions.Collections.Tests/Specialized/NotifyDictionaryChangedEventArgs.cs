@@ -36,6 +36,7 @@ public class NotifyDictionaryChangedEventArgs
 
     static void AssertNotWritable(IReadOnlyList<KeyValuePair<string, int>> items)
     {
+        Assert.IsFalse(items is KeyValuePair<string, int>[]);
         if (items is IList<KeyValuePair<string, int>> writable)
             Assert.ThrowsException<NotSupportedException>(() => writable[0] = Pair("z", 99));
     }

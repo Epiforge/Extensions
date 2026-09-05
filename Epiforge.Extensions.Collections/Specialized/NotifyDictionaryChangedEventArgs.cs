@@ -110,6 +110,18 @@ public sealed class NotifyDictionaryChangedEventArgs<TKey, TValue> :
         InitializeRemove(action, oldItems);
     }
 
+    /// <summary>
+    /// Initializes a new instance from lists which are already read-only, taking them as they are instead of copying them, which only a caller that built them for this instance may do
+    /// </summary>
+    NotifyDictionaryChangedEventArgs(NotifyDictionaryChangedAction action, ReadOnlyCollection<KeyValuePair<TKey, TValue>>? newItems, ReadOnlyCollection<KeyValuePair<TKey, TValue>>? oldItems)
+    {
+        Action = action;
+        if (newItems is { } ownedNewItems)
+            NewItems = ownedNewItems;
+        if (oldItems is { } ownedOldItems)
+            OldItems = ownedOldItems;
+    }
+
     void InitializeAdd(NotifyDictionaryChangedAction action, IEnumerable<KeyValuePair<TKey, TValue>>? newItems = null)
     {
         Action = action;
@@ -139,7 +151,7 @@ public sealed class NotifyDictionaryChangedEventArgs<TKey, TValue> :
     /// </summary>
     public IReadOnlyList<KeyValuePair<TKey, TValue>> OldItems { get; private set; } = emptyList;
 
-    static KeyValuePair<object?, object?>[] Box(IReadOnlyList<KeyValuePair<TKey, TValue>> items)
+    static ReadOnlyCollection<KeyValuePair<object?, object?>> Box(IReadOnlyList<KeyValuePair<TKey, TValue>> items)
     {
         var boxed = new KeyValuePair<object?, object?>[items.Count];
         for (int i = 0, ii = boxed.Length; i < ii; ++i)
@@ -147,7 +159,7 @@ public sealed class NotifyDictionaryChangedEventArgs<TKey, TValue> :
             var item = items[i];
             boxed[i] = new KeyValuePair<object?, object?>(item.Key, item.Value);
         }
-        return boxed;
+        return new ReadOnlyCollection<KeyValuePair<object?, object?>>(boxed);
     }
 
     /// <summary>
@@ -156,8 +168,8 @@ public sealed class NotifyDictionaryChangedEventArgs<TKey, TValue> :
     internal NotifyDictionaryChangedEventArgs<object?, object?> ToBoxed() =>
         Action switch
         {
-            NotifyDictionaryChangedAction.Add => new NotifyDictionaryChangedEventArgs<object?, object?>(NotifyDictionaryChangedAction.Add, Box(NewItems)),
-            NotifyDictionaryChangedAction.Remove => new NotifyDictionaryChangedEventArgs<object?, object?>(NotifyDictionaryChangedAction.Remove, Box(OldItems)),
+            NotifyDictionaryChangedAction.Add => new NotifyDictionaryChangedEventArgs<object?, object?>(NotifyDictionaryChangedAction.Add, Box(NewItems), null),
+            NotifyDictionaryChangedAction.Remove => new NotifyDictionaryChangedEventArgs<object?, object?>(NotifyDictionaryChangedAction.Remove, null, Box(OldItems)),
             NotifyDictionaryChangedAction.Replace => new NotifyDictionaryChangedEventArgs<object?, object?>(NotifyDictionaryChangedAction.Replace, Box(NewItems), Box(OldItems)),
             _ => new NotifyDictionaryChangedEventArgs<object?, object?>(NotifyDictionaryChangedAction.Reset)
         };
