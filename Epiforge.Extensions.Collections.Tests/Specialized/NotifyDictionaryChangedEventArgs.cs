@@ -34,6 +34,28 @@ public class NotifyDictionaryChangedEventArgs
         Assert.AreEqual(0, e.OldItems.Count);
     }
 
+    static void AssertNotWritable(IReadOnlyList<KeyValuePair<string, int>> items)
+    {
+        if (items is IList<KeyValuePair<string, int>> writable)
+            Assert.ThrowsException<NotSupportedException>(() => writable[0] = Pair("z", 99));
+    }
+
+    [TestMethod]
+    public void ItemsOfManyAreNotWritableByTheConsumer()
+    {
+        var e = new NotifyDictionaryChangedEventArgs<string, int>(NotifyDictionaryChangedAction.Replace, new[] { Pair("a", 1) }, new[] { Pair("a", 0) });
+        AssertNotWritable(e.NewItems);
+        AssertNotWritable(e.OldItems);
+    }
+
+    [TestMethod]
+    public void ItemsOfOneAreNotWritableByTheConsumer()
+    {
+        var e = new NotifyDictionaryChangedEventArgs<string, int>(NotifyDictionaryChangedAction.Replace, "key", 1, 0);
+        AssertNotWritable(e.NewItems);
+        AssertNotWritable(e.OldItems);
+    }
+
     [TestMethod]
     [ExpectedException(typeof(ArgumentOutOfRangeException))]
     public void NonAddRemoveWithItems() =>
