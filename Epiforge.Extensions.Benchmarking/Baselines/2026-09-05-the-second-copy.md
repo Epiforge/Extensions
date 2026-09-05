@@ -86,3 +86,22 @@ The observed indexer has gone **808 → 560 → 320 bytes** per dictionary chang
 **No mechanism connects it to this change.** That arm has no boxed subscriber, so `ToBoxed` is never called on its path; `Box` and the private constructor are reachable from nothing else; and the typed construction path was not touched, which the unmoved 104-byte arm independently confirms. Every other arm in the run sits inside ±1.5%.
 
 This is the shape the baselines already record for between-run variance — on 2 September an arm executing no changed code produced an 8.9% single-launch excursion which turned out to be a tail sample of a much wider distribution than its within-run deviation suggested. That is the likeliest explanation and it is **not** an established one. It is recorded here so that the next run of this suite is checked against it rather than the excursion being forgotten. If it reads near 138 again, this was a tail sample. If it stays near 147, something real happened that this pass does not explain.
+
+## The arm which moved, settled
+
+`DictionaryPropagationBenchmarks` was run a fourth time, with nothing changed, for the sole purpose of reading that one arm again.
+
+| run | `ChangeEveryValueInAWhereQueryWithASubscriber` |
+| --- | ---: |
+| before the observed-indexer pass | 138.663 μs |
+| after it | 137.746 μs |
+| after the second-copy pass | **146.813 μs** |
+| unchanged, re-run | **137.835 μs** |
+
+It came back. The excursion was a tail sample, the arm is not regressed, and nothing about the second copy reached it — which is what the byte-identical allocation said at the time and what the absence of any mechanism said before that.
+
+Every other figure reproduced. All six `ReplaceOneKey` arms and all six `ChangeEveryValue` arms allocate exactly what they allocated in the run before, and the means moved by less than 2% everywhere except the arm this run was for.
+
+**What is worth keeping is not the reassurance but the number.** `ChangeEveryValueInAWhereQueryWithASubscriber` has the widest between-run variance in this suite — four readings of 138.7, 137.7, 146.8 and 137.8 for code that was identical in three of them — while its within-run standard deviation never exceeded 1.1 μs, under 0.8%. That is a **six-to-one gap between what the instrument reports about its own precision and how far it actually moves between runs**, on the same arm, and it is the sharpest example of the rule the baselines already carry. A single-run time movement on that arm decides nothing.
+
+The cost of learning that was one benchmark run of a suite that takes about ninety seconds, which is the right price for not carrying an unexplained 6.6% regression forward in the record.
