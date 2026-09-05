@@ -14,6 +14,12 @@ public class ObservableIndexExpression
         {
         }
 
+        public void ChangeElementAndOnlyNotifyIndexerProperty(int index, T value)
+        {
+            Items[index] = value;
+            OnPropertyChanged(new PropertyChangedEventArgs("Item[]"));
+        }
+
         public void ChangeElementAndOnlyNotifyProperty(int index, T value)
         {
             Items[index] = value;
@@ -186,6 +192,20 @@ public class ObservableIndexExpression
         {
             Assert.AreEqual(expr.Evaluation.Result, 0);
             numbers.ChangeElementAndOnlyNotifyProperty(0, 100);
+            Assert.AreEqual(expr.Evaluation.Result, 100);
+        }
+        Assert.AreEqual(0, observer.CachedObservableExpressions);
+    }
+
+    [TestMethod]
+    public void ObjectValueChangesNotifiedByTheIndexerConvention()
+    {
+        var numbers = new TestObservableRangeCollection<int>(Enumerable.Range(0, 10));
+        var observer = ExpressionObserverHelpers.Create();
+        using (var expr = observer.Observe(p1 => p1[0], numbers))
+        {
+            Assert.AreEqual(expr.Evaluation.Result, 0);
+            numbers.ChangeElementAndOnlyNotifyIndexerProperty(0, 100);
             Assert.AreEqual(expr.Evaluation.Result, 100);
         }
         Assert.AreEqual(0, observer.CachedObservableExpressions);

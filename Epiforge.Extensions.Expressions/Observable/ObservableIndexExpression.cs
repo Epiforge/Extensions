@@ -6,6 +6,10 @@ sealed class ObservableIndexExpression(ExpressionObserver observer, IndexExpress
 {
     EquatableList<ObservableExpression>? arguments;
     ObservableExpressionSubscription?[]? argumentSubscriptions;
+    /// <summary>
+    /// The name by which .NET announces that an indexer changed, which is the indexer's own name followed by empty brackets and not the name alone
+    /// </summary>
+    string? conventionalIndexerName;
     MethodInfo? getMethod;
     PropertyInfo? indexer;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
@@ -162,7 +166,7 @@ sealed class ObservableIndexExpression(ExpressionObserver observer, IndexExpress
 
     void ObjectValuePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == indexer?.Name)
+        if (e.PropertyName == indexer?.Name || e.PropertyName == conventionalIndexerName)
         {
             using var propagation = new PropagationScope();
             Evaluate();
@@ -176,6 +180,7 @@ sealed class ObservableIndexExpression(ExpressionObserver observer, IndexExpress
         {
             indexer = IndexExpression.Indexer;
             getMethod = indexer!.GetMethod;
+            conventionalIndexerName = indexer.Name + "[]";
             @object = observer.GetObservableExpression(IndexExpression.Object!, IsDeferringEvaluation);
             if (@object.CanChange)
                 objectSubscription = @object.SubscribeDependent(this);
