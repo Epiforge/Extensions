@@ -138,22 +138,25 @@ sealed class ObservableIndexExpression(ExpressionObserver observer, IndexExpress
         using var propagation = new PropagationScope();
         if (e.Action == NotifyDictionaryChangedAction.Reset)
             Evaluate();
-        else if (arguments?.Count == 1)
+        else if (arguments is { Count: 1 } indexArguments && indexArguments[0].Evaluation.Result is { } key)
         {
-            var removed = false;
-            var key = arguments?[0].Evaluation.Result;
-            if (key is not null)
+            var newItems = e.NewItems;
+            for (int i = 0, ii = newItems.Count; i < ii; ++i)
             {
-                removed = e.OldItems?.Any(kv => key.Equals(kv.Key)) ?? false;
-                var keyValuePair = e.NewItems?.FirstOrDefault(kv => key.Equals(kv.Key)) ?? default;
-                if (keyValuePair.Key is not null)
+                var keyValuePair = newItems[i];
+                if (key.Equals(keyValuePair.Key))
                 {
-                    removed = false;
                     Evaluation = (null, keyValuePair.Value);
+                    return;
                 }
             }
-            if (removed)
-                Evaluation = (new KeyNotFoundException($"Key '{key}' was removed"), defaultResult);
+            var oldItems = e.OldItems;
+            for (int i = 0, ii = oldItems.Count; i < ii; ++i)
+                if (key.Equals(oldItems[i].Key))
+                {
+                    Evaluation = (new KeyNotFoundException($"Key '{key}' was removed"), defaultResult);
+                    return;
+                }
         }
     }
 

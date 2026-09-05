@@ -139,6 +139,29 @@ public sealed class NotifyDictionaryChangedEventArgs<TKey, TValue> :
     /// </summary>
     public IReadOnlyList<KeyValuePair<TKey, TValue>> OldItems { get; private set; } = emptyList;
 
+    static KeyValuePair<object?, object?>[] Box(IReadOnlyList<KeyValuePair<TKey, TValue>> items)
+    {
+        var boxed = new KeyValuePair<object?, object?>[items.Count];
+        for (int i = 0, ii = boxed.Length; i < ii; ++i)
+        {
+            var item = items[i];
+            boxed[i] = new KeyValuePair<object?, object?>(item.Key, item.Value);
+        }
+        return boxed;
+    }
+
+    /// <summary>
+    /// Returns these arguments with their keys and values boxed, sizing each list from the count already known here rather than enumerating it
+    /// </summary>
+    internal NotifyDictionaryChangedEventArgs<object?, object?> ToBoxed() =>
+        Action switch
+        {
+            NotifyDictionaryChangedAction.Add => new NotifyDictionaryChangedEventArgs<object?, object?>(NotifyDictionaryChangedAction.Add, Box(NewItems)),
+            NotifyDictionaryChangedAction.Remove => new NotifyDictionaryChangedEventArgs<object?, object?>(NotifyDictionaryChangedAction.Remove, Box(OldItems)),
+            NotifyDictionaryChangedAction.Replace => new NotifyDictionaryChangedEventArgs<object?, object?>(NotifyDictionaryChangedAction.Replace, Box(NewItems), Box(OldItems)),
+            _ => new NotifyDictionaryChangedEventArgs<object?, object?>(NotifyDictionaryChangedAction.Reset)
+        };
+
     /// <summary>
     /// Returns a string representation of the <see cref="NotifyDictionaryChangedEventArgs{TKey, TValue}"/> using the string representations of keys and values
     /// </summary>

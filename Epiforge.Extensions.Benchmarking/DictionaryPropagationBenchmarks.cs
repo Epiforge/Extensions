@@ -110,8 +110,43 @@ public class DictionaryPropagationBenchmarks
         sourceQuery.Dispose();
     }
 
+    [GlobalCleanup(Target = nameof(ReplaceOneKeyObservedByABoxedSubscriber))]
+    public void CleanupBoxedSubscriber() =>
+        ((INotifyDictionaryChanged)source).DictionaryChanged -= IgnoreBoxed;
+
+    [GlobalCleanup(Target = nameof(ReplaceOneKeyObservedByBoxedAndPropertyChangedSubscribers))]
+    public void CleanupBoxedAndPropertyChangedSubscribers()
+    {
+        ((INotifyDictionaryChanged)source).DictionaryChanged -= IgnoreBoxed;
+        source.PropertyChanged -= IgnoreProperty;
+    }
+
+    [GlobalCleanup(Target = nameof(ReplaceOneKeyObservedByAPropertyChangedSubscriber))]
+    public void CleanupPropertyChangedSubscriber() =>
+        source.PropertyChanged -= IgnoreProperty;
+
+    [GlobalCleanup(Target = nameof(ReplaceOneKeyObservedByATypedSubscriber))]
+    public void CleanupTypedSubscriber() =>
+        source.DictionaryChanged -= Ignore;
+
     [Benchmark]
     public void ReplaceOneKeyObservedByAnIndexer() =>
+        ReplaceOneKey();
+
+    [Benchmark]
+    public void ReplaceOneKeyObservedByABoxedSubscriber() =>
+        ReplaceOneKey();
+
+    [Benchmark]
+    public void ReplaceOneKeyObservedByATypedSubscriber() =>
+        ReplaceOneKey();
+
+    [Benchmark]
+    public void ReplaceOneKeyObservedByAPropertyChangedSubscriber() =>
+        ReplaceOneKey();
+
+    [Benchmark]
+    public void ReplaceOneKeyObservedByBoxedAndPropertyChangedSubscribers() =>
         ReplaceOneKey();
 
     void ReplaceOneKey()
@@ -151,6 +186,35 @@ public class DictionaryPropagationBenchmarks
         indexed = expressionObserver.ObserveWithoutOptimization(() => source[watchedKey]);
     }
 
+    [GlobalSetup(Target = nameof(ReplaceOneKeyObservedByABoxedSubscriber))]
+    public void SetupBoxedSubscriber()
+    {
+        SetupDictionary();
+        ((INotifyDictionaryChanged)source).DictionaryChanged += IgnoreBoxed;
+    }
+
+    [GlobalSetup(Target = nameof(ReplaceOneKeyObservedByBoxedAndPropertyChangedSubscribers))]
+    public void SetupBoxedAndPropertyChangedSubscribers()
+    {
+        SetupDictionary();
+        ((INotifyDictionaryChanged)source).DictionaryChanged += IgnoreBoxed;
+        source.PropertyChanged += IgnoreProperty;
+    }
+
+    [GlobalSetup(Target = nameof(ReplaceOneKeyObservedByAPropertyChangedSubscriber))]
+    public void SetupPropertyChangedSubscriber()
+    {
+        SetupDictionary();
+        source.PropertyChanged += IgnoreProperty;
+    }
+
+    [GlobalSetup(Target = nameof(ReplaceOneKeyObservedByATypedSubscriber))]
+    public void SetupTypedSubscriber()
+    {
+        SetupDictionary();
+        source.DictionaryChanged += Ignore;
+    }
+
     [GlobalSetup(Target = nameof(ChangeEveryValueObservedWithoutAQuery))]
     public void SetupObservations()
     {
@@ -175,6 +239,14 @@ public class DictionaryPropagationBenchmarks
     }
 
     static void IgnoreSelected(object? sender, NotifyDictionaryChangedEventArgs<int, int> e)
+    {
+    }
+
+    static void IgnoreBoxed(object? sender, NotifyDictionaryChangedEventArgs<object?, object?> e)
+    {
+    }
+
+    static void IgnoreProperty(object? sender, PropertyChangedEventArgs e)
     {
     }
 

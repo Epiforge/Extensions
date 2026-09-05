@@ -412,21 +412,7 @@ public class ObservableSortedDictionary<TKey, TValue> :
                     break;
             }
         if (DictionaryChangedBoxed != null)
-            switch (e.Action)
-            {
-                case NotifyDictionaryChangedAction.Add:
-                    OnDictionaryChangedBoxed(new NotifyDictionaryChangedEventArgs<object?, object?>(NotifyDictionaryChangedAction.Add, e.NewItems.Select(kv => new KeyValuePair<object?, object?>(kv.Key, kv.Value))));
-                    break;
-                case NotifyDictionaryChangedAction.Remove:
-                    OnDictionaryChangedBoxed(new NotifyDictionaryChangedEventArgs<object?, object?>(NotifyDictionaryChangedAction.Remove, e.OldItems.Select(kv => new KeyValuePair<object?, object?>(kv.Key, kv.Value))));
-                    break;
-                case NotifyDictionaryChangedAction.Replace:
-                    OnDictionaryChangedBoxed(new NotifyDictionaryChangedEventArgs<object?, object?>(NotifyDictionaryChangedAction.Replace, e.NewItems.Select(kv => new KeyValuePair<object?, object?>(kv.Key, kv.Value)), e.OldItems.Select(kv => new KeyValuePair<object?, object?>(kv.Key, kv.Value))));
-                    break;
-                case NotifyDictionaryChangedAction.Reset:
-                    OnDictionaryChangedBoxed(new NotifyDictionaryChangedEventArgs<object?, object?>(NotifyDictionaryChangedAction.Reset));
-                    break;
-            }
+            OnDictionaryChangedBoxed(e.ToBoxed());
         OnDictionaryChanged(e);
     }
 
