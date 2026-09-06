@@ -1,4 +1,4 @@
-﻿namespace Epiforge.Extensions.Benchmarking;
+namespace Epiforge.Extensions.Benchmarking;
 
 static class Program
 {
