@@ -57,7 +57,6 @@ public static class ReflectionExtensions
     static MethodInfo GetDefaultValueByTypeValueFactory(Type type) =>
         typeof(ReflectionExtensions).GetMethod(nameof(GetDefaultValue), BindingFlags.NonPublic | BindingFlags.Static)!.MakeGenericMethod(type);
 
-#if !IS_NET_7_0_OR_GREATER
     delegate object InvokeConstructorDelegate(object?[] arguments);
     delegate object? InvokeMethodDelegate(object? instance, object?[] arguments);
 
@@ -115,7 +114,6 @@ public static class ReflectionExtensions
         ilGenerator.Emit(OpCodes.Ret);
         return (InvokeMethodDelegate)dynamicMethod.CreateDelegate(typeof(InvokeMethodDelegate));
     }
-#endif
 
     /// <summary>
     /// Returns the default value for the specified type as quickly as possible
@@ -155,11 +153,7 @@ public static class ReflectionExtensions
     public static object? FastInvoke(this ConstructorInfo constructor, params object?[] arguments)
     {
         ArgumentNullException.ThrowIfNull(constructor);
-#if IS_NET_7_0_OR_GREATER
-        return constructor.Invoke(BindingFlags.DoNotWrapExceptions, null, arguments, null);
-#else
         return invokeConstructorDelegateByConstructor.GetOrAdd(constructor, InvokeConstructorDelegateByConstructorValueFactory)(arguments);
-#endif
     }
 
     /// <summary>
@@ -172,11 +166,7 @@ public static class ReflectionExtensions
     public static object? FastInvoke(this MethodInfo method, object? instance, params object?[] arguments)
     {
         ArgumentNullException.ThrowIfNull(method);
-#if IS_NET_7_0_OR_GREATER
-        return method.Invoke(instance, BindingFlags.DoNotWrapExceptions, null, arguments, null);
-#else
         return invokeMethodDelegateByMethod.GetOrAdd(method, InvokeMethodDelegateByMethodValueFactory)(instance, arguments);
-#endif
     }
 
     /// <summary>
