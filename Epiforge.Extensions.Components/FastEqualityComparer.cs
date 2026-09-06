@@ -6,6 +6,19 @@ namespace Epiforge.Extensions.Components;
 public class FastEqualityComparer :
     IEqualityComparer
 {
+    /// <summary>
+    /// Compares values of a type which arrive already boxed without unboxing them, which the default comparer for a value type that does not implement <see cref="IEquatable{T}"/> cannot do without boxing one of them again to reach the same comparison
+    /// </summary>
+    sealed class BoxedComparer :
+        TypedComparer
+    {
+        internal override bool AreEqual(object? x, object? y) =>
+            x is null ? y is null : x.Equals(y);
+
+        internal override int HashCodeOf(object obj) =>
+            obj.GetHashCode();
+    }
+
     abstract class TypedComparer
     {
         internal abstract bool AreEqual(object? x, object? y);
@@ -46,7 +59,9 @@ public class FastEqualityComparer :
     {
         ArgumentNullException.ThrowIfNull(type);
         Type = type;
-        typedComparer = (TypedComparer)Activator.CreateInstance(typeof(TypedComparer<>).MakeGenericType(type))!;
+        typedComparer = type.IsValueType && !typeof(IEquatable<>).MakeGenericType(type).IsAssignableFrom(type)
+            ? new BoxedComparer()
+            : (TypedComparer)Activator.CreateInstance(typeof(TypedComparer<>).MakeGenericType(type))!;
     }
 
     readonly TypedComparer typedComparer;
