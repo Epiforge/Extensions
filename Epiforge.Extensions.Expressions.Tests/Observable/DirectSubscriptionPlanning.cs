@@ -19,6 +19,9 @@ public class DirectSubscriptionPlanning
     static Expression Bound<TResult>(Expression<Func<TestPerson, TResult>> expression, TestPerson person) =>
         new ParameterReplacer(expression.Parameters[0], Expression.Constant(person)).Visit(expression.Body);
 
+    static Expression BoundRecorded<TResult>(Expression<Func<Recorded, TResult>> expression, Recorded recorded) =>
+        new ParameterReplacer(expression.Parameters[0], Expression.Constant(recorded)).Visit(expression.Body);
+
     static object? ValueOf(Expression? expression) =>
         ((ConstantExpression)expression!).Value;
 
@@ -122,7 +125,7 @@ public class DirectSubscriptionPlanning
     [TestMethod]
     public void IneligibleExpressionPlansNothing()
     {
-        var plan = Analyzer().Plan(Bound<int>(person => person.Name!.Length, TestPerson.CreateEmily()));
+        var plan = Analyzer().Plan(BoundRecorded<int>(recorded => recorded.Next!.Rank, new Recorded(new SubscriptionLog())));
         Assert.IsFalse(plan.IsEligible);
         Assert.AreEqual(DirectSubscriptionIneligibility.ChangeableMemberTarget, plan.Analysis.Ineligibility);
         Assert.AreEqual(0, plan.Subscriptions.Count);

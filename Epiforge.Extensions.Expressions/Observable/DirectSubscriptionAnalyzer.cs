@@ -25,7 +25,7 @@ namespace Epiforge.Extensions.Expressions.Observable;
 /// A call to the get method of a property or an indexer is refused, because the graph rewrites such a call into the member or index access it stands for and watches that instead; an indexer written in C# reaches this analysis as a call, so admitting it here would plan none of the subscriptions the rewritten form plans
 /// </remarks>
 /// <remarks>
-/// A property read through a target is never fixed, so a chain which passes through one can never be direct; the target's value can change, while the plan is decided once when the observation is constructed, so admitting it would mean deciding subscriptions after evaluation, which is what the graph exists to do
+/// A property read through a target which is not fixed is admitted only when no value the target could hold raises a change notification, which is decided by its type being sealed and implementing none of the notification interfaces; such a member contributes no subscription of its own, exactly as the graph's node for it subscribes to nothing, and the chain is watched by whatever its target contributes. A target which could notify is refused, because what would have to be subscribed to changes as that target's value changes, while the plan is decided once when the observation is constructed
 /// </remarks>
 public sealed class DirectSubscriptionAnalyzer
 {
@@ -87,6 +87,9 @@ public sealed class DirectSubscriptionAnalyzer
             UnaryExpression unaryExpression when unaryExpression.NodeType is ExpressionType.Quote => true,
             _ => false
         };
+
+    static bool CannotNotify(Type type) =>
+        type.IsSealed && !typeof(INotifyPropertyChanged).IsAssignableFrom(type) && !typeof(INotifyCollectionChanged).IsAssignableFrom(type) && !typeof(INotifyDictionaryChanged).IsAssignableFrom(type);
 
     static bool IsShortCircuiting(BinaryExpression binaryExpression) =>
         binaryExpression.NodeType is ExpressionType.Coalesce || binaryExpression.NodeType is ExpressionType.AndAlso or ExpressionType.OrElse && binaryExpression.Type == typeof(bool);
@@ -192,7 +195,7 @@ public sealed class DirectSubscriptionAnalyzer
         if (memberExpression.Expression is not { } target)
             return DirectSubscriptionAnalysis.Eligible;
         if (!IsFixed(target))
-            return new(memberExpression, DirectSubscriptionIneligibility.ChangeableMemberTarget);
+            return CannotNotify(target.Type) ? AnalyzeNode(target, planner) : new(memberExpression, DirectSubscriptionIneligibility.ChangeableMemberTarget);
         var targetAnalysis = AnalyzeNode(target, planner);
         if (!targetAnalysis.IsEligible || planner is null)
             return targetAnalysis;

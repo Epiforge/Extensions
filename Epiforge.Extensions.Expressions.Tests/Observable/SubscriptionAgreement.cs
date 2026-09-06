@@ -198,6 +198,10 @@ public class SubscriptionAgreement
     }
 
     [TestMethod]
+    public void MemberOfANonNotifyingValueOnTheArgument() =>
+        AssertAgreement(subject => subject.Tag!.Length, new Recorded(new SubscriptionLog()) { Tag = "x" });
+
+    [TestMethod]
     public void MemberOnTheArgument() =>
         AssertAgreement(subject => subject.Rank * 2, new Recorded(new SubscriptionLog()));
 

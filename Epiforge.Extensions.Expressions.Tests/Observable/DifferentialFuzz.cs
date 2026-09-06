@@ -59,6 +59,7 @@ public class DifferentialFuzz
     static readonly PropertyInfo next = typeof(Recorded).GetProperty(nameof(Recorded.Next))!;
     static readonly PropertyInfo rank = typeof(Recorded).GetProperty(nameof(Recorded.Rank))!;
     static readonly PropertyInfo score = typeof(Recorded).GetProperty(nameof(Recorded.Score))!;
+    static readonly PropertyInfo stringLength = typeof(string).GetProperty(nameof(string.Length))!;
     static readonly MethodInfo stringIsNullOrEmpty = typeof(string).GetMethod(nameof(string.IsNullOrEmpty), [typeof(string)])!;
     static readonly MethodInfo stringTrim = typeof(string).GetMethod(nameof(string.Trim), Type.EmptyTypes)!;
     static readonly PropertyInfo tag = typeof(Recorded).GetProperty(nameof(Recorded.Tag))!;
@@ -115,8 +116,9 @@ public class DifferentialFuzz
         });
 
     static Expression Leaf(Random rng, Sources sources) =>
-        rng.Next(11) switch
+        rng.Next(12) switch
         {
+            10 => Expression.MakeMemberAccess(Expression.MakeMemberAccess(sources.Subject, tag), stringLength),
             9 => Expression.MakeMemberAccess(Expression.Field(sources.Other, linked), rank),
             0 => Expression.MakeMemberAccess(sources.Subject, rank),
             1 => Expression.MakeMemberAccess(sources.Subject, score),

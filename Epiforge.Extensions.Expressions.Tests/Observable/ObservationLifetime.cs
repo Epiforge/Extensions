@@ -7,7 +7,7 @@ public class ObservationLifetime
     public void IdenticalObservationsAreDistinctHandles()
     {
         var john = TestPerson.CreateJohn();
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(new ExpressionObserverOptions { UseDirectSubscription = false });
         using var first = observer.Observe(p => p.Name!.Length, john);
         using var second = observer.Observe(p => p.Name!.Length, john);
         Assert.AreNotSame(first, second);
@@ -18,7 +18,7 @@ public class ObservationLifetime
     public void IdenticalObservationsShareOneCachedExpression()
     {
         var john = TestPerson.CreateJohn();
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(new ExpressionObserverOptions { UseDirectSubscription = false });
         using var first = observer.Observe(p => p.Name!.Length, john);
         var cachedAfterFirstObservation = observer.CachedObservableExpressions;
         using var second = observer.Observe(p => p.Name!.Length, john);
@@ -29,7 +29,7 @@ public class ObservationLifetime
     public void DisposingAnObservationTwiceIsIdempotent()
     {
         var john = TestPerson.CreateJohn();
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(new ExpressionObserverOptions { UseDirectSubscription = false });
         var observation = observer.Observe(p => p.Name!.Length, john);
         observation.Dispose();
         observation.Dispose();
@@ -41,7 +41,7 @@ public class ObservationLifetime
     public void DisposingAnObservationTwiceDoesNotReleaseAnother()
     {
         var john = TestPerson.CreateJohn();
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(new ExpressionObserverOptions { UseDirectSubscription = false });
         var first = observer.Observe(p => p.Name!.Length, john);
         var second = observer.Observe(p => p.Name!.Length, john);
         first.Dispose();
@@ -57,7 +57,7 @@ public class ObservationLifetime
     public void DisposalNotificationIsScopedToTheObservationDisposed()
     {
         var john = TestPerson.CreateJohn();
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(new ExpressionObserverOptions { UseDirectSubscription = false });
         var first = observer.Observe(p => p.Name!.Length, john);
         using var second = observer.Observe(p => p.Name!.Length, john);
         var firstDisposals = 0;

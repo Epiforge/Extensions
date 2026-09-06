@@ -9,6 +9,9 @@ public class DirectSubscriptionAnalyzer
     static Expression BodyOfPeople<TResult>(Expression<Func<ObservableCollection<TestPerson>, TResult>> expression) =>
         expression.Body;
 
+    static Expression BodyOfRecorded<TResult>(Expression<Func<Recorded, TResult>> expression) =>
+        expression.Body;
+
     static Epiforge.Extensions.Expressions.Observable.DirectSubscriptionAnalyzer Analyzer() =>
         new();
 
@@ -37,13 +40,17 @@ public class DirectSubscriptionAnalyzer
         Assert.IsTrue(Analyzer().Analyze(BodyOf<bool>(person => person.NameGets > 0)).IsEligible);
 
     [TestMethod]
-    public void ChainedMemberIsIneligible()
+    public void ChainedMemberThroughANonNotifyingValueIsEligible() =>
+        Assert.IsTrue(Analyzer().Analyze(BodyOf<int>(person => person.Name!.Length)).IsEligible);
+
+    [TestMethod]
+    public void ChainedMemberThroughANotifyingValueIsIneligible()
     {
-        var analysis = Analyzer().Analyze(BodyOf<int>(person => person.Name!.Length));
+        var analysis = Analyzer().Analyze(BodyOfRecorded<int>(recorded => recorded.Next!.Rank));
         Assert.IsFalse(analysis.IsEligible);
         Assert.AreEqual(DirectSubscriptionIneligibility.ChangeableMemberTarget, analysis.Ineligibility);
         Assert.IsInstanceOfType<MemberExpression>(analysis.IneligibleExpression);
-        Assert.AreEqual(nameof(string.Length), ((MemberExpression)analysis.IneligibleExpression!).Member.Name);
+        Assert.AreEqual(nameof(Recorded.Rank), ((MemberExpression)analysis.IneligibleExpression!).Member.Name);
     }
 
     [TestMethod]
