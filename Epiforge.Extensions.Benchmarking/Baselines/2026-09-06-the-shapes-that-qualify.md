@@ -26,7 +26,7 @@ What makes this sound is that the refusals are not small differences to be argue
 | `ShortCircuit` | 4,595.68 KB | 4,595.68 KB |
 | `DeferredBranch` | 6.67 MB | 6.67 MB |
 
-Byte for byte, at four significant figures, on separately compiled arms. Nothing else in these four classes comes within two percent of its partner.
+Byte for byte, at four significant figures, on separately compiled arms. Nothing else in these four classes comes within 2% of its partner.
 
 ## ShapeEligibilityBenchmarks
 
@@ -71,7 +71,7 @@ Thirteen distinct shapes, every one transcribed from a lambda this project alrea
 
 Eleven of thirteen take the fast path. The two that do not are the same cause: `&&`.
 
-`ArgumentIndependent` is the one eligible pair whose arms nearly touch — 801.05 KB direct against 813.17 KB graph, one and a half percent. `person => true` has nothing to subscribe to, so neither mechanism builds much, and the reading rests on the time (193 μs against 586) rather than the bytes.
+`ArgumentIndependent` is the one eligible pair whose arms nearly touch — 801.05 KB direct against 813.17 KB graph, 1.5%. `person => true` has nothing to subscribe to, so neither mechanism builds much, and the reading rests on the time (193 μs against 586) rather than the bytes.
 
 ## What this reprices
 

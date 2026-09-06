@@ -60,7 +60,7 @@ The account for the combination then reads:
 | **predicted** | | **6.42** |
 | **measured** | | **6.45** |
 
-Three hundredths of a megabyte over four terms each rounded to two decimals. That closes.
+0.03 MB over four terms each rounded to two decimals. That closes.
 
 ## A constant worth keeping
 
@@ -86,7 +86,7 @@ The property chain splits into two populations which have not been separated:
 - **an intermediate whose type cannot notify** — `person.Name.Length`, where `Name` is a `string`. Nothing can be subscribed to the intermediate because a `string` raises nothing, so subscribing to `person.PropertyChanged` for `Name` is the whole of it. If the graph attaches exactly one thing here, the analyzer could accept this shape with no change to the graph at all.
 - **an intermediate which does notify** — `person.Team.Rank`. Here the subscription target genuinely changes as the intermediate is replaced, which is what `ChangeableMemberTarget` names and what a plan fixed at construction cannot follow.
 
-Two tests were committed today to settle which of those the graph does, before any design rests on it: one asserting the graph attaches nothing beyond the object for `subject.Tag!.Length`, and one asserting it attaches to both links of `s.Next!.Rank`. If the first passes, the non-notifying case is a plan-time decision on the static type of the intermediate, the agreement harness can prove it, and Daniel's model is untouched. That would make it a smaller change than `&&` for two thirds of the saving, and it goes first.
+Two tests were committed today to settle which of those the graph does, before any design rests on it: one asserting the graph attaches nothing beyond the object for `subject.Tag!.Length`, and one asserting it attaches to both links of `s.Next!.Rank`. If the first passes, the non-notifying case is a plan-time decision on the static type of the intermediate, the agreement harness can prove it, and Daniel's model is untouched. That would make it a smaller change than `&&` for 2/3 of the saving, and it goes first.
 
 ## A note on method
 

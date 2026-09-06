@@ -46,7 +46,7 @@ The fact underneath that argument was not read, it was measured. `TheGraphAttach
 | `PropertyChainDirect` | 3,262.6 μs, 3.25 MB | **352.2 μs, 1.17 MB** |
 | `PropertyChainGraph` | 3,245.7 μs, 3.25 MB | 3,206.3 μs, 3.25 MB |
 
-**Sixty-four percent of the allocation and nine tenths of the time.** A predicate reading the length of a name now costs, over a thousand elements, 1.17 MB where it cost 3.25.
+**64% of the allocation and 89% of the time are gone.** A predicate reading the length of a name now costs, over a thousand elements, 1.17 MB where it cost 3.25.
 
 The figure worth noticing is not the ratio. It is that 1.17 MB and 352.2 μs are what `RankComparisonDirect` costs in the same run — 1.17 MB and 355.1 μs. **A chained predicate now costs exactly what the simplest possible predicate costs**, to the resolution the instrument reports, which is what a mechanism that compiles one delegate and attaches one subscription should do regardless of how many nodes the expression would have had.
 
