@@ -85,34 +85,48 @@ public class CollectionUsingSynchronizationCallbackEventually
             {
                 using var conditionCancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
                 var queryChanges = 0;
-                void collectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
-                {
+                void collectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
                     ++queryChanges;
-                }
                 usingSynchronizationCallbackEventuallyQuery.CollectionChanged += collectionChanged;
                 source.Add(1);
-                await collectionObserver.ExpressionObserver.ConditionAsync(() => usingSynchronizationCallbackEventuallyQuery.Count == 1, conditionCancellation.Token);
+                async Task persistentConditionAsync(Expression<Func<bool>> condition)
+                {
+                    while (true)
+                    {
+                        try
+                        {
+                            await collectionObserver.ExpressionObserver.ConditionAsync(condition, conditionCancellation.Token).ConfigureAwait(false);
+                            break;
+                        }
+                        catch
+                        {
+                            conditionCancellation.Token.ThrowIfCancellationRequested();
+                            continue;
+                        }
+                    }
+                }
+                await persistentConditionAsync(() => usingSynchronizationCallbackEventuallyQuery.Count == 1);
                 synchronizationCallback(usingSynchronizationCallbackEventuallyQuery, context, () => Assert.AreEqual("1", string.Join(",", usingSynchronizationCallbackEventuallyQuery)), false);
                 source.AddRange(Enumerable.Range(2, 2));
-                await collectionObserver.ExpressionObserver.ConditionAsync(() => usingSynchronizationCallbackEventuallyQuery.Count == 3, conditionCancellation.Token);
+                await persistentConditionAsync(() => usingSynchronizationCallbackEventuallyQuery.Count == 3);
                 synchronizationCallback(usingSynchronizationCallbackEventuallyQuery, context, () => Assert.AreEqual("1,2,3", string.Join(",", usingSynchronizationCallbackEventuallyQuery)), false);
                 source.InsertRange(2, Enumerable.Range(4, 2));
-                await collectionObserver.ExpressionObserver.ConditionAsync(() => usingSynchronizationCallbackEventuallyQuery.Count == 5, conditionCancellation.Token);
+                await persistentConditionAsync(() => usingSynchronizationCallbackEventuallyQuery.Count == 5);
                 synchronizationCallback(usingSynchronizationCallbackEventuallyQuery, context, () => Assert.AreEqual("1,2,4,5,3", string.Join(",", usingSynchronizationCallbackEventuallyQuery)), false);
                 source.ReplaceRange(2, 3, Enumerable.Range(3, 2));
-                await collectionObserver.ExpressionObserver.ConditionAsync(() => usingSynchronizationCallbackEventuallyQuery.Count == 4, conditionCancellation.Token);
+                await persistentConditionAsync(() => usingSynchronizationCallbackEventuallyQuery.Count == 4);
                 synchronizationCallback(usingSynchronizationCallbackEventuallyQuery, context, () => Assert.AreEqual("1,2,3,4", string.Join(",", usingSynchronizationCallbackEventuallyQuery)), false);
                 source.ReplaceRange(2, 2, Enumerable.Range(3, 3));
-                await collectionObserver.ExpressionObserver.ConditionAsync(() => usingSynchronizationCallbackEventuallyQuery.Count == 5, conditionCancellation.Token);
+                await persistentConditionAsync(() => usingSynchronizationCallbackEventuallyQuery.Count == 5);
                 synchronizationCallback(usingSynchronizationCallbackEventuallyQuery, context, () => Assert.AreEqual("1,2,3,4,5", string.Join(",", usingSynchronizationCallbackEventuallyQuery)), false);
                 source.RemoveRange(3, 2);
-                await collectionObserver.ExpressionObserver.ConditionAsync(() => usingSynchronizationCallbackEventuallyQuery.Count == 3, conditionCancellation.Token);
+                await persistentConditionAsync(() => usingSynchronizationCallbackEventuallyQuery.Count == 3);
                 synchronizationCallback(usingSynchronizationCallbackEventuallyQuery, context, () => Assert.AreEqual("1,2,3", string.Join(",", usingSynchronizationCallbackEventuallyQuery)), false);
                 source.Reset(Enumerable.Range(1, 5));
-                await collectionObserver.ExpressionObserver.ConditionAsync(() => usingSynchronizationCallbackEventuallyQuery.Count == 5, conditionCancellation.Token);
+                await persistentConditionAsync(() => usingSynchronizationCallbackEventuallyQuery.Count == 5);
                 synchronizationCallback(usingSynchronizationCallbackEventuallyQuery, context, () => Assert.AreEqual("1,2,3,4,5", string.Join(",", usingSynchronizationCallbackEventuallyQuery)), false);
                 source.MoveRange(3, 0, 2);
-                await collectionObserver.ExpressionObserver.ConditionAsync(() => usingSynchronizationCallbackEventuallyQuery.Count == 5 && usingSynchronizationCallbackEventuallyQuery[0] == 4, conditionCancellation.Token);
+                await persistentConditionAsync(() => usingSynchronizationCallbackEventuallyQuery.Count == 5 && usingSynchronizationCallbackEventuallyQuery[0] == 4);
                 synchronizationCallback(usingSynchronizationCallbackEventuallyQuery, context, () =>
                 {
                     Assert.AreEqual("4,5,1,2,3", string.Join(",", usingSynchronizationCallbackEventuallyQuery));

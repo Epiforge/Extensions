@@ -7,6 +7,7 @@ sealed class ObservableMemberExpression(ExpressionObserver observer, MemberExpre
     bool doNotListenForPropertyChanges;
     FieldInfo? field;
     MethodInfo? getMethod;
+    FastInvoker? getMethodInvoker;
     bool isFieldOfCompilerGeneratedType;
     MemberInfo? member;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
@@ -63,7 +64,7 @@ sealed class ObservableMemberExpression(ExpressionObserver observer, MemberExpre
                 }
                 else
                 {
-                    var value = getMethod.FastInvoke(observableExpressionResult, []);
+                    var value = getMethodInvoker!.Invoke(observableExpressionResult);
                     Evaluation = (null, value);
                     observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{MemberExpression} evaluated: {Value}", MemberExpression, value);
                 }
@@ -129,6 +130,7 @@ sealed class ObservableMemberExpression(ExpressionObserver observer, MemberExpre
                 case PropertyInfo property:
                     doNotListenForPropertyChanges = observer.IsIgnoredPropertyChangeNotification(property);
                     getMethod = property.GetMethod;
+                    getMethodInvoker = getMethod?.GetFastInvoker();
                     isFieldOfCompilerGeneratedType = false;
                     break;
             }
