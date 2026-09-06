@@ -1,0 +1,84 @@
+namespace Epiforge.Extensions.Benchmarking;
+
+[MemoryDiagnoser]
+public class RefusalPricingBenchmarks
+{
+    const int elementCount = 1000;
+
+    static readonly BenchmarkPersonWithPartner other = new("other", 0);
+    static readonly ObservableDictionary<int, int> table = BuildTable();
+
+    static readonly Expression<Func<BenchmarkPersonWithPartner, bool>> conditional = person => (person.Rank > 0 ? person.Rank : person.Rank) > 0;
+    static readonly Expression<Func<BenchmarkPersonWithPartner, bool>> indexerRead = person => table[person.Rank] > 0;
+    static readonly Expression<Func<BenchmarkPersonWithPartner, bool>> notifyingChain = person => person.Partner!.Rank > 0;
+    static readonly Expression<Func<BenchmarkPersonWithPartner, bool>> rankComparison = person => person.Rank > 0;
+    static readonly Expression<Func<BenchmarkPersonWithPartner, bool>> twoObjectShortCircuit = person => person.Rank > 0 && other.Rank > 0;
+
+    static ObservableDictionary<int, int> BuildTable()
+    {
+        var built = new ObservableDictionary<int, int>();
+        for (var i = 0; i < elementCount; ++i)
+            built.Add(i, i);
+        return built;
+    }
+
+    CollectionObserver direct = null!;
+    CollectionObserver graph = null!;
+    ObservableRangeCollection<BenchmarkPersonWithPartner> source = null!;
+
+    [Benchmark]
+    public void ConditionalDirect() =>
+        ConstructAndDispose(direct, conditional);
+
+    [Benchmark]
+    public void ConditionalGraph() =>
+        ConstructAndDispose(graph, conditional);
+
+    [Benchmark]
+    public void IndexerReadDirect() =>
+        ConstructAndDispose(direct, indexerRead);
+
+    [Benchmark]
+    public void IndexerReadGraph() =>
+        ConstructAndDispose(graph, indexerRead);
+
+    [Benchmark]
+    public void NotifyingChainDirect() =>
+        ConstructAndDispose(direct, notifyingChain);
+
+    [Benchmark]
+    public void NotifyingChainGraph() =>
+        ConstructAndDispose(graph, notifyingChain);
+
+    [Benchmark]
+    public void RankComparisonDirect() =>
+        ConstructAndDispose(direct, rankComparison);
+
+    [Benchmark(Baseline = true)]
+    public void RankComparisonGraph() =>
+        ConstructAndDispose(graph, rankComparison);
+
+    [Benchmark]
+    public void TwoObjectShortCircuitDirect() =>
+        ConstructAndDispose(direct, twoObjectShortCircuit);
+
+    [Benchmark]
+    public void TwoObjectShortCircuitGraph() =>
+        ConstructAndDispose(graph, twoObjectShortCircuit);
+
+    void ConstructAndDispose(CollectionObserver observer, Expression<Func<BenchmarkPersonWithPartner, bool>> predicate)
+    {
+        var sourceQuery = observer.ObserveReadOnlyList(source);
+        var where = sourceQuery.ObserveWhere(predicate);
+        where.Dispose();
+        sourceQuery.Dispose();
+    }
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        direct = new CollectionObserver(new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = true }));
+        graph = new CollectionObserver(new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = false }));
+        source = BenchmarkPersonWithPartner.CreateCollection(elementCount);
+    }
+}
