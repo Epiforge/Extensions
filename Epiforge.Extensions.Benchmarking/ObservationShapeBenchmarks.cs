@@ -14,6 +14,7 @@ public class ObservationShapeBenchmarks
 
     IObservableExpression<KeyValuePair<int, BenchmarkPerson>, KeyValuePair<int, int>>[] constantKeyProjections = null!;
     ExpressionObserver expressionObserver = null!;
+    IObservableExpression<KeyValuePair<int, BenchmarkPerson>, KeyValuePair<int, int>>[] fastPathProjections = null!;
     IObservableExpression<KeyValuePair<int, BenchmarkPerson>, int>[] memberReads = null!;
     IObservableExpression<KeyValuePair<int, BenchmarkPerson>, int>[] methodCalls = null!;
     IObservableExpression<KeyValuePair<int, BenchmarkPerson>, KeyValuePair<int, int>>[] methodCallsReturningPairs = null!;
@@ -51,6 +52,10 @@ public class ObservationShapeBenchmarks
     public void ChangeEveryValueProjectedOverAConstantKey() =>
         ChangeEveryValue();
 
+    [Benchmark]
+    public void ChangeEveryValueProjectedWithDirectSubscriptionAllowed() =>
+        ChangeEveryValue();
+
     [Benchmark(Baseline = true)]
     public void ChangeEveryValueWithNoObservation() =>
         ChangeEveryValue();
@@ -60,6 +65,13 @@ public class ObservationShapeBenchmarks
     {
         for (var i = 0; i < elementCount; ++i)
             constantKeyProjections[i].Dispose();
+    }
+
+    [GlobalCleanup(Target = nameof(ChangeEveryValueProjectedWithDirectSubscriptionAllowed))]
+    public void CleanupFastPathProjections()
+    {
+        for (var i = 0; i < elementCount; ++i)
+            fastPathProjections[i].Dispose();
     }
 
     [GlobalCleanup(Target = nameof(ChangeEveryValueMemberRead))]
@@ -110,6 +122,16 @@ public class ObservationShapeBenchmarks
             constantKeyProjections[i] = expressionObserver.ObserveWithoutOptimization(pairConstantKeyProjection, new KeyValuePair<int, BenchmarkPerson>(i, people[i]));
     }
 
+    [GlobalSetup(Target = nameof(ChangeEveryValueProjectedWithDirectSubscriptionAllowed))]
+    public void SetupFastPathProjections()
+    {
+        SetupPeople();
+        expressionObserver = new ExpressionObserver();
+        fastPathProjections = new IObservableExpression<KeyValuePair<int, BenchmarkPerson>, KeyValuePair<int, int>>[elementCount];
+        for (var i = 0; i < elementCount; ++i)
+            fastPathProjections[i] = expressionObserver.ObserveWithoutOptimization(pairProjection, new KeyValuePair<int, BenchmarkPerson>(i, people[i]));
+    }
+
     [GlobalSetup(Target = nameof(ChangeEveryValueMemberRead))]
     public void SetupMemberReads()
     {
@@ -149,7 +171,7 @@ public class ObservationShapeBenchmarks
     void SetupObserver()
     {
         SetupPeople();
-        expressionObserver = new ExpressionObserver();
+        expressionObserver = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = false });
     }
 
     void SetupPeople()

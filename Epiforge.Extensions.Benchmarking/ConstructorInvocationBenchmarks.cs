@@ -12,7 +12,7 @@ public class ConstructorInvocationBenchmarks
     object?[] arguments = null!;
     InvokeConstructorDelegate compiled = null!;
     ConstructorInfo constructor = null!;
-    ConstructorInvoker invoker;
+    ConstructorInvoker invoker = null!;
 
     [Benchmark(Baseline = true)]
     public object ConstructDirectly()

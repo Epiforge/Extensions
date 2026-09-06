@@ -138,3 +138,46 @@ Ninety-six bytes per re-evaluation, thirty-seven percent, on every observation w
 **Twenty-four bytes, and they are now shared rather than particular.** Both the pair and the tuple cost 160 against a named model of 136 — 48 floor, 24 for the boxed `Rank`, 40 for the argument array, 24 for the boxed result. An observation returning an eight-byte two-field struct costs 24 more than that model; one returning an `int` costs exactly the model. It is the only unexplained figure left on this path and it is a quarter of what it was when `2026-09-05-the-hundred-and-sixty-bytes.md` opened.
 
 **A standing prediction, to be checked whenever `DictionaryPropagationBenchmarks` next runs for any reason — not worth a run of its own.** `ChangeEveryValueInASelectQuery` measured 256 B and was shown to equal its projection observation to the byte. That observation is now 160, so the select query arm should read **160**, and the gap between a projected and a filtered dictionary query should be **64** rather than the 160 this whole investigation was named after. If it reads anything else, the identity between a query and its observation has stopped holding and that is a finding in itself.
+
+## Every figure above was taken without forcing the graph
+
+`ObservationShapeBenchmarks` constructed `new ExpressionObserver()` — default options, `UseDirectSubscription = true` — for every arm. `GraphResultBoxingBenchmarks` has set `UseDirectSubscription = false` on every arm since 2 September, and its own baseline says so; that precedent was in the tree and was not followed.
+
+What stood in for the setting was an inference: `pair.Value.Rank` is a property read through another property, the orientation lists that shape among those the analyzer refuses, therefore the graph runs. **That is not a chain that reaches an observation.** The premise is a sentence in a document, written by a previous session which as far as anyone here knows arrived at it by reading `DirectSubscriptionAnalyzer` rather than by running anything; and the step from "the analyzer refuses a chain of depth two through properties" to "it refuses *this* expression" was a match of prose against code made by intuition. Three ways of grounding it were available and none was used: set the option, read the analyzer, or ask it — `DirectSubscriptionIneligibility` exists to report the reason, so the observation was built and left unused.
+
+**What this does and does not put in doubt.** `FastEqualityComparer` and `ScopedObservableExpression.ResultEquals` are common to both mechanisms, so the 256 → 208 → 160 reduction is real on whichever path these arms took. What may be fiction is the accounting written around it — `ObservableNewExpression.Evaluate`, the `object?[2]` from `EvaluationResults`, the 136-byte named model. Those describe graph nodes. If these arms ran the fast path, that model describes code which never executed and came within 24 bytes by luck.
+
+## The correction, and what each outcome means
+
+`SetupObserver` now builds the observer with `UseDirectSubscription = false`, so the six observation arms are forced onto the graph. A seventh arm, `ChangeEveryValueProjectedWithDirectSubscriptionAllowed`, observes the **same** projection with default options.
+
+- **The six arms read what they read before.** They were on the graph all along, the inference happened to be true, and every figure and every named model in this document stands.
+- **They move.** They were not, the named models were about the wrong executor, and the accounting has to be redone against figures that now mean what they say.
+- **The paired arm equals `ChangeEveryValueProjected`.** That shape is ineligible and the option is redundant for it — which is the inference, finally observed rather than assumed.
+- **The paired arm differs.** The shape is eligible, the fast path was running, and shape-based reasoning about eligibility should not be trusted anywhere else in these instruments without the same check.
+
+**Two arms elsewhere rest on the same untested inference and have deliberately not been touched.** `DictionaryPropagationBenchmarks.ChangeEveryValueObservedWithoutAQuery` observes the same property-through-property shape, and `ReplaceOneKeyObservedByAnIndexer` relies on every C# indexer read being refused outright. Both predate this work and both use default options. Changing them now would destroy figures already on record for no gain; the right order is to let the paired arm above say whether shape-based inference is trustworthy at all, and only then decide what those two need.
+
+## The inference was true, which is not the same as its having been known
+
+| arm | before forcing | with `UseDirectSubscription = false` |
+| --- | ---: | ---: |
+| `pair.Value.Rank` | 72 B | **72 B** |
+| `pair.Value.Rank.CompareTo(0)` | 128 B | **128 B** |
+| `KeyValuePair.Create(…)` | 160 B | **160 B** |
+| `ValueTuple.Create(…)` | 160 B | **160 B** |
+| `new KeyValuePair<int, int>(pair.Key, …)` | 160 B | **160 B** |
+| `new KeyValuePair<int, int>(0, …)` | 160 B | **160 B** |
+| no observation | 48 B | **48 B** |
+
+Not one byte moved. **Every figure in this document and in `2026-09-05-the-hundred-and-sixty-bytes.md` was taken on the graph**, the named models describe code that actually ran, and nothing has to be redone.
+
+The paired arm settles it directly. `ChangeEveryValueProjectedWithDirectSubscriptionAllowed` observes the same projection with the option left at its default and reads **160 B and 82.592 μs**, against the forced-graph arm's 160 B and 82.095 μs — byte-identical and within 0.6% on time. Either the shape is ineligible and the same code ran in both, or it is eligible and the fast path costs exactly what the graph costs for this shape, which contradicts the 1.2× to 1.6× propagation advantage `MethodCallEligibilityBenchmarks` has on record. The first is the sound reading.
+
+**So the conclusion was right and the chain to it was not.** Being right does not retroactively ground it: the premise was a sentence in a document of unexamined provenance, and the step from that sentence to this expression was a match of prose against code. What has changed is not the answer but its standing — it was believed and is now known, and the arm that made it known stays in the instrument so no session has to believe it again.
+
+## What this does not settle
+
+That these arms run on the graph makes the figures sound. It says nothing about **how much the graph matters**, which is the larger question and remains untouched: `UseDirectSubscription` defaults to `true`, so every observation whose shape the analyzer accepts takes the fast path in real use, and the orientation has said since it was written that the fraction of real predicates this leaves on the graph **has never been measured and should not be asserted**.
+
+The shape benchmarked here is ineligible. That was necessary to isolate the mechanism, and it means these figures describe a path real workloads may mostly avoid. **An eligibility census — what the queries actually build, and which of those shapes the analyzer accepts — would reprice this whole line of work**, and it needs no benchmark run at all: the analyzer already produces `DirectSubscriptionIneligibility` reason codes, and `QueryFootprintReport` is precedent for a report behind a switch rather than an arm.
