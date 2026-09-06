@@ -46,6 +46,24 @@ The obvious fix is the wrong one. Caching inside `PropertyChangeNotifier.OnPrope
 
 The fix which wins on both columns is the one the class already offers and nothing uses: static per-property arguments at the call site, which is exactly what the cached arms here do at 0 bytes and 4.456 μs.
 
-So the work is not a change to `PropertyChangeNotifier`. It is an audit of the notifying types **inside** Collections and Expressions — every `OnPropertyChanged(name)` or `SetBackedProperty(…, name)` on a path a consumer hits repeatedly — and giving each one static arguments. `ObservableDictionary`'s indexer notification already does this, so the pattern and its precedent are both in the codebase.
+So the work is not a change to `PropertyChangeNotifier`. It would be an audit of the notifying types inside Collections and Expressions, giving static arguments to every `OnPropertyChanged(name)` on a path a consumer hits repeatedly.
 
-What it does not open is anything about a consumer's own types. A user's `Person` raising a change is the user's 48 bytes, and the only thing this library can do about it is document the overload.
+## The audit, which was already done
+
+There is no such site. `Epiforge.Extensions.Collections` has a `CommonPropertyChangeNotificationEventArgs` holding `CountChanged`, `CountChanging` and `IndexerChanged`, and `ObservableRangeCollection` and `ObservableDictionary` raise through it and nothing else. `Epiforge.Extensions.Expressions` does not call the string overloads at all — not in the expression nodes, not in `ObservableCollectionQuery`, not in `ObservableDictionaryQuery`, whose change events are custom events over backing fields raised with cached arguments.
+
+**The library already does this everywhere it matters, and has for some time.** The work proposed in the section above does not exist. It was proposed before checking, which is the second time today something was proposed without first establishing that it had a subject.
+
+## What the measurement means instead
+
+The 48 bytes belongs to `BenchmarkPerson` — a consumer type written for these benchmarks — and to consumers' types generally. The library cannot remove it, and the only thing it can do is document the overload that avoids it.
+
+That reframes the recorded figures rather than opening work. **Every arm in `Baselines\` which changes a property carries 48 bytes that are not the library's**, so the library's own share per change is:
+
+| shape | arm reports | the library's share |
+|--- |---: |---: |
+| member read | 72 B | **24 B** |
+| method call returning an `int` | 96 B | **48 B** |
+| projection producing a key-value pair | 120 B | **72 B** |
+
+And every byte of those shares is a box: the operand, the result, and the 24 which remain unexplained on a two-field struct. **The library's entire remaining per-change allocation on this path is boxing**, which leaves exactly one lever on it — typing the graph's results end to end — and no others.
