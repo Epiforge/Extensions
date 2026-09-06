@@ -70,6 +70,42 @@ public class SubscriptionAgreement
     }
 
     [TestMethod]
+    public void TheGraphDoesNotSubscribeToTheRightOperandOfAndAlsoUntilItIsTaken()
+    {
+        var log = new SubscriptionLog();
+        var other = new Recorded(log);
+        var subject = new Recorded(log);
+        var observer = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = false });
+        using (observer.Observe(s => s.Rank > 0 && other.Rank > 0, subject))
+        {
+            Assert.AreEqual(1, log.Attachments().Count, "the graph attached to the right operand before the left was true");
+            subject.Rank = 1;
+            Assert.AreEqual(2, log.Attachments().Count, "the graph did not attach to the right operand once the left became true");
+        }
+        Assert.AreEqual(0, log.Outstanding);
+        Assert.AreEqual(0, observer.CachedObservableExpressions);
+    }
+
+    [TestMethod]
+    public void TheGraphKeepsItsSubscriptionToTheRightOperandOfAndAlsoAfterItStopsBeingTaken()
+    {
+        var log = new SubscriptionLog();
+        var other = new Recorded(log);
+        var subject = new Recorded(log);
+        var observer = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = false });
+        using (observer.Observe(s => s.Rank > 0 && other.Rank > 0, subject))
+        {
+            subject.Rank = 1;
+            Assert.AreEqual(2, log.Outstanding);
+            subject.Rank = 0;
+            Assert.AreEqual(2, log.Outstanding, "the graph detached from the right operand when the left became false");
+            Assert.AreEqual(2, log.Attachments().Count, "the graph attached to something again");
+        }
+        Assert.AreEqual(0, log.Outstanding);
+        Assert.AreEqual(0, observer.CachedObservableExpressions);
+    }
+
+    [TestMethod]
     [DataRow(false)]
     [DataRow(true)]
     public void ACapturedLocalKeepsTheValueItHeldWhenTheObservationBegan(bool useDirectSubscription)
@@ -210,6 +246,25 @@ public class SubscriptionAgreement
         var callLog = new SubscriptionLog();
         var withCall = GraphAttachmentsFor(subject => string.IsNullOrEmpty(subject.Tag), new Recorded(callLog) { Tag = "x" }, callLog);
         CollectionAssert.AreEqual(withoutCall.ToArray(), withCall.ToArray(), $"member: [{string.Join(", ", withoutCall)}]; call: [{string.Join(", ", withCall)}]");
+    }
+
+    [TestMethod]
+    public void TheGraphAttachesNothingForAMemberOfANonNotifyingValue()
+    {
+        var memberLog = new SubscriptionLog();
+        var withoutChain = GraphAttachmentsFor(subject => subject.Tag, new Recorded(memberLog) { Tag = "x" }, memberLog);
+        var chainLog = new SubscriptionLog();
+        var withChain = GraphAttachmentsFor(subject => subject.Tag!.Length, new Recorded(chainLog) { Tag = "x" }, chainLog);
+        CollectionAssert.AreEqual(withoutChain.ToArray(), withChain.ToArray(), $"member: [{string.Join(", ", withoutChain)}]; chain: [{string.Join(", ", withChain)}]");
+    }
+
+    [TestMethod]
+    public void TheGraphAttachesToEachLinkOfAChainOfNotifyingValues()
+    {
+        var log = new SubscriptionLog();
+        var subject = new Recorded(log) { Next = new Recorded(log) };
+        var attached = GraphAttachmentsFor(s => s.Next!.Rank, subject, log);
+        Assert.AreEqual(2, attached.Count, $"chain: [{string.Join(", ", attached)}]");
     }
 
     [TestMethod]
