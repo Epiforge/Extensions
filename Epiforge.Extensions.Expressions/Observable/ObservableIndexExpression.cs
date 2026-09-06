@@ -11,6 +11,7 @@ sealed class ObservableIndexExpression(ExpressionObserver observer, IndexExpress
     /// </summary>
     string? conventionalIndexerName;
     MethodInfo? getMethod;
+    FastInvoker? getMethodInvoker;
     PropertyInfo? indexer;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     ObservableExpression? @object;
@@ -76,7 +77,7 @@ sealed class ObservableIndexExpression(ExpressionObserver observer, IndexExpress
                 }
                 else
                 {
-                    var value = getMethod?.FastInvoke(this.objectResult, arguments is { } argumentValues ? EvaluationResults(argumentValues) : []);
+                    var value = getMethodInvoker is { } invoker ? Invoke(invoker, this.objectResult, arguments) : null;
                     Evaluation = (null, value);
                     observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{IndexExpression} evaluated: {Value}", IndexExpression, value);
                 }
@@ -180,6 +181,7 @@ sealed class ObservableIndexExpression(ExpressionObserver observer, IndexExpress
         {
             indexer = IndexExpression.Indexer;
             getMethod = indexer!.GetMethod;
+            getMethodInvoker = getMethod?.GetFastInvoker();
             conventionalIndexerName = indexer.Name + "[]";
             @object = observer.GetObservableExpression(IndexExpression.Object!, IsDeferringEvaluation);
             if (@object.CanChange)

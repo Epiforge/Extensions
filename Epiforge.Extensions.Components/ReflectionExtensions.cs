@@ -170,6 +170,26 @@ public static class ReflectionExtensions
     }
 
     /// <summary>
+    /// Gets an invoker for the specified constructor, which resolves the invocation once instead of on every call
+    /// </summary>
+    /// <param name="constructor">The constructor</param>
+    public static FastInvoker GetFastInvoker(this ConstructorInfo constructor)
+    {
+        ArgumentNullException.ThrowIfNull(constructor);
+        return FastInvoker.Of(constructor);
+    }
+
+    /// <summary>
+    /// Gets an invoker for the specified method, which resolves the invocation once instead of on every call
+    /// </summary>
+    /// <param name="method">The method</param>
+    public static FastInvoker GetFastInvoker(this MethodInfo method)
+    {
+        ArgumentNullException.ThrowIfNull(method);
+        return FastInvoker.Of(method);
+    }
+
+    /// <summary>
     /// Sets the value for the specified property of the specified object as quickly as possible
     /// </summary>
     /// <param name="property">The property of which to set the value</param>

@@ -7,6 +7,7 @@ sealed class ObservableMethodCallExpression(ExpressionObserver observer, MethodC
     ReadOnlyCollection<ObservableExpression>? arguments;
     ObservableExpressionSubscription?[]? argumentSubscriptions;
     MethodInfo? method;
+    FastInvoker? methodInvoker;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     ObservableExpression? @object;
     ObservableExpressionSubscription? objectSubscription;
@@ -61,7 +62,7 @@ sealed class ObservableMethodCallExpression(ExpressionObserver observer, MethodC
             }
             else
             {
-                var value = method?.FastInvoke(objectResult, arguments is { } argumentValues ? EvaluationResults(argumentValues) : []);
+                var value = methodInvoker is { } invoker ? Invoke(invoker, objectResult, arguments) : null;
                 Evaluation = (null, value);
                 observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{MethodCallExpression} evaluated: {Value}", MethodCallExpression, value);
             }
@@ -82,6 +83,7 @@ sealed class ObservableMethodCallExpression(ExpressionObserver observer, MethodC
         try
         {
             method = MethodCallExpression.Method;
+            methodInvoker = method.GetFastInvoker();
             if (MethodCallExpression.Object is { } methodCallExpressionObject)
             {
                 @object = observer.GetObservableExpression(methodCallExpressionObject, IsDeferringEvaluation);

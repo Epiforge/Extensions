@@ -7,6 +7,7 @@ sealed class ObservableNewExpression(ExpressionObserver observer, NewExpression 
     ReadOnlyCollection<ObservableExpression>? arguments;
     ObservableExpressionSubscription?[]? argumentSubscriptions;
     ConstructorInfo? constructor;
+    FastInvoker? constructorInvoker;
     EquatableList<Type> constructorParameterTypes;
 
     internal readonly NewExpression NewExpression = newExpression;
@@ -41,8 +42,7 @@ sealed class ObservableNewExpression(ExpressionObserver observer, NewExpression 
             }
             else
             {
-                object?[] argumentValues = arguments is { } evaluatedArguments ? EvaluationResults(evaluatedArguments) : [];
-                var value = constructor is not null ? constructor.FastInvoke(argumentValues) : Activator.CreateInstance(NewExpression.Type, argumentValues);
+                var value = constructorInvoker is { } invoker ? Invoke(invoker, null, arguments) : Activator.CreateInstance(NewExpression.Type, arguments is { } evaluatedArguments ? EvaluationResults(evaluatedArguments) : []);
                 Evaluation = (null, value);
                 observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{NewExpression} evaluated: {Value}", NewExpression, value);
             }
@@ -66,6 +66,7 @@ sealed class ObservableNewExpression(ExpressionObserver observer, NewExpression 
         try
         {
             constructor = NewExpression.Constructor;
+            constructorInvoker = constructor?.GetFastInvoker();
             var newExpressionArguments = NewExpression.Arguments;
             var subscriptions = new ObservableExpressionSubscription?[newExpressionArguments.Count];
             argumentSubscriptions = subscriptions;

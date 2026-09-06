@@ -30,6 +30,18 @@ abstract class ObservableExpression :
     }
 
     /// <summary>
+    /// Invokes through the specified invoker with the specified operands' values, without building an argument array where the arity is small enough that the invoker takes the values directly
+    /// </summary>
+    internal static object? Invoke(FastInvoker invoker, object? instance, IReadOnlyList<ObservableExpression>? expressions) =>
+        (expressions?.Count ?? 0) switch
+        {
+            0 => invoker.Invoke(instance),
+            1 => invoker.Invoke(instance, expressions![0].Evaluation.Result),
+            2 => invoker.Invoke(instance, expressions![0].Evaluation.Result, expressions[1].Evaluation.Result),
+            _ => invoker.Invoke(instance, EvaluationResults(expressions!))
+        };
+
+    /// <summary>
     /// Yields the fault of the first of the specified expressions which has one, reading no further, which is what makes this equivalent to the lazy sequence it replaces
     /// </summary>
     internal static Exception? FirstFault<TExpressions>(TExpressions expressions)
