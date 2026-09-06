@@ -25,6 +25,9 @@ namespace Epiforge.Extensions.Expressions.Observable;
 /// A call to the get method of a property or an indexer is refused, because the graph rewrites such a call into the member or index access it stands for and watches that instead; an indexer written in C# reaches this analysis as a call, so admitting it here would plan none of the subscriptions the rewritten form plans
 /// </remarks>
 /// <remarks>
+/// A short-circuiting operator is admitted when the operand whose evaluation it defers subscribes to no source and event the rest of the expression does not already reach, since the graph attaches to those same sources for the operands it does evaluate, holds what it attaches once the branch is taken and never detaches it, and the deferred operand contributes nothing of its own to attach; where the deferred operand reaches a source of its own it is refused, because the graph does not attach there until the branch is taken. A conditional expression is refused whatever its branches reach
+/// </remarks>
+/// <remarks>
 /// A property read through a target which is not fixed is admitted only when no value the target could hold raises a change notification, which is decided by its type being sealed and implementing none of the notification interfaces; such a member contributes no subscription of its own, exactly as the graph's node for it subscribes to nothing, and the chain is watched by whatever its target contributes. A target which could notify is refused, because what would have to be subscribed to changes as that target's value changes, while the plan is decided once when the observation is constructed
 /// </remarks>
 public sealed class DirectSubscriptionAnalyzer
@@ -149,7 +152,7 @@ public sealed class DirectSubscriptionAnalyzer
     public DirectSubscriptionAnalysis Analyze(Expression expression)
     {
         ArgumentNullException.ThrowIfNull(expression);
-        return AnalyzeNode(expression, null);
+        return AnalyzeNode(expression, new Planner());
     }
 
     DirectSubscriptionAnalysis AnalyzeConstant(ConstantExpression constantExpression, Planner? planner)
@@ -232,6 +235,35 @@ public sealed class DirectSubscriptionAnalyzer
         return DirectSubscriptionAnalysis.Eligible;
     }
 
+    DirectSubscriptionAnalysis AnalyzeShortCircuiting(BinaryExpression binaryExpression, Planner? planner)
+    {
+        if (binaryExpression.Conversion is not null)
+            return new(binaryExpression, DirectSubscriptionIneligibility.UnsupportedExpressionKind);
+        if (planner is null)
+            return new(binaryExpression, DirectSubscriptionIneligibility.DeferredBranch);
+        var leftAnalysis = AnalyzeNode(binaryExpression.Left, planner);
+        if (!leftAnalysis.IsEligible)
+            return leftAnalysis;
+        var reached = planner.Subscriptions.Count;
+        var rightAnalysis = AnalyzeNode(binaryExpression.Right, planner);
+        if (!rightAnalysis.IsEligible)
+            return rightAnalysis;
+        for (int i = reached, ii = planner.Subscriptions.Count; i < ii; ++i)
+        {
+            var deferred = planner.Subscriptions[i];
+            var alreadyReached = false;
+            for (var j = 0; j < reached; ++j)
+                if (ReferenceEquals(planner.Subscriptions[j].Source, deferred.Source) && planner.Subscriptions[j].Kind == deferred.Kind)
+                {
+                    alreadyReached = true;
+                    break;
+                }
+            if (!alreadyReached)
+                return new(binaryExpression, DirectSubscriptionIneligibility.DeferredBranch);
+        }
+        return DirectSubscriptionAnalysis.Eligible;
+    }
+
     DirectSubscriptionAnalysis AnalyzeNode(Expression expression, Planner? planner) =>
         planner is not null && planner.Reached(expression) ? DirectSubscriptionAnalysis.Eligible : expression switch
         {
@@ -242,7 +274,7 @@ public sealed class DirectSubscriptionAnalyzer
             MethodCallExpression methodCallExpressionForPropertyGet when ExpressionObserverOptions.PropertyGetMethodToProperty.GetOrAdd(methodCallExpressionForPropertyGet.Method, ExpressionObserverOptions.GetPropertyFromGetMethod) is not null => new(methodCallExpressionForPropertyGet, DirectSubscriptionIneligibility.UnsupportedExpressionKind),
             MethodCallExpression methodCallExpression => AnalyzeMethodCall(methodCallExpression, planner),
             BinaryExpression binaryExpression when binaryExpression.Method is { } binaryOperator && !ExpressionObserverOptions.CannotBeDisposed(binaryOperator.ReturnType) => new(binaryExpression, DirectSubscriptionIneligibility.UserDefinedOperator),
-            BinaryExpression binaryExpression when IsShortCircuiting(binaryExpression) => new(binaryExpression, DirectSubscriptionIneligibility.DeferredBranch),
+            BinaryExpression binaryExpression when IsShortCircuiting(binaryExpression) => AnalyzeShortCircuiting(binaryExpression, planner),
             BinaryExpression binaryExpression when binaryExpression.Conversion is not null => new(binaryExpression, DirectSubscriptionIneligibility.UnsupportedExpressionKind),
             BinaryExpression binaryExpression => AnalyzeNode(binaryExpression.Left, planner) is { IsEligible: false } left ? left : AnalyzeNode(binaryExpression.Right, planner),
             ConditionalExpression conditionalExpression => new(conditionalExpression, DirectSubscriptionIneligibility.DeferredBranch),

@@ -106,6 +106,25 @@ public class SubscriptionAgreement
     }
 
     [TestMethod]
+    public void TheGraphsSourcesForAndAlsoOverOneObjectDoNotChangeWhenTheBranchIsTaken()
+    {
+        var log = new SubscriptionLog();
+        var subject = new Recorded(log);
+        var observer = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = false });
+        using (observer.Observe(s => s.Rank > 0 && s.Score < 100, subject))
+        {
+            var beforeTaken = log.Attachments().Distinct().ToList();
+            Assert.AreEqual(1, log.Attachments().Count, $"graph: [{string.Join(", ", log.Attachments())}]");
+            subject.Rank = 1;
+            var afterTaken = log.Attachments().Distinct().ToList();
+            Assert.AreEqual(2, log.Attachments().Count, $"graph: [{string.Join(", ", log.Attachments())}]");
+            CollectionAssert.AreEqual(beforeTaken.ToArray(), afterTaken.ToArray(), $"before: [{string.Join(", ", beforeTaken)}]; after: [{string.Join(", ", afterTaken)}]");
+        }
+        Assert.AreEqual(0, log.Outstanding);
+        Assert.AreEqual(0, observer.CachedObservableExpressions);
+    }
+
+    [TestMethod]
     [DataRow(false)]
     [DataRow(true)]
     public void ACapturedLocalKeepsTheValueItHeldWhenTheObservationBegan(bool useDirectSubscription)
@@ -196,6 +215,18 @@ public class SubscriptionAgreement
         var table = new RecordedTable(log);
         AssertAgreement(subject => subject.Rank + table.Count, new Recorded(log), new ExpressionObserverOptions { MemberExpressionsListenToGeneratedTypesFieldValuesForDictionaryChanged = false });
     }
+
+    [TestMethod]
+    public void AndAlsoOverTheArgumentWithTheBranchTaken() =>
+        AssertAgreement(subject => subject.Rank > -1 && subject.Score < 100, new Recorded(new SubscriptionLog()));
+
+    [TestMethod]
+    public void AndAlsoOverTheArgumentWithTheBranchUntaken() =>
+        AssertAgreement(subject => subject.Rank > 0 && subject.Score < 100, new Recorded(new SubscriptionLog()));
+
+    [TestMethod]
+    public void CoalesceOverTheArgument() =>
+        AssertAgreement(subject => subject.Tag ?? subject.Rank.ToString(), new Recorded(new SubscriptionLog()));
 
     [TestMethod]
     public void MemberOfANonNotifyingValueOnTheArgument() =>
