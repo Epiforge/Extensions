@@ -9,6 +9,7 @@ public class DictionaryPropagationBenchmarks
     const int watchedKey = 0;
 
     static readonly Expression<Func<KeyValuePair<int, BenchmarkPerson>, bool>> pairPredicate = pair => (pair.Value.Rank & 1) == 0;
+    static readonly Expression<Func<KeyValuePair<int, BenchmarkPerson>, KeyValuePair<int, int>>> pairProjection = pair => new KeyValuePair<int, int>(pair.Key, pair.Value.Rank);
     static readonly Expression<Func<int, BenchmarkPerson, int>> keySelector = (key, person) => key;
     static readonly Expression<Func<int, BenchmarkPerson, bool>> predicate = (key, person) => (person.Rank & 1) == 0;
     static readonly Expression<Func<int, BenchmarkPerson, int>> valueSelector = (key, person) => person.Rank;
@@ -20,6 +21,7 @@ public class DictionaryPropagationBenchmarks
     IObservableExpression<KeyValuePair<int, BenchmarkPerson>, bool>[] observations = null!;
     CollectionObserver observer = null!;
     BenchmarkPerson[] people = null!;
+    IObservableExpression<KeyValuePair<int, BenchmarkPerson>, KeyValuePair<int, int>>[] projections = null!;
     BenchmarkPerson replacement = null!;
     IObservableDictionaryQuery<int, int> select = null!;
     IObservableDictionaryQuery<int, int> selectWithSubscriber = null!;
@@ -34,6 +36,10 @@ public class DictionaryPropagationBenchmarks
 
     [Benchmark]
     public void ChangeEveryValueObservedWithoutAQuery() =>
+        ChangeEveryValue();
+
+    [Benchmark]
+    public void ChangeEveryValueProjectedWithoutAQuery() =>
         ChangeEveryValue();
 
     [Benchmark]
@@ -71,6 +77,13 @@ public class DictionaryPropagationBenchmarks
     {
         for (var i = 0; i < elementCount; ++i)
             observations[i].Dispose();
+    }
+
+    [GlobalCleanup(Target = nameof(ChangeEveryValueProjectedWithoutAQuery))]
+    public void CleanupProjections()
+    {
+        for (var i = 0; i < elementCount; ++i)
+            projections[i].Dispose();
     }
 
     [GlobalCleanup(Target = nameof(ChangeEveryValueInAnAllQuery))]
@@ -223,6 +236,16 @@ public class DictionaryPropagationBenchmarks
         observations = new IObservableExpression<KeyValuePair<int, BenchmarkPerson>, bool>[elementCount];
         for (var i = 0; i < elementCount; ++i)
             observations[i] = expressionObserver.ObserveWithoutOptimization(pairPredicate, new KeyValuePair<int, BenchmarkPerson>(i, people[i]));
+    }
+
+    [GlobalSetup(Target = nameof(ChangeEveryValueProjectedWithoutAQuery))]
+    public void SetupProjections()
+    {
+        SetupDictionary();
+        expressionObserver = new ExpressionObserver();
+        projections = new IObservableExpression<KeyValuePair<int, BenchmarkPerson>, KeyValuePair<int, int>>[elementCount];
+        for (var i = 0; i < elementCount; ++i)
+            projections[i] = expressionObserver.ObserveWithoutOptimization(pairProjection, new KeyValuePair<int, BenchmarkPerson>(i, people[i]));
     }
 
     [GlobalSetup(Target = nameof(ChangeEveryValueInAnAllQuery))]
