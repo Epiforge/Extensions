@@ -89,3 +89,52 @@ The 48 is two more boxed comparisons somewhere that does not route through `Fast
 Forty-eight bytes on every re-evaluation of an observation whose result is a value type without `IEquatable<T>` is worth keeping on its own. Every dictionary select query produces `KeyValuePair` results, so this is not an exotic case — it is the projection path of the whole dictionary side.
 
 The remaining 48 is the same size, likely the same shape, and costs one contained change and one filtered run of an instrument that already exists.
+
+## The second site, and a sweep which closes the enumeration
+
+`ScopedObservableExpression<TResult>.ResultEquals` is the same round trip in different clothes:
+
+> `x is null || y is null ? ReferenceEquals(x, y) : EqualityComparer<TResult>.Default.Equals((TResult)x, (TResult)y)`
+
+The values arrive as `object?` from `observableExpression.CurrentEvaluation`, are unboxed to `TResult`, and for a struct without `IEquatable<TResult>` the default comparer boxes one of them again. Identical mechanism, identical fix: a `static readonly bool` computed once per closed generic type selects comparing the boxed values directly.
+
+**A sweep for `EqualityComparer<` across Expressions and Components finds no third site.** `PropertyChangeNotifier.SetBackedProperty` takes typed values rather than boxed ones, so it never makes the trip; `FastEqualityComparer` was fixed above; this was the only other place values arrive boxed and are unboxed to reach the default comparer. The enumeration is closed rather than left open, which is what `2026-09-02-evaluation-sequences.md` failed to do for the LINQ sweep and paid for later.
+
+## The prediction, and the count it rests on
+
+`RaiseIfEvaluationChanged` calls `ResultEquals` **once** per change — either directly, or once through the deferred flush when a propagation scope is open, but not both, since `Enlisted` returns before the direct call when it enlists.
+
+One comparison removed is 24 bytes. So:
+
+- **The three pair arms fall from 208 B to 184 B.** The scope was one of the two remaining comparisons and 24 bytes are still unlocated between a pair result and a tuple result.
+- **They fall to 160.** The scope accounts for both, the pair result now costs exactly what the tuple result costs, and the only residue left anywhere on this path is the 24 bytes the tuple carries too.
+- **They do not move at all.** This site is not reached by these arms and the remaining 48 is somewhere the last two passes have not looked.
+- The `ValueTuple`, `int` and floor arms **must not move**.
+
+**The count is read, not measured.** The last prediction on this path rested on an unchecked count of comparisons per change and was wrong by half — it assumed four where there were two. This one assumes one, from reading `Enlisted` and `RaiseIfEvaluationChanged`, and the same caution applies: 184 is the prediction, and a fall to 160 would mean the count is wrong again in the same direction.
+
+## Closed
+
+| arm | at the start | after the comparer | after the scope |
+| --- | ---: | ---: | ---: |
+| `KeyValuePair.Create(…)` | 256 B | 208 B | **160 B** |
+| `new KeyValuePair<int, int>(pair.Key, …)` | 256 B | 208 B | **160 B** |
+| `new KeyValuePair<int, int>(0, …)` | 256 B | 208 B | **160 B** |
+| `ValueTuple.Create(…)` | 160 B | 160 B | **160 B** |
+| `pair.Value.Rank.CompareTo(0)` | 128 B | 128 B | **128 B** |
+| `pair.Value.Rank` | 72 B | 72 B | **72 B** |
+| no observation | 48 B | 48 B | **48 B** |
+
+**A result type which does not implement `IEquatable<T>` now costs exactly what one which does costs.** The pair and the tuple agree to the byte, which is the whole of what the two changes set out to do.
+
+Ninety-six bytes per re-evaluation, thirty-seven percent, on every observation whose result is a value type without that interface — which is every projection in every query, since `KeyValuePair` is what a dictionary select produces.
+
+**Predicted 184, measured 160.** The count was wrong again and wrong in the same direction as last time: the scope's `ResultEquals` accounted for **both** remaining comparisons, not one. Reading `RaiseIfEvaluationChanged` and `Enlisted` said one call per change; two happen. **Two predictions in a row on this path have rested on a count of comparisons read out of the code, and both were wrong by a factor of two.** The direction was right both times and the magnitude was wrong both times, which is the same lesson this repository already carries about reading, arriving now in the specific form of counting call sites.
+
+**The time fell and no per-byte figure may be read from it.** The four unmoved arms sat within ±1.6%, so the direction is real this run — unlike the previous pair, where the floor arm moved 7.5% and swamped everything. But the three pair arms fell 4.5%, 8.6% and 11.4% for an identical forty-eight-byte change, so the arms plainly do not convert bytes to time at a common rate.
+
+## What this leaves
+
+**Twenty-four bytes, and they are now shared rather than particular.** Both the pair and the tuple cost 160 against a named model of 136 — 48 floor, 24 for the boxed `Rank`, 40 for the argument array, 24 for the boxed result. An observation returning an eight-byte two-field struct costs 24 more than that model; one returning an `int` costs exactly the model. It is the only unexplained figure left on this path and it is a quarter of what it was when `2026-09-05-the-hundred-and-sixty-bytes.md` opened.
+
+**A standing prediction, to be checked whenever `DictionaryPropagationBenchmarks` next runs for any reason — not worth a run of its own.** `ChangeEveryValueInASelectQuery` measured 256 B and was shown to equal its projection observation to the byte. That observation is now 160, so the select query arm should read **160**, and the gap between a projected and a filtered dictionary query should be **64** rather than the 160 this whole investigation was named after. If it reads anything else, the identity between a query and its observation has stopped holding and that is a finding in itself.

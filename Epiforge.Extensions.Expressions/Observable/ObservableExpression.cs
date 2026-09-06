@@ -368,6 +368,11 @@ class ScopedObservableExpression<TResult>(ExpressionObserver observer, Expressio
     ScopedObservableExpression(observer, expression, observableExpression, arguments),
     IObservableExpression<TResult>
 {
+    /// <summary>
+    /// Whether results of this type are best compared as they arrive, already boxed, which is so for a value type that does not implement <see cref="IEquatable{T}"/> because its default comparer boxes one of them again to reach the very same comparison
+    /// </summary>
+    static readonly bool compareResultsBoxed = typeof(TResult).IsValueType && !typeof(IEquatable<TResult>).IsAssignableFrom(typeof(TResult));
+
     public (Exception? Fault, TResult Result) Evaluation
     {
         get
@@ -378,7 +383,7 @@ class ScopedObservableExpression<TResult>(ExpressionObserver observer, Expressio
     }
 
     private protected override bool ResultEquals(object? x, object? y) =>
-        x is null || y is null ? ReferenceEquals(x, y) : EqualityComparer<TResult>.Default.Equals((TResult)x, (TResult)y);
+        x is null || y is null ? ReferenceEquals(x, y) : compareResultsBoxed ? x.Equals(y) : EqualityComparer<TResult>.Default.Equals((TResult)x, (TResult)y);
 }
 
 class ScopedObservableExpression<TArgument, TResult>(ExpressionObserver observer, Expression? expression, ObservableExpression observableExpression, TArgument argument) :
