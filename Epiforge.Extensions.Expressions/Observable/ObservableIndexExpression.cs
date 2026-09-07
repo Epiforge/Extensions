@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Expressions.Observable;
+﻿namespace Epiforge.Extensions.Expressions.Observable;
 
 sealed class ObservableIndexExpression(ExpressionObserver observer, IndexExpression indexExpression, bool deferEvaluation) :
     ObservableExpression(observer, indexExpression, deferEvaluation),
@@ -147,19 +147,16 @@ sealed class ObservableIndexExpression(ExpressionObserver observer, IndexExpress
         {
             var newItems = e.NewItems;
             for (int i = 0, ii = newItems.Count; i < ii; ++i)
-            {
-                var keyValuePair = newItems[i];
-                if (key.Equals(keyValuePair.Key))
+                if (key.Equals(newItems[i].Key))
                 {
-                    Evaluation = (null, keyValuePair.Value);
+                    Evaluate();
                     return;
                 }
-            }
             var oldItems = e.OldItems;
             for (int i = 0, ii = oldItems.Count; i < ii; ++i)
                 if (key.Equals(oldItems[i].Key))
                 {
-                    Evaluation = (new KeyNotFoundException($"Key '{key}' was removed"), defaultResult);
+                    Evaluate();
                     return;
                 }
         }

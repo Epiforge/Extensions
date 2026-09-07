@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Expressions.Observable;
+﻿namespace Epiforge.Extensions.Expressions.Observable;
 
 /// <summary>
 /// Determines whether an expression can be observed by subscribing directly to its change sources instead of by building a graph of observable expressions
@@ -22,7 +22,7 @@ namespace Epiforge.Extensions.Expressions.Observable;
 /// A method call is admitted when its return type is sealed and implements neither disposal interface, decided by the return type alone rather than by whether the call is registered for disposal, so that the rule holds whatever the options say; it contributes only the subscriptions its object and its arguments contribute, the graph's node for a call subscribing to nothing itself and re-evaluating when one of those changes
 /// </remarks>
 /// <remarks>
-/// A call to the get method of a property or an indexer is refused, because the graph rewrites such a call into the member or index access it stands for and watches that instead; an indexer written in C# reaches this analysis as a call, so admitting it here would plan none of the subscriptions the rewritten form plans
+/// A call to the get method of a property or an indexer is rewritten into the member or index access it stands for and analyzed as that, exactly as the graph rewrites it, so that an indexer written in C# — which reaches this analysis as a call — plans the subscriptions the rewritten form plans rather than none of them
 /// </remarks>
 /// <remarks>
 /// A short-circuiting operator is admitted when the operand whose evaluation it defers subscribes to no source and event the rest of the expression does not already reach, since the graph attaches to those same sources for the operands it does evaluate, holds what it attaches once the branch is taken and never detaches it, and the deferred operand contributes nothing of its own to attach; where the deferred operand reaches a source of its own it is refused, because the graph does not attach there until the branch is taken. A conditional expression is refused whatever its branches reach
@@ -271,7 +271,7 @@ public sealed class DirectSubscriptionAnalyzer
             ParameterExpression parameterExpression => AnalyzeParameter(parameterExpression, planner),
             MemberExpression memberExpression => AnalyzeMember(memberExpression, planner),
             IndexExpression indexExpression => AnalyzeIndex(indexExpression, planner),
-            MethodCallExpression methodCallExpressionForPropertyGet when ExpressionObserverOptions.PropertyGetMethodToProperty.GetOrAdd(methodCallExpressionForPropertyGet.Method, ExpressionObserverOptions.GetPropertyFromGetMethod) is not null => new(methodCallExpressionForPropertyGet, DirectSubscriptionIneligibility.UnsupportedExpressionKind),
+            MethodCallExpression methodCallExpressionForPropertyGet when ExpressionObserverOptions.PropertyGetMethodToProperty.GetOrAdd(methodCallExpressionForPropertyGet.Method, ExpressionObserverOptions.GetPropertyFromGetMethod) is { } property => AnalyzeNode(methodCallExpressionForPropertyGet.Arguments.Count > 0 ? Expression.MakeIndex(methodCallExpressionForPropertyGet.Object!, property, methodCallExpressionForPropertyGet.Arguments) : Expression.MakeMemberAccess(methodCallExpressionForPropertyGet.Object, property), planner),
             MethodCallExpression methodCallExpression => AnalyzeMethodCall(methodCallExpression, planner),
             BinaryExpression binaryExpression when binaryExpression.Method is { } binaryOperator && !ExpressionObserverOptions.CannotBeDisposed(binaryOperator.ReturnType) => new(binaryExpression, DirectSubscriptionIneligibility.UserDefinedOperator),
             BinaryExpression binaryExpression when IsShortCircuiting(binaryExpression) => AnalyzeShortCircuiting(binaryExpression, planner),

@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Expressions.Tests.Observable;
+﻿namespace Epiforge.Extensions.Expressions.Tests.Observable;
 
 [TestClass]
 public class ObservableIndexExpression
@@ -132,7 +132,7 @@ public class ObservableIndexExpression
             expr.PropertyChanged -= propertyChanged;
         }
         Assert.AreEqual(0, observer.CachedObservableExpressions);
-        Assert.IsTrue(new int[] { 25, 0, 0, 30, 25, 0, 0, 25, 0, 0 }.SequenceEqual(values));
+        Assert.IsTrue(new int[] { 25, 0, 30, 25, 0, 25, 0 }.SequenceEqual(values));
     }
 
     [TestMethod]

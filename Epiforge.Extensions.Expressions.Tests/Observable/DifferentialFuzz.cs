@@ -7,13 +7,15 @@ public class DifferentialFuzz
     {
         public Recorded? Held;
         public ObservableRangeCollection<Recorded> HeldItems = [];
+        public ObservableRangeCollection<int> Numbers = [1, 2, 3];
     }
 
-    sealed class Sources(ParameterExpression subject, MemberExpression other, MemberExpression items, MemberExpression held, MemberExpression heldItems)
+    sealed class Sources(ParameterExpression subject, MemberExpression other, MemberExpression items, MemberExpression held, MemberExpression heldItems, MemberExpression numbers)
     {
         internal readonly MemberExpression Held = held;
         internal readonly MemberExpression HeldItems = heldItems;
         internal readonly MemberExpression Items = items;
+        internal readonly MemberExpression Numbers = numbers;
         internal readonly MemberExpression Other = other;
         internal readonly ParameterExpression Subject = subject;
     }
@@ -33,10 +35,12 @@ public class DifferentialFuzz
             var holder = Expression.Constant(Holder, typeof(FieldHolder));
             HeldMember = Expression.Field(holder, held);
             HeldItemsMember = Expression.Field(holder, heldItems);
+            NumbersMember = Expression.Field(holder, numbers);
         }
 
         internal readonly MemberExpression HeldItemsMember;
         internal readonly MemberExpression HeldMember;
+        internal readonly MemberExpression NumbersMember;
         internal readonly FieldHolder Holder;
         internal readonly ObservableRangeCollection<Recorded> Items;
         internal readonly MemberExpression ItemsMember;
@@ -56,6 +60,8 @@ public class DifferentialFuzz
     static readonly FieldInfo held = typeof(FieldHolder).GetField(nameof(FieldHolder.Held))!;
     static readonly FieldInfo heldItems = typeof(FieldHolder).GetField(nameof(FieldHolder.HeldItems))!;
     static readonly FieldInfo linked = typeof(Recorded).GetField(nameof(Recorded.Linked))!;
+    static readonly FieldInfo numbers = typeof(FieldHolder).GetField(nameof(FieldHolder.Numbers))!;
+    static readonly PropertyInfo numbersIndexer = typeof(ObservableRangeCollection<int>).GetProperty("Item")!;
     static readonly PropertyInfo next = typeof(Recorded).GetProperty(nameof(Recorded.Next))!;
     static readonly PropertyInfo rank = typeof(Recorded).GetProperty(nameof(Recorded.Rank))!;
     static readonly PropertyInfo score = typeof(Recorded).GetProperty(nameof(Recorded.Score))!;
@@ -116,8 +122,9 @@ public class DifferentialFuzz
         });
 
     static Expression Leaf(Random rng, Sources sources) =>
-        rng.Next(12) switch
+        rng.Next(13) switch
         {
+            11 => Expression.MakeIndex(sources.Numbers, numbersIndexer, [Expression.Constant(0)]),
             10 => Expression.MakeMemberAccess(Expression.MakeMemberAccess(sources.Subject, tag), stringLength),
             9 => Expression.MakeMemberAccess(Expression.Field(sources.Other, linked), rank),
             0 => Expression.MakeMemberAccess(sources.Subject, rank),
@@ -155,7 +162,7 @@ public class DifferentialFuzz
     {
         var rng = new Random(seed);
         var subject = Expression.Parameter(typeof(Recorded), "s");
-        var sources = new Sources(subject, world.OtherMember, world.ItemsMember, world.HeldMember, world.HeldItemsMember);
+        var sources = new Sources(subject, world.OtherMember, world.ItemsMember, world.HeldMember, world.HeldItemsMember, world.NumbersMember);
         var body = rng.Next(3) switch
         {
             0 => Boolean(rng, depth, sources),
@@ -171,8 +178,11 @@ public class DifferentialFuzz
     static void Mutate(World world, Random rng, int step)
     {
         var target = world.Chosen(rng.Next(2));
-        switch (rng.Next(13))
+        switch (rng.Next(14))
         {
+            case 13:
+                world.Holder.Numbers[rng.Next(0, 3)] = rng.Next(0, 4);
+                break;
             case 5:
                 world.Items.Add(new Recorded(world.Log) { Rank = rng.Next(0, 4) });
                 break;

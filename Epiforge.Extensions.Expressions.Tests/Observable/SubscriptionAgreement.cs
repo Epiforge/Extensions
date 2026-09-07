@@ -201,6 +201,14 @@ public class SubscriptionAgreement
     }
 
     [TestMethod]
+    public void ClosureFieldHoldingSomethingIndexed()
+    {
+        var log = new SubscriptionLog();
+        var list = new RecordedList(log);
+        AssertAgreement(subject => subject.Rank + list[0], new Recorded(log));
+    }
+
+    [TestMethod]
     public void ClosureFieldHoldingSomethingWhichNotifiesBothWays()
     {
         var log = new SubscriptionLog();

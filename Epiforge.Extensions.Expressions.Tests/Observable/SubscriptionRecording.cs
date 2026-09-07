@@ -154,6 +154,54 @@ public sealed class RecordedCollection(SubscriptionLog log) :
     }
 }
 
+public sealed class RecordedList(SubscriptionLog log) :
+    INotifyCollectionChanged,
+    INotifyPropertyChanged
+{
+    NotifyCollectionChangedEventHandler? collectionChanged;
+    PropertyChangedEventHandler? propertyChanged;
+
+    public int Count { get; private set; }
+
+    public int this[int index] =>
+        Count + index;
+
+    public void Announce()
+    {
+        ++Count;
+        collectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+        propertyChanged?.Invoke(this, new PropertyChangedEventArgs("Item[]"));
+    }
+
+    public event NotifyCollectionChangedEventHandler? CollectionChanged
+    {
+        add
+        {
+            log.Record(this, nameof(CollectionChanged), 1);
+            collectionChanged += value;
+        }
+        remove
+        {
+            log.Record(this, nameof(CollectionChanged), -1);
+            collectionChanged -= value;
+        }
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged
+    {
+        add
+        {
+            log.Record(this, nameof(PropertyChanged), 1);
+            propertyChanged += value;
+        }
+        remove
+        {
+            log.Record(this, nameof(PropertyChanged), -1);
+            propertyChanged -= value;
+        }
+    }
+}
+
 public sealed class RecordedTable(SubscriptionLog log) :
     INotifyCollectionChanged,
     INotifyDictionaryChanged,
@@ -164,6 +212,9 @@ public sealed class RecordedTable(SubscriptionLog log) :
     PropertyChangedEventHandler? propertyChanged;
 
     public int Count { get; private set; }
+
+    public int this[int index] =>
+        Count + index;
 
     public void Announce()
     {

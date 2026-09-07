@@ -106,12 +106,8 @@ public class DirectSubscriptionAnalyzer
     }
 
     [TestMethod]
-    public void IndexerIsIneligible()
-    {
-        var analysis = Analyzer().Analyze(BodyOfPeople<TestPerson>(people => people[0]));
-        Assert.IsFalse(analysis.IsEligible);
-        Assert.AreEqual(DirectSubscriptionIneligibility.UnsupportedExpressionKind, analysis.Ineligibility);
-    }
+    public void IndexerOnAFixedTargetIsEligible() =>
+        Assert.IsTrue(Analyzer().Analyze(BodyOfPeople<TestPerson>(people => people[0])).IsEligible);
 
     [TestMethod]
     public void IndexOnChangeableTargetIsIneligible()
@@ -231,14 +227,12 @@ public class DirectSubscriptionAnalyzer
         Assert.IsTrue(Analyzer().Analyze(BodyOf<bool>(person => person.NameGets > 0 | person.NameGets < 100)).IsEligible);
 
     [TestMethod]
-    public void PropertyGetMethodCallIsIneligible()
+    public void PropertyGetMethodCallIsEligible()
     {
         var body = BodyOfPeople<TestPerson>(people => people[0]);
         Assert.IsInstanceOfType<MethodCallExpression>(body);
         Assert.IsNotNull(typeof(ObservableCollection<TestPerson>).GetProperty("Item"));
-        var analysis = Analyzer().Analyze(body);
-        Assert.IsFalse(analysis.IsEligible);
-        Assert.AreEqual(DirectSubscriptionIneligibility.UnsupportedExpressionKind, analysis.Ineligibility);
+        Assert.IsTrue(Analyzer().Analyze(body).IsEligible);
     }
 
     [TestMethod]

@@ -123,6 +123,21 @@ public class DirectSubscriptionPlanning
     }
 
     [TestMethod]
+    public void IndexOnAParameterHoldingADictionaryPlansBothContentsSubscriptionsAndTheIndexer()
+    {
+        var parameter = Expression.Parameter(typeof(ObservableDictionary<int, int>));
+        var plan = Analyzer().Plan(Expression.MakeIndex(parameter, typeof(ObservableDictionary<int, int>).GetProperty("Item")!, [Expression.Constant(5)]));
+        Assert.IsTrue(plan.IsEligible);
+        Assert.AreEqual(3, plan.Subscriptions.Count);
+        Assert.AreEqual(DirectSubscriptionKind.DictionaryOrCollectionChanged, plan.Subscriptions[0].Kind);
+        Assert.AreSame(parameter, plan.Subscriptions[0].Source);
+        Assert.AreEqual(plan.Subscriptions[0], plan.Subscriptions[1]);
+        Assert.AreEqual(DirectSubscriptionKind.IndexerPropertyChanged, plan.Subscriptions[2].Kind);
+        Assert.AreEqual("Item", plan.Subscriptions[2].PropertyName);
+        Assert.AreSame(parameter, plan.Subscriptions[2].Source);
+    }
+
+    [TestMethod]
     public void IneligibleExpressionPlansNothing()
     {
         var plan = Analyzer().Plan(BoundRecorded<int>(recorded => recorded.Next!.Rank, new Recorded(new SubscriptionLog())));

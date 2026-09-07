@@ -22,6 +22,8 @@ sealed class DirectSubscriptionSource
     {
         this.kind = kind;
         this.propertyName = propertyName;
+        if (kind is DirectSubscriptionKind.IndexerPropertyChanged && propertyName is not null)
+            conventionalPropertyName = string.Concat(propertyName, "[]");
         this.source = source;
         switch (kind)
         {
@@ -42,6 +44,7 @@ sealed class DirectSubscriptionSource
 #else
     readonly object attachmentsAccess = new();
 #endif
+    readonly string? conventionalPropertyName;
     DirectSubscriptionAttachment? firstAttachment;
     readonly DirectSubscriptionKind kind;
     DirectSubscriptionAttachment? lastAttachment;
@@ -130,7 +133,12 @@ sealed class DirectSubscriptionSource
 
     void SourcePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (kind is DirectSubscriptionKind.MemberPropertyChanged ? !(string.IsNullOrEmpty(e.PropertyName) || e.PropertyName == propertyName) : e.PropertyName != propertyName)
+        if (kind switch
+            {
+                DirectSubscriptionKind.MemberPropertyChanged => !(string.IsNullOrEmpty(e.PropertyName) || e.PropertyName == propertyName),
+                DirectSubscriptionKind.IndexerPropertyChanged => !(e.PropertyName == propertyName || e.PropertyName == conventionalPropertyName),
+                _ => e.PropertyName != propertyName
+            })
             return;
         using var propagation = new PropagationScope();
         NotifyAttachments();
