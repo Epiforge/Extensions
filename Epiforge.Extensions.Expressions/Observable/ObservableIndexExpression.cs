@@ -10,6 +10,8 @@ sealed class ObservableIndexExpression(ExpressionObserver observer, IndexExpress
     /// The name by which .NET announces that an indexer changed, which is the indexer's own name followed by empty brackets and not the name alone
     /// </summary>
     string? conventionalIndexerName;
+    SourceNotificationAttachment? contentsAttachment;
+    SourceNotificationAttachment? propertyAttachment;
     MethodInfo? getMethod;
     FastInvoker? getMethodInvoker;
     PropertyInfo? indexer;
@@ -97,9 +99,9 @@ sealed class ObservableIndexExpression(ExpressionObserver observer, IndexExpress
         Evaluate();
 
     [SuppressMessage("Code Analysis", "CA1502: Avoid excessive complexity")]
-    void ObjectValueCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    void ObjectValueCollectionChanged(object? sender, EventArgs eventArgs)
     {
-        using var propagation = new PropagationScope();
+        var e = (NotifyCollectionChangedEventArgs)eventArgs;
         switch (e.Action)
         {
             case NotifyCollectionChangedAction.Add:
@@ -138,9 +140,9 @@ sealed class ObservableIndexExpression(ExpressionObserver observer, IndexExpress
         }
     }
 
-    void ObjectValueDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<object?, object?> e)
+    void ObjectValueDictionaryChanged(object? sender, EventArgs eventArgs)
     {
-        using var propagation = new PropagationScope();
+        var e = (NotifyDictionaryChangedEventArgs<object?, object?>)eventArgs;
         if (e.Action == NotifyDictionaryChangedAction.Reset)
             Evaluate();
         else if (arguments is { Count: 1 } indexArguments && indexArguments[0].Evaluation.Result is { } key)
@@ -162,13 +164,11 @@ sealed class ObservableIndexExpression(ExpressionObserver observer, IndexExpress
         }
     }
 
-    void ObjectValuePropertyChanged(object? sender, PropertyChangedEventArgs e)
+    void ObjectValuePropertyChanged(object? sender, EventArgs eventArgs)
     {
+        var e = (PropertyChangedEventArgs)eventArgs;
         if (e.PropertyName == indexer?.Name || e.PropertyName == conventionalIndexerName)
-        {
-            using var propagation = new PropagationScope();
             Evaluate();
-        }
     }
 
     protected override void OnInitialization()
@@ -220,21 +220,19 @@ sealed class ObservableIndexExpression(ExpressionObserver observer, IndexExpress
 
     void SubscribeToObjectValueNotifications()
     {
-        if (objectResult is INotifyDictionaryChanged dictionaryChangedNotifier)
-            dictionaryChangedNotifier.DictionaryChanged += ObjectValueDictionaryChanged;
-        else if (objectResult is INotifyCollectionChanged collectionChangedNotifier)
-            collectionChangedNotifier.CollectionChanged += ObjectValueCollectionChanged;
-        if (objectResult is INotifyPropertyChanged propertyChangedNotifier)
-            propertyChangedNotifier.PropertyChanged += ObjectValuePropertyChanged;
+        if (objectResult is INotifyDictionaryChanged)
+            contentsAttachment = observer.SourceNotifications.Attach(objectResult, SourceNotificationKind.DictionaryChanged, ObjectValueDictionaryChanged);
+        else if (objectResult is INotifyCollectionChanged)
+            contentsAttachment = observer.SourceNotifications.Attach(objectResult, SourceNotificationKind.CollectionChanged, ObjectValueCollectionChanged);
+        if (objectResult is INotifyPropertyChanged)
+            propertyAttachment = observer.SourceNotifications.Attach(objectResult, SourceNotificationKind.PropertyChanged, ObjectValuePropertyChanged);
     }
 
     void UnsubscribeFromObjectValueNotifications()
     {
-        if (objectResult is INotifyDictionaryChanged dictionaryChangedNotifier)
-            dictionaryChangedNotifier.DictionaryChanged -= ObjectValueDictionaryChanged;
-        else if (objectResult is INotifyCollectionChanged collectionChangedNotifier)
-            collectionChangedNotifier.CollectionChanged -= ObjectValueCollectionChanged;
-        if (objectResult is INotifyPropertyChanged propertyChangedNotifier)
-            propertyChangedNotifier.PropertyChanged -= ObjectValuePropertyChanged;
+        observer.SourceNotifications.Detach(contentsAttachment);
+        contentsAttachment = null;
+        observer.SourceNotifications.Detach(propertyAttachment);
+        propertyAttachment = null;
     }
 }

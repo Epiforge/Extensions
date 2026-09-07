@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Expressions.Tests.Observable;
+﻿namespace Epiforge.Extensions.Expressions.Tests.Observable;
 
 [TestClass]
 public class DifferentialFuzz
@@ -124,7 +124,7 @@ public class DifferentialFuzz
     static Expression Leaf(Random rng, Sources sources) =>
         rng.Next(13) switch
         {
-            11 => Expression.MakeIndex(sources.Numbers, numbersIndexer, [Expression.Constant(0)]),
+            11 => Expression.MakeIndex(sources.Numbers, numbersIndexer, [Expression.Constant(rng.Next(0, 3))]),
             10 => Expression.MakeMemberAccess(Expression.MakeMemberAccess(sources.Subject, tag), stringLength),
             9 => Expression.MakeMemberAccess(Expression.Field(sources.Other, linked), rank),
             0 => Expression.MakeMemberAccess(sources.Subject, rank),
@@ -181,7 +181,7 @@ public class DifferentialFuzz
         switch (rng.Next(14))
         {
             case 13:
-                world.Holder.Numbers[rng.Next(0, 3)] = rng.Next(0, 4);
+                MutateNumbers(world, rng);
                 break;
             case 5:
                 world.Items.Add(new Recorded(world.Log) { Rank = rng.Next(0, 4) });
@@ -226,6 +226,91 @@ public class DifferentialFuzz
             default:
                 target.Rank ^= 1;
                 break;
+        }
+    }
+
+    static Expression<Func<Recorded, object?>> IndexedLambda(int seed, World world)
+    {
+        var rng = new Random(seed);
+        var subject = Expression.Parameter(typeof(Recorded), "s");
+        var indexed = Expression.MakeIndex(world.NumbersMember, numbersIndexer, [Expression.Constant(rng.Next(0, 4))]);
+        var body = rng.Next(4) switch
+        {
+            0 => (Expression)indexed,
+            1 => Expression.Add(indexed, Expression.MakeMemberAccess(subject, rank)),
+            2 => Expression.GreaterThan(indexed, Expression.MakeMemberAccess(subject, score)),
+            _ => Expression.Add(indexed, Expression.MakeIndex(world.NumbersMember, numbersIndexer, [Expression.Constant(rng.Next(0, 4))]))
+        };
+        return Expression.Lambda<Func<Recorded, object?>>(Expression.Convert(body, typeof(object)), subject);
+    }
+
+    static void MutateNumbers(World world, Random rng)
+    {
+        var numbers = world.Holder.Numbers;
+        switch (rng.Next(6))
+        {
+            case 0:
+                if (numbers.Count > 0)
+                    numbers[rng.Next(0, numbers.Count)] = rng.Next(0, 9);
+                break;
+            case 1:
+                if (numbers.Count > 1)
+                {
+                    var moving = rng.Next(1, 3);
+                    var oldStart = rng.Next(0, numbers.Count);
+                    var newStart = rng.Next(0, numbers.Count);
+                    if (oldStart != newStart && oldStart + moving <= numbers.Count && newStart + moving <= numbers.Count)
+                        numbers.MoveRange(oldStart, newStart, moving);
+                }
+                break;
+            case 2:
+                if (numbers.Count > 1)
+                {
+                    var at = rng.Next(0, numbers.Count);
+                    numbers.RemoveRange(at, rng.Next(1, numbers.Count - at + 1));
+                }
+                break;
+            case 3:
+                if (numbers.Count < 8)
+                    numbers.InsertRange(rng.Next(0, numbers.Count + 1), new List<int> { rng.Next(0, 9), rng.Next(0, 9) });
+                break;
+            case 4:
+                if (numbers.Count > 0)
+                {
+                    var at = rng.Next(0, numbers.Count);
+                    var taken = rng.Next(1, numbers.Count - at + 1);
+                    var replacement = new List<int>();
+                    for (int i = 0, ii = rng.Next(0, 3); i < ii; ++i)
+                        replacement.Add(rng.Next(0, 9));
+                    numbers.ReplaceRange(at, taken, replacement);
+                }
+                break;
+            default:
+                numbers.Reset(new List<int> { rng.Next(0, 9), rng.Next(0, 9), rng.Next(0, 9) });
+                break;
+        }
+    }
+
+    static void RunIndexedProgram(int seed, int steps)
+    {
+        var graphWorld = new World(seed, false);
+        var fastWorld = new World(seed, true);
+        var graphLambda = IndexedLambda(seed, graphWorld);
+        var fastLambda = IndexedLambda(seed, fastWorld);
+        Assert.AreEqual(graphLambda.ToString().Replace("value(", "@("), fastLambda.ToString().Replace("value(", "@("), $"seed {seed}: the two worlds were given different expressions");
+        using var graphExpression = graphWorld.Observer.Observe(graphLambda, graphWorld.Subject);
+        using var fastExpression = fastWorld.Observer.Observe(fastLambda, fastWorld.Subject);
+        graphExpression.PropertyChanged += (sender, e) => ++graphWorld.Notifications;
+        fastExpression.PropertyChanged += (sender, e) => ++fastWorld.Notifications;
+        Assert.AreEqual(Describe(graphExpression.Evaluation), Describe(fastExpression.Evaluation), $"seed {seed}: initial evaluation diverged for {graphLambda}");
+        var graphRng = new Random(seed ^ 0x1de8);
+        var fastRng = new Random(seed ^ 0x1de8);
+        for (var step = 0; step < steps; ++step)
+        {
+            MutateNumbers(graphWorld, graphRng);
+            MutateNumbers(fastWorld, fastRng);
+            Assert.AreEqual(Describe(graphExpression.Evaluation), Describe(fastExpression.Evaluation), $"seed {seed}, step {step}: evaluation diverged for {graphLambda}");
+            Assert.AreEqual(graphWorld.Notifications, fastWorld.Notifications, $"seed {seed}, step {step}: notification count diverged for {graphLambda}");
         }
     }
 

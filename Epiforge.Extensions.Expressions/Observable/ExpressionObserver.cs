@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Expressions.Observable;
+﻿namespace Epiforge.Extensions.Expressions.Observable;
 
 /// <summary>
 /// Represents an observer of expressions
@@ -126,6 +126,7 @@ public class ExpressionObserver :
     DirectSubscriptionAnalyzer? directSubscriptionAnalyzer;
 
     internal readonly DirectSubscriptionRegistry DirectSubscriptions = new();
+    internal readonly SourceNotificationRegistry SourceNotifications = new();
 
     readonly Dictionary<BinaryExpression, ObservableBinaryExpression> cachedObservableBinaryExpressions = new(ExpressionEqualityComparer.Default);
     readonly Dictionary<ConditionalExpression, ObservableConditionalExpression> cachedObservableConditionalExpressions = new(ExpressionEqualityComparer.Default);

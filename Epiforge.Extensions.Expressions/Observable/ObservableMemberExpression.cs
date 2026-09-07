@@ -1,9 +1,10 @@
-namespace Epiforge.Extensions.Expressions.Observable;
+﻿namespace Epiforge.Extensions.Expressions.Observable;
 
 sealed class ObservableMemberExpression(ExpressionObserver observer, MemberExpression memberExpression, bool deferEvaluation) :
     ObservableExpression(observer, memberExpression, deferEvaluation),
     IObservableExpressionDependent
 {
+    SourceNotificationAttachment? contentsAttachment;
     bool doNotListenForPropertyChanges;
     FieldInfo? field;
     MethodInfo? getMethod;
@@ -14,6 +15,7 @@ sealed class ObservableMemberExpression(ExpressionObserver observer, MemberExpre
     ObservableExpression? observableExpression;
     object? observableExpressionResult;
     ObservableExpressionSubscription? observableExpressionSubscription;
+    SourceNotificationAttachment? propertyAttachment;
 
     internal readonly MemberExpression MemberExpression = memberExpression;
 
@@ -101,13 +103,11 @@ sealed class ObservableMemberExpression(ExpressionObserver observer, MemberExpre
     void IObservableExpressionDependent.OnDependencyEvaluationChanged(ObservableExpression dependency) =>
         Evaluate();
 
-    void ObservableExpressionValuePropertyChanged(object? sender, PropertyChangedEventArgs e)
+    void ObservableExpressionValuePropertyChanged(object? sender, EventArgs eventArgs)
     {
+        var e = (PropertyChangedEventArgs)eventArgs;
         if (string.IsNullOrEmpty(e.PropertyName) || e.PropertyName == member?.Name)
-        {
-            using var propagation = new PropagationScope();
             Evaluate();
-        }
     }
 
     protected override void OnInitialization()
@@ -157,43 +157,33 @@ sealed class ObservableMemberExpression(ExpressionObserver observer, MemberExpre
     {
         if (doNotListenForPropertyChanges)
             return;
-        if (observableExpressionResult is INotifyPropertyChanged propertyChangedNotifier)
-            propertyChangedNotifier.PropertyChanged += ObservableExpressionValuePropertyChanged;
+        if (observableExpressionResult is INotifyPropertyChanged)
+            propertyAttachment = observer.SourceNotifications.Attach(observableExpressionResult, SourceNotificationKind.PropertyChanged, ObservableExpressionValuePropertyChanged);
     }
 
     void SubscribeToValueNotifications()
     {
-        if (isFieldOfCompilerGeneratedType)
+        if (isFieldOfCompilerGeneratedType && Evaluation.Result is { } value)
         {
-            if (observer.MemberExpressionsListenToGeneratedTypesFieldValuesForDictionaryChanged && Evaluation.Result is INotifyDictionaryChanged dictionaryChangedNotifier)
-                dictionaryChangedNotifier.DictionaryChanged += ValueChanged;
-            else if (observer.MemberExpressionsListenToGeneratedTypesFieldValuesForCollectionChanged && Evaluation.Result is INotifyCollectionChanged collectionChangedNotifier)
-                collectionChangedNotifier.CollectionChanged += ValueChanged;
+            if (observer.MemberExpressionsListenToGeneratedTypesFieldValuesForDictionaryChanged && value is INotifyDictionaryChanged)
+                contentsAttachment = observer.SourceNotifications.Attach(value, SourceNotificationKind.DictionaryChanged, ValueChanged);
+            else if (observer.MemberExpressionsListenToGeneratedTypesFieldValuesForCollectionChanged && value is INotifyCollectionChanged)
+                contentsAttachment = observer.SourceNotifications.Attach(value, SourceNotificationKind.CollectionChanged, ValueChanged);
         }
     }
 
     void UnsubscribeFromExpressionValueNotifications()
     {
-        if (doNotListenForPropertyChanges)
-            return;
-        if (observableExpressionResult is INotifyPropertyChanged propertyChangedNotifier)
-            propertyChangedNotifier.PropertyChanged -= ObservableExpressionValuePropertyChanged;
+        observer.SourceNotifications.Detach(propertyAttachment);
+        propertyAttachment = null;
     }
 
     void UnsubscribeFromValueNotifications()
     {
-        if (isFieldOfCompilerGeneratedType && TryGetUndeferredResult(out var value))
-        {
-            if (observer.MemberExpressionsListenToGeneratedTypesFieldValuesForDictionaryChanged && value is INotifyDictionaryChanged dictionaryChangedNotifier)
-                dictionaryChangedNotifier.DictionaryChanged -= ValueChanged;
-            else if (observer.MemberExpressionsListenToGeneratedTypesFieldValuesForCollectionChanged && value is INotifyCollectionChanged collectionChangedNotifier)
-                collectionChangedNotifier.CollectionChanged -= ValueChanged;
-        }
+        observer.SourceNotifications.Detach(contentsAttachment);
+        contentsAttachment = null;
     }
 
-    void ValueChanged(object? sender, EventArgs e)
-    {
-        using var propagation = new PropagationScope();
+    void ValueChanged(object? sender, EventArgs e) =>
         NotifyDependentsOfValueContentsChanged();
-    }
 }

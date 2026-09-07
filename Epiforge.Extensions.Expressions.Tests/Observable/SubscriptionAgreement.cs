@@ -61,9 +61,9 @@ public class SubscriptionAgreement
         var observer = new ExpressionObserver();
         using (observer.Observe(s => s.Rank > 0 ? other.Rank : s.Score, subject))
         {
-            Assert.AreEqual(2, log.Attachments().Count);
+            Assert.AreEqual(1, log.Attachments().Count);
             subject.Rank = 1;
-            Assert.AreEqual(3, log.Attachments().Count);
+            Assert.AreEqual(2, log.Attachments().Count);
         }
         Assert.AreEqual(0, log.Outstanding);
         Assert.AreEqual(0, observer.CachedObservableExpressions);
@@ -111,14 +111,22 @@ public class SubscriptionAgreement
         var log = new SubscriptionLog();
         var subject = new Recorded(log);
         var observer = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = false });
-        using (observer.Observe(s => s.Rank > 0 && s.Score < 100, subject))
+        using (var expr = observer.Observe(s => s.Rank > 0 && s.Score < 100, subject))
         {
+            var notifications = 0;
+            expr.PropertyChanged += (sender, e) =>
+            {
+                if (e.PropertyName == nameof(IObservableExpression<object?>.Evaluation))
+                    ++notifications;
+            };
             var beforeTaken = log.Attachments().Distinct().ToList();
             Assert.AreEqual(1, log.Attachments().Count, $"graph: [{string.Join(", ", log.Attachments())}]");
             subject.Rank = 1;
             var afterTaken = log.Attachments().Distinct().ToList();
-            Assert.AreEqual(2, log.Attachments().Count, $"graph: [{string.Join(", ", log.Attachments())}]");
+            Assert.AreEqual(1, log.Attachments().Count, $"graph: [{string.Join(", ", log.Attachments())}]");
             CollectionAssert.AreEqual(beforeTaken.ToArray(), afterTaken.ToArray(), $"before: [{string.Join(", ", beforeTaken)}]; after: [{string.Join(", ", afterTaken)}]");
+            subject.Score = 200;
+            Assert.AreEqual(2, notifications, "the right operand was not observed after the branch was taken");
         }
         Assert.AreEqual(0, log.Outstanding);
         Assert.AreEqual(0, observer.CachedObservableExpressions);
