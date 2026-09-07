@@ -42,11 +42,6 @@ sealed class SourceNotificationSource
         }
     }
 
-#if IS_NET_9_0_OR_GREATER
-    readonly Lock attachmentsAccess = new();
-#else
-    readonly object attachmentsAccess = new();
-#endif
     SourceNotificationAttachment? firstAttachment;
     readonly SourceNotificationKind kind;
     SourceNotificationAttachment? lastAttachment;
@@ -57,39 +52,39 @@ sealed class SourceNotificationSource
     internal (object Source, SourceNotificationKind Kind) Key =>
         (source, kind);
 
+    /// <remarks>
+    /// The registry calls this only while holding its own lock, which is what makes the list safe to mutate without one of its own
+    /// </remarks>
     internal void Attach(SourceNotificationAttachment attachment)
     {
-        lock (attachmentsAccess)
-        {
-            attachment.Source = this;
-            attachment.Previous = lastAttachment;
-            if (lastAttachment is null)
-                Volatile.Write(ref firstAttachment, attachment);
-            else
-                lastAttachment.Next = attachment;
-            lastAttachment = attachment;
-            ++Attachments;
-        }
+        attachment.Source = this;
+        attachment.Previous = lastAttachment;
+        if (lastAttachment is null)
+            Volatile.Write(ref firstAttachment, attachment);
+        else
+            lastAttachment.Next = attachment;
+        lastAttachment = attachment;
+        ++Attachments;
     }
 
+    /// <remarks>
+    /// The registry calls this only while holding its own lock, which is what makes the list safe to mutate without one of its own
+    /// </remarks>
     internal void Detach(SourceNotificationAttachment attachment)
     {
-        lock (attachmentsAccess)
-        {
-            if (attachment.IsRemoved)
-                return;
-            attachment.IsRemoved = true;
-            if (attachment.Previous is null)
-                Volatile.Write(ref firstAttachment, attachment.Next);
-            else
-                attachment.Previous.Next = attachment.Next;
-            if (attachment.Next is null)
-                lastAttachment = attachment.Previous;
-            else
-                attachment.Next.Previous = attachment.Previous;
-            attachment.Previous = null;
-            --Attachments;
-        }
+        if (attachment.IsRemoved)
+            return;
+        attachment.IsRemoved = true;
+        if (attachment.Previous is null)
+            Volatile.Write(ref firstAttachment, attachment.Next);
+        else
+            attachment.Previous.Next = attachment.Next;
+        if (attachment.Next is null)
+            lastAttachment = attachment.Previous;
+        else
+            attachment.Next.Previous = attachment.Previous;
+        attachment.Previous = null;
+        --Attachments;
     }
 
     void NotifyAttachments(object? sender, EventArgs e)
