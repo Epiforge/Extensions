@@ -98,6 +98,9 @@ public sealed class DirectSubscriptionAnalyzer
         internal void EndDeferredGroup(int enclosing) =>
             CurrentGroup = enclosing;
 
+        bool IsAncestorOrSelf(int candidate, int group) =>
+            NearestCommonAncestor(candidate, group) == candidate;
+
         void Lower(Expression expression, int group)
         {
             if (groups.TryGetValue(expression, out var reached) && NearestCommonAncestor(reached, group) is var lowered && lowered != reached)
@@ -120,6 +123,28 @@ public sealed class DirectSubscriptionAnalyzer
             return first;
         }
 
+        /// <summary>
+        /// Discards a subscription which another names the same event of the same source for, from a group attached no later and never released, since the graph gives one node to an expression however many places name it and attaches that node once; sibling groups keep theirs, neither being attached when the other is
+        /// </summary>
+        void DiscardRedundant()
+        {
+            for (var i = Subscriptions.Count - 1; i >= 0; --i)
+            {
+                var subscription = Subscriptions[i];
+                for (var j = 0; j < Subscriptions.Count; ++j)
+                {
+                    if (j == i)
+                        continue;
+                    var other = Subscriptions[j];
+                    if (!ReferenceEquals(other.Source, subscription.Source) || other.Kind != subscription.Kind || other.PropertyName != subscription.PropertyName || !IsAncestorOrSelf(other.DeferredGroup, subscription.DeferredGroup) || other.DeferredGroup == subscription.DeferredGroup && j > i)
+                        continue;
+                    Subscriptions.RemoveAt(i);
+                    owners.RemoveAt(i);
+                    break;
+                }
+            }
+        }
+
         internal bool Reached(Expression expression)
         {
             var group = expression is ConstantExpression or ParameterExpression ? 0 : CurrentGroup;
@@ -138,6 +163,7 @@ public sealed class DirectSubscriptionAnalyzer
             for (int i = 0, ii = Subscriptions.Count; i < ii; ++i)
                 if (Subscriptions[i] is var subscription && groups[owners[i]] is var owned && owned != subscription.DeferredGroup)
                     Subscriptions[i] = new(subscription.Source!, subscription.Kind, subscription.PropertyName, owned);
+            DiscardRedundant();
             var used = new bool[DeferredGroups.Count];
             for (int i = 0, ii = Subscriptions.Count; i < ii; ++i)
                 if (Subscriptions[i].DeferredGroup is var group && group > 0)

@@ -113,13 +113,12 @@ public class DirectSubscriptionPlanning
         var people = new ObservableCollection<TestPerson>(TestPerson.MakePeople());
         var plan = Analyzer().Plan(Expression.MakeIndex(Expression.Constant(people), typeof(ObservableCollection<TestPerson>).GetProperty("Item")!, [Expression.Constant(0)]));
         Assert.IsTrue(plan.IsEligible);
-        Assert.AreEqual(3, plan.Subscriptions.Count);
+        Assert.AreEqual(2, plan.Subscriptions.Count, $"[{string.Join(", ", plan.Subscriptions)}]");
         Assert.AreEqual(DirectSubscriptionKind.CollectionChanged, plan.Subscriptions[0].Kind);
         Assert.AreSame(people, ValueOf(plan.Subscriptions[0].Source));
-        Assert.AreEqual(plan.Subscriptions[0], plan.Subscriptions[1]);
-        Assert.AreEqual(DirectSubscriptionKind.IndexerPropertyChanged, plan.Subscriptions[2].Kind);
-        Assert.AreEqual("Item", plan.Subscriptions[2].PropertyName);
-        Assert.AreSame(people, ValueOf(plan.Subscriptions[2].Source));
+        Assert.AreEqual(DirectSubscriptionKind.IndexerPropertyChanged, plan.Subscriptions[1].Kind);
+        Assert.AreEqual("Item", plan.Subscriptions[1].PropertyName);
+        Assert.AreSame(people, ValueOf(plan.Subscriptions[1].Source));
     }
 
     [TestMethod]
@@ -128,13 +127,12 @@ public class DirectSubscriptionPlanning
         var parameter = Expression.Parameter(typeof(ObservableDictionary<int, int>));
         var plan = Analyzer().Plan(Expression.MakeIndex(parameter, typeof(ObservableDictionary<int, int>).GetProperty("Item")!, [Expression.Constant(5)]));
         Assert.IsTrue(plan.IsEligible);
-        Assert.AreEqual(3, plan.Subscriptions.Count);
+        Assert.AreEqual(2, plan.Subscriptions.Count, $"[{string.Join(", ", plan.Subscriptions)}]");
         Assert.AreEqual(DirectSubscriptionKind.DictionaryOrCollectionChanged, plan.Subscriptions[0].Kind);
         Assert.AreSame(parameter, plan.Subscriptions[0].Source);
-        Assert.AreEqual(plan.Subscriptions[0], plan.Subscriptions[1]);
-        Assert.AreEqual(DirectSubscriptionKind.IndexerPropertyChanged, plan.Subscriptions[2].Kind);
-        Assert.AreEqual("Item", plan.Subscriptions[2].PropertyName);
-        Assert.AreSame(parameter, plan.Subscriptions[2].Source);
+        Assert.AreEqual(DirectSubscriptionKind.IndexerPropertyChanged, plan.Subscriptions[1].Kind);
+        Assert.AreEqual("Item", plan.Subscriptions[1].PropertyName);
+        Assert.AreSame(parameter, plan.Subscriptions[1].Source);
     }
 
     [TestMethod]
@@ -164,13 +162,12 @@ public class DirectSubscriptionPlanning
         Analyzer().Plan(null!);
 
     [TestMethod]
-    public void RepeatedMemberPlansTheSameSiteTwice()
+    public void RepeatedMemberPlansOneSite()
     {
         var person = TestPerson.CreateEmily();
         var plan = Analyzer().Plan(Bound<long>(subject => subject.NameGets + subject.NameGets, person));
         Assert.IsTrue(plan.IsEligible);
-        Assert.AreEqual(2, plan.Subscriptions.Count);
-        Assert.AreEqual(plan.Subscriptions[0], plan.Subscriptions[1]);
+        Assert.AreEqual(1, plan.Subscriptions.Count, $"[{string.Join(", ", plan.Subscriptions)}]");
         Assert.AreEqual(DirectSubscriptionKind.MemberPropertyChanged, plan.Subscriptions[0].Kind);
         Assert.AreEqual(nameof(TestPerson.NameGets), plan.Subscriptions[0].PropertyName);
         Assert.AreSame(person, ValueOf(plan.Subscriptions[0].Source));
@@ -183,7 +180,33 @@ public class DirectSubscriptionPlanning
         var index = Expression.MakeIndex(Expression.Constant(people), typeof(ObservableCollection<TestPerson>).GetProperty("Item")!, [Expression.Constant(0)]);
         var plan = Analyzer().Plan(Expression.MakeBinary(ExpressionType.Equal, index, index));
         Assert.IsTrue(plan.IsEligible);
-        Assert.AreEqual(3, plan.Subscriptions.Count);
+        Assert.AreEqual(2, plan.Subscriptions.Count, $"[{string.Join(", ", plan.Subscriptions)}]");
+        Assert.AreEqual(DirectSubscriptionKind.CollectionChanged, plan.Subscriptions[0].Kind);
+        Assert.AreEqual(DirectSubscriptionKind.IndexerPropertyChanged, plan.Subscriptions[1].Kind);
+    }
+
+    [TestMethod]
+    public void AMemberReadByBothTheTestAndABranchOfAConditionalIsPlannedOnceAndEagerly()
+    {
+        var person = TestPerson.CreateEmily();
+        var plan = Analyzer().Plan(Bound<long>(subject => subject.NameGets > 0 ? subject.NameGets : subject.NameGets, person));
+        Assert.IsTrue(plan.IsEligible);
+        Assert.AreEqual(1, plan.Subscriptions.Count, $"[{string.Join(", ", plan.Subscriptions)}]");
+        Assert.AreEqual(0, plan.Subscriptions[0].DeferredGroup);
+        Assert.AreEqual(0, plan.DeferredGroups.Count);
+    }
+
+    [TestMethod]
+    public void AMemberReadBySiblingBranchesOfAConditionalIsPlannedInEach()
+    {
+        var person = TestPerson.CreateEmily();
+        var plan = Analyzer().Plan(Bound<long>(subject => subject.Name!.Length > 0 ? subject.NameGets : subject.NameGets + 1, person));
+        Assert.IsTrue(plan.IsEligible);
+        Assert.AreEqual(2, plan.DeferredGroups.Count, $"[{string.Join(", ", plan.Subscriptions)}]");
+        var deferred = plan.Subscriptions.Where(subscription => subscription.PropertyName == nameof(TestPerson.NameGets)).ToList();
+        Assert.AreEqual(2, deferred.Count, $"[{string.Join(", ", plan.Subscriptions)}]");
+        Assert.AreEqual(1, deferred[0].DeferredGroup);
+        Assert.AreEqual(2, deferred[1].DeferredGroup);
     }
 
     [TestMethod]
