@@ -123,6 +123,7 @@ public class ExpressionObserver :
     }
 
     readonly ConditionalWeakTable<LambdaExpression, DirectEvaluator> compiledLambdas = [];
+    readonly ConditionalWeakTable<LambdaExpression, DirectEvaluator> compiledOptimizedLambdas = [];
     DirectSubscriptionAnalyzer? directSubscriptionAnalyzer;
 
     internal readonly DirectSubscriptionRegistry DirectSubscriptions = new();
@@ -805,26 +806,32 @@ public class ExpressionObserver :
     public IObservableExpression<TResult> ObserveWithoutOptimization<TResult>(Expression<Func<TResult>> expression) =>
         ObserveWithoutOptimization<TResult>((LambdaExpression)expression);
 
-    DirectEvaluator CompiledLambda<TArgument, TResult>(Expression<Func<TArgument, TResult>> lambdaExpression)
+    /// <summary>
+    /// Compiles a lambda for direct subscription, from the expression the optimizer produces where one is configured and the caller has not asked for it to be left alone, so that both mechanisms observe the same expression; the two forms are cached apart because one lambda can be observed either way
+    /// </summary>
+    DirectEvaluator CompiledLambda<TArgument, TResult>(Expression<Func<TArgument, TResult>> lambdaExpression, bool optimize)
     {
-        if (compiledLambdas.TryGetValue(lambdaExpression, out var evaluator))
+        var optimizing = optimize && Optimizer is not null;
+        var compiled = optimizing ? compiledOptimizedLambdas : compiledLambdas;
+        if (compiled.TryGetValue(lambdaExpression, out var evaluator))
             return evaluator;
-        if ((directSubscriptionAnalyzer ??= new DirectSubscriptionAnalyzer(this)).Plan(lambdaExpression.Body) is not { IsEligible: true } plan)
+        var observed = optimizing ? (LambdaExpression)Optimizer!(lambdaExpression) : lambdaExpression;
+        if ((directSubscriptionAnalyzer ??= new DirectSubscriptionAnalyzer(this)).Plan(observed.Body) is not { IsEligible: true } plan)
             evaluator = DirectEvaluator.Ineligible;
         else
         {
             var values = Expression.Parameter(typeof(object[]), "values");
             var reached = Expression.Parameter(typeof(bool[]), "reached");
             var rewriter = new FixedSubexpressionRewriter(values, reached, plan.DeferredGroups);
-            var body = rewriter.Visit(lambdaExpression.Body)!;
+            var body = rewriter.Visit(observed.Body)!;
             var fixedSubexpressions = rewriter.FixedSubexpressions;
             var subscriptions = plan.Subscriptions;
             var sites = new DirectSubscriptionSite[subscriptions.Count];
             for (var i = 0; i < sites.Length; ++i)
-                sites[i] = Site(subscriptions[i], lambdaExpression, fixedSubexpressions);
-            evaluator = new DirectEvaluator(Expression.Lambda<Func<TArgument, object?[], bool[], TResult>>(body, lambdaExpression.Parameters[0], values, reached).Compile(), [.. fixedSubexpressions], sites, plan.DeferredGroups.Count);
+                sites[i] = Site(subscriptions[i], observed, fixedSubexpressions);
+            evaluator = new DirectEvaluator(Expression.Lambda<Func<TArgument, object?[], bool[], TResult>>(body, observed.Parameters[0], values, reached).Compile(), [.. fixedSubexpressions], sites, plan.DeferredGroups.Count);
         }
-        compiledLambdas.AddOrUpdate(lambdaExpression, evaluator);
+        compiled.AddOrUpdate(lambdaExpression, evaluator);
         return evaluator;
     }
 
@@ -851,9 +858,9 @@ public class ExpressionObserver :
         return new(subscription, fixedSubexpressions.Count - 1, null, forcesNotification);
     }
 
-    DirectObservableExpression<TArgument, TResult>? DirectObservation<TArgument, TResult>(Expression<Func<TArgument, TResult>> lambdaExpression, TArgument argument)
+    DirectObservableExpression<TArgument, TResult>? DirectObservation<TArgument, TResult>(Expression<Func<TArgument, TResult>> lambdaExpression, TArgument argument, bool optimize)
     {
-        if (!UseDirectSubscription || CompiledLambda(lambdaExpression) is not { Sites: { } sites } evaluator)
+        if (!UseDirectSubscription || CompiledLambda(lambdaExpression, optimize) is not { Sites: { } sites } evaluator)
             return null;
         var fixedSubexpressions = evaluator.FixedSubexpressions;
         var values = fixedSubexpressions.Length == 0 ? [] : new object?[fixedSubexpressions.Length];
@@ -877,7 +884,7 @@ public class ExpressionObserver :
     public IObservableExpression<TArgument, TResult> Observe<TArgument, TResult>(Expression<Func<TArgument, TResult>> expression, TArgument argument)
     {
         ArgumentNullException.ThrowIfNull(expression);
-        if (DirectObservation<TArgument, TResult>(expression, argument) is { } direct)
+        if (DirectObservation<TArgument, TResult>(expression, argument, true) is { } direct)
             return new ScopedObservableExpression<TArgument, TResult>(this, null, direct, argument);
         var parameterReplacedExpression = ReplaceParameters(expression, argument);
         return new ScopedObservableExpression<TArgument, TResult>(this, parameterReplacedExpression!, GetObservableExpression(parameterReplacedExpression!, false), argument);
@@ -888,7 +895,7 @@ public class ExpressionObserver :
     public IObservableExpression<TArgument, TResult> ObserveWithoutOptimization<TArgument, TResult>(Expression<Func<TArgument, TResult>> expression, TArgument argument)
     {
         ArgumentNullException.ThrowIfNull(expression);
-        if (DirectObservation<TArgument, TResult>(expression, argument) is { } direct)
+        if (DirectObservation<TArgument, TResult>(expression, argument, false) is { } direct)
             return new ScopedObservableExpression<TArgument, TResult>(this, null, direct, argument);
         var parameterReplacedExpression = ExpressionObserver.ReplaceParametersWithoutOptimization(expression, argument);
         return new ScopedObservableExpression<TArgument, TResult>(this, parameterReplacedExpression!, GetObservableExpression(parameterReplacedExpression!, false), argument);
