@@ -7,27 +7,35 @@ enum SourceNotificationKind
     PropertyChanged
 }
 
-sealed class SourceNotificationAttachment
+class SourceNotificationAttachment
 {
-    internal SourceNotificationAttachment(Action<object?, EventArgs> handler) =>
+    internal SourceNotificationAttachment(Action<object?, EventArgs>? handler) =>
         Handler = handler;
 
-    internal readonly Action<object?, EventArgs> Handler;
+    internal Action<object?, EventArgs>? Handler;
     internal volatile bool IsRemoved;
     internal volatile SourceNotificationAttachment? Next;
+    internal SourceNotificationOwner? Owner;
     internal SourceNotificationAttachment? Previous;
-    internal SourceNotificationSource? Source;
 }
 
 /// <summary>
-/// One event of one source object, to which the graph attaches a single handler however many nodes are interested, so that every node reacts within one propagation and no consumer sees a value composed of inputs which were never simultaneously current
+/// The first attachment to one event of one source object, which is also what is registered with that event, so that however many nodes are interested every one of them reacts within a single propagation and no consumer sees a value composed of inputs which were never simultaneously current
 /// </summary>
-sealed class SourceNotificationSource
+/// <remarks>
+/// The registration is made when this is constructed and released only when the last attachment goes, and is never exchanged for another: .NET captures an event's invocation list when it raises, so swapping a registration while a dispatch is in flight would let two handlers run in separate propagations, which is the defect this exists to prevent. That is why this remains the owner of the list after its own handler is detached, as a removed attachment the walk skips.
+/// </remarks>
+sealed class SourceNotificationOwner :
+    SourceNotificationAttachment
 {
-    internal SourceNotificationSource(object source, SourceNotificationKind kind)
+    internal SourceNotificationOwner(object source, SourceNotificationKind kind, Action<object?, EventArgs> handler) :
+        base(handler)
     {
         this.kind = kind;
         this.source = source;
+        Owner = this;
+        last = this;
+        Live = 1;
         switch (kind)
         {
             case SourceNotificationKind.DictionaryChanged:
@@ -42,12 +50,11 @@ sealed class SourceNotificationSource
         }
     }
 
-    SourceNotificationAttachment? firstAttachment;
     readonly SourceNotificationKind kind;
-    SourceNotificationAttachment? lastAttachment;
+    SourceNotificationAttachment last;
     readonly object source;
 
-    internal int Attachments;
+    internal int Live;
 
     internal (object Source, SourceNotificationKind Kind) Key =>
         (source, kind);
@@ -57,45 +64,43 @@ sealed class SourceNotificationSource
     /// </remarks>
     internal void Attach(SourceNotificationAttachment attachment)
     {
-        attachment.Source = this;
-        attachment.Previous = lastAttachment;
-        if (lastAttachment is null)
-            Volatile.Write(ref firstAttachment, attachment);
-        else
-            lastAttachment.Next = attachment;
-        lastAttachment = attachment;
-        ++Attachments;
+        attachment.Owner = this;
+        attachment.Previous = last;
+        Volatile.Write(ref last.Next, attachment);
+        last = attachment;
+        ++Live;
     }
 
     /// <remarks>
-    /// The registry calls this only while holding its own lock, which is what makes the list safe to mutate without one of its own
+    /// The registry calls this only while holding its own lock, which is what makes the list safe to mutate without one of its own. The owner is never unlinked, because the walk begins at it
     /// </remarks>
     internal void Detach(SourceNotificationAttachment attachment)
     {
         if (attachment.IsRemoved)
             return;
         attachment.IsRemoved = true;
-        if (attachment.Previous is null)
-            Volatile.Write(ref firstAttachment, attachment.Next);
+        attachment.Handler = null;
+        --Live;
+        if (ReferenceEquals(attachment, this))
+            return;
+        if (attachment.Previous is { } previous)
+            Volatile.Write(ref previous.Next, attachment.Next);
+        if (attachment.Next is { } following)
+            following.Previous = attachment.Previous;
         else
-            attachment.Previous.Next = attachment.Next;
-        if (attachment.Next is null)
-            lastAttachment = attachment.Previous;
-        else
-            attachment.Next.Previous = attachment.Previous;
+            last = attachment.Previous!;
         attachment.Previous = null;
-        --Attachments;
     }
 
     void NotifyAttachments(object? sender, EventArgs e)
     {
         using var propagation = new PropagationScope();
-        var current = Volatile.Read(ref firstAttachment);
+        SourceNotificationAttachment? current = this;
         while (current is not null)
         {
             var following = current.Next;
-            if (!current.IsRemoved)
-                current.Handler(sender, e);
+            if (!current.IsRemoved && current.Handler is { } handler)
+                handler(sender, e);
             current = following;
         }
     }
@@ -141,39 +146,40 @@ sealed class SourceNotificationRegistry
     }
 
 #if IS_NET_9_0_OR_GREATER
-    readonly Lock sourcesAccess = new();
+    readonly Lock ownersAccess = new();
 #else
-    readonly object sourcesAccess = new();
+    readonly object ownersAccess = new();
 #endif
-    readonly Dictionary<(object Source, SourceNotificationKind Kind), SourceNotificationSource> sources = new(KeyComparer.Default);
+    readonly Dictionary<(object Source, SourceNotificationKind Kind), SourceNotificationOwner> owners = new(KeyComparer.Default);
 
     internal SourceNotificationAttachment Attach(object source, SourceNotificationKind kind, Action<object?, EventArgs> handler)
     {
-        var attachment = new SourceNotificationAttachment(handler);
-        lock (sourcesAccess)
+        lock (ownersAccess)
         {
             var key = (source, kind);
-            if (!sources.TryGetValue(key, out var notificationSource))
+            if (!owners.TryGetValue(key, out var owner))
             {
-                notificationSource = new SourceNotificationSource(source, kind);
-                sources.Add(key, notificationSource);
+                owner = new SourceNotificationOwner(source, kind, handler);
+                owners.Add(key, owner);
+                return owner;
             }
-            notificationSource.Attach(attachment);
+            var attachment = new SourceNotificationAttachment(handler);
+            owner.Attach(attachment);
+            return attachment;
         }
-        return attachment;
     }
 
     internal void Detach(SourceNotificationAttachment? attachment)
     {
-        if (attachment?.Source is not { } notificationSource)
+        if (attachment?.Owner is not { } owner)
             return;
-        lock (sourcesAccess)
+        lock (ownersAccess)
         {
-            notificationSource.Detach(attachment);
-            if (notificationSource.Attachments > 0)
+            owner.Detach(attachment);
+            if (owner.Live > 0)
                 return;
-            sources.Remove(notificationSource.Key);
-            notificationSource.Release();
+            owners.Remove(owner.Key);
+            owner.Release();
         }
     }
 }

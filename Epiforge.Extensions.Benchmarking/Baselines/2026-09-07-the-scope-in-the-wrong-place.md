@@ -21,15 +21,15 @@ Nothing smaller could fix it. The announcement at flush reads the root's cached 
 
 ## The readings
 
-| arm | before | with the registry | after dropping the redundant lock |
-|---|---|---|---|
-| `RankComparisonGraph` | 2.62 MB / 2,352.1 μs | 2.86 MB / 2,561.5 μs | 2.81 MB / 2,349.2 μs |
-| `ConditionalGraph` | 5.05 MB | 5.28 MB | 5.23 MB |
-| `TwoObjectShortCircuitGraph` | 3.95 MB | 4.18 MB | 4.13 MB |
-| `NotifyingChainGraph` | 3.39 MB | 3.85 MB | 3.75 MB |
-| `IndexerReadGraph` | 15.24 MB / 10,640.5 μs | 4.86 MB / 5,027.5 μs | **4.81 MB / 4,622.8 μs** |
-| `RankComparisonDirect` (control) | 1.18 MB / 361.6 μs | 1.18 MB / 361.5 μs | 1.18 MB / 352.2 μs |
-| `IndexerReadDirect` (control) | 1.35 MB | 1.35 MB | 1.35 MB |
+| arm | before | with the registry | lock dropped | first attachment as owner |
+|---|---|---|---|---|
+| `RankComparisonGraph` | 2.62 MB / 2,352.1 μs | 2.86 MB / 2,561.5 μs | 2.81 MB / 2,349.2 μs | 2.78 MB / 2,476.6 μs |
+| `ConditionalGraph` | 5.05 MB | 5.28 MB | 5.23 MB | 5.21 MB |
+| `TwoObjectShortCircuitGraph` | 3.95 MB | 4.18 MB | 4.13 MB | 4.11 MB |
+| `NotifyingChainGraph` | 3.39 MB | 3.85 MB | 3.75 MB | 3.71 MB |
+| `IndexerReadGraph` | 15.24 MB / 10,640.5 μs | 4.86 MB / 5,027.5 μs | 4.81 MB / 4,622.8 μs | **4.79 MB / 4,861.6 μs** |
+| `RankComparisonDirect` (control) | 1.18 MB / 361.6 μs | 1.18 MB / 361.5 μs | 1.18 MB / 352.2 μs | 1.18 MB / 356.0 μs |
+| `IndexerReadDirect` (control) | 1.35 MB | 1.35 MB | 1.35 MB | 1.35 MB |
 
 `ObservationShapeBenchmarks` did not move by a byte: 70.31, 93.75 and 117.19 KB, which are the recorded 72, 96 and 120 bytes per change. **The registry is construction-only and costs nothing on the propagation path.**
 
@@ -41,7 +41,11 @@ Nothing smaller could fix it. The announcement at flush reads the root's cached 
 
 **The per-source lock was redundant and worth 50 bytes of it.** `Attach` and `Detach` are only ever called while the registry holds its own lock, and `NotifyAttachments` takes none, walking with volatile reads — so the source's own lock could never be contended. Removing it saved 0.05 MB per thousand where each element is one source and 0.10 for `NotifyingChain`'s two, closing the same model a second time. The prediction was 24 bytes and the reading was 50: the field is a `System.Threading.Lock` on `net10.0`, a class carrying owner and recursion state, not the empty sync object it was priced as. **Count times unit cost held; the unit was read wrong.**
 
-So the graph pays 7.3% where every element is its own source and saves 68% where elements share one, propagation is untouched, and a correctness defect is gone.
+**Making the first attachment the owner was worth a flat 24 bytes per source.** A separate source object costs 48 and is replaced by 24 bytes of extra fields on one derived instance per source, so a plain attachment stays at 56 and the saving is independent of how many nodes share the source — no crossover, and no registration is ever swapped, which is what rules out the promotion design. This was predicted in advance at 2.79 / 5.21 / 4.11 / 3.70 / 4.79 and read back at 2.78 / 5.21 / 4.11 / 3.71 / 4.79, with `NotifyingChain` moving twice the single-source arms as the per-source model requires. **An earlier count said this change would have a crossover and lose above two nodes per source; that count was wrong because it assumed one class rather than a derived owner.**
+
+So the graph pays 6.1% where every element is its own source and saves 68% where elements share one, propagation is untouched, and a correctness defect is gone.
+
+**The account does not close, by about a fifth.** Measured overhead is 160 bytes per source (2.78 against 2.62 per thousand elements). Named: 56 for the attachment, 24 for the owner's extra fields, about 47 for a dictionary entry with load-factor slack — 127. **Roughly 33 bytes per source are unexplained**, and by this project's own rule that is a finding rather than a rounding. It has not been chased. Candidates not yet separated: the dictionary's growth behavior at a thousand entries, the owner's actual layout, and something unnamed.
 
 **An excursion, recorded as one.** In the final run `TwoObjectShortCircuitDirect` read 4,921.0 μs against its `Graph` twin's 3,903.8 on byte-identical allocation of 4.13 MB — 26% apart for identical work, with an error of 96.22 μs and a deviation of 180.73, both unusually high for this class. That is the instrument. The next run of this suite for any other reason settles it; do not chase it.
 
