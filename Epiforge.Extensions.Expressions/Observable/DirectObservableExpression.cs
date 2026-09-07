@@ -4,6 +4,7 @@ abstract class DirectObservableExpression(ExpressionObserver observer, Type type
     ObservableExpression(observer, type, false)
 {
     private protected static readonly bool[] noDeferredGroups = [];
+    private protected static readonly object?[] noLinks = [];
 
     internal static object? Resolve(Expression expression, object? argument) =>
         expression switch
@@ -37,36 +38,43 @@ abstract class DirectObservableExpression(ExpressionObserver observer, Type type
     /// <summary>
     /// Counts the sites of a group which resolve to something to attach to, which is done before anything is allocated so that the array of attachments is made once at the size it will keep
     /// </summary>
-    static int Attaching(DirectSubscriptionSite[] sites, int group, object? argument, object?[] values)
+    static int Attaching(DirectSubscriptionSite[] sites, int group, object? argument, object?[] values, object?[] links)
     {
         var attaching = 0;
         for (var i = 0; i < sites.Length; ++i)
         {
             var site = sites[i];
-            if (site.DeferredGroup != group)
+            if (site.DeferredGroup != group || site.Link >= 0)
                 continue;
-            var source = site.ResolveSource(argument, values);
+            var source = site.ResolveSource(argument, values, links);
             if (source is not null && site.ResolveKind(source) is not DirectSubscriptionKind.None)
                 ++attaching;
         }
         return attaching;
     }
 
-    private protected void Attach(DirectSubscriptionSite[] sites, object? argument, object?[] values)
+    /// <summary>
+    /// Attaches one site to whatever its source resolves to now, which is <c>null</c> where that value notifies of nothing the site wants
+    /// </summary>
+    private protected DirectSubscriptionAttachment? AttachSite(DirectSubscriptionSite site, object? argument, object?[] values, object?[] links)
     {
-        if (Attaching(sites, 0, argument, values) is var attaching && attaching == 0)
+        var source = site.ResolveSource(argument, values, links);
+        return source is null || site.ResolveKind(source) is var kind && kind is DirectSubscriptionKind.None ? null : observer.DirectSubscriptions.Attach(source, kind, site.PropertyName, this, site.ForcesNotification);
+    }
+
+    private protected void Attach(DirectSubscriptionSite[] sites, object? argument, object?[] values, object?[] links)
+    {
+        if (Attaching(sites, 0, argument, values, links) is var attaching && attaching == 0)
             return;
         var attached = new DirectSubscriptionAttachment[attaching];
         var index = 0;
         for (var i = 0; i < sites.Length; ++i)
         {
             var site = sites[i];
-            if (site.DeferredGroup != 0)
+            if (site.DeferredGroup != 0 || site.Link >= 0)
                 continue;
-            var source = site.ResolveSource(argument, values);
-            if (source is null || site.ResolveKind(source) is var kind && kind is DirectSubscriptionKind.None)
-                continue;
-            attached[index++] = observer.DirectSubscriptions.Attach(source, kind, site.PropertyName, this, site.ForcesNotification);
+            if (AttachSite(site, argument, values, links) is { } attachment)
+                attached[index++] = attachment;
         }
         attachments = attached;
     }
@@ -74,9 +82,9 @@ abstract class DirectObservableExpression(ExpressionObserver observer, Type type
     /// <summary>
     /// Attaches the subscriptions of a deferred group, which is done the first time the operand of that group is evaluated because that is when the graph attaches the nodes of that operand
     /// </summary>
-    private protected bool AttachDeferred(DirectSubscriptionSite[] sites, int group, object? argument, object?[] values)
+    private protected bool AttachDeferred(DirectSubscriptionSite[] sites, int group, object? argument, object?[] values, object?[] links)
     {
-        if (Attaching(sites, group, argument, values) is var attaching && attaching == 0)
+        if (Attaching(sites, group, argument, values, links) is var attaching && attaching == 0)
             return false;
         var current = attachments;
         var updated = new DirectSubscriptionAttachment[current.Length + attaching];
@@ -85,12 +93,10 @@ abstract class DirectObservableExpression(ExpressionObserver observer, Type type
         for (var i = 0; i < sites.Length; ++i)
         {
             var site = sites[i];
-            if (site.DeferredGroup != group)
+            if (site.DeferredGroup != group || site.Link >= 0)
                 continue;
-            var source = site.ResolveSource(argument, values);
-            if (source is null || site.ResolveKind(source) is var kind && kind is DirectSubscriptionKind.None)
-                continue;
-            updated[index++] = observer.DirectSubscriptions.Attach(source, kind, site.PropertyName, this, site.ForcesNotification);
+            if (AttachSite(site, argument, values, links) is { } attachment)
+                updated[index++] = attachment;
         }
         while (!ReferenceEquals(Interlocked.CompareExchange(ref attachments, updated, current), current))
         {
@@ -121,7 +127,7 @@ class DirectObservableExpression<TArgument, TResult> :
     static readonly bool sharesBooleanBoxes = typeof(TResult) == typeof(bool);
     static readonly TResult trueResult = typeof(TResult) == typeof(bool) ? (TResult)(object)true : default!;
 
-    internal DirectObservableExpression(ExpressionObserver observer, Expression<Func<TArgument, TResult>> lambdaExpression, DirectSubscriptionSite[] sites, Func<TArgument, object?[], bool[], TResult> evaluate, TArgument argument, object?[] values) :
+    internal DirectObservableExpression(ExpressionObserver observer, Expression<Func<TArgument, TResult>> lambdaExpression, DirectSubscriptionSite[] sites, Func<TArgument, object?[], bool[], object?[], TResult> evaluate, TArgument argument, object?[] values) :
         base(observer, lambdaExpression.Body.Type)
     {
         this.argument = argument;
@@ -134,7 +140,7 @@ class DirectObservableExpression<TArgument, TResult> :
 
     private protected readonly TArgument argument;
     readonly bool comparesBeforeBoxing;
-    private protected readonly Func<TArgument, object?[], bool[], TResult> evaluate;
+    private protected readonly Func<TArgument, object?[], bool[], object?[], TResult> evaluate;
     readonly Expression<Func<TArgument, TResult>> lambdaExpression;
     private protected readonly DirectSubscriptionSite[] sites;
     private protected readonly object?[] values;
@@ -149,7 +155,7 @@ class DirectObservableExpression<TArgument, TResult> :
     {
         try
         {
-            var value = evaluate(argument, values, noDeferredGroups);
+            var value = evaluate(argument, values, noDeferredGroups, noLinks);
             if (!IsCurrentResult(value))
                 Evaluation = (null, Box(value));
             observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{Expression} evaluated directly: {Value}", Expression, value);
@@ -173,7 +179,7 @@ class DirectObservableExpression<TArgument, TResult> :
     {
         try
         {
-            Attach(sites, argument, values);
+            Attach(sites, argument, values, noLinks);
             EvaluateIfNotDeferred();
         }
         catch (Exception ex)
@@ -193,15 +199,56 @@ class DirectObservableExpression<TArgument, TResult> :
 sealed class DeferringDirectObservableExpression<TArgument, TResult> :
     DirectObservableExpression<TArgument, TResult>
 {
-    internal DeferringDirectObservableExpression(ExpressionObserver observer, Expression<Func<TArgument, TResult>> lambdaExpression, DirectSubscriptionSite[] sites, Func<TArgument, object?[], bool[], TResult> evaluate, TArgument argument, object?[] values, bool[] reached) :
-        base(observer, lambdaExpression, sites, evaluate, argument, values) =>
+    internal DeferringDirectObservableExpression(ExpressionObserver observer, Expression<Func<TArgument, TResult>> lambdaExpression, DirectSubscriptionSite[] sites, Func<TArgument, object?[], bool[], object?[], TResult> evaluate, TArgument argument, object?[] values, bool[] reached, object?[] links, int[] linkSites) :
+        base(observer, lambdaExpression, sites, evaluate, argument, values)
+    {
+        attachedLinks = links.Length == 0 ? links : new object?[links.Length];
+        linkAttachments = linkSites.Length == 0 ? [] : new DirectSubscriptionAttachment?[linkSites.Length];
+        this.links = links;
+        this.linkSites = linkSites;
         this.reached = reached;
+    }
 
     long attachedGroups;
+    readonly object?[] attachedLinks;
+    readonly DirectSubscriptionAttachment?[] linkAttachments;
+    readonly object?[] links;
+    readonly int[] linkSites;
     readonly bool[] reached;
 
     internal override bool CanChange =>
         true;
+
+    /// <summary>
+    /// Moves the subscriptions of every link whose value is not the one they are attached to, which is what the graph's node does when the value it read last is not the value it reads now
+    /// </summary>
+    bool AttachChangedLinks()
+    {
+        var moved = false;
+        for (var i = 0; i < links.Length; ++i)
+        {
+            var current = links[i];
+            var attached = attachedLinks[i];
+            if (ReferenceEquals(current, attached) || !ReferenceEquals(Interlocked.CompareExchange(ref attachedLinks[i], current, attached), attached))
+                continue;
+            for (var s = 0; s < linkSites.Length; ++s)
+            {
+                var site = sites[linkSites[s]];
+                if (site.Link != i)
+                    continue;
+                if (Interlocked.Exchange(ref linkAttachments[s], null) is { } previous)
+                    observer.DirectSubscriptions.Detach(previous);
+                if (current is not null && AttachSite(site, argument, values, links) is { } attachment)
+                {
+                    linkAttachments[s] = attachment;
+                    if (Volatile.Read(ref released) != 0 && Interlocked.Exchange(ref linkAttachments[s], null) is { } releasing)
+                        observer.DirectSubscriptions.Detach(releasing);
+                }
+                moved = true;
+            }
+        }
+        return moved;
+    }
 
     bool AttachNewlyReached()
     {
@@ -217,7 +264,7 @@ sealed class DeferringDirectObservableExpression<TArgument, TResult> :
                 var exchanged = Interlocked.CompareExchange(ref attachedGroups, current | bit, current);
                 if (exchanged == current)
                 {
-                    attached |= AttachDeferred(sites, group + 1, argument, values);
+                    attached |= AttachDeferred(sites, group + 1, argument, values, links);
                     break;
                 }
                 current = exchanged;
@@ -226,14 +273,28 @@ sealed class DeferringDirectObservableExpression<TArgument, TResult> :
         return attached;
     }
 
+    protected override bool DisposeCore()
+    {
+        if (!base.DisposeCore())
+            return false;
+        for (var s = 0; s < linkAttachments.Length; ++s)
+            if (Interlocked.Exchange(ref linkAttachments[s], null) is { } attachment)
+                observer.DirectSubscriptions.Detach(attachment);
+        return true;
+    }
+
     protected override void Evaluate()
     {
+        var moved = false;
         while (true)
         {
             try
             {
-                var value = evaluate(argument, values, reached);
-                if (AttachNewlyReached())
+                var value = evaluate(argument, values, reached, links);
+                var again = AttachNewlyReached();
+                if (!moved && AttachChangedLinks())
+                    again = moved = true;
+                if (again)
                     continue;
                 if (!IsCurrentResult(value))
                     Evaluation = (null, Box(value));
@@ -242,7 +303,10 @@ sealed class DeferringDirectObservableExpression<TArgument, TResult> :
             }
             catch (Exception ex)
             {
-                if (AttachNewlyReached())
+                var again = AttachNewlyReached();
+                if (!moved && AttachChangedLinks())
+                    again = moved = true;
+                if (again)
                     continue;
                 Evaluation = (ex, defaultResult);
                 observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, ex, "{Expression} faulted: {Fault}", Expression, ex);

@@ -48,13 +48,10 @@ public class DirectSubscriptionAnalyzer
         Assert.IsTrue(Analyzer().Analyze(BodyOf<int>(person => person.Name!.Length)).IsEligible);
 
     [TestMethod]
-    public void ChainedMemberThroughANotifyingValueIsIneligible()
+    public void ChainedMemberThroughANotifyingValueIsEligible()
     {
         var analysis = Analyzer().Analyze(BodyOfRecorded<int>(recorded => recorded.Next!.Rank));
-        Assert.IsFalse(analysis.IsEligible);
-        Assert.AreEqual(DirectSubscriptionIneligibility.ChangeableMemberTarget, analysis.Ineligibility);
-        Assert.IsInstanceOfType<MemberExpression>(analysis.IneligibleExpression);
-        Assert.AreEqual(nameof(Recorded.Rank), ((MemberExpression)analysis.IneligibleExpression!).Member.Name);
+        Assert.IsTrue(analysis.IsEligible, analysis.ToString());
     }
 
     [TestMethod]

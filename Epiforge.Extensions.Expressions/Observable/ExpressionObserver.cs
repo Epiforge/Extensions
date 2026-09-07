@@ -822,31 +822,35 @@ public class ExpressionObserver :
         {
             var values = Expression.Parameter(typeof(object[]), "values");
             var reached = Expression.Parameter(typeof(bool[]), "reached");
-            var rewriter = new FixedSubexpressionRewriter(values, reached, plan.DeferredGroups);
+            var links = Expression.Parameter(typeof(object[]), "links");
+            var rewriter = new FixedSubexpressionRewriter(values, reached, links, plan.DeferredGroups, plan.Links);
             var body = rewriter.Visit(observed.Body)!;
             var fixedSubexpressions = rewriter.FixedSubexpressions;
             var subscriptions = plan.Subscriptions;
             var sites = new DirectSubscriptionSite[subscriptions.Count];
             for (var i = 0; i < sites.Length; ++i)
-                sites[i] = Site(subscriptions[i], observed, fixedSubexpressions);
-            evaluator = new DirectEvaluator(Expression.Lambda<Func<TArgument, object?[], bool[], TResult>>(body, observed.Parameters[0], values, reached).Compile(), [.. fixedSubexpressions], sites, plan.DeferredGroups.Count);
+                sites[i] = Site(subscriptions[i], observed, fixedSubexpressions, plan.Links);
+            evaluator = new DirectEvaluator(Expression.Lambda<Func<TArgument, object?[], bool[], object?[], TResult>>(body, observed.Parameters[0], values, reached, links).Compile(), [.. fixedSubexpressions], sites, plan.DeferredGroups.Count, plan.Links.Count);
         }
         compiled.AddOrUpdate(lambdaExpression, evaluator);
         return evaluator;
     }
 
-    static DirectSubscriptionSite Site(DirectSubscription subscription, LambdaExpression lambdaExpression, List<Expression> fixedSubexpressions)
+    static DirectSubscriptionSite Site(DirectSubscription subscription, LambdaExpression lambdaExpression, List<Expression> fixedSubexpressions, IReadOnlyList<Expression> links)
     {
         var source = subscription.Source!;
         var forcesNotification = ReferenceEquals(source, lambdaExpression.Body);
+        for (int i = 0, ii = links.Count; i < ii; ++i)
+            if (ReferenceEquals(links[i], source))
+                return new(subscription, DirectSubscriptionSite.Constant, null, forcesNotification, i);
         for (int i = 0, ii = fixedSubexpressions.Count; i < ii; ++i)
             if (ReferenceEquals(fixedSubexpressions[i], source))
-                return new(subscription, i, null, forcesNotification);
+                return new(subscription, i, null, forcesNotification, -1);
         return source switch
         {
-            ParameterExpression parameterExpression when ReferenceEquals(parameterExpression, lambdaExpression.Parameters[0]) => new(subscription, DirectSubscriptionSite.Argument, null, forcesNotification),
-            ConstantExpression constantExpression => new(subscription, DirectSubscriptionSite.Constant, constantExpression.Value, forcesNotification),
-            UnaryExpression { NodeType: ExpressionType.Quote } unaryExpression => new(subscription, DirectSubscriptionSite.Constant, unaryExpression.Operand, forcesNotification),
+            ParameterExpression parameterExpression when ReferenceEquals(parameterExpression, lambdaExpression.Parameters[0]) => new(subscription, DirectSubscriptionSite.Argument, null, forcesNotification, -1),
+            ConstantExpression constantExpression => new(subscription, DirectSubscriptionSite.Constant, constantExpression.Value, forcesNotification, -1),
+            UnaryExpression { NodeType: ExpressionType.Quote } unaryExpression => new(subscription, DirectSubscriptionSite.Constant, unaryExpression.Operand, forcesNotification, -1),
             MemberExpression memberExpression when DirectSubscriptionAnalyzer.IsFixed(memberExpression) => Frozen(subscription, memberExpression, fixedSubexpressions, forcesNotification),
             _ => throw new NotSupportedException($"the analyzer planned a subscription to {source}, which the execution path cannot resolve once per observation")
         };
@@ -855,7 +859,7 @@ public class ExpressionObserver :
     static DirectSubscriptionSite Frozen(DirectSubscription subscription, MemberExpression memberExpression, List<Expression> fixedSubexpressions, bool forcesNotification)
     {
         fixedSubexpressions.Add(memberExpression);
-        return new(subscription, fixedSubexpressions.Count - 1, null, forcesNotification);
+        return new(subscription, fixedSubexpressions.Count - 1, null, forcesNotification, -1);
     }
 
     DirectObservableExpression<TArgument, TResult>? DirectObservation<TArgument, TResult>(Expression<Func<TArgument, TResult>> lambdaExpression, TArgument argument, bool optimize)
@@ -870,10 +874,10 @@ public class ExpressionObserver :
             for (var i = 0; i < values.Length; ++i)
                 values[i] = DirectObservableExpression.Resolve(fixedSubexpressions[i], resolutionArgument);
         }
-        var evaluate = (Func<TArgument, object?[], bool[], TResult>)evaluator.Evaluate;
-        DirectObservableExpression<TArgument, TResult> directObservableExpression = evaluator.DeferredGroupCount == 0
+        var evaluate = (Func<TArgument, object?[], bool[], object?[], TResult>)evaluator.Evaluate;
+        DirectObservableExpression<TArgument, TResult> directObservableExpression = evaluator.DeferredGroupCount == 0 && evaluator.LinkCount == 0
             ? new DirectObservableExpression<TArgument, TResult>(this, lambdaExpression, sites, evaluate, argument, values)
-            : new DeferringDirectObservableExpression<TArgument, TResult>(this, lambdaExpression, sites, evaluate, argument, values, new bool[evaluator.DeferredGroupCount]);
+            : new DeferringDirectObservableExpression<TArgument, TResult>(this, lambdaExpression, sites, evaluate, argument, values, evaluator.DeferredGroupCount == 0 ? [] : new bool[evaluator.DeferredGroupCount], evaluator.LinkCount == 0 ? [] : new object?[evaluator.LinkCount], evaluator.LinkSites);
         directObservableExpression.Initialize();
         directObservableExpression.IsInitialized = true;
         return directObservableExpression;

@@ -29,15 +29,38 @@ public class SubscriptionStability
     }
 
     [TestMethod]
-    public void IneligibleExpressionMovesItsSubscriptionToTheNewTarget()
+    public void AChainMovesItsSubscriptionToTheNewTarget()
     {
         var analysis = Analyzer().Analyze(BodyOf<int>(watched => watched.Next!.Rank));
-        Assert.IsFalse(analysis.IsEligible);
-        Assert.AreEqual(DirectSubscriptionIneligibility.ChangeableMemberTarget, analysis.Ineligibility);
+        Assert.IsTrue(analysis.IsEligible, analysis.ToString());
         var first = new Watched { Rank = 1 };
         var second = new Watched { Rank = 2 };
         var subject = new Watched { Next = first };
         var observer = new ExpressionObserver();
+        using (var expr = observer.Observe(watched => watched.Next!.Rank, subject))
+        {
+            Assert.AreEqual(1, subject.Handlers);
+            Assert.AreEqual(1, first.Handlers);
+            Assert.AreEqual(0, second.Handlers);
+            Assert.AreEqual(1, expr.Evaluation.Result);
+            subject.Next = second;
+            Assert.AreEqual(1, subject.Handlers);
+            Assert.AreEqual(0, first.Handlers);
+            Assert.AreEqual(1, second.Handlers);
+            Assert.AreEqual(2, expr.Evaluation.Result);
+        }
+        Assert.AreEqual(0, subject.Handlers);
+        Assert.AreEqual(0, second.Handlers);
+        Assert.AreEqual(0, observer.CachedObservableExpressions);
+    }
+
+    [TestMethod]
+    public void TheGraphMovesItsSubscriptionToTheNewTarget()
+    {
+        var first = new Watched { Rank = 1 };
+        var second = new Watched { Rank = 2 };
+        var subject = new Watched { Next = first };
+        var observer = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = false });
         using (var expr = observer.Observe(watched => watched.Next!.Rank, subject))
         {
             Assert.AreEqual(1, subject.Handlers);

@@ -31,7 +31,7 @@
 /// A subscription belongs to the nearest operand enclosing every use of the node which plans it, because the graph gives one node to an expression however many operands name it and attaches that node the first time any of them is evaluated; the contents of a constant or of the argument are the exception, the graph attaching those when the node is constructed whether or not its evaluation is deferred
 /// </remarks>
 /// <remarks>
-/// A property read through a target which is not fixed is admitted only when no value the target could hold raises a change notification, which is decided by its type being sealed and implementing none of the notification interfaces; such a member contributes no subscription of its own, exactly as the graph's node for it subscribes to nothing, and the chain is watched by whatever its target contributes. A target which could notify is refused, because what would have to be subscribed to changes as that target's value changes, while the plan is decided once when the observation is constructed
+/// A property read through a target which is not fixed contributes no subscription of its own when no value the target could hold raises a change notification, which is decided by its type being sealed and implementing none of the notification interfaces, exactly as the graph's node for it subscribes to nothing. A target which could notify becomes a link: the target's value is recorded by the evaluation which produces it, and the subscription naming that link attaches to whatever it holds and moves when it changes, which is what the graph's node does when the value it read last is not the value it reads now
 /// </remarks>
 public sealed class DirectSubscriptionAnalyzer
 {
@@ -67,6 +67,7 @@ public sealed class DirectSubscriptionAnalyzer
         readonly List<int> parents = [];
 
         internal readonly List<Expression> DeferredGroups = [];
+        internal readonly List<Expression> Links = [];
         internal readonly List<DirectSubscription> Subscriptions = [];
 
         internal int CurrentGroup;
@@ -75,6 +76,18 @@ public sealed class DirectSubscriptionAnalyzer
         {
             owners.Add(owner);
             Subscriptions.Add(subscription);
+        }
+
+        internal void AddLinked(Expression owner, Expression target, string propertyName)
+        {
+            for (int i = 0, ii = Links.Count; i < ii; ++i)
+                if (ReferenceEquals(Links[i], target))
+                {
+                    Add(owner, new(target, DirectSubscriptionKind.MemberPropertyChanged, propertyName, 0));
+                    return;
+                }
+            Links.Add(target);
+            Add(owner, new(target, DirectSubscriptionKind.MemberPropertyChanged, propertyName, 0));
         }
 
         internal void BeginDeferredGroup(Expression operand)
@@ -350,7 +363,16 @@ public sealed class DirectSubscriptionAnalyzer
         if (memberExpression.Expression is not { } target)
             return DirectSubscriptionAnalysis.Eligible;
         if (!IsFixed(target))
-            return CannotNotify(target.Type) ? AnalyzeNode(target, planner) : new(memberExpression, DirectSubscriptionIneligibility.ChangeableMemberTarget);
+        {
+            if (target.Type.IsValueType && !CannotNotify(target.Type))
+                return new(memberExpression, DirectSubscriptionIneligibility.ChangeableMemberTarget);
+            var linkAnalysis = AnalyzeNode(target, planner);
+            if (!linkAnalysis.IsEligible || planner is null || CannotNotify(target.Type))
+                return linkAnalysis;
+            if (memberExpression.Member is PropertyInfo linkedProperty)
+                planner.AddLinked(memberExpression, target, linkedProperty.Name);
+            return linkAnalysis;
+        }
         var targetAnalysis = AnalyzeNode(target, planner);
         if (!targetAnalysis.IsEligible || planner is null)
             return targetAnalysis;
@@ -427,7 +449,7 @@ public sealed class DirectSubscriptionAnalyzer
         ArgumentNullException.ThrowIfNull(expression);
         var planner = new Planner();
         var analysis = Resolved(expression, planner);
-        return analysis.IsEligible ? new(analysis, planner.Subscriptions.ToArray(), planner.DeferredGroups.ToArray()) : new(analysis, null, null);
+        return analysis.IsEligible ? new(analysis, planner.Subscriptions.ToArray(), planner.DeferredGroups.ToArray(), planner.Links.ToArray()) : new(analysis, null, null, null);
     }
 
     DirectSubscriptionAnalysis Resolved(Expression expression, Planner planner)

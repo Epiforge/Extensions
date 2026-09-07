@@ -334,11 +334,11 @@ public class DirectSubscriptionExecution
     public void IneligibleExpressionStillBuildsTheGraph()
     {
         var log = new SubscriptionLog();
-        var subject = new Recorded(log) { Next = new Recorded(log) { Rank = 3 } };
+        var subject = new Recorded(log) { Rank = 3 };
         var observer = new ExpressionObserver();
-        using (var expr = observer.Observe(s => s.Next!.Rank, subject))
+        using (var expr = observer.Observe(s => new[] { s.Rank, s.Score }.Length, subject))
         {
-            Assert.AreEqual(3, expr.Evaluation.Result);
+            Assert.AreEqual(2, expr.Evaluation.Result);
             Assert.AreNotEqual(0, observer.CachedObservableExpressions);
         }
         Assert.AreEqual(0, observer.CachedObservableExpressions);

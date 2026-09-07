@@ -9,15 +9,19 @@ namespace Epiforge.Extensions.Expressions.Observable;
 sealed class FixedSubexpressionRewriter :
     ExpressionVisitor
 {
-    internal FixedSubexpressionRewriter(ParameterExpression values, ParameterExpression reached, IReadOnlyList<Expression> deferredGroups)
+    internal FixedSubexpressionRewriter(ParameterExpression values, ParameterExpression reached, ParameterExpression links, IReadOnlyList<Expression> deferredGroups, IReadOnlyList<Expression> linkTargets)
     {
         this.deferredGroups = deferredGroups;
+        this.links = links;
+        this.linkTargets = linkTargets;
         this.reached = reached;
         this.values = values;
     }
 
     readonly IReadOnlyList<Expression> deferredGroups;
     readonly List<Expression> fixedSubexpressions = [];
+    readonly ParameterExpression links;
+    readonly IReadOnlyList<Expression> linkTargets;
     readonly ParameterExpression reached;
     readonly ParameterExpression values;
     Expression? wrapping;
@@ -31,6 +35,23 @@ sealed class FixedSubexpressionRewriter :
             if (ReferenceEquals(deferredGroups[i], node))
                 return i;
         return -1;
+    }
+
+    int LinkOf(Expression node)
+    {
+        for (int i = 0, ii = linkTargets.Count; i < ii; ++i)
+            if (ReferenceEquals(linkTargets[i], node))
+                return i;
+        return -1;
+    }
+
+    /// <summary>
+    /// Yields the value of a target the observation must follow, recording it in an array the observation reads once the evaluation has returned, which is how the fast path learns which object a chain now reaches
+    /// </summary>
+    BlockExpression Record(int link, Expression target)
+    {
+        var held = Expression.Variable(target.Type);
+        return Expression.Block(target.Type, [held], Expression.Assign(held, target), Expression.Assign(Expression.ArrayAccess(links, Expression.Constant(link)), Expression.Convert(held, typeof(object))), held);
     }
 
     UnaryExpression Substitute(MemberExpression memberExpression)
@@ -49,7 +70,9 @@ sealed class FixedSubexpressionRewriter :
 
     public override Expression? Visit(Expression? node)
     {
-        if (node is not null && !ReferenceEquals(node, wrapping) && GroupOf(node) is var group && group >= 0)
+        if (node is null)
+            return null;
+        if (!ReferenceEquals(node, wrapping) && GroupOf(node) is var group && group >= 0)
         {
             var enclosing = wrapping;
             wrapping = node;
@@ -57,11 +80,13 @@ sealed class FixedSubexpressionRewriter :
             wrapping = enclosing;
             return Expression.Block(operand.Type, Expression.Assign(Expression.ArrayAccess(reached, Expression.Constant(group)), Expression.Constant(true)), operand);
         }
-        return node switch
+        var visited = node switch
         {
             MemberExpression memberExpression when DirectSubscriptionAnalyzer.IsFixed(memberExpression) => Substitute(memberExpression),
             UnaryExpression { NodeType: ExpressionType.Quote } => node,
-            _ => base.Visit(node)
+            _ => base.Visit(node)!
         };
+        var link = LinkOf(node);
+        return link < 0 ? visited : Record(link, visited);
     }
 }

@@ -66,7 +66,7 @@ sealed class SourceNotificationOwner :
     {
         attachment.Owner = this;
         attachment.Previous = last;
-        Volatile.Write(ref last.Next, attachment);
+        last.Next = attachment;
         last = attachment;
         ++Live;
     }
@@ -84,7 +84,7 @@ sealed class SourceNotificationOwner :
         if (ReferenceEquals(attachment, this))
             return;
         if (attachment.Previous is { } previous)
-            Volatile.Write(ref previous.Next, attachment.Next);
+            previous.Next = attachment.Next;
         if (attachment.Next is { } following)
             following.Previous = attachment.Previous;
         else
