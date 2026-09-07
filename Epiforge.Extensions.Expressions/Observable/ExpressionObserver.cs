@@ -865,7 +865,7 @@ public class ExpressionObserver :
         }
         var evaluate = (Func<TArgument, object?[], bool[], TResult>)evaluator.Evaluate;
         DirectObservableExpression<TArgument, TResult> directObservableExpression = evaluator.DeferredGroupCount == 0
-            ? new DirectObservableExpression<TArgument, TResult>(this, lambdaExpression, sites, evaluate, argument, values, [])
+            ? new DirectObservableExpression<TArgument, TResult>(this, lambdaExpression, sites, evaluate, argument, values)
             : new DeferringDirectObservableExpression<TArgument, TResult>(this, lambdaExpression, sites, evaluate, argument, values, new bool[evaluator.DeferredGroupCount]);
         directObservableExpression.Initialize();
         directObservableExpression.IsInitialized = true;

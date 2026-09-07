@@ -59,13 +59,41 @@ Every graph arm is byte-identical to its before. The three times on record moved
 
 Predicted 1.33, 1.30 and 1.35 MB; measured 1.42, 1.44 and 1.45. The direction held and the magnitude did not, by 90 to 150 bytes per element.
 
-**And the claim that a group-free expression would pay nothing was wrong by 8 bytes.** `RankComparisonDirect` went 1.18 to 1.19 MB. The `bool[]` is held in a field on the shared generic class rather than on the deferring subclass, so every direct observation carries one extra reference: 8 bytes, 0.008 MB per thousand. `IndexerReadDirect` did not move, which is what an 8-byte cost looks like at a resolution of 0.01 MB — one arm crosses the rounding boundary and the other does not. The field is removable: the base class can pass an empty array to the delegate instead of holding one, since `[]` is `Array.Empty<bool>()` and allocates nothing.
+**And the claim that a group-free expression would pay nothing was wrong by 8 bytes.** `RankComparisonDirect` went 1.18 to 1.19 MB. The `bool[]` is held in a field on the shared generic class rather than on the deferring subclass, so every direct observation carries one extra reference: 8 bytes, 0.008 MB per thousand. `IndexerReadDirect` did not move, which is what an 8-byte cost looks like at a resolution of 0.01 MB — one arm crosses the rounding boundary and the other does not. The field is removable: the base class can pass an empty array to the delegate instead of holding one, since `[]` is `Array.Empty<bool>()` and allocates nothing. It was removed in the pass recorded below, along with the two allocations the decomposition named, and the figures in this table are that pass's before.
 
 ## The account does not close, by about 140 bytes per element
 
 `TwoObjectShortCircuitDirect` exceeds `RankComparisonDirect` by 0.25 MB, which is 250 bytes per element. Named: a `bool[1]` at 32, the deferring subclass's bitmask at 8, one attachment to `other` at 56, and a one-entry `values` array at 32 — 128. The contents subscription planned for the closure field resolves to `None`, `other` being no kind of collection, and costs nothing.
 
 **The leading candidate for the remaining 122 is `AttachDeferred` itself**, which builds a `List<DirectSubscriptionAttachment>`, lets it allocate a backing array, and then allocates a fresh `attachments` array to copy into — 32 plus 56 plus 40 by the unit costs on record, which is 128 and closes the gap almost exactly. That is a decomposition from reading, which this project holds fit to rank candidates and unfit to price them, so it is a hypothesis and not a measurement. Counting the group's attaching sites before allocating anything, and growing `attachments` once, would test it in one pass.
+
+## Then the three allocations the decomposition named
+
+Three removals in one pass, with the arms only partly separating them: the flags field and the scratch array move every direct observation, the list moves only an observation with a deferred operand. What distinguishes the first two is that the scratch saving scales with the number of sites the analyzer named while the field is flat, so the two controls predict different movements rather than one number repeated.
+
+- The `bool[]` field moved off the shared generic class onto the deferring subclass, and the base hands the delegate one static empty array.
+- `Attach` allocated an array sized to every site, filled the prefix which resolved to something, and then copied to a right-sized one. It now counts what will attach in a pass which resolves and type-tests and allocates nothing, then allocates once at that size.
+- `AttachDeferred` built a `List<DirectSubscriptionAttachment>` and let it allocate a backing array before copying into the grown `attachments`. The attachments now go straight into the grown array, and the compare-and-swap retry merges rather than re-attaching.
+
+| arm | before | predicted | after |
+|---|---:|---:|---:|
+| `RankComparisonDirect` | 1.19 MB | 1.14 | **1.14 MB / 353.0 μs** |
+| `IndexerReadDirect` | 1.35 MB | 1.29 | **1.29 MB / 518.4 μs** |
+| `ConditionalDirect` | 1.42 MB | 1.27 | **1.28 MB / 464.8 μs** |
+| `TwoObjectShortCircuitDirect` | 1.44 MB | 1.30 | **1.31 MB / 469.4 μs** |
+| `TwoObjectConditionalDirect` | 1.45 MB | 1.30 | **1.31 MB / 471.4 μs** |
+| `NotifyingChainDirect` | 3.71 MB | unchanged | 3.71 MB |
+| every `Graph` arm | as measured | unchanged | byte-identical |
+
+**Two predictions landed exactly and three landed one printing step high.** The controls carry only the flat field and the site-scaled scratch array; they were predicted at 1.14 and 1.29 and read 1.14 and 1.29. That is a count of objects at unit costs already on record, which is the form of prediction this project has found reliable, and it is the form which failed in the pass before this one — where the same method was applied to terms nobody had priced. The three arms with a deferred operand were predicted 1.27, 1.30 and 1.30 and read 1.28, 1.31 and 1.31, so the model is short by at most 15 bytes per element there and possibly by nothing at all, the true figures lying anywhere inside the rounding step. Not chased.
+
+**A count read out of the analyzer was wrong again, and was caught before the run rather than after.** The short-circuit arm's second object is a static field of the benchmark class and not a closure field, which makes that expression three sites and not four; noticing it moved that prediction from 1.29 to 1.30, which is the figure that then landed within a step. The standing rule is that a count read this way is the least reliable term in any prediction resting on it, and it is worth re-reading rather than trusting.
+
+**The fast path now has a floor of 1.14 MB per thousand elements**, against 1.18 where this day's work began, and an indexer read costs 1.29 against 1.35. Neither of those is the deferred-operand feature; both are the scratch array, which every direct observation had been paying for since the fast path was written.
+
+**Times decide nothing in this pair of runs.** The graph arms are byte-identical and their means moved between −4.5% and +5.2%, so the drift band here is about 5%, against 0.6% in the previous pair. Every direct arm moved inside that band. Read the controls in the run you have; there is no drift figure that carries between pairs.
+
+**The excursion recorded in the previous pass settled itself.** `TwoObjectConditionalGraph` reported a standard deviation of 4.5% of its mean and now reports 2.3%, on byte-identical allocation. It was the instrument, and waiting for a run that was going to happen anyway cost nothing.
 
 ## Also recorded
 
@@ -85,7 +113,6 @@ Predicted 1.33, 1.30 and 1.35 MB; measured 1.42, 1.44 and 1.45. The direction he
 
 ## Left open
 
-- The 8 bytes on every direct observation, and the roughly 122 unexplained bytes per element in `AttachDeferred`. Both are one pass, and the befores are the figures in the table above.
-- Deduplicating plan entries by resolved source, event and property name, keeping the shallowest group. The graph caches one node per equal expression and so attaches once where the fast path attaches once per node; deduplicating would close that and would also help `RepeatedMember`. Left out so this run measured one change.
+- **Deduplicating plan entries by resolved source, event and property name, keeping the shallowest group.** The graph caches one node per equal expression and attaches once where the fast path attaches once per node, so `ConditionalDirect`'s expression, which reads one member through three distinct nodes, attaches three times where the graph attaches once. This is now the largest difference between the mechanisms on this path, and every byte of it is waste: an attachment object, and a whole redundant evaluation on every notification from that object. The befores are the figures in the second table above.
+- At most 15 bytes per element on the three arms with a deferred operand which the model does not name, and which may be nothing at all at this resolution. Worth naming only if a later run at a smaller element count puts the units in kilobytes.
 - The `ShortCircuit` arms of `EligibilityMatrixBenchmarks` and `RefusalCauseBenchmarks` have moved, their deferred operand's subscription now being attached late rather than eagerly. Their recorded figures remain a valid before for whenever re-measuring them is decided on its own merits.
-- `TwoObjectConditionalGraph` reported a standard deviation of 300.11 μs against a mean of 6,719.2 — 4.5%, high for this class, on a first reading with nothing to compare it to. Recorded as an excursion; the next run of this suite for any other reason settles it.

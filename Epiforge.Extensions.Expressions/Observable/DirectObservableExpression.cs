@@ -3,6 +3,8 @@
 abstract class DirectObservableExpression(ExpressionObserver observer, Type type) :
     ObservableExpression(observer, type, false)
 {
+    private protected static readonly bool[] noDeferredGroups = [];
+
     internal static object? Resolve(Expression expression, object? argument) =>
         expression switch
         {
@@ -32,12 +34,30 @@ abstract class DirectObservableExpression(ExpressionObserver observer, Type type
         return true;
     }
 
+    /// <summary>
+    /// Counts the sites of a group which resolve to something to attach to, which is done before anything is allocated so that the array of attachments is made once at the size it will keep
+    /// </summary>
+    static int Attaching(DirectSubscriptionSite[] sites, int group, object? argument, object?[] values)
+    {
+        var attaching = 0;
+        for (var i = 0; i < sites.Length; ++i)
+        {
+            var site = sites[i];
+            if (site.DeferredGroup != group)
+                continue;
+            var source = site.ResolveSource(argument, values);
+            if (source is not null && site.ResolveKind(source) is not DirectSubscriptionKind.None)
+                ++attaching;
+        }
+        return attaching;
+    }
+
     private protected void Attach(DirectSubscriptionSite[] sites, object? argument, object?[] values)
     {
-        if (sites.Length == 0)
+        if (Attaching(sites, 0, argument, values) is var attaching && attaching == 0)
             return;
-        var attaching = new DirectSubscriptionAttachment[sites.Length];
-        var attached = 0;
+        var attached = new DirectSubscriptionAttachment[attaching];
+        var index = 0;
         for (var i = 0; i < sites.Length; ++i)
         {
             var site = sites[i];
@@ -46,10 +66,9 @@ abstract class DirectObservableExpression(ExpressionObserver observer, Type type
             var source = site.ResolveSource(argument, values);
             if (source is null || site.ResolveKind(source) is var kind && kind is DirectSubscriptionKind.None)
                 continue;
-            attaching[attached++] = observer.DirectSubscriptions.Attach(source, kind, site.PropertyName, this, site.ForcesNotification);
+            attached[index++] = observer.DirectSubscriptions.Attach(source, kind, site.PropertyName, this, site.ForcesNotification);
         }
-        if (attached > 0)
-            attachments = attached == sites.Length ? attaching : attaching[..attached];
+        attachments = attached;
     }
 
     /// <summary>
@@ -57,7 +76,12 @@ abstract class DirectObservableExpression(ExpressionObserver observer, Type type
     /// </summary>
     private protected bool AttachDeferred(DirectSubscriptionSite[] sites, int group, object? argument, object?[] values)
     {
-        List<DirectSubscriptionAttachment>? added = null;
+        if (Attaching(sites, group, argument, values) is var attaching && attaching == 0)
+            return false;
+        var current = attachments;
+        var updated = new DirectSubscriptionAttachment[current.Length + attaching];
+        Array.Copy(current, updated, current.Length);
+        var index = current.Length;
         for (var i = 0; i < sites.Length; ++i)
         {
             var site = sites[i];
@@ -66,23 +90,20 @@ abstract class DirectObservableExpression(ExpressionObserver observer, Type type
             var source = site.ResolveSource(argument, values);
             if (source is null || site.ResolveKind(source) is var kind && kind is DirectSubscriptionKind.None)
                 continue;
-            (added ??= []).Add(observer.DirectSubscriptions.Attach(source, kind, site.PropertyName, this, site.ForcesNotification));
+            updated[index++] = observer.DirectSubscriptions.Attach(source, kind, site.PropertyName, this, site.ForcesNotification);
         }
-        if (added is null)
-            return false;
-        while (true)
+        while (!ReferenceEquals(Interlocked.CompareExchange(ref attachments, updated, current), current))
         {
-            var current = attachments;
-            var updated = new DirectSubscriptionAttachment[current.Length + added.Count];
-            Array.Copy(current, updated, current.Length);
-            for (var i = 0; i < added.Count; ++i)
-                updated[current.Length + i] = added[i];
-            if (ReferenceEquals(Interlocked.CompareExchange(ref attachments, updated, current), current))
-                break;
+            var latest = attachments;
+            var merged = new DirectSubscriptionAttachment[latest.Length + attaching];
+            Array.Copy(latest, merged, latest.Length);
+            Array.Copy(updated, updated.Length - attaching, merged, latest.Length, attaching);
+            current = latest;
+            updated = merged;
         }
         if (Volatile.Read(ref released) != 0)
-            for (var i = 0; i < added.Count; ++i)
-                observer.DirectSubscriptions.Detach(added[i]);
+            for (var i = updated.Length - attaching; i < updated.Length; ++i)
+                observer.DirectSubscriptions.Detach(updated[i]);
         return true;
     }
 
@@ -100,14 +121,13 @@ class DirectObservableExpression<TArgument, TResult> :
     static readonly bool sharesBooleanBoxes = typeof(TResult) == typeof(bool);
     static readonly TResult trueResult = typeof(TResult) == typeof(bool) ? (TResult)(object)true : default!;
 
-    internal DirectObservableExpression(ExpressionObserver observer, Expression<Func<TArgument, TResult>> lambdaExpression, DirectSubscriptionSite[] sites, Func<TArgument, object?[], bool[], TResult> evaluate, TArgument argument, object?[] values, bool[] reached) :
+    internal DirectObservableExpression(ExpressionObserver observer, Expression<Func<TArgument, TResult>> lambdaExpression, DirectSubscriptionSite[] sites, Func<TArgument, object?[], bool[], TResult> evaluate, TArgument argument, object?[] values) :
         base(observer, lambdaExpression.Body.Type)
     {
         this.argument = argument;
         comparesBeforeBoxing = typeof(TResult).IsValueType && lambdaExpression.Body.Type == typeof(TResult);
         this.evaluate = evaluate;
         this.lambdaExpression = lambdaExpression;
-        this.reached = reached;
         this.sites = sites;
         this.values = values;
     }
@@ -116,7 +136,6 @@ class DirectObservableExpression<TArgument, TResult> :
     readonly bool comparesBeforeBoxing;
     private protected readonly Func<TArgument, object?[], bool[], TResult> evaluate;
     readonly Expression<Func<TArgument, TResult>> lambdaExpression;
-    private protected readonly bool[] reached;
     private protected readonly DirectSubscriptionSite[] sites;
     private protected readonly object?[] values;
 
@@ -130,7 +149,7 @@ class DirectObservableExpression<TArgument, TResult> :
     {
         try
         {
-            var value = evaluate(argument, values, reached);
+            var value = evaluate(argument, values, noDeferredGroups);
             if (!IsCurrentResult(value))
                 Evaluation = (null, Box(value));
             observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{Expression} evaluated directly: {Value}", Expression, value);
@@ -175,11 +194,11 @@ sealed class DeferringDirectObservableExpression<TArgument, TResult> :
     DirectObservableExpression<TArgument, TResult>
 {
     internal DeferringDirectObservableExpression(ExpressionObserver observer, Expression<Func<TArgument, TResult>> lambdaExpression, DirectSubscriptionSite[] sites, Func<TArgument, object?[], bool[], TResult> evaluate, TArgument argument, object?[] values, bool[] reached) :
-        base(observer, lambdaExpression, sites, evaluate, argument, values, reached)
-    {
-    }
+        base(observer, lambdaExpression, sites, evaluate, argument, values) =>
+        this.reached = reached;
 
     long attachedGroups;
+    readonly bool[] reached;
 
     internal override bool CanChange =>
         true;
