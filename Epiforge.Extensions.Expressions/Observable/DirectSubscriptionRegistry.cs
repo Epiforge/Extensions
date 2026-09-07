@@ -188,6 +188,8 @@ sealed class DirectSubscriptionRegistry
             return;
         lock (sourcesAccess)
         {
+            if (attachment.IsRemoved)
+                return;
             subscriptionSource.Detach(attachment);
             if (subscriptionSource.Attachments > 0)
                 return;

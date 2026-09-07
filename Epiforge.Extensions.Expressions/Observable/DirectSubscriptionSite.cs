@@ -19,6 +19,9 @@ readonly struct DirectSubscriptionSite
 
     internal readonly bool ForcesNotification;
 
+    internal int DeferredGroup =>
+        subscription.DeferredGroup;
+
     internal string? PropertyName =>
         subscription.PropertyName;
 

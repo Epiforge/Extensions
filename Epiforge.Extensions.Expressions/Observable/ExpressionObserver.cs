@@ -814,14 +814,15 @@ public class ExpressionObserver :
         else
         {
             var values = Expression.Parameter(typeof(object[]), "values");
-            var rewriter = new FixedSubexpressionRewriter(values);
+            var reached = Expression.Parameter(typeof(bool[]), "reached");
+            var rewriter = new FixedSubexpressionRewriter(values, reached, plan.DeferredGroups);
             var body = rewriter.Visit(lambdaExpression.Body)!;
             var fixedSubexpressions = rewriter.FixedSubexpressions;
             var subscriptions = plan.Subscriptions;
             var sites = new DirectSubscriptionSite[subscriptions.Count];
             for (var i = 0; i < sites.Length; ++i)
                 sites[i] = Site(subscriptions[i], lambdaExpression, fixedSubexpressions);
-            evaluator = new DirectEvaluator(Expression.Lambda<Func<TArgument, object?[], TResult>>(body, lambdaExpression.Parameters[0], values).Compile(), [.. fixedSubexpressions], sites);
+            evaluator = new DirectEvaluator(Expression.Lambda<Func<TArgument, object?[], bool[], TResult>>(body, lambdaExpression.Parameters[0], values, reached).Compile(), [.. fixedSubexpressions], sites, plan.DeferredGroups.Count);
         }
         compiledLambdas.AddOrUpdate(lambdaExpression, evaluator);
         return evaluator;
@@ -862,7 +863,10 @@ public class ExpressionObserver :
             for (var i = 0; i < values.Length; ++i)
                 values[i] = DirectObservableExpression.Resolve(fixedSubexpressions[i], resolutionArgument);
         }
-        var directObservableExpression = new DirectObservableExpression<TArgument, TResult>(this, lambdaExpression, sites, (Func<TArgument, object?[], TResult>)evaluator.Evaluate, argument, values);
+        var evaluate = (Func<TArgument, object?[], bool[], TResult>)evaluator.Evaluate;
+        DirectObservableExpression<TArgument, TResult> directObservableExpression = evaluator.DeferredGroupCount == 0
+            ? new DirectObservableExpression<TArgument, TResult>(this, lambdaExpression, sites, evaluate, argument, values, [])
+            : new DeferringDirectObservableExpression<TArgument, TResult>(this, lambdaExpression, sites, evaluate, argument, values, new bool[evaluator.DeferredGroupCount]);
         directObservableExpression.Initialize();
         directObservableExpression.IsInitialized = true;
         return directObservableExpression;

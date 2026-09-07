@@ -8,18 +8,26 @@ namespace Epiforge.Extensions.Expressions.Observable;
 /// </remarks>
 public readonly record struct DirectSubscriptionPlan
 {
-    internal DirectSubscriptionPlan(DirectSubscriptionAnalysis analysis, IReadOnlyList<DirectSubscription>? subscriptions)
+    internal DirectSubscriptionPlan(DirectSubscriptionAnalysis analysis, IReadOnlyList<DirectSubscription>? subscriptions, IReadOnlyList<Expression>? deferredGroups)
     {
         Analysis = analysis;
+        this.deferredGroups = deferredGroups;
         this.subscriptions = subscriptions;
     }
 
+    readonly IReadOnlyList<Expression>? deferredGroups;
     readonly IReadOnlyList<DirectSubscription>? subscriptions;
 
     /// <summary>
     /// Gets whether the expression can be observed by subscribing directly to its change sources, and when it cannot, which part of it is responsible
     /// </summary>
     public DirectSubscriptionAnalysis Analysis { get; }
+
+    /// <summary>
+    /// Gets the operands whose evaluation the expression defers, each of which attaches the subscriptions belonging to it the first time it is evaluated; a subscription names one of these by its one-based position
+    /// </summary>
+    public IReadOnlyList<Expression> DeferredGroups =>
+        deferredGroups ?? [];
 
     /// <summary>
     /// Gets whether the expression can be observed by subscribing directly to its change sources

@@ -10,13 +10,15 @@ sealed class DirectEvaluator
         FixedSubexpressions = [];
     }
 
-    internal DirectEvaluator(Delegate evaluate, Expression[] fixedSubexpressions, DirectSubscriptionSite[] sites)
+    internal DirectEvaluator(Delegate evaluate, Expression[] fixedSubexpressions, DirectSubscriptionSite[] sites, int deferredGroupCount)
     {
+        DeferredGroupCount = deferredGroupCount;
         Evaluate = evaluate;
         FixedSubexpressions = fixedSubexpressions;
         Sites = sites;
     }
 
+    internal readonly int DeferredGroupCount;
     internal readonly Delegate Evaluate;
     internal readonly Expression[] FixedSubexpressions;
     internal readonly DirectSubscriptionSite[]? Sites;

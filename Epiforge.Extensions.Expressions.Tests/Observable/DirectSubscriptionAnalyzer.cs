@@ -20,12 +20,11 @@ public class DirectSubscriptionAnalyzer
         Assert.IsTrue(Analyzer().Analyze(BodyOf<bool>(person => person.NameGets > 0 && person.NameGets < 100)).IsEligible);
 
     [TestMethod]
-    public void AndAlsoReachingASecondObjectIsIneligible()
+    public void AndAlsoReachingASecondObjectIsEligible()
     {
         var other = TestPerson.CreateEmily();
         var analysis = Analyzer().Analyze(BodyOf<bool>(person => person.NameGets > 0 && other.NameGets < 100));
-        Assert.IsFalse(analysis.IsEligible);
-        Assert.AreEqual(DirectSubscriptionIneligibility.DeferredBranch, analysis.Ineligibility);
+        Assert.IsTrue(analysis.IsEligible, analysis.ToString());
     }
 
     [TestMethod]
@@ -70,20 +69,18 @@ public class DirectSubscriptionAnalyzer
         Assert.IsTrue(Analyzer().Analyze(BodyOf<string?>(person => person.Name ?? person.Placeholder)).IsEligible);
 
     [TestMethod]
-    public void CoalesceReachingASecondObjectIsIneligible()
+    public void CoalesceReachingASecondObjectIsEligible()
     {
         var other = TestPerson.CreateEmily();
         var analysis = Analyzer().Analyze(BodyOf<string?>(person => person.Name ?? other.Name));
-        Assert.IsFalse(analysis.IsEligible);
-        Assert.AreEqual(DirectSubscriptionIneligibility.DeferredBranch, analysis.Ineligibility);
+        Assert.IsTrue(analysis.IsEligible, analysis.ToString());
     }
 
     [TestMethod]
-    public void ConditionalOfMembersIsIneligible()
+    public void ConditionalOfMembersIsEligible()
     {
         var analysis = Analyzer().Analyze(BodyOf<string?>(person => person.NameGets > 0 ? person.Name : person.Placeholder));
-        Assert.IsFalse(analysis.IsEligible);
-        Assert.AreEqual(DirectSubscriptionIneligibility.DeferredBranch, analysis.Ineligibility);
+        Assert.IsTrue(analysis.IsEligible, analysis.ToString());
     }
 
     [TestMethod]
@@ -214,12 +211,11 @@ public class DirectSubscriptionAnalyzer
         Assert.IsTrue(Analyzer().Analyze(BodyOf<bool>(person => person.NameGets > 0 || person.NameGets < 100)).IsEligible);
 
     [TestMethod]
-    public void OrElseReachingASecondObjectIsIneligible()
+    public void OrElseReachingASecondObjectIsEligible()
     {
         var other = TestPerson.CreateEmily();
         var analysis = Analyzer().Analyze(BodyOf<bool>(person => person.NameGets > 0 || other.NameGets < 100));
-        Assert.IsFalse(analysis.IsEligible);
-        Assert.AreEqual(DirectSubscriptionIneligibility.DeferredBranch, analysis.Ineligibility);
+        Assert.IsTrue(analysis.IsEligible, analysis.ToString());
     }
 
     [TestMethod]

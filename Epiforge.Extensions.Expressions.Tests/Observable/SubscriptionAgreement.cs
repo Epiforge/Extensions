@@ -58,7 +58,7 @@ public class SubscriptionAgreement
         var log = new SubscriptionLog();
         var other = new Recorded(log);
         var subject = new Recorded(log);
-        var observer = new ExpressionObserver();
+        var observer = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = false });
         using (observer.Observe(s => s.Rank > 0 ? other.Rank : s.Score, subject))
         {
             Assert.AreEqual(1, log.Attachments().Count);

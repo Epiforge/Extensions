@@ -25,7 +25,10 @@
 /// A call to the get method of a property or an indexer is rewritten into the member or index access it stands for and analyzed as that, exactly as the graph rewrites it, so that an indexer written in C# — which reaches this analysis as a call — plans the subscriptions the rewritten form plans rather than none of them
 /// </remarks>
 /// <remarks>
-/// A short-circuiting operator is admitted when the operand whose evaluation it defers subscribes to no source and event the rest of the expression does not already reach, since the graph attaches to those same sources for the operands it does evaluate, holds what it attaches once the branch is taken and never detaches it, and the deferred operand contributes nothing of its own to attach; where the deferred operand reaches a source of its own it is refused, because the graph does not attach there until the branch is taken. A conditional expression is refused whatever its branches reach
+/// A short-circuiting operator and a conditional expression are admitted whatever their deferred operands reach, the subscriptions of each deferred operand being attached the first time an evaluation reaches that operand rather than when the observation is constructed, which is where the graph attaches the nodes of that operand and after which it never detaches them
+/// </remarks>
+/// <remarks>
+/// A subscription belongs to the nearest operand enclosing every use of the node which plans it, because the graph gives one node to an expression however many operands name it and attaches that node the first time any of them is evaluated; the contents of a constant or of the argument are the exception, the graph attaching those when the node is constructed whether or not its evaluation is deferred
 /// </remarks>
 /// <remarks>
 /// A property read through a target which is not fixed is admitted only when no value the target could hold raises a change notification, which is decided by its type being sealed and implementing none of the notification interfaces; such a member contributes no subscription of its own, exactly as the graph's node for it subscribes to nothing, and the chain is watched by whatever its target contributes. A target which could notify is refused, because what would have to be subscribed to changes as that target's value changes, while the plan is decided once when the observation is constructed
@@ -46,38 +49,141 @@ public sealed class DirectSubscriptionAnalyzer
 
     sealed class Planner
     {
-        readonly HashSet<Expression> planned = new(ExpressionIdentityComparer.Default);
+        sealed class GroupLowering(Planner planner, int group) :
+            ExpressionVisitor
+        {
+            public override Expression? Visit(Expression? node)
+            {
+                if (node is UnaryExpression { NodeType: ExpressionType.Quote })
+                    return node;
+                if (node is not null)
+                    planner.Lower(node, group);
+                return base.Visit(node);
+            }
+        }
 
+        readonly Dictionary<Expression, int> groups = new(ExpressionIdentityComparer.Default);
+        readonly List<Expression> owners = [];
+        readonly List<int> parents = [];
+
+        internal readonly List<Expression> DeferredGroups = [];
         internal readonly List<DirectSubscription> Subscriptions = [];
 
-        internal bool Reached(Expression expression) =>
-            !planned.Add(expression);
+        internal int CurrentGroup;
+
+        internal void Add(Expression owner, DirectSubscription subscription)
+        {
+            owners.Add(owner);
+            Subscriptions.Add(subscription);
+        }
+
+        internal void BeginDeferredGroup(Expression operand)
+        {
+            DeferredGroups.Add(operand);
+            parents.Add(CurrentGroup);
+            CurrentGroup = DeferredGroups.Count;
+        }
+
+        int DepthOf(int group)
+        {
+            var depth = 0;
+            while (group != 0)
+            {
+                group = parents[group - 1];
+                ++depth;
+            }
+            return depth;
+        }
+
+        internal void EndDeferredGroup(int enclosing) =>
+            CurrentGroup = enclosing;
+
+        void Lower(Expression expression, int group)
+        {
+            if (groups.TryGetValue(expression, out var reached) && NearestCommonAncestor(reached, group) is var lowered && lowered != reached)
+                groups[expression] = lowered;
+        }
+
+        int NearestCommonAncestor(int first, int second)
+        {
+            if (first == 0 || second == 0)
+                return 0;
+            while (DepthOf(first) > DepthOf(second))
+                first = parents[first - 1];
+            while (DepthOf(second) > DepthOf(first))
+                second = parents[second - 1];
+            while (first != second)
+            {
+                first = parents[first - 1];
+                second = parents[second - 1];
+            }
+            return first;
+        }
+
+        internal bool Reached(Expression expression)
+        {
+            var group = expression is ConstantExpression or ParameterExpression ? 0 : CurrentGroup;
+            if (!groups.TryGetValue(expression, out var reached))
+            {
+                groups.Add(expression, group);
+                return false;
+            }
+            if (NearestCommonAncestor(reached, group) is var lowered && lowered != reached)
+                new GroupLowering(this, lowered).Visit(expression);
+            return true;
+        }
+
+        internal void Resolve()
+        {
+            for (int i = 0, ii = Subscriptions.Count; i < ii; ++i)
+                if (Subscriptions[i] is var subscription && groups[owners[i]] is var owned && owned != subscription.DeferredGroup)
+                    Subscriptions[i] = new(subscription.Source!, subscription.Kind, subscription.PropertyName, owned);
+            var used = new bool[DeferredGroups.Count];
+            for (int i = 0, ii = Subscriptions.Count; i < ii; ++i)
+                if (Subscriptions[i].DeferredGroup is var group && group > 0)
+                    used[group - 1] = true;
+            var renumbered = new int[DeferredGroups.Count + 1];
+            var kept = new List<Expression>();
+            for (var group = 0; group < used.Length; ++group)
+                if (used[group])
+                {
+                    kept.Add(DeferredGroups[group]);
+                    renumbered[group + 1] = kept.Count;
+                }
+            if (kept.Count == DeferredGroups.Count)
+                return;
+            for (int i = 0, ii = Subscriptions.Count; i < ii; ++i)
+                if (Subscriptions[i] is var subscription && renumbered[subscription.DeferredGroup] is var group && group != subscription.DeferredGroup)
+                    Subscriptions[i] = new(subscription.Source!, subscription.Kind, subscription.PropertyName, group);
+            DeferredGroups.Clear();
+            DeferredGroups.AddRange(kept);
+        }
     }
 
-    static void AddContentsSubscription(List<DirectSubscription> subscriptions, Expression source, bool dictionaryPermitted, bool collectionPermitted)
+    static void AddContentsSubscription(Planner planner, Expression owner, Expression source, bool dictionaryPermitted, bool collectionPermitted)
     {
         if (source is ConstantExpression constantExpression)
         {
             var value = constantExpression.Value;
             if (dictionaryPermitted && value is INotifyDictionaryChanged)
-                subscriptions.Add(new(source, DirectSubscriptionKind.DictionaryChanged, null));
+                planner.Add(owner, new(source, DirectSubscriptionKind.DictionaryChanged, null, 0));
             else if (collectionPermitted && value is INotifyCollectionChanged)
-                subscriptions.Add(new(source, DirectSubscriptionKind.CollectionChanged, null));
+                planner.Add(owner, new(source, DirectSubscriptionKind.CollectionChanged, null, 0));
             return;
         }
         if (dictionaryPermitted && collectionPermitted)
-            subscriptions.Add(new(source, DirectSubscriptionKind.DictionaryOrCollectionChanged, null));
+            planner.Add(owner, new(source, DirectSubscriptionKind.DictionaryOrCollectionChanged, null, 0));
         else if (dictionaryPermitted)
-            subscriptions.Add(new(source, DirectSubscriptionKind.DictionaryChanged, null));
+            planner.Add(owner, new(source, DirectSubscriptionKind.DictionaryChanged, null, 0));
         else if (collectionPermitted)
-            subscriptions.Add(new(source, DirectSubscriptionKind.CollectionChanged, null));
+            planner.Add(owner, new(source, DirectSubscriptionKind.CollectionChanged, null, 0));
     }
 
-    static void AddPropertyChangedSubscription(List<DirectSubscription> subscriptions, Expression source, DirectSubscriptionKind kind, string propertyName)
+    static void AddPropertyChangedSubscription(Planner planner, Expression owner, Expression source, DirectSubscriptionKind kind, string propertyName)
     {
         if (source is ConstantExpression constantExpression && constantExpression.Value is not INotifyPropertyChanged)
             return;
-        subscriptions.Add(new(source, kind, propertyName));
+        planner.Add(owner, new(source, kind, propertyName, 0));
     }
 
     internal static bool IsFixed(Expression expression) =>
@@ -152,14 +258,34 @@ public sealed class DirectSubscriptionAnalyzer
     public DirectSubscriptionAnalysis Analyze(Expression expression)
     {
         ArgumentNullException.ThrowIfNull(expression);
-        return AnalyzeNode(expression, new Planner());
+        return Resolved(expression, new Planner());
+    }
+
+    DirectSubscriptionAnalysis AnalyzeConditional(ConditionalExpression conditionalExpression, Planner? planner)
+    {
+        if (planner is null)
+            return new(conditionalExpression, DirectSubscriptionIneligibility.DeferredBranch);
+        var testAnalysis = AnalyzeNode(conditionalExpression.Test, planner);
+        if (!testAnalysis.IsEligible)
+            return testAnalysis;
+        var ifTrueAnalysis = AnalyzeDeferredOperand(conditionalExpression.IfTrue, planner);
+        return ifTrueAnalysis.IsEligible ? AnalyzeDeferredOperand(conditionalExpression.IfFalse, planner) : ifTrueAnalysis;
     }
 
     DirectSubscriptionAnalysis AnalyzeConstant(ConstantExpression constantExpression, Planner? planner)
     {
         if (planner is not null)
-            AddContentsSubscription(planner.Subscriptions, constantExpression, constantsListenForDictionaryChanged, constantsListenForCollectionChanged);
+            AddContentsSubscription(planner, constantExpression, constantExpression, constantsListenForDictionaryChanged, constantsListenForCollectionChanged);
         return DirectSubscriptionAnalysis.Eligible;
+    }
+
+    DirectSubscriptionAnalysis AnalyzeDeferredOperand(Expression operand, Planner planner)
+    {
+        var enclosing = planner.CurrentGroup;
+        planner.BeginDeferredGroup(operand);
+        var analysis = AnalyzeNode(operand, planner);
+        planner.EndDeferredGroup(enclosing);
+        return analysis;
     }
 
     DirectSubscriptionAnalysis AnalyzeIndex(IndexExpression indexExpression, Planner? planner)
@@ -183,8 +309,8 @@ public sealed class DirectSubscriptionAnalyzer
         }
         if (planner is not null)
         {
-            AddContentsSubscription(planner.Subscriptions, target, true, true);
-            AddPropertyChangedSubscription(planner.Subscriptions, target, DirectSubscriptionKind.IndexerPropertyChanged, indexer.Name);
+            AddContentsSubscription(planner, indexExpression, target, true, true);
+            AddPropertyChangedSubscription(planner, indexExpression, target, DirectSubscriptionKind.IndexerPropertyChanged, indexer.Name);
         }
         return DirectSubscriptionAnalysis.Eligible;
     }
@@ -203,9 +329,9 @@ public sealed class DirectSubscriptionAnalyzer
         if (!targetAnalysis.IsEligible || planner is null)
             return targetAnalysis;
         if (memberExpression.Member is PropertyInfo property)
-            AddPropertyChangedSubscription(planner.Subscriptions, target, DirectSubscriptionKind.MemberPropertyChanged, property.Name);
+            AddPropertyChangedSubscription(planner, memberExpression, target, DirectSubscriptionKind.MemberPropertyChanged, property.Name);
         else if (memberExpression.Member is FieldInfo && IsCompilerGenerated(target))
-            AddContentsSubscription(planner.Subscriptions, memberExpression, generatedTypeFieldsListenForDictionaryChanged, generatedTypeFieldsListenForCollectionChanged);
+            AddContentsSubscription(planner, memberExpression, memberExpression, generatedTypeFieldsListenForDictionaryChanged, generatedTypeFieldsListenForCollectionChanged);
         return targetAnalysis;
     }
 
@@ -231,7 +357,7 @@ public sealed class DirectSubscriptionAnalyzer
     DirectSubscriptionAnalysis AnalyzeParameter(ParameterExpression parameterExpression, Planner? planner)
     {
         if (planner is not null)
-            AddContentsSubscription(planner.Subscriptions, parameterExpression, constantsListenForDictionaryChanged, constantsListenForCollectionChanged);
+            AddContentsSubscription(planner, parameterExpression, parameterExpression, constantsListenForDictionaryChanged, constantsListenForCollectionChanged);
         return DirectSubscriptionAnalysis.Eligible;
     }
 
@@ -242,26 +368,7 @@ public sealed class DirectSubscriptionAnalyzer
         if (planner is null)
             return new(binaryExpression, DirectSubscriptionIneligibility.DeferredBranch);
         var leftAnalysis = AnalyzeNode(binaryExpression.Left, planner);
-        if (!leftAnalysis.IsEligible)
-            return leftAnalysis;
-        var reached = planner.Subscriptions.Count;
-        var rightAnalysis = AnalyzeNode(binaryExpression.Right, planner);
-        if (!rightAnalysis.IsEligible)
-            return rightAnalysis;
-        for (int i = reached, ii = planner.Subscriptions.Count; i < ii; ++i)
-        {
-            var deferred = planner.Subscriptions[i];
-            var alreadyReached = false;
-            for (var j = 0; j < reached; ++j)
-                if (ReferenceEquals(planner.Subscriptions[j].Source, deferred.Source) && planner.Subscriptions[j].Kind == deferred.Kind)
-                {
-                    alreadyReached = true;
-                    break;
-                }
-            if (!alreadyReached)
-                return new(binaryExpression, DirectSubscriptionIneligibility.DeferredBranch);
-        }
-        return DirectSubscriptionAnalysis.Eligible;
+        return leftAnalysis.IsEligible ? AnalyzeDeferredOperand(binaryExpression.Right, planner) : leftAnalysis;
     }
 
     DirectSubscriptionAnalysis AnalyzeNode(Expression expression, Planner? planner) =>
@@ -277,7 +384,7 @@ public sealed class DirectSubscriptionAnalyzer
             BinaryExpression binaryExpression when IsShortCircuiting(binaryExpression) => AnalyzeShortCircuiting(binaryExpression, planner),
             BinaryExpression binaryExpression when binaryExpression.Conversion is not null => new(binaryExpression, DirectSubscriptionIneligibility.UnsupportedExpressionKind),
             BinaryExpression binaryExpression => AnalyzeNode(binaryExpression.Left, planner) is { IsEligible: false } left ? left : AnalyzeNode(binaryExpression.Right, planner),
-            ConditionalExpression conditionalExpression => new(conditionalExpression, DirectSubscriptionIneligibility.DeferredBranch),
+            ConditionalExpression conditionalExpression => AnalyzeConditional(conditionalExpression, planner),
             TypeBinaryExpression typeBinaryExpression when typeBinaryExpression.NodeType is not ExpressionType.TypeAs => AnalyzeNode(typeBinaryExpression.Expression, planner),
             UnaryExpression unaryExpression when unaryExpression.NodeType is ExpressionType.Quote => DirectSubscriptionAnalysis.Eligible,
             UnaryExpression unaryExpression when unaryExpression.Method is { } unaryOperator && !ExpressionObserverOptions.CannotBeDisposed(unaryOperator.ReturnType) => new(unaryExpression, DirectSubscriptionIneligibility.UserDefinedOperator),
@@ -293,7 +400,16 @@ public sealed class DirectSubscriptionAnalyzer
     {
         ArgumentNullException.ThrowIfNull(expression);
         var planner = new Planner();
+        var analysis = Resolved(expression, planner);
+        return analysis.IsEligible ? new(analysis, planner.Subscriptions.ToArray(), planner.DeferredGroups.ToArray()) : new(analysis, null, null);
+    }
+
+    DirectSubscriptionAnalysis Resolved(Expression expression, Planner planner)
+    {
         var analysis = AnalyzeNode(expression, planner);
-        return new(analysis, analysis.IsEligible ? planner.Subscriptions.ToArray() : null);
+        if (!analysis.IsEligible)
+            return analysis;
+        planner.Resolve();
+        return planner.DeferredGroups.Count > 64 ? new(expression, DirectSubscriptionIneligibility.DeferredBranch) : analysis;
     }
 }

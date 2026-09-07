@@ -185,4 +185,135 @@ public class DeferredAttachment
         Assert.AreEqual(0, log.Outstanding);
         Assert.AreEqual(0, observer.CachedObservableExpressions);
     }
+    /// <summary>
+    /// Compares what the two mechanisms have attached before and after an operand is reached, at the grain of one object and event, which is the grain the graph works at since it began holding one handler per source however many nodes are interested; the fast path keys a subscription by property name as well, so it can place more than one handler on an object the graph places one on
+    /// </summary>
+    static void AssertMechanismsAgree<TResult>(Func<SubscriptionLog, (Recorded Subject, Expression<Func<Recorded, TResult>> Lambda)> build, Action<Recorded> take)
+    {
+        var graphLog = new SubscriptionLog();
+        var (graphSubject, graphLambda) = build(graphLog);
+        var graphObserver = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = false });
+        var fastLog = new SubscriptionLog();
+        var (fastSubject, fastLambda) = build(fastLog);
+        var fastObserver = new ExpressionObserver();
+        using (var graphExpression = graphObserver.Observe(graphLambda, graphSubject))
+        using (var fastExpression = fastObserver.Observe(fastLambda, fastSubject))
+        {
+            Assert.AreEqual(0, fastObserver.CachedObservableExpressions, $"the fast path declined {fastLambda} and fell back to the graph, which makes this comparison vacuous");
+            CollectionAssert.AreEqual(graphLog.Attachments().Distinct().ToArray(), fastLog.Attachments().Distinct().ToArray(), $"before the branch was reached; graph: [{string.Join(", ", graphLog.Attachments())}]; fast: [{string.Join(", ", fastLog.Attachments())}]");
+            Assert.AreEqual(graphExpression.Evaluation.Result, fastExpression.Evaluation.Result, "before the branch was reached");
+            take(graphSubject);
+            take(fastSubject);
+            CollectionAssert.AreEqual(graphLog.Attachments().Distinct().ToArray(), fastLog.Attachments().Distinct().ToArray(), $"after the branch was reached; graph: [{string.Join(", ", graphLog.Attachments())}]; fast: [{string.Join(", ", fastLog.Attachments())}]");
+            Assert.AreEqual(graphExpression.Evaluation.Result, fastExpression.Evaluation.Result, "after the branch was reached");
+        }
+        Assert.AreEqual(0, graphLog.Outstanding, "the graph did not detach everything it attached");
+        Assert.AreEqual(0, fastLog.Outstanding, "the fast path did not detach everything it attached");
+        Assert.AreEqual(0, graphObserver.CachedObservableExpressions);
+    }
+
+    [TestMethod]
+    public void BothMechanismsAttachToTheRightOperandOfAndAlsoWhenTheBranchIsTaken() =>
+        AssertMechanismsAgree(log =>
+        {
+            var other = new Recorded(log) { Rank = 4 };
+            return (new Recorded(log), (Expression<Func<Recorded, bool>>)(s => s.Rank > 0 && other.Rank > 0));
+        }, subject => subject.Rank = 1);
+
+    [TestMethod]
+    public void BothMechanismsAttachToTheRightOperandOfOrElseWhenTheBranchIsTaken() =>
+        AssertMechanismsAgree(log =>
+        {
+            var other = new Recorded(log) { Rank = 4 };
+            return (new Recorded(log) { Rank = 1 }, (Expression<Func<Recorded, bool>>)(s => s.Rank > 0 || other.Rank > 0));
+        }, subject => subject.Rank = 0);
+
+    [TestMethod]
+    public void BothMechanismsAttachToTheRightOperandOfCoalesceWhenTheBranchIsTaken() =>
+        AssertMechanismsAgree(log =>
+        {
+            var other = new Recorded(log) { Tag = "o" };
+            return (new Recorded(log) { Tag = "s" }, (Expression<Func<Recorded, string?>>)(s => s.Tag ?? other.Tag));
+        }, subject => subject.Tag = null);
+
+    [TestMethod]
+    public void BothMechanismsAttachToAConditionalBranchWhenTheTestTurns() =>
+        AssertMechanismsAgree(log =>
+        {
+            var other = new Recorded(log) { Rank = 7 };
+            return (new Recorded(log) { Score = 3 }, (Expression<Func<Recorded, int>>)(s => s.Rank > 0 ? other.Rank : s.Score));
+        }, subject => subject.Rank = 1);
+
+    [TestMethod]
+    public void BothMechanismsAttachToTheOtherConditionalBranchWhenTheTestTurnsBack() =>
+        AssertMechanismsAgree(log =>
+        {
+            var other = new Recorded(log) { Rank = 7 };
+            var third = new Recorded(log) { Score = 8 };
+            return (new Recorded(log) { Rank = 1 }, (Expression<Func<Recorded, int>>)(s => s.Rank > 0 ? other.Rank : third.Score));
+        }, subject => subject.Rank = 0);
+
+    [TestMethod]
+    public void BothMechanismsAttachToANestedDeferredOperandOnlyWhenItIsReached() =>
+        AssertMechanismsAgree(log =>
+        {
+            var other = new Recorded(log) { Rank = 1 };
+            var third = new Recorded(log) { Rank = 1 };
+            return (new Recorded(log), (Expression<Func<Recorded, bool>>)(s => s.Rank > 0 && (other.Rank > 0 && third.Rank > 0)));
+        }, subject => subject.Rank = 1);
+
+    [TestMethod]
+    public void BothMechanismsAttachToAClosureFieldsContentsWhenTheBranchReadingItIsTaken() =>
+        AssertMechanismsAgree(log =>
+        {
+            var items = new RecordedCollection(log);
+            return (new Recorded(log), (Expression<Func<Recorded, int>>)(s => s.Rank > 0 ? items.Count : 0));
+        }, subject => subject.Rank = 1);
+
+    [TestMethod]
+    public void BothMechanismsKeepWhatTheyAttachedToABranchWhichStopsBeingTaken() =>
+        AssertMechanismsAgree(log =>
+        {
+            var other = new Recorded(log) { Rank = 4 };
+            return (new Recorded(log), (Expression<Func<Recorded, bool>>)(s => s.Rank > 0 && other.Rank > 0));
+        }, subject =>
+        {
+            subject.Rank = 1;
+            subject.Rank = 0;
+        });
+
+    [TestMethod]
+    public void BothMechanismsReportTheSameFaultFromADeferredOperand() =>
+        AssertMechanismsAgree(log =>
+        {
+            var other = new Recorded(log);
+            return (new Recorded(log), (Expression<Func<Recorded, int>>)(s => s.Tag == null ? 0 : other.Tag!.Length));
+        }, subject => subject.Tag = "s");
+
+    [TestMethod]
+    public void ThePlanDefersTheSubscriptionOfAnOperandWhichReachesASourceOfItsOwn()
+    {
+        var log = new SubscriptionLog();
+        var other = new Recorded(log);
+        Expression<Func<Recorded, bool>> lambda = s => s.Rank > 0 && other.Rank > 0;
+        var plan = new Epiforge.Extensions.Expressions.Observable.DirectSubscriptionAnalyzer().Plan(lambda.Body);
+        Assert.IsTrue(plan.IsEligible, plan.ToString());
+        Assert.AreEqual(1, plan.DeferredGroups.Count, string.Join("; ", plan.Subscriptions));
+        Assert.IsTrue(plan.Subscriptions.Any(subscription => subscription.DeferredGroup == 1), string.Join("; ", plan.Subscriptions));
+        Assert.IsFalse(plan.Subscriptions.Any(subscription => subscription.DeferredGroup != 0 && subscription.Source is ParameterExpression), string.Join("; ", plan.Subscriptions));
+    }
+
+    [TestMethod]
+    public void ThePlanKeepsAMemberEagerWhenSomethingOutsideTheOperandNamingItAlsoReadsIt()
+    {
+        var log = new SubscriptionLog();
+        var other = new Recorded(log) { Rank = 5 };
+        var subject = new Recorded(log);
+        var otherRank = Expression.MakeMemberAccess(Expression.Constant(other, typeof(Recorded)), rank);
+        var subjectRank = Expression.MakeMemberAccess(Expression.Constant(subject, typeof(Recorded)), rank);
+        var body = Expression.Add(Expression.Condition(Expression.GreaterThan(subjectRank, Expression.Constant(0)), otherRank, Expression.Constant(0)), otherRank);
+        var plan = new Epiforge.Extensions.Expressions.Observable.DirectSubscriptionAnalyzer().Plan(body);
+        Assert.IsTrue(plan.IsEligible, plan.ToString());
+        Assert.AreEqual(0, plan.DeferredGroups.Count, string.Join("; ", plan.Subscriptions));
+    }
 }

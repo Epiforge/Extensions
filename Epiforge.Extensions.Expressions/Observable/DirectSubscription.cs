@@ -6,14 +6,23 @@ namespace Epiforge.Extensions.Expressions.Observable;
 /// <remarks>
 /// A subscription names a site rather than an attachment; whether anything is attached there depends on which notification interfaces the source's value implements, which is why the analyzer resolves the kind only when the source is a constant whose value it can read without invoking anything
 /// </remarks>
+/// <remarks>
+/// A subscription belonging to a deferred group is attached the first time the operand of that group is evaluated rather than when the observation is constructed, which is where the graph attaches the nodes of that operand
+/// </remarks>
 public readonly record struct DirectSubscription
 {
-    internal DirectSubscription(Expression source, DirectSubscriptionKind kind, string? propertyName)
+    internal DirectSubscription(Expression source, DirectSubscriptionKind kind, string? propertyName, int deferredGroup)
     {
-        Source = source;
+        DeferredGroup = deferredGroup;
         Kind = kind;
         PropertyName = propertyName;
+        Source = source;
     }
+
+    /// <summary>
+    /// Gets the one-based deferred group of <see cref="DirectSubscriptionPlan.DeferredGroups" /> whose first evaluation attaches the subscription, which is zero when it is attached as soon as the observation is constructed
+    /// </summary>
+    public int DeferredGroup { get; }
 
     /// <summary>
     /// Gets the event to which the subscription attaches
@@ -46,5 +55,5 @@ public readonly record struct DirectSubscription
 
     /// <inheritdoc/>
     public override string ToString() =>
-        PropertyName is null ? $"{Kind} of {Source}" : $"{Kind} ({PropertyName}) of {Source}";
+        (PropertyName is null ? $"{Kind} of {Source}" : $"{Kind} ({PropertyName}) of {Source}") + (DeferredGroup is 0 ? string.Empty : $", deferred to group {DeferredGroup}");
 }
