@@ -345,6 +345,13 @@ public class DifferentialFuzz
     }
 
     [TestMethod]
+    public void IndexedReadsUnderCollectionChanges()
+    {
+        for (var seed = 9000; seed < 9200; ++seed)
+            RunIndexedProgram(seed, 20);
+    }
+
+    [TestMethod]
     public void ShallowExpressions()
     {
         for (var seed = 1000; seed < 1300; ++seed)
