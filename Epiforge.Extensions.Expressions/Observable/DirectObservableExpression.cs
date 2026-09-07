@@ -196,33 +196,117 @@ class DirectObservableExpression<TArgument, TResult> :
 /// <remarks>
 /// The evaluation is repeated after a group is attached so that the result kept is one read after the subscription was in place, which is the order the graph's nodes observe
 /// </remarks>
-sealed class DeferringDirectObservableExpression<TArgument, TResult> :
+class DeferringDirectObservableExpression<TArgument, TResult> :
     DirectObservableExpression<TArgument, TResult>
 {
-    internal DeferringDirectObservableExpression(ExpressionObserver observer, Expression<Func<TArgument, TResult>> lambdaExpression, DirectSubscriptionSite[] sites, Func<TArgument, object?[], bool[], object?[], TResult> evaluate, TArgument argument, object?[] values, bool[] reached, object?[] links, int[] linkSites) :
-        base(observer, lambdaExpression, sites, evaluate, argument, values)
-    {
-        attachedLinks = links.Length == 0 ? links : new object?[links.Length];
-        linkAttachments = linkSites.Length == 0 ? [] : new DirectSubscriptionAttachment?[linkSites.Length];
-        this.links = links;
-        this.linkSites = linkSites;
+    internal DeferringDirectObservableExpression(ExpressionObserver observer, Expression<Func<TArgument, TResult>> lambdaExpression, DirectSubscriptionSite[] sites, Func<TArgument, object?[], bool[], object?[], TResult> evaluate, TArgument argument, object?[] values, bool[] reached) :
+        base(observer, lambdaExpression, sites, evaluate, argument, values) =>
         this.reached = reached;
-    }
 
     long attachedGroups;
-    readonly object?[] attachedLinks;
-    readonly DirectSubscriptionAttachment?[] linkAttachments;
-    readonly object?[] links;
-    readonly int[] linkSites;
     readonly bool[] reached;
 
     internal override bool CanChange =>
         true;
 
     /// <summary>
+    /// Gets the values the observation is following, of which an observation with no link has none
+    /// </summary>
+    private protected virtual object?[] Links =>
+        noLinks;
+
+    /// <summary>
+    /// Moves the subscriptions of every link whose value is not the one they are attached to, of which an observation with no link has none
+    /// </summary>
+    private protected virtual bool AttachChangedLinks() =>
+        false;
+
+    bool AttachNewlyReached()
+    {
+        var attached = false;
+        for (var group = 0; group < reached.Length; ++group)
+        {
+            if (!reached[group])
+                continue;
+            var bit = 1L << group;
+            var current = Interlocked.Read(ref attachedGroups);
+            while ((current & bit) == 0)
+            {
+                var exchanged = Interlocked.CompareExchange(ref attachedGroups, current | bit, current);
+                if (exchanged == current)
+                {
+                    attached |= AttachDeferred(sites, group + 1, argument, values, Links);
+                    break;
+                }
+                current = exchanged;
+            }
+        }
+        return attached;
+    }
+
+    protected override void Evaluate()
+    {
+        var moved = false;
+        while (true)
+        {
+            try
+            {
+                var value = evaluate(argument, values, reached, Links);
+                var again = AttachNewlyReached();
+                if (!moved && AttachChangedLinks())
+                    again = moved = true;
+                if (again)
+                    continue;
+                if (!IsCurrentResult(value))
+                    Evaluation = (null, Box(value));
+                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{Expression} evaluated directly: {Value}", Expression, value);
+                return;
+            }
+            catch (Exception ex)
+            {
+                var again = AttachNewlyReached();
+                if (!moved && AttachChangedLinks())
+                    again = moved = true;
+                if (again)
+                    continue;
+                Evaluation = (ex, defaultResult);
+                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, ex, "{Expression} faulted: {Fault}", Expression, ex);
+                return;
+            }
+        }
+    }
+}
+
+/// <summary>
+/// An observation of an expression which reads a member through a value which can notify, and which therefore holds the state needed to move that subscription as the value is replaced
+/// </summary>
+/// <remarks>
+/// This state is kept apart from the deferred group state above so that an observation which defers an operand and follows nothing pays nothing for the following
+/// </remarks>
+sealed class LinkingDirectObservableExpression<TArgument, TResult> :
+    DeferringDirectObservableExpression<TArgument, TResult>
+{
+    internal LinkingDirectObservableExpression(ExpressionObserver observer, Expression<Func<TArgument, TResult>> lambdaExpression, DirectSubscriptionSite[] sites, Func<TArgument, object?[], bool[], object?[], TResult> evaluate, TArgument argument, object?[] values, bool[] reached, object?[] links, int[] linkSites) :
+        base(observer, lambdaExpression, sites, evaluate, argument, values, reached)
+    {
+        attachedLinks = links.Length == 0 ? links : new object?[links.Length];
+        linkAttachments = linkSites.Length == 0 ? [] : new DirectSubscriptionAttachment?[linkSites.Length];
+        this.links = links;
+        this.linkSites = linkSites;
+    }
+
+    readonly object?[] attachedLinks;
+    readonly DirectSubscriptionAttachment?[] linkAttachments;
+    readonly object?[] links;
+    readonly int[] linkSites;
+
+    private protected override object?[] Links =>
+        links;
+
+    /// <summary>
     /// Moves the subscriptions of every link whose value is not the one they are attached to, which is what the graph's node does when the value it read last is not the value it reads now
     /// </summary>
-    bool AttachChangedLinks()
+    private protected override bool AttachChangedLinks()
     {
         var moved = false;
         for (var i = 0; i < links.Length; ++i)
@@ -250,29 +334,6 @@ sealed class DeferringDirectObservableExpression<TArgument, TResult> :
         return moved;
     }
 
-    bool AttachNewlyReached()
-    {
-        var attached = false;
-        for (var group = 0; group < reached.Length; ++group)
-        {
-            if (!reached[group])
-                continue;
-            var bit = 1L << group;
-            var current = Interlocked.Read(ref attachedGroups);
-            while ((current & bit) == 0)
-            {
-                var exchanged = Interlocked.CompareExchange(ref attachedGroups, current | bit, current);
-                if (exchanged == current)
-                {
-                    attached |= AttachDeferred(sites, group + 1, argument, values, links);
-                    break;
-                }
-                current = exchanged;
-            }
-        }
-        return attached;
-    }
-
     protected override bool DisposeCore()
     {
         if (!base.DisposeCore())
@@ -281,37 +342,5 @@ sealed class DeferringDirectObservableExpression<TArgument, TResult> :
             if (Interlocked.Exchange(ref linkAttachments[s], null) is { } attachment)
                 observer.DirectSubscriptions.Detach(attachment);
         return true;
-    }
-
-    protected override void Evaluate()
-    {
-        var moved = false;
-        while (true)
-        {
-            try
-            {
-                var value = evaluate(argument, values, reached, links);
-                var again = AttachNewlyReached();
-                if (!moved && AttachChangedLinks())
-                    again = moved = true;
-                if (again)
-                    continue;
-                if (!IsCurrentResult(value))
-                    Evaluation = (null, Box(value));
-                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{Expression} evaluated directly: {Value}", Expression, value);
-                return;
-            }
-            catch (Exception ex)
-            {
-                var again = AttachNewlyReached();
-                if (!moved && AttachChangedLinks())
-                    again = moved = true;
-                if (again)
-                    continue;
-                Evaluation = (ex, defaultResult);
-                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, ex, "{Expression} faulted: {Fault}", Expression, ex);
-                return;
-            }
-        }
     }
 }

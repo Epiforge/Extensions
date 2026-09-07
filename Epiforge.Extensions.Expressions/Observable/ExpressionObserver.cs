@@ -875,9 +875,11 @@ public class ExpressionObserver :
                 values[i] = DirectObservableExpression.Resolve(fixedSubexpressions[i], resolutionArgument);
         }
         var evaluate = (Func<TArgument, object?[], bool[], object?[], TResult>)evaluator.Evaluate;
-        DirectObservableExpression<TArgument, TResult> directObservableExpression = evaluator.DeferredGroupCount == 0 && evaluator.LinkCount == 0
-            ? new DirectObservableExpression<TArgument, TResult>(this, lambdaExpression, sites, evaluate, argument, values)
-            : new DeferringDirectObservableExpression<TArgument, TResult>(this, lambdaExpression, sites, evaluate, argument, values, evaluator.DeferredGroupCount == 0 ? [] : new bool[evaluator.DeferredGroupCount], evaluator.LinkCount == 0 ? [] : new object?[evaluator.LinkCount], evaluator.LinkSites);
+        DirectObservableExpression<TArgument, TResult> directObservableExpression = evaluator.LinkCount > 0
+            ? new LinkingDirectObservableExpression<TArgument, TResult>(this, lambdaExpression, sites, evaluate, argument, values, evaluator.DeferredGroupCount == 0 ? [] : new bool[evaluator.DeferredGroupCount], new object?[evaluator.LinkCount], evaluator.LinkSites)
+            : evaluator.DeferredGroupCount > 0
+            ? new DeferringDirectObservableExpression<TArgument, TResult>(this, lambdaExpression, sites, evaluate, argument, values, new bool[evaluator.DeferredGroupCount])
+            : new DirectObservableExpression<TArgument, TResult>(this, lambdaExpression, sites, evaluate, argument, values);
         directObservableExpression.Initialize();
         directObservableExpression.IsInitialized = true;
         return directObservableExpression;
