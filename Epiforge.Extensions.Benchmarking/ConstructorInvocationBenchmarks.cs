@@ -19,7 +19,10 @@ public class ConstructorInvocationBenchmarks
     object?[] methodArguments = null!;
     InvokeMethodDelegate methodCompiled = null!;
     MethodInvoker methodInvoker = null!;
+    BenchmarkPerson person = null!;
+    PropertyInfo rank = null!;
     string text = null!;
+    PropertyInfo textLength = null!;
 
     [Benchmark]
     public object CallDirectly()
@@ -120,9 +123,60 @@ public class ConstructorInvocationBenchmarks
         return result;
     }
 
+    [Benchmark]
+    public object? GetPropertyDirectly()
+    {
+        object? result = null;
+        for (var i = 0; i < iterations; ++i)
+            result = text.Length;
+        return result;
+    }
+
+    [Benchmark]
+    public object? GetPropertyThroughFastGetValue()
+    {
+        object? result = null;
+        for (var i = 0; i < iterations; ++i)
+            result = textLength.FastGetValue(text);
+        return result;
+    }
+
+    [Benchmark]
+    public object? GetPropertyThroughReflection()
+    {
+        object? result = null;
+        for (var i = 0; i < iterations; ++i)
+            result = textLength.GetValue(text);
+        return result;
+    }
+
+    [Benchmark]
+    public void SetPropertyDirectly()
+    {
+        for (var i = 0; i < iterations; ++i)
+            person.Rank = i;
+    }
+
+    [Benchmark]
+    public void SetPropertyThroughFastSetValue()
+    {
+        for (var i = 0; i < iterations; ++i)
+            rank.FastSetValue(person, i);
+    }
+
+    [Benchmark]
+    public void SetPropertyThroughReflection()
+    {
+        for (var i = 0; i < iterations; ++i)
+            rank.SetValue(person, i);
+    }
+
     [GlobalSetup]
     public void Setup()
     {
+        person = new BenchmarkPerson("P", 0);
+        rank = typeof(BenchmarkPerson).GetProperty(nameof(BenchmarkPerson.Rank))!;
+        textLength = typeof(string).GetProperty(nameof(string.Length))!;
         constructor = typeof(KeyValuePair<int, int>).GetConstructor([typeof(int), typeof(int)])!;
         arguments = [1, 2];
         invoker = ConstructorInvoker.Create(constructor);
