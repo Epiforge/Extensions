@@ -39,11 +39,6 @@ sealed class DirectSubscriptionSource
         }
     }
 
-#if IS_NET_9_0_OR_GREATER
-    readonly Lock attachmentsAccess = new();
-#else
-    readonly object attachmentsAccess = new();
-#endif
     readonly string? conventionalPropertyName;
     DirectSubscriptionAttachment? firstAttachment;
     readonly DirectSubscriptionKind kind;
@@ -56,39 +51,39 @@ sealed class DirectSubscriptionSource
     internal (object Source, DirectSubscriptionKind Kind, string? PropertyName) Key =>
         (source, kind, propertyName);
 
+    /// <remarks>
+    /// The registry calls this only while holding its own lock, which is what makes the list safe to mutate without one of its own
+    /// </remarks>
     internal void Attach(DirectSubscriptionAttachment attachment)
     {
-        lock (attachmentsAccess)
-        {
-            attachment.Source = this;
-            attachment.Previous = lastAttachment;
-            if (lastAttachment is null)
-                Volatile.Write(ref firstAttachment, attachment);
-            else
-                lastAttachment.Next = attachment;
-            lastAttachment = attachment;
-            ++Attachments;
-        }
+        attachment.Source = this;
+        attachment.Previous = lastAttachment;
+        if (lastAttachment is null)
+            Volatile.Write(ref firstAttachment, attachment);
+        else
+            lastAttachment.Next = attachment;
+        lastAttachment = attachment;
+        ++Attachments;
     }
 
+    /// <remarks>
+    /// The registry calls this only while holding its own lock, which is what makes the list safe to mutate without one of its own
+    /// </remarks>
     internal void Detach(DirectSubscriptionAttachment attachment)
     {
-        lock (attachmentsAccess)
-        {
-            if (attachment.IsRemoved)
-                return;
-            attachment.IsRemoved = true;
-            if (attachment.Previous is null)
-                Volatile.Write(ref firstAttachment, attachment.Next);
-            else
-                attachment.Previous.Next = attachment.Next;
-            if (attachment.Next is null)
-                lastAttachment = attachment.Previous;
-            else
-                attachment.Next.Previous = attachment.Previous;
-            attachment.Previous = null;
-            --Attachments;
-        }
+        if (attachment.IsRemoved)
+            return;
+        attachment.IsRemoved = true;
+        if (attachment.Previous is null)
+            Volatile.Write(ref firstAttachment, attachment.Next);
+        else
+            attachment.Previous.Next = attachment.Next;
+        if (attachment.Next is null)
+            lastAttachment = attachment.Previous;
+        else
+            attachment.Next.Previous = attachment.Previous;
+        attachment.Previous = null;
+        --Attachments;
     }
 
     internal void Release()
