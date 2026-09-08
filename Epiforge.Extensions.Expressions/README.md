@@ -243,14 +243,23 @@ These are from the benchmarks in this repository, against DynamicData 9.4.33 at 
 | | This library | DynamicData |
 |---|---|---|
 | A property change that does not alter a filtered view | **0 B**, **7.3 ns** | 608 B, 192.4 ns |
-| An element changing group | **592 B**, **234.8 ns** | 1,936 B, 596.7 ns |
+| An element changing group | **578 B**, **236.9 ns** | 1,891 B, 604.8 ns |
 | An element moving in a sorted view | **292 B**, 1,259.5 ns | 414 B, **984.4 ns** |
 | Building a filtered view | **965 KB**, **294 μs** | 4,119 KB, 2,169 μs |
 | What a live filtered view holds | **934 B** per element | 1,865 B per element |
 
 The zero is exact rather than rounded: a property change that does not move an element in or out of a filtered view allocates nothing here, at a thousand, ten thousand and a hundred thousand elements alike. This library re-evaluates the predicate in place and stays silent when the answer has not moved; DynamicData's model is a stream of change sets, so a refresh has to materialize one. Neither is a defect. **One library pays per change and the other pays per change that matters.**
 
-**Sorting is the one where DynamicData is faster, and only on small collections.** Its cost per move grows with the size of the collection while this library's mostly does not, so the two cross at about 1,400 elements: below that DynamicData is 1.28x faster, at four thousand elements this library is 1.72x faster, and at ten thousand it is 2.98x faster. If you sort a small collection, that is a point against this library.
+**Two of those rows move with the size of the view, in opposite directions, and this is the part worth reading twice.**
+
+- **Sorting.** DynamicData's cost per move grows with the collection while this library's barely does, so the two cross at about **1,400** elements. Below that DynamicData is 1.28x faster; at four thousand this library is 1.72x faster and at ten thousand 2.98x.
+- **Grouping.** The reverse. DynamicData's cost per migration is flat while this library's grows, so the two cross at about **7,900** elements. Below that this library is 2.55x faster; at ten thousand DynamicData is 1.18x faster.
+
+**What decides both is the size of the view the operator sees, not the size of your collection.** Filter ten thousand elements down to a thousand and then sort, and you are on the small-view side of the sorting crossover, where DynamicData wins; grouping that same thousand puts you well on this library's side of the grouping one.
+
+**Allocation does not cross.** At every size measured, this library allocates less for the same work: nothing at all for a filtered view, about a third of DynamicData's for grouping, about seven tenths for sorting.
+
+**Composition behaves.** Ordering or grouping a filtered view costs each library close to the sum of its parts rather than more, so a chain does not change which one to prefer — only the size of the view arriving at each stage does.
 
 Two more things worth knowing before you weigh any of the above.
 
