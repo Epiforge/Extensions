@@ -88,6 +88,9 @@ sealed class ObservableCollectionOrderingComparer<TElement> :
         counts.TrimExcess();
     }
 
+    /// <remarks>
+    /// The selections are walked by index rather than searched with a predicate, because the predicate closes over the sender and so allocates a closure, a delegate and an iterator on every change this handles, which for a query ordered on an observed key is once for every key change for the life of the query, over a list which is nearly always one selection long
+    /// </remarks>
     [SuppressMessage("Maintainability", "CA1502: Avoid excessive complexity")]
     void SelectionCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
@@ -103,8 +106,9 @@ sealed class ObservableCollectionOrderingComparer<TElement> :
             if (e.Action is NotifyCollectionChangedAction.Replace && (e.OldItems?.Count ?? 0) == 1 && (e.NewItems?.Count ?? 0) == 1 && e.OldItems![0] is Tuple<TElement, IComparable> oldItem && e.NewItems![0] is Tuple<TElement, IComparable> newItem && ReferenceEquals(oldItem.Item1, newItem.Item1))
             {
                 if (comparables.TryGetValue(oldItem.Item1, out var replacedComparables))
-                    foreach (var selectionIndex in selectionsAndDirections.FindIndicies(t => ReferenceEquals(t.selection, sender)))
-                        AssignComparable(replacedComparables, selectionIndex, newItem.Item2);
+                    for (int selectionIndex = 0, selectionCount = selectionsAndDirections.Count; selectionIndex < selectionCount; ++selectionIndex)
+                        if (ReferenceEquals(selectionsAndDirections[selectionIndex].selection, sender))
+                            AssignComparable(replacedComparables, selectionIndex, newItem.Item2);
                 return;
             }
             if ((e.OldItems?.Count ?? 0) > 0 && ReferenceEquals(sender, lastSelectionAndDirection.selection))
@@ -123,7 +127,10 @@ sealed class ObservableCollectionOrderingComparer<TElement> :
                         counts[element] = countDiff;
                 }
             if ((e.NewItems?.Count ?? 0) > 0)
-                foreach (var selectionIndex in selectionsAndDirections.FindIndicies(t => ReferenceEquals(t.selection, sender)))
+                for (int selectionIndex = 0, selectionCount = selectionsAndDirections.Count; selectionIndex < selectionCount; ++selectionIndex)
+                {
+                    if (!ReferenceEquals(selectionsAndDirections[selectionIndex].selection, sender))
+                        continue;
                     if (selectionIndex == 0)
                         foreach (var elementComparables in e.NewItems!.OfType<Tuple<TElement, IComparable>>().GroupBy(t => t.Item1, t => t.Item2))
                         {
@@ -143,6 +150,7 @@ sealed class ObservableCollectionOrderingComparer<TElement> :
                         foreach (var elementComparables in e.NewItems!.OfType<Tuple<TElement, IComparable>>().GroupBy(t => t.Item1, t => t.Item2))
                             if (comparables.TryGetValue(elementComparables.Key, out var elementComparablesList))
                                 AssignComparable(elementComparablesList, selectionIndex, elementComparables.First());
+                }
         }
     }
 }

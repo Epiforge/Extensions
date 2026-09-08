@@ -198,13 +198,17 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
     void ResultsPropertyChanged(object? sender, PropertyChangedEventArgs e) =>
         OnPropertyChanged(e);
 
+    /// <remarks>
+    /// The payload is walked by index rather than through a query over it, because a key change carries a single item and the query allocates two iterators and their enumerators to deliver it
+    /// </remarks>
     void SelectionCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
         lock (access)
-            if (e.NewItems is { } newItems && newItems.Count > 0)
-                foreach (var element in newItems.OfType<Tuple<TElement, IComparable>>().Select(t => t.Item1))
-                    RepositionElementWithAccess(element);
+            if (e.NewItems is { } newItems)
+                for (int i = 0, ii = newItems.Count; i < ii; ++i)
+                    if (newItems[i] is Tuple<TElement, IComparable> keyedElement)
+                        RepositionElementWithAccess(keyedElement.Item1);
     }
 
     void SelectionPropertyChanged(object? sender, PropertyChangedEventArgs e)
