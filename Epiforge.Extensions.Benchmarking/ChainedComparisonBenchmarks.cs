@@ -155,22 +155,36 @@ public class ChainedComparisonBenchmarks
     }
 
     /// <summary>
-    /// Requires the ordered view to be in order and to hold what the filter admits, and to reorder when a key changes
+    /// Requires the ordered view to be in order, to hold what the filter admits, and to reorder when keys change
     /// </summary>
+    /// <remarks>
+    /// The two elements at the ends exchange keys rather than one element taking a key which is already the largest, because every admitted rank is already taken and giving an element a key another element holds asks the two libraries which of two equal elements comes first. Neither specifies that, and they answer differently: this library's search puts a newly equal element before the one already there and DynamicData's puts it after. Exchanging keys keeps every key unique, and requiring the exchange to be reflected and then undone is a stronger check than the one it replaces rather than a weaker one
+    /// </remarks>
     void VerifyOrdered(Func<IReadOnlyList<BenchmarkPerson>> view, string arm)
     {
-        var ordered = view();
+        VerifyInOrder(view(), arm);
+        var lowest = source[0];
+        var highest = source[AdmittedCount - 1];
+        lowest.Rank = AdmittedCount - 1;
+        highest.Rank = 0;
+        var exchanged = view();
+        VerifyInOrder(exchanged, arm);
+        if (!ReferenceEquals(exchanged[0], highest) || !ReferenceEquals(exchanged[exchanged.Count - 1], lowest))
+            throw new InvalidOperationException($"{arm} did not exchange the places of the two elements whose keys were exchanged; this instrument would otherwise be reporting an arrangement which does not do the work as though it did it quickly");
+        lowest.Rank = 0;
+        highest.Rank = AdmittedCount - 1;
+        var restored = view();
+        VerifyInOrder(restored, arm);
+        if (!ReferenceEquals(restored[0], lowest) || !ReferenceEquals(restored[restored.Count - 1], highest))
+            throw new InvalidOperationException($"{arm} did not restore the places of the two elements whose keys were restored");
+    }
+
+    void VerifyInOrder(IReadOnlyList<BenchmarkPerson> ordered, string arm)
+    {
         VerifyAdmitted(ordered.Count, arm);
         for (var i = 1; i < ordered.Count; ++i)
             if (ordered[i - 1].Rank > ordered[i].Rank)
-                throw new InvalidOperationException($"{arm} is not maintaining order at index {i}; this instrument would otherwise be reporting an arrangement which does not do the work as though it did it quickly");
-        var subject = source[0];
-        var held = subject.Rank;
-        subject.Rank = AdmittedCount - 1;
-        var moved = view();
-        if (!ReferenceEquals(moved[moved.Count - 1], subject))
-            throw new InvalidOperationException($"{arm} did not move an element whose key became the largest admitted to the end of the order");
-        subject.Rank = held;
+                throw new InvalidOperationException($"{arm} is not maintaining order at index {i}");
     }
 
     void SetupCache()
