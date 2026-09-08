@@ -372,6 +372,49 @@ Reading is also cheaper than being told. A query subscribes to the one it is bui
 
 Which is also how to decide whether you want one. If you compute a result once and move on, plain LINQ is cheaper and simpler, and you should use it. If a result has to stay correct across a long run of small changes, such as a list someone is looking at, a running total, or a filter someone is typing into, that is what these are for.
 
+#### Which of These Should I Use?
+The nearest thing to this in .NET is [DynamicData](https://github.com/reactivemarbles/DynamicData), and it is a good library. Both keep a derived collection correct as your data changes — filter, sort, group, project, aggregate — and both update the result when an element's property changes rather than only when the collection does. Here is how to tell which one you want.
+
+**Start with what you already know.** If you know `INotifyPropertyChanged`, `ObservableCollection<T>` and LINQ, this library asks you to learn almost nothing else: you point it at the collection you already have, write `ObserveWhere(person => person.Rank > 0)`, and bind the result. If you already know Rx, or you use ReactiveUI, DynamicData will feel like home and this library will feel like an unfamiliar dialect — and it is probably already somewhere in your dependency graph. Most of the rest follows from that one answer.
+
+| What you will actually run into | This library | DynamicData |
+|---|---|---|
+| Where your data lives | The `ObservableCollection<T>` you already have | A `SourceCache` or `SourceList`; adapting an existing collection is possible but much slower |
+| Saying which property to watch | Read out of your expression | You name it with `AutoRefresh` — forget it and your view goes quietly stale |
+| A property change that does not change the result | Costs nothing | Materializes a change set each time |
+| When your projection throws | A fault you can bind to; the query keeps working | Ends the subscription, as Rx does, unless you use `TransformSafe` |
+| Combining collections | `ObserveConcat`, chained | Also union, intersection, difference, and merging a changing set of sources |
+| Showing only what is on screen | A fixed slice that stays correct | Live paging and virtualization driven by a stream of requests |
+| Composing with anything else reactive | Not applicable | Everything in Rx composes with it |
+| An expression it cannot analyze | Falls back to a slower path, says so in your log, results unchanged | Not applicable |
+
+**Use DynamicData if** you are already in Rx; you need to combine several collections by set operations; you need live paging, virtualization, size limits or expiry; you need asynchronous projections; or you want the reassurance of a large and long-established user base.
+
+**Use this library if** you want a live view of a collection you already have, with the least new vocabulary, and you care about what an individual property change costs.
+
+##### What It Costs
+These are from the benchmarks in this repository, against DynamicData 9.4.33 at a thousand elements unless stated otherwise. Each propagation figure is per property change, above what the same changes cost with nothing observing them at all.
+
+| | This library | DynamicData |
+|---|---|---|
+| A property change that does not alter a filtered view | **0 B**, **7.3 ns** | 608 B, 192.4 ns |
+| An element changing group | **592 B**, **234.8 ns** | 1,936 B, 596.7 ns |
+| An element moving in a sorted view | **292 B**, 1,259.5 ns | 414 B, **984.4 ns** |
+| Building a filtered view | **965 KB**, **294 μs** | 4,119 KB, 2,169 μs |
+| What a live filtered view holds | **934 B** per element | 1,865 B per element |
+
+The zero is exact rather than rounded: a property change that does not move an element in or out of a filtered view allocates nothing here, at a thousand, ten thousand and a hundred thousand elements alike. This library re-evaluates the predicate in place and stays silent when the answer has not moved; DynamicData's model is a stream of change sets, so a refresh has to materialize one. Neither is a defect. **One library pays per change and the other pays per change that matters.**
+
+**Sorting is the one where DynamicData is faster, and only on small collections.** Its cost per move grows with the size of the collection while this library's mostly does not, so the two cross at about 1,400 elements: below that DynamicData is 1.28x faster, at four thousand elements this library is 1.72x faster, and at ten thousand it is 2.98x faster. If you sort a small collection, that is a point against this library.
+
+Two more things worth knowing before you weigh any of the above.
+
+**A live view is not free in either library.** One over ten thousand elements holds about 9 MB here and about 19 MB in DynamicData, against 960 KB for the elements themselves. Building a view is likewise proportional to the size of the collection in both. Build one and keep it; neither library rewards building views casually.
+
+**`ToObservableChangeSet()` over an existing `ObservableCollection<T>` costs DynamicData about 210x what its own `SourceCache` does** for the same property changes. That is the path you land on if you adopt it without changing where your data lives, and it is worth knowing about before you do.
+
+These comparisons were written by someone who does not use DynamicData, which is a real limitation on them. The harness is in this repository, the workloads are ordinary ones, and corrections are welcome.
+
 ---
 
 ## Platforms

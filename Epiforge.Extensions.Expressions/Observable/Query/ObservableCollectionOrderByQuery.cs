@@ -214,6 +214,8 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
     /// <summary>
     /// Places the specified number of occurrences of an element, which finds it a place in the order where it has none yet
     /// </summary>
+    /// <param name="element">The element to place</param>
+    /// <param name="count">The number of occurrences of it to place</param>
     /// <param name="occurrences">The occurrences to place, which is <c>null</c> for a single one, in which case the buffer this keeps for the purpose stands in for them</param>
     /// <remarks>
     /// The buffer is safe to reuse because every caller holds the query's lock and <see cref="ObservableRangeCollection{T}.InsertRange(int, IEnumerable{T})" /> copies what it is given before it announces anything
