@@ -37,6 +37,31 @@ sealed class ObservableCollectionOrderingComparer<TElement> :
             elementComparables[selectionIndex] = comparable;
     }
 
+    /// <summary>
+    /// Records the comparable of the first selection for the specified number of occurrences of an element, which begins keeping that element where it is not yet kept
+    /// </summary>
+    void AssignFirstComparable(TElement element, int addedCount, IComparable comparable)
+    {
+        if (!comparables.TryGetValue(element, out var elementComparablesList))
+        {
+            elementComparablesList = [];
+            comparables.Add(element, elementComparablesList);
+            counts.Add(element, addedCount);
+        }
+        else
+            counts[element] += addedCount;
+        AssignComparable(elementComparablesList, 0, comparable);
+    }
+
+    /// <summary>
+    /// Records the comparable of a selection other than the first for an element already kept, which is where an ordering by more than one key keeps its later keys
+    /// </summary>
+    void AssignLaterComparable(TElement element, int selectionIndex, IComparable comparable)
+    {
+        if (comparables.TryGetValue(element, out var elementComparablesList))
+            AssignComparable(elementComparablesList, selectionIndex, comparable);
+    }
+
     public int Compare(TElement? x, TElement? y)
     {
         if (comparablesAreStale)
@@ -67,6 +92,23 @@ sealed class ObservableCollectionOrderingComparer<TElement> :
         return true;
     }
 
+    /// <summary>
+    /// Forgets the specified number of occurrences of an element, which stops keeping it where none remain
+    /// </summary>
+    void RemoveOccurrences(TElement element, int removedCount)
+    {
+        if (!counts.TryGetValue(element, out var currentCount))
+            return;
+        var countDiff = currentCount - removedCount;
+        if (countDiff <= 0)
+        {
+            counts.Remove(element);
+            comparables.Remove(element);
+        }
+        else
+            counts[element] = countDiff;
+    }
+
     void RebuildWithAccess()
     {
         comparablesAreStale = false;
@@ -91,6 +133,9 @@ sealed class ObservableCollectionOrderingComparer<TElement> :
     /// <remarks>
     /// The selections are walked by index rather than searched with a predicate, because the predicate closes over the sender and so allocates a closure, a delegate and an iterator on every change this handles, which for a query ordered on an observed key is once for every key change for the life of the query, over a list which is nearly always one selection long
     /// </remarks>
+    /// <remarks>
+    /// A payload of a single item is handled without grouping it, because grouping one item builds a lookup, its array of groupings, the grouping itself and the array of its one element, none of which a payload of one needs. The grouping remains for payloads which can hold one element more than once
+    /// </remarks>
     [SuppressMessage("Maintainability", "CA1502: Avoid excessive complexity")]
     void SelectionCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
@@ -112,45 +157,40 @@ sealed class ObservableCollectionOrderingComparer<TElement> :
                 return;
             }
             if ((e.OldItems?.Count ?? 0) > 0 && ReferenceEquals(sender, lastSelectionAndDirection.selection))
-                foreach (var elementComparables in e.OldItems!.OfType<Tuple<TElement, IComparable>>().GroupBy(t => t.Item1, t => t.Item2))
+            {
+                var oldItems = e.OldItems!;
+                if (oldItems.Count == 1)
                 {
-                    var element = elementComparables.Key;
-                    if (!counts.TryGetValue(element, out var currentCount))
-                        continue;
-                    var countDiff = currentCount - elementComparables.Count();
-                    if (countDiff <= 0)
-                    {
-                        counts.Remove(element);
-                        comparables.Remove(element);
-                    }
-                    else
-                        counts[element] = countDiff;
+                    if (oldItems[0] is Tuple<TElement, IComparable> onlyOldItem)
+                        RemoveOccurrences(onlyOldItem.Item1, 1);
                 }
+                else
+                    foreach (var elementComparables in oldItems.OfType<Tuple<TElement, IComparable>>().GroupBy(t => t.Item1, t => t.Item2))
+                        RemoveOccurrences(elementComparables.Key, elementComparables.Count());
+            }
             if ((e.NewItems?.Count ?? 0) > 0)
+            {
+                var newItems = e.NewItems!;
+                var onlyNewItem = newItems.Count == 1 ? newItems[0] as Tuple<TElement, IComparable> : null;
                 for (int selectionIndex = 0, selectionCount = selectionsAndDirections.Count; selectionIndex < selectionCount; ++selectionIndex)
                 {
                     if (!ReferenceEquals(selectionsAndDirections[selectionIndex].selection, sender))
                         continue;
-                    if (selectionIndex == 0)
-                        foreach (var elementComparables in e.NewItems!.OfType<Tuple<TElement, IComparable>>().GroupBy(t => t.Item1, t => t.Item2))
-                        {
-                            var element = elementComparables.Key;
-                            var count = elementComparables.Count();
-                            if (!comparables.TryGetValue(element, out var elementComparablesList))
-                            {
-                                elementComparablesList = [];
-                                comparables.Add(element, elementComparablesList);
-                                counts.Add(element, count);
-                            }
-                            else
-                                counts[element] += count;
-                            AssignComparable(elementComparablesList, 0, elementComparables.First());
-                        }
+                    if (onlyNewItem is not null)
+                    {
+                        if (selectionIndex == 0)
+                            AssignFirstComparable(onlyNewItem.Item1, 1, onlyNewItem.Item2);
+                        else
+                            AssignLaterComparable(onlyNewItem.Item1, selectionIndex, onlyNewItem.Item2);
+                    }
+                    else if (selectionIndex == 0)
+                        foreach (var elementComparables in newItems.OfType<Tuple<TElement, IComparable>>().GroupBy(t => t.Item1, t => t.Item2))
+                            AssignFirstComparable(elementComparables.Key, elementComparables.Count(), elementComparables.First());
                     else
-                        foreach (var elementComparables in e.NewItems!.OfType<Tuple<TElement, IComparable>>().GroupBy(t => t.Item1, t => t.Item2))
-                            if (comparables.TryGetValue(elementComparables.Key, out var elementComparablesList))
-                                AssignComparable(elementComparablesList, selectionIndex, elementComparables.First());
+                        foreach (var elementComparables in newItems.OfType<Tuple<TElement, IComparable>>().GroupBy(t => t.Item1, t => t.Item2))
+                            AssignLaterComparable(elementComparables.Key, selectionIndex, elementComparables.First());
                 }
+            }
         }
     }
 }

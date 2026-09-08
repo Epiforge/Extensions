@@ -29,6 +29,7 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
     readonly NullableKeyDictionary<TElement, PrefixWeightedSequenceNode<TElement>> nodesByElement;
     readonly PrefixWeightedSequence<TElement> positions;
     readonly ObservableRangeCollection<TElement> results;
+    readonly List<TElement> singleOccurrence = [default!];
     IReadOnlyList<(IObservableCollectionQuery<Tuple<TElement, IComparable>> selection, bool isDescending)>? selectionsAndDirections;
     readonly ObservableCollectionQuery<TElement> source;
 
@@ -189,6 +190,51 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
         results.MoveRange(startingIndex, positions.PrefixWeightBefore(node), node.Weight);
     }
 
+    /// <summary>
+    /// Places the specified number of occurrences of an element, which finds it a place in the order where it has none yet
+    /// </summary>
+    /// <param name="occurrences">The occurrences to place, which is <c>null</c> for a single one, in which case the buffer this keeps for the purpose stands in for them</param>
+    /// <remarks>
+    /// The buffer is safe to reuse because every caller holds the query's lock and <see cref="ObservableRangeCollection{T}.InsertRange(int, IEnumerable{T})" /> copies what it is given before it announces anything
+    /// </remarks>
+    void InsertElementOccurrencesWithAccess(TElement element, int count, IEnumerable<TElement>? occurrences)
+    {
+        if (occurrences is null)
+        {
+            singleOccurrence[0] = element;
+            occurrences = singleOccurrence;
+        }
+        if (nodesByElement.TryGetValue(element, out var node))
+        {
+            results.InsertRange(positions.PrefixWeightBefore(node), occurrences);
+            positions.SetWeight(node, node.Weight + count);
+        }
+        else
+        {
+            var index = FindInsertionIndexWithAccess(element);
+            nodesByElement.Add(element, positions.Insert(index, element, count));
+            results.InsertRange(positions.PrefixWeightBefore(index), occurrences);
+        }
+        singleOccurrence[0] = default!;
+    }
+
+    /// <summary>
+    /// Forgets the specified number of occurrences of an element, which takes it out of the order where none remain
+    /// </summary>
+    void RemoveElementOccurrencesWithAccess(TElement element, int removedCount)
+    {
+        if (!nodesByElement.TryGetValue(element, out var node))
+            return;
+        results.RemoveRange(positions.PrefixWeightBefore(node), removedCount);
+        if (removedCount < node.Weight)
+            positions.SetWeight(node, node.Weight - removedCount);
+        else
+        {
+            positions.RemoveAt(positions.IndexOf(node));
+            nodesByElement.Remove(element);
+        }
+    }
+
     void ResultsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         enumerationSnapshot = null;
@@ -251,22 +297,11 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
                         nodesByElement.TrimExcess();
                         results.Clear();
                     }
+                    else if (oldItems.Count == 1)
+                        RemoveElementOccurrencesWithAccess((TElement)oldItems[0]!, 1);
                     else
                         foreach (var elements in oldItems.Cast<TElement>().GroupBy(element => element))
-                        {
-                            var element = elements.Key;
-                            if (!nodesByElement.TryGetValue(element, out var node))
-                                continue;
-                            var removedCount = elements.Count();
-                            results.RemoveRange(positions.PrefixWeightBefore(node), removedCount);
-                            if (removedCount < node.Weight)
-                                positions.SetWeight(node, node.Weight - removedCount);
-                            else
-                            {
-                                positions.RemoveAt(positions.IndexOf(node));
-                                nodesByElement.Remove(element);
-                            }
-                        }
+                            RemoveElementOccurrencesWithAccess(elements.Key, elements.Count());
                 }
                 if (e.NewItems is { } newItems && newItems.Count > 0)
                 {
@@ -276,23 +311,11 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
                         RebuildPositionsWithAccess(newItems.Cast<TElement>().OrderBy(element => element, comparer).ToList(), ordered);
                         results.Reset(ordered);
                     }
+                    else if (newItems.Count == 1)
+                        InsertElementOccurrencesWithAccess((TElement)newItems[0]!, 1, null);
                     else
                         foreach (var elements in newItems.Cast<TElement>().GroupBy(element => element))
-                        {
-                            var element = elements.Key;
-                            var count = elements.Count();
-                            if (nodesByElement.TryGetValue(element, out var node))
-                            {
-                                results.InsertRange(positions.PrefixWeightBefore(node), elements);
-                                positions.SetWeight(node, node.Weight + count);
-                            }
-                            else
-                            {
-                                var index = FindInsertionIndexWithAccess(element);
-                                nodesByElement.Add(element, positions.Insert(index, element, count));
-                                results.InsertRange(positions.PrefixWeightBefore(index), elements);
-                            }
-                        }
+                            InsertElementOccurrencesWithAccess(elements.Key, elements.Count(), elements);
                 }
             }
         }
