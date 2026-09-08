@@ -184,7 +184,7 @@ public class NotifyingChainAttachment
             subject => subject.Rank = 0);
 
     [TestMethod]
-    public void TheFastPathHoldsOneSubscriptionPerPropertyWhereTheGraphHoldsOnePerObject()
+    public void BothMechanismsHoldOneSubscriptionPerObjectOfAChainReadAtTwoProperties()
     {
         var graphLog = new SubscriptionLog();
         var graphSubject = new Recorded(graphLog) { Next = new Recorded(graphLog) { Rank = 1, Score = 2 } };
@@ -199,7 +199,7 @@ public class NotifyingChainAttachment
             Assert.AreEqual(3, graphExpression.Evaluation.Result);
             Assert.AreEqual(3, fastExpression.Evaluation.Result);
             Assert.AreEqual(2, graphLog.Outstanding, $"graph: [{string.Join(", ", graphLog.Attachments())}]");
-            Assert.AreEqual(3, fastLog.Outstanding, $"the fast path is expected to hold one more, keying by property name where the graph keys by event; fast: [{string.Join(", ", fastLog.Attachments())}]");
+            Assert.AreEqual(2, fastLog.Outstanding, $"the fast path held one subscription per property until it began sharing one registration per object and event as the graph does; fast: [{string.Join(", ", fastLog.Attachments())}]");
         }
         Assert.AreEqual(0, graphLog.Outstanding);
         Assert.AreEqual(0, fastLog.Outstanding);
