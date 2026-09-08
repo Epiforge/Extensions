@@ -116,6 +116,47 @@ static class QueryFootprintReport
         return new(allocated, retained, afterDispose);
     }
 
+    /// <summary>
+    /// Builds and drops the same filtered view five times over five separate collections under a single baseline, so that what remains can be divided by the number of cycles
+    /// </summary>
+    /// <remarks>
+    /// This is the arm which decides whether unreclaimed memory is a leak or a cost. Memory which grows with the number of cycles is being lost on every query a process ever builds; memory which does not is a one-time cost of first use, paid by a cache which fills in once. The DynamicData counterpart below is the control, because it is already known to return to its baseline in a single cycle and must therefore stay flat across five
+    /// </remarks>
+    static ComparisonReading MeasureExpressionsFilterOverFiveCycles(int elementCount)
+    {
+        var baseline = Settle();
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        for (var cycle = 0; cycle < 5; ++cycle)
+        {
+            var observer = new CollectionObserver();
+            var source = BenchmarkPerson.CreateCollection(elementCount);
+            var sourceQuery = observer.ObserveReadOnlyList(source);
+            var where = sourceQuery.ObserveWhere(person => person.Rank > 0);
+            where.Dispose();
+            sourceQuery.Dispose();
+        }
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+        var retained = Settle() - baseline;
+        var afterDispose = Settle() - baseline;
+        return new(allocated, retained, afterDispose);
+    }
+
+    static ComparisonReading MeasureDynamicDataListFilterOverFiveCycles(int elementCount)
+    {
+        var baseline = Settle();
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        for (var cycle = 0; cycle < 5; ++cycle)
+        {
+            var source = BenchmarkPerson.CreateCollection(elementCount);
+            var subscription = source.ToObservableChangeSet().AutoRefresh(person => person.Rank).Filter(person => person.Rank > 0).Bind(out var bound).Subscribe();
+            subscription.Dispose();
+        }
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+        var retained = Settle() - baseline;
+        var afterDispose = Settle() - baseline;
+        return new(allocated, retained, afterDispose);
+    }
+
     static ComparisonReading MeasureDynamicDataCacheItself(int elementCount)
     {
         var source = BenchmarkPerson.CreateCollection(elementCount);
@@ -194,6 +235,8 @@ static class QueryFootprintReport
         report.AppendLine();
         report.AppendLine("Every row is the same predicate over the same collection. `Retained` is what the standing view occupies once settled, above whatever the caller holds anyway: the collection for this library and for DynamicData's list, the collection and the cache for DynamicData's cache. **What the cache itself retains is its own row**, because a caller who has an `ObservableCollection<T>` and adopts DynamicData pays for that as well as for the view.");
         report.AppendLine();
+        report.AppendLine("**The `five build-and-drop cycles` rows divide unreclaimed memory into a leak and a cost.** Each builds and drops the whole arrangement five times over five separate collections under one baseline. A figure near five times the single-cycle one is memory lost on every query a process builds; a figure near the single-cycle one is a one-time cost of first use. Its DynamicData counterpart is the control for that pair, since that arm already returns to its baseline in a single cycle and must stay flat across five. Their `Retained per element` divides by the element count of one cycle, so five cycles of a genuine leak read as five times the per-element figure above.");
+        report.AppendLine();
         report.AppendLine("**Two rows are controls rather than results.** `nothing built` takes the baseline and then does nothing at all, so all three of its columns must read zero; anything else means this instrument cannot measure retention and no other figure in either table may be quoted. `releasing the collection too` takes its baseline before the collection exists and then drops the collection along with the query, so it must return near zero as well; if it does while the plain `Expressions` row does not, then what that row still shows after disposal is being held by the elements themselves.");
         report.AppendLine();
         report.AppendLine("| Shape | Elements | Allocated | Retained | Retained per element | After dispose |");
@@ -204,6 +247,8 @@ static class QueryFootprintReport
                 ("Expressions, nothing built (control)", MeasureNothing),
                 ("Expressions", MeasureExpressionsFilter),
                 ("Expressions, releasing the collection too", MeasureExpressionsFilterReleasingTheSource),
+                ("Expressions, five build-and-drop cycles", MeasureExpressionsFilterOverFiveCycles),
+                ("DynamicData list, five build-and-drop cycles", MeasureDynamicDataListFilterOverFiveCycles),
                 ("DynamicData cache, the cache alone", MeasureDynamicDataCacheItself),
                 ("DynamicData cache, the view over it", MeasureDynamicDataCacheFilter),
                 ("DynamicData list, the view over the collection", MeasureDynamicDataListFilter)
