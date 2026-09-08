@@ -43,3 +43,32 @@ The `Where` query's per-element share should be a property of the query, not of 
 ## What reading found while the run was in flight
 
 `ScopedObservableExpression<TArgument, TResult>` passes `[argument]` to its base, which allocates an `object?[1]` per observation — 32 bytes, on every observation of every shape, on both mechanisms — solely to serve the public `Arguments` list. The typed subclass already holds the argument in its own `Argument` property, so the list duplicates what is there and is built whether or not anything reads it. Nothing inside the library reads it. Building it on demand would cost nothing where it is not read and preserve its identity where it is, and the class already has a field for it.
+
+## What that change was worth, measured
+
+The list is now made on first request. Every arm which constructs observations fell by **23.44 KB per thousand** and `SourceQueryOnly`, which constructs none, did not move at all — seventeen arms across two classes and both mechanisms, moving by one identical figure.
+
+| arm | before | after |
+|---|---|---|
+| `RankComparisonDirect`, in a query | 1121.37 KB | 1097.93 KB |
+| `ConstantPredicateDirect` | 801.05 | 777.62 |
+| `NotifyingChainDirect` | 1504.18 | 1480.74 |
+| `RankComparisonGraph`, in a query | 2882.28 | 2857.61 |
+| `ConstantDirect`, no query | 414.06 | 390.63 |
+| `RankComparisonDirect`, no query | 734.38 | 710.94 |
+| `SourceQueryOnly` | 4.30 | 4.30 |
+
+The graph arms fell between 23.42 and 27.19, which is the same figure inside their known 2.5 KB of run-to-run variation.
+
+**The shape was exactly right and the size was wrong.** The prediction was 32 bytes per observation, being the size of a one-element array of references on this platform. The measurement is **24.0**. The change removed exactly one allocation per observation and added none, so whatever `[argument]` compiled to for an `IReadOnlyList<object?>` target was not a plain `object?[1]`. That is 8 bytes unaccounted for on a term whose whole size was predicted, and the same collection-expression form is used elsewhere in this library, so it is worth knowing what it produces before it is priced again.
+
+## The decomposition after the change
+
+| term | before | after |
+|---|---|---|
+| the observation itself | 424.0 B | **400.0 B** |
+| the `Where` query's per-element share | 391.9 B | 391.9 B |
+| one subscription to a distinct object | 328.0 B | 328.0 B |
+| **total** | 1143.9 B | **1119.9 B** |
+
+Measured floor after the change: **1119.9 B**. The distinct-source constant is now confirmed a third time, unchanged at 328.0, and the query share is unchanged at 391.9 — both as they should be, since neither term was touched.
