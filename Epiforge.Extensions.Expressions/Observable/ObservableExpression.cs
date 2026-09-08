@@ -269,22 +269,22 @@ abstract class ScopedObservableExpression :
     static bool FaultEquals(Exception? x, Exception? y) =>
         ReferenceEquals(x, y) || x is not null && y is not null && x.GetType() == y.GetType() && x.Message == y.Message;
 
-    protected ScopedObservableExpression(ExpressionObserver observer, Expression? expression, ObservableExpression observableExpression, IReadOnlyList<object?> arguments)
+    protected ScopedObservableExpression(ExpressionObserver observer, Expression? expression, ObservableExpression observableExpression, IReadOnlyList<object?>? arguments)
     {
         ArgumentNullException.ThrowIfNull(observer);
         ArgumentNullException.ThrowIfNull(observableExpression);
-        ArgumentNullException.ThrowIfNull(arguments);
+        this.arguments = arguments;
         this.observer = observer;
         this.expression = expression;
         this.observableExpression = observableExpression;
         evaluation = observableExpression.CurrentEvaluation;
         if (this.observableExpression.CanChange)
             subscription = this.observableExpression.SubscribeDependent(this);
-        Arguments = arguments;
     }
 
     private protected readonly ObservableExpression observableExpression;
     readonly ExpressionObserver observer;
+    IReadOnlyList<object?>? arguments;
     int disposed;
     Expression? expression;
     private protected (Exception? Fault, object? Result) evaluation;
@@ -295,7 +295,19 @@ abstract class ScopedObservableExpression :
     internal Expression Expression =>
         expression ??= observableExpression.Expression;
 
-    public IReadOnlyList<object?> Arguments { get; }
+    /// <summary>
+    /// Gets the arguments the expression is observed with, made when something asks for it where the observation was given its arguments singly, since one is made per element of a query and nothing within the library reads it
+    /// </summary>
+    public IReadOnlyList<object?> Arguments
+    {
+        get
+        {
+            if (arguments is { } made)
+                return made;
+            Interlocked.CompareExchange(ref arguments, MakeArguments(), null);
+            return arguments!;
+        }
+    }
 
     public bool IsDisposed =>
         disposed != 0;
@@ -364,6 +376,9 @@ abstract class ScopedObservableExpression :
         PropertyChanged?.Invoke(this, ObservableExpression.EvaluationPropertyChangedEventArgs);
     }
 
+    private protected virtual IReadOnlyList<object?> MakeArguments() =>
+        [];
+
     private protected abstract bool ResultEquals(object? x, object? y);
 
     internal void RaisePendingNotification()
@@ -376,7 +391,7 @@ abstract class ScopedObservableExpression :
         Expression.ToString();
 }
 
-class ScopedObservableExpression<TResult>(ExpressionObserver observer, Expression? expression, ObservableExpression observableExpression, IReadOnlyList<object?> arguments) :
+class ScopedObservableExpression<TResult>(ExpressionObserver observer, Expression? expression, ObservableExpression observableExpression, IReadOnlyList<object?>? arguments) :
     ScopedObservableExpression(observer, expression, observableExpression, arguments),
     IObservableExpression<TResult>
 {
@@ -399,23 +414,29 @@ class ScopedObservableExpression<TResult>(ExpressionObserver observer, Expressio
 }
 
 class ScopedObservableExpression<TArgument, TResult>(ExpressionObserver observer, Expression? expression, ObservableExpression observableExpression, TArgument argument) :
-    ScopedObservableExpression<TResult>(observer, expression, observableExpression, [argument]),
+    ScopedObservableExpression<TResult>(observer, expression, observableExpression, null),
     IObservableExpression<TArgument, TResult>
 {
     public TArgument Argument { get; } = argument;
+
+    private protected override IReadOnlyList<object?> MakeArguments() =>
+        [Argument];
 }
 
 class ScopedObservableExpression<TArgument1, TArgument2, TResult>(ExpressionObserver observer, Expression expression, ObservableExpression observableExpression, TArgument1 argument1, TArgument2 argument2) :
-    ScopedObservableExpression<TResult>(observer, expression, observableExpression, [argument1, argument2]),
+    ScopedObservableExpression<TResult>(observer, expression, observableExpression, null),
     IObservableExpression<TArgument1, TArgument2, TResult>
 {
     public TArgument1 Argument1 { get; } = argument1;
 
     public TArgument2 Argument2 { get; } = argument2;
+
+    private protected override IReadOnlyList<object?> MakeArguments() =>
+        [Argument1, Argument2];
 }
 
 class ScopedObservableExpression<TArgument1, TArgument2, TArgument3, TResult>(ExpressionObserver observer, Expression expression, ObservableExpression observableExpression, TArgument1 argument1, TArgument2 argument2, TArgument3 argument3) :
-    ScopedObservableExpression<TResult>(observer, expression, observableExpression, [argument1, argument2, argument3]),
+    ScopedObservableExpression<TResult>(observer, expression, observableExpression, null),
     IObservableExpression<TArgument1, TArgument2, TArgument3, TResult>
 {
     public TArgument1 Argument1 { get; } = argument1;
@@ -423,4 +444,7 @@ class ScopedObservableExpression<TArgument1, TArgument2, TArgument3, TResult>(Ex
     public TArgument2 Argument2 { get; } = argument2;
 
     public TArgument3 Argument3 { get; } = argument3;
+
+    private protected override IReadOnlyList<object?> MakeArguments() =>
+        [Argument1, Argument2, Argument3];
 }
