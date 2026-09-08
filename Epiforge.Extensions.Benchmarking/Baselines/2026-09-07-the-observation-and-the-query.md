@@ -72,3 +72,28 @@ The graph arms fell between 23.42 and 27.19, which is the same figure inside the
 | **total** | 1143.9 B | **1119.9 B** |
 
 Measured floor after the change: **1119.9 B**. The distinct-source constant is now confirmed a third time, unchanged at 328.0, and the query share is unchanged at 391.9 — both as they should be, since neither term was touched.
+
+## The discrepancy, settled
+
+The 233 bytes were an artifact of the comparison, not a defect. Four arms were added which construct every observation before disposing any — which is what a query does — against the four which dispose as they go.
+
+| arm | disposed as made | held alive |
+|---|---|---|
+| `ConstantDirect` | 390.63 KB | **390.63 KB** |
+| `RankComparisonDirect` | 710.94 KB | **710.94 KB** |
+| `ConstantGraph` | 663.13 KB | **434.62 KB** |
+| `RankComparisonGraph` | 2698.51 KB | **2474.37 KB** |
+
+**Holding costs the fast path nothing, to the byte, on both shapes.** That was the prediction and it landed on both arms rather than the one it was made for.
+
+**The graph is cheaper held, by about 226 KB per thousand.** The reason is node sharing: the literal in `person.Rank > 0` is one `ConstantExpression` in the lambda every observation is built from, so the observer caches one node for it and a thousand living observations share it. Disposing each observation before making the next destroys that node and builds it again, a thousand times. The standalone loop was denying the graph the thing its cache exists for, and the query was not.
+
+So the graph's query share has to be read against the held arm, not the other: 2921.8 minus 2533.8 is **388.0 bytes per element**, against the fast path's **391.9**. Two mechanisms, 3.9 bytes apart, on a term which ought to belong to the query alone. **The `Where` query costs about 390 bytes per element whichever mechanism is inside it**, and the earlier 233-byte gap was the measurement, not the library.
+
+## What that corrects
+
+An observation of `person.Rank > 0` on the graph costs **2533.8 bytes per element** where it coexists with others, not the 2787.9 recorded above, which is the figure for the unnatural case. The mechanisms compared on that footing: **728.0 against 2533.8**, and with each mechanism's own no-subscription arm removed, **328.0 against 2088.8** for the structure and subscription of one member read.
+
+## What the instrument cannot see
+
+Both observers are made once in `GlobalSetup` and live for every iteration, so their registries and caches reach their working size during warmup and are never grown again inside a measured operation. **Nothing in these figures includes the one-time growth of a dictionary to a thousand entries**, on either mechanism. That is the right choice for measuring steady state, and it means these numbers cannot be used to argue about table growth at all.
