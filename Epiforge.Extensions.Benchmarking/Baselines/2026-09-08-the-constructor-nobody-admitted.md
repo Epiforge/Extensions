@@ -50,6 +50,25 @@ Recorded before the run: 2,900 to 3,600 bytes off the 5,261, with the projection
 
 **56% and 71.5%.** Of the 2,024 that remain, 144 is the collection itself, 0 is observing it, 456 is the ordering machinery, and 1,424 is constructing and disposing one observation — which the construction floor puts near 1,045 for an element of a bulk query, so the projection is now close to what an observation simply costs.
 
+## The grouped query, measured the same day
+
+`ObserveGroupBy` wraps its selector the same way and was refused for the same reason. Its before is the table in `2026-09-04-the-invocation-wrapper.md` rather than a run taken this morning, so four other changes sit inside the difference; the attribution below is therefore approximate in a way the ordered figures are not.
+
+| arm | 4 September | now |
+|---|---|---|
+| `Count` (control) | 12.80 ns / 0 B | 12.79 ns / 0 B |
+| `Enumerate` (control) | 24.41 ns / 40 B | 24.14 ns / 40 B |
+| `KeyChange` at 100 | 398.40 ns / 725 B | 219.20 ns / **622 B** |
+| `KeyChange` at 1000 | 450.23 ns / 711 B | 255.66 ns / **608 B** |
+| `KeyChange` at 10000 | 1,071.49 ns / 711 B | 425.02 ns / **608 B** |
+| `SourceAddAndRemove` at 100 | 4,440.28 ns / 5,111 B | 531.12 ns / **1,864 B** |
+| `SourceAddAndRemove` at 1000 | 3,851.77 ns / 5,213 B | 719.18 ns / **1,864 B** |
+| `SourceAddAndRemove` at 10000 | 6,147.51 ns / 5,438 B | 1,068.10 ns / **1,864 B** |
+
+**An add and a remove on a grouped query of a thousand costs 1,864 bytes against 5,213, in 19% of the time — 5.4x faster.** At ten thousand it is 5.8x. **The figure is flat at 1,864 across every element count**, where it was 5,111, 5,213 and 5,438; that is the same signature the ordered query showed, and the same cause. The grouped query gains more in time than the ordered one because it has no reordering to pay for underneath.
+
+A key change costs 608 bytes against 711 and takes 43% to 60% less time. Both controls held.
+
 ## What has not been measured
 
-`ObserveGroupBy` and `ObserveLookup` wrap their selectors the same way and were refused for the same reason, so they are on the fast path now too. `ObserveGroupByBenchmarks` exists and would show it. Nothing here says by how much.
+`ObserveLookup` wraps its selector the same way and moved with them. No instrument covers it.
