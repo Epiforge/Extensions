@@ -12,8 +12,10 @@ public class RefusalPricingBenchmarks
     static readonly Expression<Func<BenchmarkPersonWithPartner, bool>> indexerRead = person => table[person.Rank] > 0;
     static readonly Expression<Func<BenchmarkPersonWithPartner, bool>> notifyingChain = person => person.Partner!.Rank > 0;
     static readonly Expression<Func<BenchmarkPersonWithPartner, bool>> rankComparison = person => person.Rank > 0;
+    static readonly Expression<Func<BenchmarkPersonWithPartner, bool>> sharedSourceRepeated = person => other.Rank + other.Rank > person.Rank;
     static readonly Expression<Func<BenchmarkPersonWithPartner, bool>> twoObjectConditional = person => (person.Rank > 0 ? other.Rank : person.Rank) > 0;
     static readonly Expression<Func<BenchmarkPersonWithPartner, bool>> twoObjectShortCircuit = person => person.Rank > 0 && other.Rank > 0;
+    static readonly Expression<Func<BenchmarkPersonWithPartner, bool>> twoSourceSum = person => other.Rank + person.Rank > 0;
 
     static ObservableDictionary<int, int> BuildTable()
     {
@@ -60,6 +62,14 @@ public class RefusalPricingBenchmarks
         ConstructAndDispose(graph, rankComparison);
 
     [Benchmark]
+    public void SharedSourceRepeatedDirect() =>
+        ConstructAndDispose(direct, sharedSourceRepeated);
+
+    [Benchmark]
+    public void SharedSourceRepeatedGraph() =>
+        ConstructAndDispose(graph, sharedSourceRepeated);
+
+    [Benchmark]
     public void TwoObjectConditionalDirect() =>
         ConstructAndDispose(direct, twoObjectConditional);
 
@@ -74,6 +84,10 @@ public class RefusalPricingBenchmarks
     [Benchmark]
     public void TwoObjectShortCircuitGraph() =>
         ConstructAndDispose(graph, twoObjectShortCircuit);
+
+    [Benchmark]
+    public void TwoSourceSumDirect() =>
+        ConstructAndDispose(direct, twoSourceSum);
 
     void ConstructAndDispose(CollectionObserver observer, Expression<Func<BenchmarkPersonWithPartner, bool>> predicate)
     {

@@ -43,6 +43,20 @@ public class DirectSubscriptionPlanning
     }
 
     [TestMethod]
+    public void ClosureFieldReadTwiceNamesOneSourceThroughTwoEqualNodes()
+    {
+        var person = TestPerson.CreateJohn();
+        var other = TestPerson.CreateEmily();
+        var plan = Analyzer().Plan(Bound<bool>(subject => other.NameGets + other.NameGets > subject.NameGets, person));
+        Assert.IsTrue(plan.IsEligible);
+        Assert.AreEqual(5, plan.Subscriptions.Count);
+        var reads = plan.Subscriptions.Where(subscription => subscription.Kind is DirectSubscriptionKind.MemberPropertyChanged && subscription.Source is MemberExpression).ToList();
+        Assert.AreEqual(2, reads.Count);
+        Assert.IsFalse(ReferenceEquals(reads[0].Source, reads[1].Source));
+        Assert.IsTrue(Epiforge.Extensions.Expressions.ExpressionEqualityComparer.Default.Equals(reads[0].Source, reads[1].Source));
+    }
+
+    [TestMethod]
     public void ConstantCollectionPlansCollectionChanged()
     {
         var people = TestPerson.CreatePeopleCollection();
