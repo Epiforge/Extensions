@@ -6,11 +6,14 @@ public class ObservationConstructionBenchmarks
     const int elementCount = 1000;
 
     static readonly Expression<Func<BenchmarkPersonWithPartner, bool>> constantPredicate = person => true;
+    static readonly Expression<Func<BenchmarkPersonWithPartner, BenchmarkPersonWithPartner>> parameterOnly = person => person;
+    static readonly Expression<Func<BenchmarkPersonWithPartner, int>> rankRead = person => person.Rank;
     static readonly Expression<Func<BenchmarkPersonWithPartner, bool>> rankComparison = person => person.Rank > 0;
 
     ExpressionObserver direct = null!;
     ExpressionObserver graph = null!;
     IObservableExpression<BenchmarkPersonWithPartner, bool>[] held = null!;
+    IObservableExpression<BenchmarkPersonWithPartner, int>[] heldRanks = null!;
     BenchmarkPersonWithPartner[] people = null!;
 
     [Benchmark]
@@ -29,10 +32,10 @@ public class ObservationConstructionBenchmarks
     public void ConstantGraphHeld() =>
         ConstructHoldAndDispose(graph, constantPredicate);
 
-    void ConstructAndDispose(ExpressionObserver observer, Expression<Func<BenchmarkPersonWithPartner, bool>> predicate)
+    void ConstructAndDispose<TResult>(ExpressionObserver observer, Expression<Func<BenchmarkPersonWithPartner, TResult>> expression)
     {
         for (var i = 0; i < elementCount; ++i)
-            observer.Observe(predicate, people[i]).Dispose();
+            observer.Observe(expression, people[i]).Dispose();
     }
 
     /// <summary>
@@ -46,6 +49,25 @@ public class ObservationConstructionBenchmarks
             held[i].Dispose();
     }
 
+    void ConstructHoldAndDispose<TResult>(ExpressionObserver observer, Expression<Func<BenchmarkPersonWithPartner, TResult>> expression, IObservableExpression<BenchmarkPersonWithPartner, TResult>[] into)
+    {
+        for (var i = 0; i < elementCount; ++i)
+            into[i] = observer.Observe(expression, people[i]);
+        for (var i = 0; i < elementCount; ++i)
+            into[i].Dispose();
+    }
+
+    /// <summary>
+    /// An expression which is nothing but the argument, so that what an observation costs before it reads anything can be told from what reading costs
+    /// </summary>
+    [Benchmark]
+    public void ParameterOnlyDirect() =>
+        ConstructAndDispose(direct, parameterOnly);
+
+    [Benchmark]
+    public void ParameterOnlyGraph() =>
+        ConstructAndDispose(graph, parameterOnly);
+
     [Benchmark]
     public void RankComparisonDirect() =>
         ConstructAndDispose(direct, rankComparison);
@@ -53,6 +75,21 @@ public class ObservationConstructionBenchmarks
     [Benchmark]
     public void RankComparisonDirectHeld() =>
         ConstructHoldAndDispose(direct, rankComparison);
+
+    /// <summary>
+    /// A member read whose result is an <see cref="int" />, which is boxed where the boolean of every other arm is not, so that the result box can be told from the rest
+    /// </summary>
+    [Benchmark]
+    public void RankReadDirect() =>
+        ConstructAndDispose(direct, rankRead);
+
+    [Benchmark]
+    public void RankReadDirectHeld() =>
+        ConstructHoldAndDispose(direct, rankRead, heldRanks);
+
+    [Benchmark]
+    public void RankReadGraphHeld() =>
+        ConstructHoldAndDispose(graph, rankRead, heldRanks);
 
     [Benchmark(Baseline = true)]
     public void RankComparisonGraph() =>
@@ -68,6 +105,7 @@ public class ObservationConstructionBenchmarks
         direct = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = true });
         graph = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = false });
         held = new IObservableExpression<BenchmarkPersonWithPartner, bool>[elementCount];
+        heldRanks = new IObservableExpression<BenchmarkPersonWithPartner, int>[elementCount];
         var collection = BenchmarkPersonWithPartner.CreateCollection(elementCount);
         people = new BenchmarkPersonWithPartner[elementCount];
         for (var i = 0; i < elementCount; ++i)

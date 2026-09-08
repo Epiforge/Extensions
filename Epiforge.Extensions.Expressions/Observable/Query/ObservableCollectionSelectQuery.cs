@@ -56,6 +56,7 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
     int enumerationSnapshotPatches;
     bool enumerationSnapshotShared;
     int liveEnumerations;
+    PropertyChangedEventHandler? observableExpressionPropertyChangedHandler;
     readonly Dictionary<IObservableExpression<TElement, TResult>, (Projection Projection, List<PrefixWeightedSequenceNode<Projection>> Nodes, Exception? Fault)> observableExpressionStates = [];
     readonly PrefixWeightedSequence<Projection> positions = new();
     readonly EqualityComparer<TResult> resultComparer = EqualityComparer<TResult>.Default;
@@ -100,7 +101,7 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
             {
                 foreach (var (observableExpression, state) in observableExpressionStates)
                 {
-                    observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
+                    observableExpression.PropertyChanged -= ObservableExpressionPropertyChangedHandler;
                     for (int i = 0, ii = state.Nodes.Count; i < ii; ++i)
                         observableExpression.Dispose();
                 }
@@ -142,6 +143,12 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
         enumerationSnapshot = null;
         enumerationSnapshotShared = false;
     }
+
+    /// <summary>
+    /// Yields the one handler this query attaches to every observation it makes, since a method group converts to a new delegate at each conversion and this one is converted twice for every element
+    /// </summary>
+    PropertyChangedEventHandler ObservableExpressionPropertyChangedHandler =>
+        observableExpressionPropertyChangedHandler ??= ObservableExpressionPropertyChanged;
 
     void ObservableExpressionPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -189,7 +196,7 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
         {
             var projection = new Projection(observableExpression, result);
             observableExpressionStates.Add(observableExpression, (projection, [positions.Insert(index, projection, 1)], fault));
-            observableExpression.PropertyChanged += ObservableExpressionPropertyChanged;
+            observableExpression.PropertyChanged += ObservableExpressionPropertyChangedHandler;
         }
     }
 
@@ -219,7 +226,7 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
         if (state.Nodes.Count == 0)
         {
             observableExpressionStates.Remove(observableExpression);
-            observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
+            observableExpression.PropertyChanged -= ObservableExpressionPropertyChangedHandler;
         }
         observableExpression.Dispose();
     }
@@ -235,7 +242,7 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
     {
         foreach (var (observableExpression, state) in observableExpressionStates)
         {
-            observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
+            observableExpression.PropertyChanged -= ObservableExpressionPropertyChangedHandler;
             for (int i = 0, ii = state.Nodes.Count; i < ii; ++i)
                 observableExpression.Dispose();
         }

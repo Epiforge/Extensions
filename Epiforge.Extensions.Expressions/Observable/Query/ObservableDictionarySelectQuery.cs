@@ -11,6 +11,7 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
     readonly Dictionary<TKey, List<TSourceKey>> claimantsByProjectedKey = new(equalityComparer);
     int duplicateClaims;
     int nullKeys;
+    PropertyChangedEventHandler? observableExpressionPropertyChangedHandler;
     readonly ObservableDictionary<TSourceKey, (IObservableExpression<KeyValuePair<TSourceKey, TSourceValue>, KeyValuePair<TKey, TValue>> ObservableExpression, Exception? CommittedFault, KeyValuePair<TKey, TValue> CommittedProjection)> observableExpressions = new(source.KeyComparer);
     readonly ObservableDictionary<TKey, TValue> result = new(equalityComparer);
     IReadOnlyList<TValue>? valuesSnapshot;
@@ -103,7 +104,7 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
             {
                 foreach (var (observableExpression, _, _) in observableExpressions.Values)
                 {
-                    observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
+                    observableExpression.PropertyChanged -= ObservableExpressionPropertyChangedHandler;
                     observableExpression.Dispose();
                 }
                 source.DictionaryChanged -= SourceDictionaryChanged;
@@ -127,6 +128,12 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
         lock (access)
             return result.GetRange(keys);
     }
+
+    /// <summary>
+    /// Yields the one handler this query attaches to every observation it makes, since a method group converts to a new delegate at each conversion and this one is converted twice for every element
+    /// </summary>
+    PropertyChangedEventHandler ObservableExpressionPropertyChangedHandler =>
+        observableExpressionPropertyChangedHandler ??= ObservableExpressionPropertyChanged;
 
     void ObservableExpressionPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -174,7 +181,7 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
         var (fault, projection) = observableExpression.Evaluation;
         if (fault is null)
             ApplyProjectionWithAccess(sourceKeyValuePair.Key, projection, into);
-        observableExpression.PropertyChanged += ObservableExpressionPropertyChanged;
+        observableExpression.PropertyChanged += ObservableExpressionPropertyChangedHandler;
         observableExpressions.Add(sourceKeyValuePair.Key, (observableExpression, fault, projection));
     }
 
@@ -291,7 +298,7 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
                 nullKeys = 0;
                 foreach (var (observableExpression, _, _) in observableExpressions.Values)
                 {
-                    observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
+                    observableExpression.PropertyChanged -= ObservableExpressionPropertyChangedHandler;
                     observableExpression.Dispose();
                 }
                 observableExpressions.Clear();
@@ -314,7 +321,7 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
                             continue;
                         if (committed.CommittedFault is null)
                             RetractProjectionWithAccess(keyValuePair.Key!, committed.CommittedProjection);
-                        committed.ObservableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
+                        committed.ObservableExpression.PropertyChanged -= ObservableExpressionPropertyChangedHandler;
                         committed.ObservableExpression.Dispose();
                         observableExpressions.Remove(keyValuePair.Key!);
                     }

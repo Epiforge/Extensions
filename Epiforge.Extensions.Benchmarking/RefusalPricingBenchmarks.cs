@@ -12,6 +12,7 @@ public class RefusalPricingBenchmarks
     static readonly Expression<Func<BenchmarkPersonWithPartner, bool>> constantPredicate = person => true;
     static readonly Expression<Func<BenchmarkPersonWithPartner, bool>> indexerRead = person => table[person.Rank] > 0;
     static readonly Expression<Func<BenchmarkPersonWithPartner, bool>> notifyingChain = person => person.Partner!.Rank > 0;
+    static readonly Expression<Func<BenchmarkPersonWithPartner, bool>> nonShortCircuit = person => person.Rank > 0 & other.Rank > 0;
     static readonly Expression<Func<BenchmarkPersonWithPartner, bool>> rankComparison = person => person.Rank > 0;
     static readonly Expression<Func<BenchmarkPersonWithPartner, bool>> sharedSourceRepeated = person => other.Rank + other.Rank > person.Rank;
     static readonly Expression<Func<BenchmarkPersonWithPartner, bool>> twoObjectConditional = person => (person.Rank > 0 ? other.Rank : person.Rank) > 0;
@@ -57,6 +58,14 @@ public class RefusalPricingBenchmarks
     [Benchmark]
     public void NotifyingChainGraph() =>
         ConstructAndDispose(graph, notifyingChain);
+
+    [Benchmark]
+    public void NonShortCircuitDirect() =>
+        ConstructAndDispose(direct, nonShortCircuit);
+
+    [Benchmark]
+    public void NonShortCircuitGraph() =>
+        ConstructAndDispose(graph, nonShortCircuit);
 
     [Benchmark]
     public void RankComparisonDirect() =>

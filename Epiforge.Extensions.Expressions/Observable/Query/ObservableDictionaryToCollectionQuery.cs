@@ -8,6 +8,7 @@ sealed class ObservableDictionaryToCollectionQuery<TElement, TKey, TValue>(Colle
     readonly EqualityComparer<TElement> elementComparer = EqualityComparer<TElement>.Default;
     readonly ObservableRangeCollection<TElement> elements = [];
     readonly List<TKey> keysByPosition = [];
+    PropertyChangedEventHandler? observableExpressionPropertyChangedHandler;
     readonly Dictionary<TKey, (IObservableExpression<KeyValuePair<TKey, TValue>, TElement> ObservableExpression, Exception? CommittedFault, TElement CommittedElement)> observableExpressions = new(source.KeyComparer);
     readonly Dictionary<TKey, int> positionsByKey = new(source.KeyComparer);
     internal readonly Expression<Func<KeyValuePair<TKey, TValue>, TElement>> Selector = selector;
@@ -46,7 +47,7 @@ sealed class ObservableDictionaryToCollectionQuery<TElement, TKey, TValue>(Colle
             {
                 foreach (var (observableExpression, _, _) in observableExpressions.Values)
                 {
-                    observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
+                    observableExpression.PropertyChanged -= ObservableExpressionPropertyChangedHandler;
                     observableExpression.Dispose();
                 }
                 source.DictionaryChanged -= SourceDictionaryChanged;
@@ -74,6 +75,12 @@ sealed class ObservableDictionaryToCollectionQuery<TElement, TKey, TValue>(Colle
             return snapshot.GetEnumerator();
         }
     }
+
+    /// <summary>
+    /// Yields the one handler this query attaches to every observation it makes, since a method group converts to a new delegate at each conversion and this one is converted twice for every element
+    /// </summary>
+    PropertyChangedEventHandler ObservableExpressionPropertyChangedHandler =>
+        observableExpressionPropertyChangedHandler ??= ObservableExpressionPropertyChanged;
 
     void ObservableExpressionPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -108,7 +115,7 @@ sealed class ObservableDictionaryToCollectionQuery<TElement, TKey, TValue>(Colle
             var (fault, element) = observableExpression.Evaluation;
             if (!faultList.Check(observableExpression))
                 AppendElementWithAccess(keyValuePair.Key, element, elements);
-            observableExpression.PropertyChanged += ObservableExpressionPropertyChanged;
+            observableExpression.PropertyChanged += ObservableExpressionPropertyChangedHandler;
             observableExpressions.Add(keyValuePair.Key, (observableExpression, fault, element));
         }
         OperationFault = faultList.Fault;
@@ -144,7 +151,7 @@ sealed class ObservableDictionaryToCollectionQuery<TElement, TKey, TValue>(Colle
             {
                 foreach (var (observableExpression, _, _) in observableExpressions.Values)
                 {
-                    observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
+                    observableExpression.PropertyChanged -= ObservableExpressionPropertyChangedHandler;
                     observableExpression.Dispose();
                 }
                 observableExpressions.Clear();
@@ -158,7 +165,7 @@ sealed class ObservableDictionaryToCollectionQuery<TElement, TKey, TValue>(Colle
                     var (fault, element) = observableExpression.Evaluation;
                     if (!faultList.Check(observableExpression))
                         AppendElementWithAccess(keyValuePair.Key, element, newElements);
-                    observableExpression.PropertyChanged += ObservableExpressionPropertyChanged;
+                    observableExpression.PropertyChanged += ObservableExpressionPropertyChangedHandler;
                     observableExpressions.Add(keyValuePair.Key, (observableExpression, fault, element));
                 }
                 elements.Reset(newElements);
@@ -178,7 +185,7 @@ sealed class ObservableDictionaryToCollectionQuery<TElement, TKey, TValue>(Colle
                     }
                     else
                         RemoveElementWithAccess(keyValuePair.Key);
-                    committed.ObservableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
+                    committed.ObservableExpression.PropertyChanged -= ObservableExpressionPropertyChangedHandler;
                     committed.ObservableExpression.Dispose();
                     observableExpressions.Remove(keyValuePair.Key);
                 }
@@ -193,7 +200,7 @@ sealed class ObservableDictionaryToCollectionQuery<TElement, TKey, TValue>(Colle
                     }
                     else
                         AppendElementWithAccess(keyValuePair.Key, element, elements);
-                    observableExpression.PropertyChanged += ObservableExpressionPropertyChanged;
+                    observableExpression.PropertyChanged += ObservableExpressionPropertyChangedHandler;
                     observableExpressions.Add(keyValuePair.Key, (observableExpression, fault, element));
                 }
                 if (faultList is not null)

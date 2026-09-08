@@ -52,6 +52,7 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
     bool enumerationSnapshotShared;
     int liveEnumerations;
     readonly PrefixWeightedSequence<IObservableExpression<TElement, bool>> memberships = new();
+    PropertyChangedEventHandler? observableExpressionPropertyChangedHandler;
     readonly Dictionary<IObservableExpression<TElement, bool>, (List<PrefixWeightedSequenceNode<IObservableExpression<TElement, bool>>> Nodes, Exception? Fault)> observableExpressionStates = [];
     internal readonly Expression<Func<TElement, bool>> Predicate = predicate;
 
@@ -90,7 +91,7 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
             {
                 foreach (var (observableExpression, state) in observableExpressionStates)
                 {
-                    observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
+                    observableExpression.PropertyChanged -= ObservableExpressionPropertyChangedHandler;
                     for (int i = 0, ii = state.Nodes.Count; i < ii; ++i)
                         observableExpression.Dispose();
                 }
@@ -151,6 +152,12 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
         }
     }
 
+    /// <summary>
+    /// Yields the one handler this query attaches to every observation it makes, since a method group converts to a new delegate at each conversion and this one is converted twice for every element
+    /// </summary>
+    PropertyChangedEventHandler ObservableExpressionPropertyChangedHandler =>
+        observableExpressionPropertyChangedHandler ??= ObservableExpressionPropertyChanged;
+
     void ObservableExpressionPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
@@ -194,7 +201,7 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
         else
         {
             observableExpressionStates.Add(observableExpression, ([node], fault));
-            observableExpression.PropertyChanged += ObservableExpressionPropertyChanged;
+            observableExpression.PropertyChanged += ObservableExpressionPropertyChangedHandler;
         }
     }
 
@@ -224,7 +231,7 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
         if (state.Nodes.Count == 0)
         {
             observableExpressionStates.Remove(observableExpression);
-            observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
+            observableExpression.PropertyChanged -= ObservableExpressionPropertyChangedHandler;
         }
     }
 
@@ -299,7 +306,7 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
                             else
                             {
                                 observableExpressionStates.Add(observableExpression, ([node], fault));
-                                observableExpression.PropertyChanged += ObservableExpressionPropertyChanged;
+                                observableExpression.PropertyChanged += ObservableExpressionPropertyChangedHandler;
                             }
                             if (fault is not null)
                             {
@@ -361,7 +368,7 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
                     faultList = new FaultList();
                     foreach (var (observableExpression, state) in observableExpressionStates)
                     {
-                        observableExpression.PropertyChanged -= ObservableExpressionPropertyChanged;
+                        observableExpression.PropertyChanged -= ObservableExpressionPropertyChangedHandler;
                         for (int i = 0, ii = state.Nodes.Count; i < ii; ++i)
                             observableExpression.Dispose();
                     }
