@@ -18,6 +18,9 @@ using System.Reactive.Linq;
 /// The changed elements are spread evenly through the collection by stride, and each rank is exclusive-ored with 2 so that the element moves a couple of positions. <b>The distance moved is the same at every size</b>, so growth in the measured cost is structural rather than the workload quietly becoming harder
 /// </remarks>
 /// <remarks>
+/// Three further arms change the same thousand ranks and then read the whole result, because a per-change cost which comes back suspiciously cheap may belong to a view which defers its work until somebody looks. Their spread over the arms which only change is the answer
+/// </remarks>
+/// <remarks>
 /// This instrument uses <see cref="ParamsAttribute" /> where the convention here is not to, for the same reason <c>ScaleComparisonBenchmarks</c> does: the element count is the question rather than a dimension of it
 /// </remarks>
 [MemoryDiagnoser]
@@ -69,18 +72,56 @@ public class OrderedScaleComparisonBenchmarks
     public void ChangeAThousandRanksWithExpressions() =>
         ChangeAThousandRanks();
 
-    [GlobalCleanup(Target = nameof(ChangeAThousandRanksWithDynamicDataCache))]
+    /// <summary>
+    /// Changes a thousand ranks and then walks the whole ordered result, which is what distinguishes a view that repositions as each change arrives from one that defers the work until somebody looks
+    /// </summary>
+    /// <remarks>
+    /// A library which merely marked itself dirty on each change would report a very cheap per-change cost and pay for it here instead. If the arms which only change and the arms which change and then read differ by no more than the cost of walking the elements, the per-change figures above are what they claim to be
+    /// </remarks>
+    [Benchmark]
+    public long ChangeAThousandRanksThenReadWithExpressions()
+    {
+        ChangeAThousandRanks();
+        return Read(orderBy);
+    }
+
+    [Benchmark]
+    public long ChangeAThousandRanksThenReadWithDynamicDataCache()
+    {
+        ChangeAThousandRanks();
+        return Read(bound);
+    }
+
+    /// <summary>
+    /// Walks the source itself after the same changes, which is the floor the two arms above stand on and the cost of the walk alone
+    /// </summary>
+    [Benchmark]
+    public long ChangeAThousandRanksThenReadUnobserved()
+    {
+        ChangeAThousandRanks();
+        return Read(source);
+    }
+
+    [GlobalCleanup(Targets = [nameof(ChangeAThousandRanksWithDynamicDataCache), nameof(ChangeAThousandRanksThenReadWithDynamicDataCache)])]
     public void CleanupDynamicDataCache()
     {
         dynamicDataSubscription.Dispose();
         dynamicDataCache.Dispose();
     }
 
-    [GlobalCleanup(Target = nameof(ChangeAThousandRanksWithExpressions))]
+    [GlobalCleanup(Targets = [nameof(ChangeAThousandRanksWithExpressions), nameof(ChangeAThousandRanksThenReadWithExpressions)])]
     public void CleanupExpressions()
     {
         orderBy.Dispose();
         sourceQuery.Dispose();
+    }
+
+    static long Read(IEnumerable<BenchmarkPerson> view)
+    {
+        var total = 0L;
+        foreach (var person in view)
+            total += person.Rank;
+        return total;
     }
 
     /// <summary>
@@ -105,7 +146,7 @@ public class OrderedScaleComparisonBenchmarks
         stride = ElementCount / changeCount;
     }
 
-    [GlobalSetup(Target = nameof(ChangeAThousandRanksWithDynamicDataCache))]
+    [GlobalSetup(Targets = [nameof(ChangeAThousandRanksWithDynamicDataCache), nameof(ChangeAThousandRanksThenReadWithDynamicDataCache)])]
     public void SetupStandingDynamicDataCache()
     {
         SetupSource();
@@ -119,7 +160,7 @@ public class OrderedScaleComparisonBenchmarks
         Probe(() => bound, "DynamicData's sorted binding");
     }
 
-    [GlobalSetup(Target = nameof(ChangeAThousandRanksWithExpressions))]
+    [GlobalSetup(Targets = [nameof(ChangeAThousandRanksWithExpressions), nameof(ChangeAThousandRanksThenReadWithExpressions)])]
     public void SetupStandingExpressions()
     {
         SetupSource();
@@ -129,7 +170,7 @@ public class OrderedScaleComparisonBenchmarks
         Probe(() => [.. orderBy], "this library's ordered query");
     }
 
-    [GlobalSetup(Target = nameof(ChangeAThousandRanksUnobserved))]
+    [GlobalSetup(Targets = [nameof(ChangeAThousandRanksUnobserved), nameof(ChangeAThousandRanksThenReadUnobserved)])]
     public void SetupUnobserved() =>
         SetupSource();
 
