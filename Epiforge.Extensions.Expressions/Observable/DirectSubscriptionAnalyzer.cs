@@ -383,6 +383,31 @@ public sealed class DirectSubscriptionAnalyzer
         return targetAnalysis;
     }
 
+    /// <summary>
+    /// Determines whether an expression constructing an object and then assigning its members can be observed by subscribing directly to its change sources, and when it can, plans the subscriptions its arguments and assignments take
+    /// </summary>
+    /// <remarks>
+    /// The limits here are the expression graph's limits, deliberately: <c>ObservableMemberInitExpression</c> supports assignment bindings over a reference type and throws for anything else, so admitting more here would make a shape which works one way and throws the other. Where the graph grows, this grows with it
+    /// </remarks>
+    DirectSubscriptionAnalysis AnalyzeMemberInit(MemberInitExpression memberInitExpression, Planner? planner)
+    {
+        if (memberInitExpression.Type.IsValueType)
+            return new(memberInitExpression, DirectSubscriptionIneligibility.UnsupportedExpressionKind);
+        var newAnalysis = AnalyzeNew(memberInitExpression.NewExpression, planner);
+        if (!newAnalysis.IsEligible)
+            return newAnalysis;
+        var bindings = memberInitExpression.Bindings;
+        for (int i = 0, ii = bindings.Count; i < ii; ++i)
+        {
+            if (bindings[i] is not MemberAssignment memberAssignment)
+                return new(memberInitExpression, DirectSubscriptionIneligibility.UnsupportedExpressionKind);
+            var bindingAnalysis = AnalyzeNode(memberAssignment.Expression, planner);
+            if (!bindingAnalysis.IsEligible)
+                return bindingAnalysis;
+        }
+        return DirectSubscriptionAnalysis.Eligible;
+    }
+
     DirectSubscriptionAnalysis AnalyzeMethodCall(MethodCallExpression methodCallExpression, Planner? planner)
     {
         if (!ExpressionObserverOptions.CannotBeDisposed(methodCallExpression.Method.ReturnType))
@@ -421,6 +446,26 @@ public sealed class DirectSubscriptionAnalyzer
         return DirectSubscriptionAnalysis.Eligible;
     }
 
+    /// <summary>
+    /// Determines whether an expression building an array from its elements can be observed by subscribing directly to its change sources, and when it can, plans the subscriptions those elements take
+    /// </summary>
+    /// <remarks>
+    /// An array built from bounds rather than from elements is left ineligible, because the graph names its node for initialization alone and a shape neither mechanism is known to share is not parity
+    /// </remarks>
+    DirectSubscriptionAnalysis AnalyzeNewArray(NewArrayExpression newArrayExpression, Planner? planner)
+    {
+        if (newArrayExpression.NodeType is not ExpressionType.NewArrayInit)
+            return new(newArrayExpression, DirectSubscriptionIneligibility.UnsupportedExpressionKind);
+        var expressions = newArrayExpression.Expressions;
+        for (int i = 0, ii = expressions.Count; i < ii; ++i)
+        {
+            var elementAnalysis = AnalyzeNode(expressions[i], planner);
+            if (!elementAnalysis.IsEligible)
+                return elementAnalysis;
+        }
+        return DirectSubscriptionAnalysis.Eligible;
+    }
+
     DirectSubscriptionAnalysis AnalyzeParameter(ParameterExpression parameterExpression, Planner? planner)
     {
         if (planner is not null)
@@ -444,10 +489,12 @@ public sealed class DirectSubscriptionAnalyzer
             ConstantExpression constantExpression => AnalyzeConstant(constantExpression, planner),
             ParameterExpression parameterExpression => AnalyzeParameter(parameterExpression, planner),
             MemberExpression memberExpression => AnalyzeMember(memberExpression, planner),
+            MemberInitExpression memberInitExpression => AnalyzeMemberInit(memberInitExpression, planner),
             IndexExpression indexExpression => AnalyzeIndex(indexExpression, planner),
             MethodCallExpression methodCallExpressionForPropertyGet when ExpressionObserverOptions.PropertyGetMethodToProperty.GetOrAdd(methodCallExpressionForPropertyGet.Method, ExpressionObserverOptions.GetPropertyFromGetMethod) is { } property => AnalyzeNode(methodCallExpressionForPropertyGet.Arguments.Count > 0 ? Expression.MakeIndex(methodCallExpressionForPropertyGet.Object!, property, methodCallExpressionForPropertyGet.Arguments) : Expression.MakeMemberAccess(methodCallExpressionForPropertyGet.Object, property), planner),
             MethodCallExpression methodCallExpression => AnalyzeMethodCall(methodCallExpression, planner),
             NewExpression newExpression => AnalyzeNew(newExpression, planner),
+            NewArrayExpression newArrayExpression => AnalyzeNewArray(newArrayExpression, planner),
             BinaryExpression binaryExpression when binaryExpression.Method is { } binaryOperator && !ExpressionObserverOptions.CannotBeDisposed(binaryOperator.ReturnType) => new(binaryExpression, DirectSubscriptionIneligibility.UserDefinedOperator),
             BinaryExpression binaryExpression when IsShortCircuiting(binaryExpression) => AnalyzeShortCircuiting(binaryExpression, planner),
             BinaryExpression binaryExpression when binaryExpression.Conversion is not null => new(binaryExpression, DirectSubscriptionIneligibility.UnsupportedExpressionKind),

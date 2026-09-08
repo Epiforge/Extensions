@@ -809,6 +809,9 @@ public class ExpressionObserver :
     /// <summary>
     /// Compiles a lambda for direct subscription, from the expression the optimizer produces where one is configured and the caller has not asked for it to be left alone, so that both mechanisms observe the same expression; the two forms are cached apart because one lambda can be observed either way
     /// </summary>
+    /// <remarks>
+    /// An expression which is not eligible is reported to the logger here rather than where it is observed, because this is where the analysis happens and every later observation of the same lambda is a cache hit; a query which observes one predicate for each of a thousand elements therefore reports once. A caller which rebuilds its expression tree for every observation is told every time, which is the honest answer, since it is also paying for an analysis and a compilation every time
+    /// </remarks>
     DirectEvaluator CompiledLambda<TArgument, TResult>(Expression<Func<TArgument, TResult>> lambdaExpression, bool optimize)
     {
         var optimizing = optimize && Optimizer is not null;
@@ -816,8 +819,12 @@ public class ExpressionObserver :
         if (compiled.TryGetValue(lambdaExpression, out var evaluator))
             return evaluator;
         var observed = optimizing ? (LambdaExpression)Optimizer!(lambdaExpression) : lambdaExpression;
-        if ((directSubscriptionAnalyzer ??= new DirectSubscriptionAnalyzer(this)).Plan(observed.Body) is not { IsEligible: true } plan)
+        var plan = (directSubscriptionAnalyzer ??= new DirectSubscriptionAnalyzer(this)).Plan(observed.Body);
+        if (!plan.IsEligible)
+        {
             evaluator = DirectEvaluator.Ineligible;
+            Logger?.LogDebug(EventIds.Epiforge_Extensions_Expressions_ExpressionNotEligibleForDirectSubscription, "{Expression} is not eligible to be observed by subscribing directly to its change sources and will be observed by a graph of observable expressions instead; {IneligibleExpression} is {Ineligibility}", observed, plan.Analysis.IneligibleExpression, plan.Analysis.Ineligibility);
+        }
         else
         {
             var values = Expression.Parameter(typeof(object[]), "values");

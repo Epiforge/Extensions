@@ -1,8 +1,34 @@
 namespace Epiforge.Extensions.Expressions.Tests.Observable;
 
+public struct InitializablePoint
+{
+    public int X { get; set; }
+}
+
+public sealed class Nicknamed
+{
+    public List<string> Nicknames { get; } = [];
+}
+
 [TestClass]
 public class ConstructedValues
 {
+    sealed class RecordingLogger :
+        Microsoft.Extensions.Logging.ILogger
+    {
+        internal readonly List<(Microsoft.Extensions.Logging.LogLevel Level, Microsoft.Extensions.Logging.EventId EventId, string Message)> Records = [];
+
+        public IDisposable? BeginScope<TState>(TState state)
+            where TState : notnull =>
+            null;
+
+        public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel logLevel) =>
+            true;
+
+        public void Log<TState>(Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
+            Records.Add((logLevel, eventId, formatter(state, exception)));
+    }
+
     static Expression BodyOfRecorded<TResult>(Expression<Func<Recorded, TResult>> expression) =>
         expression.Body;
 
@@ -27,7 +53,7 @@ public class ConstructedValues
     [TestMethod]
     public void AConstructorOverSomethingIneligibleIsIneligible()
     {
-        var analysis = Analyzer().Analyze(BodyOfRecorded<Tuple<int, int>>(recorded => new Tuple<int, int>(recorded.Rank, new[] { 3 }[0])));
+        var analysis = Analyzer().Analyze(BodyOfRecorded<Tuple<int, int>>(recorded => new Tuple<int, int>(recorded.Rank, new List<int> { 3 }.Count)));
         Assert.IsFalse(analysis.IsEligible);
         Assert.AreEqual(DirectSubscriptionIneligibility.UnsupportedExpressionKind, analysis.Ineligibility);
     }
@@ -46,6 +72,56 @@ public class ConstructedValues
             Assert.AreEqual(7, (int)expr.Evaluation.Result!.Item2);
         }
         Assert.AreEqual(0, log.Outstanding);
+        Assert.AreEqual(0, observer.CachedObservableExpressions);
+    }
+
+    [TestMethod]
+    public void AMemberInitOfAValueTypeIsIneligible()
+    {
+        var analysis = Analyzer().Analyze(Expression.MemberInit(Expression.New(typeof(InitializablePoint)), Expression.Bind(typeof(InitializablePoint).GetProperty(nameof(InitializablePoint.X))!, Expression.Constant(1))));
+        Assert.IsFalse(analysis.IsEligible);
+        Assert.AreEqual(DirectSubscriptionIneligibility.UnsupportedExpressionKind, analysis.Ineligibility);
+    }
+
+    [TestMethod]
+    public void AMemberInitWithAListBindingIsIneligible()
+    {
+        var analysis = Analyzer().Analyze(Expression.MemberInit(Expression.New(typeof(Nicknamed)), Expression.ListBind(typeof(Nicknamed).GetProperty(nameof(Nicknamed.Nicknames))!, Expression.ElementInit(typeof(List<string>).GetMethod(nameof(List<string>.Add), [typeof(string)])!, Expression.Constant("Em")))));
+        Assert.IsFalse(analysis.IsEligible);
+        Assert.AreEqual(DirectSubscriptionIneligibility.UnsupportedExpressionKind, analysis.Ineligibility);
+    }
+
+    [TestMethod]
+    public void AnInitializedObjectFollowsItsAssignments()
+    {
+        var log = new SubscriptionLog();
+        var subject = new Recorded(log) { Tag = "one" };
+        var observer = new ExpressionObserver();
+        using (var expr = observer.Observe(recorded => new TestPerson { Name = recorded.Tag }, subject))
+        {
+            Assert.AreEqual(1, log.Attachments().Count, $"fast: [{string.Join(", ", log.Attachments())}]");
+            Assert.AreEqual("one", expr.Evaluation.Result!.Name);
+            subject.Tag = "two";
+            Assert.AreEqual("two", expr.Evaluation.Result!.Name);
+        }
+        Assert.AreEqual(0, log.Outstanding);
+        Assert.AreEqual(0, observer.CachedObservableExpressions);
+    }
+
+    [TestMethod]
+    public void AnExpressionWhichIsNotEligibleIsReportedOnceForDebugging()
+    {
+        var logger = new RecordingLogger();
+        var log = new SubscriptionLog();
+        var observer = new ExpressionObserver(new ExpressionObserverOptions { Logger = logger });
+        Expression<Func<Recorded, string?>> notEligible = recorded => new SyncDisposableTestPerson(recorded.Tag!).Name;
+        using (observer.Observe(notEligible, new Recorded(log) { Tag = "one" }))
+        using (observer.Observe(notEligible, new Recorded(log) { Tag = "two" }))
+        {
+        }
+        var reports = logger.Records.Where(record => record.EventId == EventIds.Epiforge_Extensions_Expressions_ExpressionNotEligibleForDirectSubscription).ToList();
+        Assert.AreEqual(1, reports.Count, $"two observations of one expression should report its ineligibility once; records: [{string.Join("; ", logger.Records.Select(record => record.Message))}]");
+        Assert.AreEqual(Microsoft.Extensions.Logging.LogLevel.Debug, reports[0].Level);
         Assert.AreEqual(0, observer.CachedObservableExpressions);
     }
 

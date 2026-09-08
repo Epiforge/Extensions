@@ -128,11 +128,10 @@ public class DirectSubscriptionAnalyzer
     }
 
     [TestMethod]
-    public void MemberInitIsIneligible()
+    public void MemberInitIsEligible()
     {
         var analysis = Analyzer().Analyze(BodyOf<TestPerson>(person => new TestPerson { Name = "Emily" }));
-        Assert.IsFalse(analysis.IsEligible);
-        Assert.AreEqual(DirectSubscriptionIneligibility.UnsupportedExpressionKind, analysis.Ineligibility);
+        Assert.IsTrue(analysis.IsEligible, analysis.ToString());
     }
 
     [TestMethod]
@@ -178,11 +177,10 @@ public class DirectSubscriptionAnalyzer
     }
 
     [TestMethod]
-    public void NewArrayInitIsIneligible()
+    public void NewArrayInitIsEligible()
     {
         var analysis = Analyzer().Analyze(BodyOf<long[]>(person => new[] { person.NameGets }));
-        Assert.IsFalse(analysis.IsEligible);
-        Assert.AreEqual(DirectSubscriptionIneligibility.UnsupportedExpressionKind, analysis.Ineligibility);
+        Assert.IsTrue(analysis.IsEligible, analysis.ToString());
     }
 
     [TestMethod]

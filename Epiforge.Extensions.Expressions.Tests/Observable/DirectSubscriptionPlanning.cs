@@ -165,7 +165,7 @@ public class DirectSubscriptionPlanning
     [TestMethod]
     public void IneligibleExpressionPlansNothing()
     {
-        var plan = Analyzer().Plan(BoundRecorded<int>(recorded => new[] { recorded.Rank, recorded.Score }.Length, new Recorded(new SubscriptionLog())));
+        var plan = Analyzer().Plan(BoundRecorded<List<int>>(recorded => new List<int> { recorded.Rank, recorded.Score }, new Recorded(new SubscriptionLog())));
         Assert.IsFalse(plan.IsEligible);
         Assert.AreEqual(DirectSubscriptionIneligibility.UnsupportedExpressionKind, plan.Analysis.Ineligibility);
         Assert.AreEqual(0, plan.Subscriptions.Count);

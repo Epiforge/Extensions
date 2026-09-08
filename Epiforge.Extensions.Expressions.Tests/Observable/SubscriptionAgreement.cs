@@ -249,6 +249,14 @@ public class SubscriptionAgreement
         AssertAgreement(subject => new Tuple<Recorded, IComparable>(subject, subject.Rank), new Recorded(new SubscriptionLog()));
 
     [TestMethod]
+    public void AnArrayOfMembersOfTheArgument() =>
+        AssertAgreement(subject => new[] { subject.Rank, subject.Score }, new Recorded(new SubscriptionLog()));
+
+    [TestMethod]
+    public void AnInitializedObjectOverTheArgument() =>
+        AssertAgreement(subject => new TestPerson { Name = subject.Tag }, new Recorded(new SubscriptionLog()));
+
+    [TestMethod]
     public void AndAlsoOverTheArgumentWithTheBranchTaken() =>
         AssertAgreement(subject => subject.Rank > -1 && subject.Score < 100, new Recorded(new SubscriptionLog()));
 

@@ -16,4 +16,5 @@ public static class EventIds
     public static readonly EventId Epiforge_Extensions_Expressions_QueryDisposed = new(7, nameof(Epiforge_Extensions_Expressions_QueryDisposed));
     public static readonly EventId Epiforge_Extensions_Expressions_QueryFaulted = new(8, nameof(Epiforge_Extensions_Expressions_QueryFaulted));
     public static readonly EventId Epiforge_Extensions_Expressions_QueryEvaluated = new(9, nameof(Epiforge_Extensions_Expressions_QueryEvaluated));
+    public static readonly EventId Epiforge_Extensions_Expressions_ExpressionNotEligibleForDirectSubscription = new(10, nameof(Epiforge_Extensions_Expressions_ExpressionNotEligibleForDirectSubscription));
 }

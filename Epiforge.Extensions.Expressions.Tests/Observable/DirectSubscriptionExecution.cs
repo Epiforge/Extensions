@@ -334,9 +334,9 @@ public class DirectSubscriptionExecution
     public void IneligibleExpressionStillBuildsTheGraph()
     {
         var log = new SubscriptionLog();
-        var subject = new Recorded(log) { Rank = 3 };
+        var subject = new Recorded(log) { Rank = 3, Tag = "ab" };
         var observer = new ExpressionObserver();
-        using (var expr = observer.Observe(s => new[] { s.Rank, s.Score }.Length, subject))
+        using (var expr = observer.Observe(s => new SyncDisposableTestPerson(s.Tag!).Name!.Length, subject))
         {
             Assert.AreEqual(2, expr.Evaluation.Result);
             Assert.AreNotEqual(0, observer.CachedObservableExpressions);
