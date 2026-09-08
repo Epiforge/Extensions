@@ -76,19 +76,34 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
         return true;
     }
 
-    TElement ElementAtExcludingWithAccess(int index, int excludedIndex) =>
-        positions.NodeAt(index < excludedIndex ? index : index + 1).Item;
-
-    int FindDestinationWithAccess(TElement element, int currentIndex)
+    /// <summary>
+    /// Takes the element at a position in the order, counting as though the element being repositioned were not in it, and leaves the node it found as the finger for the next call
+    /// </summary>
+    /// <remarks>
+    /// The search which uses this probes positions which converge on one another, so each node is found from the one before it rather than from the root of the sequence. <c>NodeAtFrom</c> decides for itself whether the finger is nearer than the root and descends from the root when it is not, so this cannot reach a different node than a descent would
+    /// </remarks>
+    TElement ElementAtExcludingWithAccess(int index, int excludedIndex, ref PrefixWeightedSequenceNode<TElement> finger, ref int fingerIndex)
     {
-        if (currentIndex > 0 && comparer!.Compare(element, ElementAtExcludingWithAccess(currentIndex - 1, currentIndex)) < 0)
+        var positionIndex = index < excludedIndex ? index : index + 1;
+        var node = positions.NodeAtFrom(finger, fingerIndex, positionIndex);
+        finger = node;
+        fingerIndex = positionIndex;
+        return node.Item;
+    }
+
+    int FindDestinationWithAccess(TElement element, PrefixWeightedSequenceNode<TElement> node, int currentIndex)
+    {
+        var elementComparables = comparer!.ComparablesOf(element);
+        var finger = node;
+        var fingerIndex = currentIndex;
+        if (currentIndex > 0 && comparer!.CompareWithComparablesOf(element, ref elementComparables, ElementAtExcludingWithAccess(currentIndex - 1, currentIndex, ref finger, ref fingerIndex)) < 0)
         {
             var low = 0;
             var high = currentIndex - 1;
             while (low < high)
             {
                 var middle = low + (high - low) / 2;
-                if (comparer!.Compare(element, ElementAtExcludingWithAccess(middle, currentIndex)) < 0)
+                if (comparer!.CompareWithComparablesOf(element, ref elementComparables, ElementAtExcludingWithAccess(middle, currentIndex, ref finger, ref fingerIndex)) < 0)
                     high = middle;
                 else
                     low = middle + 1;
@@ -96,14 +111,14 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
             return low;
         }
         var reducedCount = positions.Count - 1;
-        if (currentIndex < reducedCount && comparer!.Compare(element, ElementAtExcludingWithAccess(currentIndex, currentIndex)) > 0)
+        if (currentIndex < reducedCount && comparer!.CompareWithComparablesOf(element, ref elementComparables, ElementAtExcludingWithAccess(currentIndex, currentIndex, ref finger, ref fingerIndex)) > 0)
         {
             var low = currentIndex;
             var high = reducedCount;
             while (low < high)
             {
                 var middle = low + (high - low) / 2;
-                if (comparer!.Compare(element, ElementAtExcludingWithAccess(middle, currentIndex)) <= 0)
+                if (comparer!.CompareWithComparablesOf(element, ref elementComparables, ElementAtExcludingWithAccess(middle, currentIndex, ref finger, ref fingerIndex)) <= 0)
                     high = middle;
                 else
                     low = middle + 1;
@@ -115,12 +130,18 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
 
     int FindInsertionIndexWithAccess(TElement element)
     {
+        var elementComparables = comparer!.ComparablesOf(element);
         var low = 0;
         var high = positions.Count;
+        PrefixWeightedSequenceNode<TElement>? finger = null;
+        var fingerIndex = 0;
         while (low < high)
         {
             var middle = low + (high - low) / 2;
-            if (comparer!.Compare(element, positions.NodeAt(middle).Item) < 0)
+            var node = finger is null ? positions.NodeAt(middle) : positions.NodeAtFrom(finger, fingerIndex, middle);
+            finger = node;
+            fingerIndex = middle;
+            if (comparer!.CompareWithComparablesOf(element, ref elementComparables, node.Item) < 0)
                 high = middle;
             else
                 low = middle + 1;
@@ -182,7 +203,7 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
         if (!nodesByElement.TryGetValue(element, out var node))
             return;
         var currentIndex = positions.IndexOf(node);
-        var destinationIndex = FindDestinationWithAccess(element, currentIndex);
+        var destinationIndex = FindDestinationWithAccess(element, node, currentIndex);
         if (destinationIndex == currentIndex)
             return;
         var startingIndex = positions.PrefixWeightBefore(currentIndex);

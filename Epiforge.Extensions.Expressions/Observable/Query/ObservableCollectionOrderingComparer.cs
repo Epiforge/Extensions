@@ -64,15 +64,43 @@ sealed class ObservableCollectionOrderingComparer<TElement> :
 
     public int Compare(TElement? x, TElement? y)
     {
+        var xComparables = ComparablesOf(x);
+        return CompareWithComparablesOf(x, ref xComparables, y);
+    }
+
+    /// <summary>
+    /// Gets the comparables kept for an element
+    /// </summary>
+    /// <remarks>
+    /// A search for an element's place compares that one element against a logarithmic number of others, and its comparables are the same for every one of those comparisons; taking them once spares the search a dictionary lookup per comparison
+    /// </remarks>
+    internal List<IComparable>? ComparablesOf(TElement? element)
+    {
         if (comparablesAreStale)
             RebuildWithAccess();
-        comparables.TryGetValue(x!, out var xList);
-        comparables.TryGetValue(y!, out var yList);
+        comparables.TryGetValue(element!, out var elementComparables);
+        return elementComparables;
+    }
+
+    /// <summary>
+    /// Compares two elements where the comparables of the first have already been taken
+    /// </summary>
+    /// <remarks>
+    /// The comparables are passed by reference because a rebuild here would replace the list the caller holds. A rebuild cannot happen partway through a search while the query's lock is held, and this does not depend on that
+    /// </remarks>
+    internal int CompareWithComparablesOf(TElement? x, ref List<IComparable>? xComparables, TElement? y)
+    {
+        if (comparablesAreStale)
+        {
+            RebuildWithAccess();
+            comparables.TryGetValue(x!, out xComparables);
+        }
+        comparables.TryGetValue(y!, out var yComparables);
         for (var i = 0; i < selectionsAndDirections.Count; ++i)
         {
             var isDescending = selectionsAndDirections[i].isDescending;
-            var xComparable = xList is not null && i < xList.Count ? xList[i] : null;
-            var yComparable = yList is not null && i < yList.Count ? yList[i] : null;
+            var xComparable = xComparables is not null && i < xComparables.Count ? xComparables[i] : null;
+            var yComparable = yComparables is not null && i < yComparables.Count ? yComparables[i] : null;
             if (xComparable is null)
                 return yComparable is null ? 0 : isDescending ? 1 : -1;
             else if (yComparable is null)
