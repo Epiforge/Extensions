@@ -49,11 +49,24 @@ public class DirectSubscriptionPlanning
         var other = TestPerson.CreateEmily();
         var plan = Analyzer().Plan(Bound<bool>(subject => other.NameGets + other.NameGets > subject.NameGets, person));
         Assert.IsTrue(plan.IsEligible);
+        Assert.AreEqual(3, plan.Subscriptions.Count);
+        var reads = plan.Subscriptions.Where(subscription => subscription.Kind is DirectSubscriptionKind.MemberPropertyChanged && subscription.Source is MemberExpression).ToList();
+        Assert.AreEqual(1, reads.Count);
+        Assert.AreEqual(nameof(TestPerson.NameGets), reads[0].PropertyName);
+    }
+
+    [TestMethod]
+    public void ClosureFieldsOfSeparateObjectsAreNamedSeparately()
+    {
+        var person = TestPerson.CreateJohn();
+        var first = TestPerson.CreateEmily();
+        var second = TestPerson.CreateJohn();
+        var plan = Analyzer().Plan(Bound<bool>(subject => first.NameGets + second.NameGets > subject.NameGets, person));
+        Assert.IsTrue(plan.IsEligible);
         Assert.AreEqual(5, plan.Subscriptions.Count);
         var reads = plan.Subscriptions.Where(subscription => subscription.Kind is DirectSubscriptionKind.MemberPropertyChanged && subscription.Source is MemberExpression).ToList();
         Assert.AreEqual(2, reads.Count);
-        Assert.IsFalse(ReferenceEquals(reads[0].Source, reads[1].Source));
-        Assert.IsTrue(Epiforge.Extensions.Expressions.ExpressionEqualityComparer.Default.Equals(reads[0].Source, reads[1].Source));
+        Assert.IsFalse(Epiforge.Extensions.Expressions.ExpressionEqualityComparer.Default.Equals(reads[0].Source, reads[1].Source));
     }
 
     [TestMethod]

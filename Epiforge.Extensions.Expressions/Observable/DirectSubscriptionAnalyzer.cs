@@ -137,7 +137,7 @@ public sealed class DirectSubscriptionAnalyzer
         }
 
         /// <summary>
-        /// Discards a subscription which another names the same event of the same source for, from a group attached no later and never released, since the graph gives one node to an expression however many places name it and attaches that node once; sibling groups keep theirs, neither being attached when the other is
+        /// Discards a subscription which another names the same event of the same source for, from a group attached no later and never released, since the graph gives one node to an expression however many places name it and attaches that node once; sameness of source is expression equality and not node identity, because two occurrences of one captured or static value are two nodes naming one object; sibling groups keep theirs, neither being attached when the other is
         /// </summary>
         void DiscardRedundant()
         {
@@ -149,7 +149,7 @@ public sealed class DirectSubscriptionAnalyzer
                     if (j == i)
                         continue;
                     var other = Subscriptions[j];
-                    if (!ReferenceEquals(other.Source, subscription.Source) || other.Kind != subscription.Kind || other.PropertyName != subscription.PropertyName || !IsAncestorOrSelf(other.DeferredGroup, subscription.DeferredGroup) || other.DeferredGroup == subscription.DeferredGroup && j > i)
+                    if (!ExpressionEqualityComparer.Default.Equals(other.Source, subscription.Source) || other.Kind != subscription.Kind || other.PropertyName != subscription.PropertyName || !IsAncestorOrSelf(other.DeferredGroup, subscription.DeferredGroup) || other.DeferredGroup == subscription.DeferredGroup && j > i)
                         continue;
                     Subscriptions.RemoveAt(i);
                     owners.RemoveAt(i);

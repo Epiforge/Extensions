@@ -268,6 +268,31 @@ public class SubscriptionAgreement
     public void TwoMembersOnTheArgument() =>
         AssertAgreement(subject => subject.Rank + subject.Score, new Recorded(new SubscriptionLog()));
 
+    [TestMethod]
+    public void ARepeatedClosureSourceIsAttachedOnce()
+    {
+        var log = new SubscriptionLog();
+        var other = new Recorded(log);
+        var subject = new Recorded(log);
+        var observer = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = true });
+        using (observer.Observe(s => other.Rank + other.Rank > s.Rank, subject))
+            Assert.AreEqual(2, log.Attachments().Count, string.Join(", ", log.Attachments()));
+        Assert.AreEqual(0, log.Outstanding);
+    }
+
+    [TestMethod]
+    public void SeparateClosureSourcesAreEachAttached()
+    {
+        var log = new SubscriptionLog();
+        var first = new Recorded(log);
+        var second = new Recorded(log);
+        var subject = new Recorded(log);
+        var observer = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = true });
+        using (observer.Observe(s => first.Rank + second.Rank > s.Rank, subject))
+            Assert.AreEqual(3, log.Attachments().Count, string.Join(", ", log.Attachments()));
+        Assert.AreEqual(0, log.Outstanding);
+    }
+
     static IReadOnlyList<string> GraphAttachmentsFor<TResult>(Expression<Func<Recorded, TResult>> lambda, Recorded subject, SubscriptionLog log)
     {
         var observer = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = false });
