@@ -9,6 +9,7 @@ public class RefusalPricingBenchmarks
     static readonly ObservableDictionary<int, int> table = BuildTable();
 
     static readonly Expression<Func<BenchmarkPersonWithPartner, bool>> conditional = person => (person.Rank > 0 ? person.Rank : person.Rank) > 0;
+    static readonly Expression<Func<BenchmarkPersonWithPartner, bool>> constantPredicate = person => true;
     static readonly Expression<Func<BenchmarkPersonWithPartner, bool>> indexerRead = person => table[person.Rank] > 0;
     static readonly Expression<Func<BenchmarkPersonWithPartner, bool>> notifyingChain = person => person.Partner!.Rank > 0;
     static readonly Expression<Func<BenchmarkPersonWithPartner, bool>> rankComparison = person => person.Rank > 0;
@@ -36,6 +37,10 @@ public class RefusalPricingBenchmarks
     [Benchmark]
     public void ConditionalGraph() =>
         ConstructAndDispose(graph, conditional);
+
+    [Benchmark]
+    public void ConstantPredicateDirect() =>
+        ConstructAndDispose(direct, constantPredicate);
 
     [Benchmark]
     public void IndexerReadDirect() =>
@@ -68,6 +73,13 @@ public class RefusalPricingBenchmarks
     [Benchmark]
     public void SharedSourceRepeatedGraph() =>
         ConstructAndDispose(graph, sharedSourceRepeated);
+
+    [Benchmark]
+    public void SourceQueryOnly()
+    {
+        var sourceQuery = direct.ObserveReadOnlyList(source);
+        sourceQuery.Dispose();
+    }
 
     [Benchmark]
     public void TwoObjectConditionalDirect() =>
