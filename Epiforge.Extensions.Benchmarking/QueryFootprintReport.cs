@@ -182,16 +182,43 @@ static class QueryFootprintReport
         return new(allocated, retained, afterDispose);
     }
 
+    /// <remarks>
+    /// The cycle body is a separate method for the same reason its counterpart above is: a measurement which builds and drops inside the frame it then measures from reads that frame's dead locals as live, and an instrument may not apply that treatment to one library and not the other
+    /// </remarks>
     static ComparisonReading MeasureDynamicDataListFilterOverFiveCycles(int elementCount)
     {
         var baseline = Settle();
         var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
         for (var cycle = 0; cycle < 5; ++cycle)
-        {
-            var source = BenchmarkPerson.CreateCollection(elementCount);
-            var subscription = source.ToObservableChangeSet().AutoRefresh(person => person.Rank).Filter(person => person.Rank > 0).Bind(out var bound).Subscribe();
-            subscription.Dispose();
-        }
+            BuildAndDropADynamicDataListView(elementCount);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+        var retained = Settle() - baseline;
+        var afterDispose = Settle() - baseline;
+        return new(allocated, retained, afterDispose);
+    }
+
+    static void BuildAndDropADynamicDataListView(int elementCount)
+    {
+        var source = BenchmarkPerson.CreateCollection(elementCount);
+        var subscription = source.ToObservableChangeSet().AutoRefresh(person => person.Rank).Filter(person => person.Rank > 0).Bind(out var bound).Subscribe();
+        subscription.Dispose();
+    }
+
+    static void BuildAndDropACollection(int elementCount)
+    {
+        var source = BenchmarkPerson.CreateCollection(elementCount);
+        GC.KeepAlive(source);
+    }
+
+    /// <summary>
+    /// Creates and drops a collection of the given size five times from a method which has returned each time, so that the bare-collection control can be read without the frame artifact the control itself demonstrated
+    /// </summary>
+    static ComparisonReading MeasureCollectionAloneOverFiveCycles(int elementCount)
+    {
+        var baseline = Settle();
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        for (var cycle = 0; cycle < 5; ++cycle)
+            BuildAndDropACollection(elementCount);
         var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
         var retained = Settle() - baseline;
         var afterDispose = Settle() - baseline;
@@ -276,13 +303,11 @@ static class QueryFootprintReport
         report.AppendLine();
         report.AppendLine("Every row is the same predicate over the same collection. `Retained` is what the standing view occupies once settled, above whatever the caller holds anyway: the collection for this library and for DynamicData's list, the collection and the cache for DynamicData's cache. **What the cache itself retains is its own row**, because a caller who has an `ObservableCollection<T>` and adopts DynamicData pays for that as well as for the view.");
         report.AppendLine();
-        report.AppendLine("**`The collection alone` is the control which isolates this library from the harness.** It creates the collection, reads it, drops it and reads again, with nothing else involved. If it returns to zero then a residue in any other row belongs to what that row built; if it does not, the `After dispose` column means nothing anywhere in this table and the residue is the harness's.");
+        report.AppendLine("**Read the `Retained` column and disregard `After dispose` on any row whose work happens inline.** A method which builds an object graph, drops it, and then measures from that same frame reads its own dead locals as live: the source-level variable is null and the reference the JIT spilled elsewhere in the frame is not. `The collection alone, then released` demonstrates this with no library involved at all — it creates a collection, drops it, and still reads 96 B per element — so a residue on any inline row is the harness's and says nothing about what that row built.");
         report.AppendLine();
-        report.AppendLine("**`five cycles then one over ten elements` separates the last two readings of a residue which does not accumulate.** Five cycles leave exactly one cycle's worth, which is either something holding a strong reference to the most recently built graph — in which case ending on a ten-element graph collapses the residue — or a figure proportional to what the arm allocated, in which case it does not move.");
+        report.AppendLine("**The `five cycles` rows are the ones which measure release, because their cycle bodies are separate methods which have returned before anything is measured.** Each builds and drops the whole arrangement five times under one baseline. Compare each against its own `five cycles` counterpart and never against an inline row; a figure which grows with the number of cycles is memory lost on every query a process builds. `five cycles then one over ten elements` ends on a tiny graph, so a residue which is really the most recently built graph would collapse there.");
         report.AppendLine();
-        report.AppendLine("**The `five build-and-drop cycles` rows divide unreclaimed memory into a leak and a cost.** Each builds and drops the whole arrangement five times over five separate collections under one baseline. A figure near five times the single-cycle one is memory lost on every query a process builds; a figure near the single-cycle one is a one-time cost of first use. Its DynamicData counterpart is the control for that pair, since that arm already returns to its baseline in a single cycle and must stay flat across five. Their `Retained per element` divides by the element count of one cycle, so five cycles of a genuine leak read as five times the per-element figure above.");
-        report.AppendLine();
-        report.AppendLine("**Two rows are controls rather than results.** `nothing built` takes the baseline and then does nothing at all, so all three of its columns must read zero; anything else means this instrument cannot measure retention and no other figure in either table may be quoted. `releasing the collection too` takes its baseline before the collection exists and then drops the collection along with the query, so it must return near zero as well; if it does while the plain `Expressions` row does not, then what that row still shows after disposal is being held by the elements themselves.");
+        report.AppendLine("`nothing built` takes the baseline and then does nothing at all, so all three of its columns must read zero; anything else means this instrument cannot measure retention and no other figure in either table may be quoted.");
         report.AppendLine();
         report.AppendLine("| Shape | Elements | Allocated | Retained | Retained per element | After dispose |");
         report.AppendLine("|--- |---: |---: |---: |---: |---: |");
@@ -291,6 +316,7 @@ static class QueryFootprintReport
             {
                 ("Expressions, nothing built (control)", MeasureNothing),
                 ("The collection alone, then released (control)", MeasureCollectionAlone),
+                ("The collection alone, five cycles (control)", MeasureCollectionAloneOverFiveCycles),
                 ("Expressions", MeasureExpressionsFilter),
                 ("Expressions, releasing the collection too", MeasureExpressionsFilterReleasingTheSource),
                 ("Expressions, five build-and-drop cycles", MeasureExpressionsFilterOverFiveCycles),
