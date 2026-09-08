@@ -75,6 +75,47 @@ static class QueryFootprintReport
         return new(allocated, retained, afterDispose);
     }
 
+    /// <summary>
+    /// Measures what this instrument reads when nothing whatever is built over the collection, which is the control every other row of this table depends on and which should read zero in all three columns
+    /// </summary>
+    static ComparisonReading MeasureNothing(int elementCount)
+    {
+        var source = BenchmarkPerson.CreateCollection(elementCount);
+        var baseline = Settle();
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+        var retained = Settle() - baseline;
+        var afterDispose = Settle() - baseline;
+        GC.KeepAlive(source);
+        return new(allocated, retained, afterDispose);
+    }
+
+    /// <summary>
+    /// Measures the same filtered view as <see cref="MeasureExpressionsFilter(int)" />, but takes its baseline before the collection exists and drops the collection along with the query, so that what remains afterwards is what nothing in the measurement is holding any longer
+    /// </summary>
+    /// <remarks>
+    /// This arm exists to discriminate between two readings of a high <c>After dispose</c> figure in the arm above: memory the elements are still holding because something outlived the query's disposal, and memory which nothing in the measurement can account for. If this returns near zero while the arm above does not, the elements are holding it
+    /// </remarks>
+    static ComparisonReading MeasureExpressionsFilterReleasingTheSource(int elementCount)
+    {
+        var baseline = Settle();
+        var observer = new CollectionObserver();
+        var source = BenchmarkPerson.CreateCollection(elementCount);
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var sourceQuery = observer.ObserveReadOnlyList(source);
+        var where = sourceQuery.ObserveWhere(person => person.Rank > 0);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+        var retained = Settle() - baseline;
+        where.Dispose();
+        sourceQuery.Dispose();
+        where = null;
+        sourceQuery = null;
+        observer = null;
+        source = null;
+        var afterDispose = Settle() - baseline;
+        return new(allocated, retained, afterDispose);
+    }
+
     static ComparisonReading MeasureDynamicDataCacheItself(int elementCount)
     {
         var source = BenchmarkPerson.CreateCollection(elementCount);
@@ -151,14 +192,18 @@ static class QueryFootprintReport
         report.AppendLine();
         report.AppendLine("## What a filtered view retains, against DynamicData");
         report.AppendLine();
-        report.AppendLine("Every row is the same predicate over the same collection. `Retained` is what the standing view occupies once settled, above whatever the caller holds anyway: the collection for this library and for DynamicData's list, the collection and the cache for DynamicData's cache. **What the cache itself retains is its own row**, because a caller who has an `ObservableCollection<T>` and adopts DynamicData pays for that as well as for the view. `After dispose` should return near zero in every row; where it does not, something is being held.");
+        report.AppendLine("Every row is the same predicate over the same collection. `Retained` is what the standing view occupies once settled, above whatever the caller holds anyway: the collection for this library and for DynamicData's list, the collection and the cache for DynamicData's cache. **What the cache itself retains is its own row**, because a caller who has an `ObservableCollection<T>` and adopts DynamicData pays for that as well as for the view.");
+        report.AppendLine();
+        report.AppendLine("**Two rows are controls rather than results.** `nothing built` takes the baseline and then does nothing at all, so all three of its columns must read zero; anything else means this instrument cannot measure retention and no other figure in either table may be quoted. `releasing the collection too` takes its baseline before the collection exists and then drops the collection along with the query, so it must return near zero as well; if it does while the plain `Expressions` row does not, then what that row still shows after disposal is being held by the elements themselves.");
         report.AppendLine();
         report.AppendLine("| Shape | Elements | Allocated | Retained | Retained per element | After dispose |");
         report.AppendLine("|--- |---: |---: |---: |---: |---: |");
         foreach (var elementCount in elementCounts)
             foreach (var (name, measure) in new (string Name, Func<int, ComparisonReading> Measure)[]
             {
+                ("Expressions, nothing built (control)", MeasureNothing),
                 ("Expressions", MeasureExpressionsFilter),
+                ("Expressions, releasing the collection too", MeasureExpressionsFilterReleasingTheSource),
                 ("DynamicData cache, the cache alone", MeasureDynamicDataCacheItself),
                 ("DynamicData cache, the view over it", MeasureDynamicDataCacheFilter),
                 ("DynamicData list, the view over the collection", MeasureDynamicDataListFilter)
