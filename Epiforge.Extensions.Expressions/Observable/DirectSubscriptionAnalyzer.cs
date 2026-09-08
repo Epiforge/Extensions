@@ -402,6 +402,25 @@ public sealed class DirectSubscriptionAnalyzer
         return DirectSubscriptionAnalysis.Eligible;
     }
 
+    /// <summary>
+    /// Determines whether an expression constructing an object can be observed by subscribing directly to its change sources, and when it can, plans the subscriptions its arguments take
+    /// </summary>
+    /// <remarks>
+    /// A constructor is not a method: its value is of the constructed type exactly and never of a type derived from it, so the sealed test which a method's declared return type requires does not apply. What is left is whether the type implements either disposal interface, because the options can be told to dispose what an expression constructed and a value of a type implementing neither cannot be disposed by anyone, whatever the options say
+    /// </remarks>
+    DirectSubscriptionAnalysis AnalyzeNew(NewExpression newExpression, Planner? planner)
+    {
+        if (ExpressionObserverOptions.IsDisposable(newExpression.Type))
+            return new(newExpression, DirectSubscriptionIneligibility.ValueRequiresDisposal);
+        for (int i = 0, ii = newExpression.Arguments.Count; i < ii; ++i)
+        {
+            var argumentAnalysis = AnalyzeNode(newExpression.Arguments[i], planner);
+            if (!argumentAnalysis.IsEligible)
+                return argumentAnalysis;
+        }
+        return DirectSubscriptionAnalysis.Eligible;
+    }
+
     DirectSubscriptionAnalysis AnalyzeParameter(ParameterExpression parameterExpression, Planner? planner)
     {
         if (planner is not null)
@@ -428,6 +447,7 @@ public sealed class DirectSubscriptionAnalyzer
             IndexExpression indexExpression => AnalyzeIndex(indexExpression, planner),
             MethodCallExpression methodCallExpressionForPropertyGet when ExpressionObserverOptions.PropertyGetMethodToProperty.GetOrAdd(methodCallExpressionForPropertyGet.Method, ExpressionObserverOptions.GetPropertyFromGetMethod) is { } property => AnalyzeNode(methodCallExpressionForPropertyGet.Arguments.Count > 0 ? Expression.MakeIndex(methodCallExpressionForPropertyGet.Object!, property, methodCallExpressionForPropertyGet.Arguments) : Expression.MakeMemberAccess(methodCallExpressionForPropertyGet.Object, property), planner),
             MethodCallExpression methodCallExpression => AnalyzeMethodCall(methodCallExpression, planner),
+            NewExpression newExpression => AnalyzeNew(newExpression, planner),
             BinaryExpression binaryExpression when binaryExpression.Method is { } binaryOperator && !ExpressionObserverOptions.CannotBeDisposed(binaryOperator.ReturnType) => new(binaryExpression, DirectSubscriptionIneligibility.UserDefinedOperator),
             BinaryExpression binaryExpression when IsShortCircuiting(binaryExpression) => AnalyzeShortCircuiting(binaryExpression, planner),
             BinaryExpression binaryExpression when binaryExpression.Conversion is not null => new(binaryExpression, DirectSubscriptionIneligibility.UnsupportedExpressionKind),

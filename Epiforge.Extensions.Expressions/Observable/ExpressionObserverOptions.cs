@@ -9,7 +9,10 @@ public class ExpressionObserverOptions
     internal static readonly ConcurrentDictionary<MethodInfo, PropertyInfo?> PropertyGetMethodToProperty = new();
 
     internal static bool CannotBeDisposed(Type type) =>
-        type.IsSealed && !typeof(IDisposable).IsAssignableFrom(type) && !typeof(IAsyncDisposable).IsAssignableFrom(type);
+        type.IsSealed && !IsDisposable(type);
+
+    internal static bool IsDisposable(Type type) =>
+        typeof(IDisposable).IsAssignableFrom(type) || typeof(IAsyncDisposable).IsAssignableFrom(type);
 
     internal static MethodInfo GetGenericMethodDefinitionFromGenericMethod(MethodInfo methodInfo) =>
         methodInfo.GetGenericMethodDefinition();

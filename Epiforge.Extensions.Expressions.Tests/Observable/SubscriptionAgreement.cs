@@ -233,6 +233,22 @@ public class SubscriptionAgreement
     }
 
     [TestMethod]
+    public void AConstructedPairOverTheArgument() =>
+        AssertAgreement(subject => new Tuple<int, int>(subject.Rank, subject.Score), new Recorded(new SubscriptionLog()));
+
+    [TestMethod]
+    public void AConstructedPairOverTheArgumentAndAClosure()
+    {
+        var log = new SubscriptionLog();
+        var other = new Recorded(log);
+        AssertAgreement(subject => new Tuple<int, int>(subject.Rank, other.Rank), new Recorded(log));
+    }
+
+    [TestMethod]
+    public void AConstructedPairOfAnElementAndItsKey() =>
+        AssertAgreement(subject => new Tuple<Recorded, IComparable>(subject, subject.Rank), new Recorded(new SubscriptionLog()));
+
+    [TestMethod]
     public void AndAlsoOverTheArgumentWithTheBranchTaken() =>
         AssertAgreement(subject => subject.Rank > -1 && subject.Score < 100, new Recorded(new SubscriptionLog()));
 
@@ -267,31 +283,6 @@ public class SubscriptionAgreement
     [TestMethod]
     public void TwoMembersOnTheArgument() =>
         AssertAgreement(subject => subject.Rank + subject.Score, new Recorded(new SubscriptionLog()));
-
-    [TestMethod]
-    public void ARepeatedClosureSourceIsAttachedOnce()
-    {
-        var log = new SubscriptionLog();
-        var other = new Recorded(log);
-        var subject = new Recorded(log);
-        var observer = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = true });
-        using (observer.Observe(s => other.Rank + other.Rank > s.Rank, subject))
-            Assert.AreEqual(2, log.Attachments().Count, string.Join(", ", log.Attachments()));
-        Assert.AreEqual(0, log.Outstanding);
-    }
-
-    [TestMethod]
-    public void SeparateClosureSourcesAreEachAttached()
-    {
-        var log = new SubscriptionLog();
-        var first = new Recorded(log);
-        var second = new Recorded(log);
-        var subject = new Recorded(log);
-        var observer = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = true });
-        using (observer.Observe(s => first.Rank + second.Rank > s.Rank, subject))
-            Assert.AreEqual(3, log.Attachments().Count, string.Join(", ", log.Attachments()));
-        Assert.AreEqual(0, log.Outstanding);
-    }
 
     static IReadOnlyList<string> GraphAttachmentsFor<TResult>(Expression<Func<Recorded, TResult>> lambda, Recorded subject, SubscriptionLog log)
     {

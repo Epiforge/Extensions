@@ -186,11 +186,10 @@ public class DirectSubscriptionAnalyzer
     }
 
     [TestMethod]
-    public void NewIsIneligible()
+    public void NewIsEligible()
     {
         var analysis = Analyzer().Analyze(BodyOf<TestPerson>(person => new TestPerson()));
-        Assert.IsFalse(analysis.IsEligible);
-        Assert.AreEqual(DirectSubscriptionIneligibility.UnsupportedExpressionKind, analysis.Ineligibility);
+        Assert.IsTrue(analysis.IsEligible, analysis.ToString());
     }
 
     [TestMethod]
