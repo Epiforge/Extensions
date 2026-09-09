@@ -372,8 +372,8 @@ Reading is also cheaper than being told. A query subscribes to the one it is bui
 
 Which is also how to decide whether you want one. If you compute a result once and move on, plain LINQ is cheaper and simpler, and you should use it. If a result has to stay correct across a long run of small changes, such as a list someone is looking at, a running total, or a filter someone is typing into, that is what these are for.
 
-#### Which of These Should I Use?
-The nearest thing to this in .NET is [DynamicData](https://github.com/reactivemarbles/DynamicData), and it is a good library. Both keep a derived collection correct as your data changes — filter, sort, group, project, aggregate — and both update the result when an element's property changes rather than only when the collection does. Here is how to tell which one you want.
+#### Choosing Between Observable Queries and DynamicData
+[DynamicData](https://github.com/reactivemarbles/DynamicData) is the nearest thing to this in .NET, and it is a good library. Both keep a derived collection correct as your data changes — filter, sort, group, project, aggregate — and both update the result when an element's property changes rather than only when the collection does. Here is how to tell which one you want.
 
 **Start with what you already know.** If you know `INotifyPropertyChanged`, `ObservableCollection<T>` and LINQ, this library asks you to learn almost nothing else: you point it at the collection you already have, write `ObserveWhere(person => person.Rank > 0)`, and bind the result. If you already know Rx, or you use ReactiveUI, DynamicData will feel like home and this library will feel like an unfamiliar dialect — and it is probably already somewhere in your dependency graph. Most of the rest follows from that one answer.
 
@@ -409,6 +409,8 @@ The zero is exact rather than rounded: a property change that does not move an e
 
 - **Sorting.** DynamicData's cost per move grows with the collection while this library's barely does, so the two cross at about **1,400** elements. Below that DynamicData is 1.28x faster; at four thousand this library is 1.72x faster and at ten thousand 2.98x.
 - **Grouping.** The reverse. DynamicData's cost per migration is flat while this library's grows, so the two cross at about **7,900** elements. Below that this library is 2.55x faster; at ten thousand DynamicData is 1.18x faster.
+
+**The grouping crossover is a trade rather than an oversight, and knowing which side of it you want is more useful than the number.** A grouping here keeps its elements in the order they were added, so moving one out of its old group means finding it first, which is work proportional to the size of that group. DynamicData's groups are keyed rather than positional, so a removal is a dictionary operation and costs the same whatever the group holds. If you need the elements of a group in a stable order, that is what you are paying for. If you do not, DynamicData's shape is cheaper once groups get large.
 
 **What decides both is the size of the view the operator sees, not the size of your collection.** Filter ten thousand elements down to a thousand and then sort, and you are on the small-view side of the sorting crossover, where DynamicData wins; grouping that same thousand puts you well on this library's side of the grouping one.
 
