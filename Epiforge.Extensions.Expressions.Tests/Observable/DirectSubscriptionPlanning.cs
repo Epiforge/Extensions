@@ -123,12 +123,25 @@ public class DirectSubscriptionPlanning
         Assert.AreEqual(0, plan.Subscriptions.Count);
     }
 
+    /// <summary>
+    /// A read of a property whose change notifications are ignored, which is admitted where nothing it is read through can change and plans nothing, the graph's node for one attaching nothing
+    /// </summary>
     [TestMethod]
-    public void IgnoredPropertyChangeNotificationIsIneligible()
+    public void IgnoredPropertyChangeNotificationPlansNothing()
     {
         var options = new ExpressionObserverOptions();
         options.AddIgnoredPropertyChangeNotification(typeof(TestPerson).GetProperty(nameof(TestPerson.Name))!);
         var plan = Analyzer(options).Plan(Bound<string?>(person => person.Name, TestPerson.CreateEmily()));
+        Assert.IsTrue(plan.IsEligible, plan.ToString());
+        Assert.AreEqual(0, plan.Subscriptions.Count, "a subscription was planned for a property the graph attaches nothing for");
+    }
+
+    [TestMethod]
+    public void IgnoredPropertyChangeNotificationThroughAChangeableTargetIsIneligible()
+    {
+        var options = new ExpressionObserverOptions();
+        options.AddIgnoredPropertyChangeNotification(typeof(Recorded).GetProperty(nameof(Recorded.Rank))!);
+        var plan = Analyzer(options).Plan(BoundRecorded<int>(recorded => recorded.Next!.Rank, new Recorded(new SubscriptionLog())));
         Assert.IsFalse(plan.IsEligible);
         Assert.AreEqual(DirectSubscriptionIneligibility.IgnoredChangeNotification, plan.Analysis.Ineligibility);
         Assert.AreEqual(0, plan.Subscriptions.Count);

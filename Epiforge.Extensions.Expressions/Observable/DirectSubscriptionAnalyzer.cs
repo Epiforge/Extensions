@@ -254,10 +254,14 @@ public sealed class DirectSubscriptionAnalyzer
     /// <remarks>
     /// The graph gives every subexpression a node holding its last evaluation and re-evaluates that node only when something it depends on announces. A call whose object and arguments cannot change is therefore made exactly once, however many times the observation is re-evaluated, and its value is disposed of exactly once. Such a call is not fixed, because it cannot be resolved without invoking something, but it is a value the fast path may hold rather than recompute, and holding it is what lets the two mechanisms agree about how many of those values are made
     /// </remarks>
+    /// <remarks>
+    /// A property whose change notifications are ignored is the same case reached by another road. The graph's node for one subscribes to nothing, so it reads the property when it is first evaluated and keeps what it read for the life of the observation, however often the property changes afterwards. Reading it afresh on every evaluation is what the fast path would otherwise do and is what the refusal of these existed to prevent; holding it reads it once, which is what the graph does
+    /// </remarks>
     bool IsInvariant(Expression expression) =>
         IsFixed(expression) || expression switch
         {
             MethodCallExpression methodCallExpression => (methodCallExpression.Object is not { } target || IsInvariant(target)) && AreInvariant(methodCallExpression.Arguments),
+            MemberExpression { Member: PropertyInfo property } memberExpression when isIgnoredPropertyChangeNotification(property) => memberExpression.Expression is not { } target || IsInvariant(target),
             UnaryExpression unaryExpression when unaryExpression.Method is null && unaryExpression.NodeType is ExpressionType.Convert or ExpressionType.ConvertChecked => IsInvariant(unaryExpression.Operand),
             _ => false
         };
@@ -390,12 +394,23 @@ public sealed class DirectSubscriptionAnalyzer
         return DirectSubscriptionAnalysis.Eligible;
     }
 
+    /// <summary>
+    /// Determines whether an expression reading a member can be observed by subscribing directly to its change sources, and when it can, plans the subscription that read takes
+    /// </summary>
+    /// <remarks>
+    /// A read of a property whose change notifications are ignored is admitted when nothing it is read through can change, and is then held rather than planned: the observation reads it when an evaluation first reaches it and keeps what it read, which is what the graph's node for it does, and it plans no subscription of its own, which is what the graph's node attaches. A read through something which can change stays refused, because there the graph re-reads the property when that something moves and keeps its value between those moves, where the fast path would read it afresh whenever anything at all announced
+    /// </remarks>
     DirectSubscriptionAnalysis AnalyzeMember(MemberExpression memberExpression, Planner? planner)
     {
         if (memberExpression.Member is PropertyInfo disposedProperty && isPropertyValueDisposed(disposedProperty) && !ExpressionObserverOptions.CannotBeDisposed(disposedProperty.PropertyType))
             return new(memberExpression, DirectSubscriptionIneligibility.ValueRequiresDisposal);
         if (memberExpression.Member is PropertyInfo ignoredProperty && isIgnoredPropertyChangeNotification(ignoredProperty))
-            return new(memberExpression, DirectSubscriptionIneligibility.IgnoredChangeNotification);
+        {
+            if (!IsInvariant(memberExpression))
+                return new(memberExpression, DirectSubscriptionIneligibility.IgnoredChangeNotification);
+            planner?.AddHeld(memberExpression, false);
+            return memberExpression.Expression is { } ignoredTarget ? AnalyzeNode(ignoredTarget, planner) : DirectSubscriptionAnalysis.Eligible;
+        }
         if (memberExpression.Expression is not { } target)
             return DirectSubscriptionAnalysis.Eligible;
         if (!IsFixed(target))

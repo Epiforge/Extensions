@@ -71,8 +71,11 @@ public class DirectSubscriptionExecution
         Assert.AreEqual(0, log.Outstanding);
     }
 
+    /// <summary>
+    /// A read of a property whose change notifications are ignored, through the observation's own argument, which the fast path holds rather than reading again
+    /// </summary>
     [TestMethod]
-    public void AnIgnoredPropertyChangeNotificationBuildsTheGraph()
+    public void AnIgnoredPropertyChangeNotificationIsHeld()
     {
         var options = new ExpressionObserverOptions();
         options.AddIgnoredPropertyChangeNotification(typeof(Recorded).GetProperty(nameof(Recorded.Rank))!);
@@ -81,9 +84,28 @@ public class DirectSubscriptionExecution
         using (var expr = observer.Observe(s => s.Rank * 2, subject))
         {
             Assert.AreEqual(6, expr.Evaluation.Result);
-            Assert.AreNotEqual(0, observer.CachedObservableExpressions);
+            Assert.AreEqual(0, observer.CachedObservableExpressions, "the analyzer refused a read of an ignored property through the observation's own argument");
+            subject.Rank = 100;
+            Assert.AreEqual(6, expr.Evaluation.Result, "the observation read a property it was told to ignore again");
         }
         Assert.AreEqual(0, observer.CachedObservableExpressions);
+    }
+
+    [TestMethod]
+    public void AnIgnoredPropertyChangeNotificationThroughAChangeableTargetBuildsTheGraph()
+    {
+        var options = new ExpressionObserverOptions();
+        options.AddIgnoredPropertyChangeNotification(typeof(Recorded).GetProperty(nameof(Recorded.Rank))!);
+        var log = new SubscriptionLog();
+        var subject = new Recorded(log) { Rank = 3, Next = new Recorded(log) { Rank = 4 } };
+        var observer = new ExpressionObserver(options);
+        using (var expr = observer.Observe(s => s.Next!.Rank * 2, subject))
+        {
+            Assert.AreEqual(8, expr.Evaluation.Result);
+            Assert.AreNotEqual(0, observer.CachedObservableExpressions, "the analyzer admitted a read of an ignored property through something which can change");
+        }
+        Assert.AreEqual(0, observer.CachedObservableExpressions);
+        Assert.AreEqual(0, log.Outstanding);
     }
 
     [TestMethod]
