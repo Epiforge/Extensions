@@ -19,12 +19,10 @@ public class ObservableUnaryExpression
     }
 
     [TestMethod]
-    [DataRow(false)]
-    [DataRow(true)]
-    public void EvaluationFault(bool useDirectSubscription)
+    public void EvaluationFault()
     {
         TestPerson? noOne = null;
-        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe(() => -noOne!))
             Assert.IsNotNull(expr.Evaluation.Fault);
         Assert.AreEqual(0, observer.CachedObservableExpressions);

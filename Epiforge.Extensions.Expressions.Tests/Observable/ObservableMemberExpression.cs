@@ -69,12 +69,10 @@ public class ObservableMemberExpression
     }
 
     [TestMethod]
-    [DataRow(false)]
-    [DataRow(true)]
-    public void ClosureFieldValueCollectionChanged(bool useDirectSubscription)
+    public void ClosureFieldValueCollectionChanged()
     {
         var collection = new CollectionChangeOnlyNotifier();
-        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe(() => collection.Count))
         {
             Assert.AreEqual(0, expr.Evaluation.Result);
@@ -117,13 +115,11 @@ public class ObservableMemberExpression
     }
 
     [TestMethod]
-    [DataRow(false)]
-    [DataRow(true)]
-    public void ObjectFaultPropagation(bool useDirectSubscription)
+    public void ObjectFaultPropagation()
     {
         var john = TestPerson.CreateJohn();
         var emily = TestPerson.CreateEmily();
-        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe((p1, p2) => (p1.Name!.Length > 0 ? p1 : p2).Name, john, emily))
         {
             Assert.IsNull(expr.Evaluation.Fault);
@@ -136,11 +132,9 @@ public class ObservableMemberExpression
     }
 
     [TestMethod]
-    [DataRow(false)]
-    [DataRow(true)]
-    public void StaticPropertyValue(bool useDirectSubscription)
+    public void StaticPropertyValue()
     {
-        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe(() => Environment.UserName))
             Assert.AreEqual(Environment.UserName, expr.Evaluation.Result);
         Assert.AreEqual(0, observer.CachedObservableExpressions);

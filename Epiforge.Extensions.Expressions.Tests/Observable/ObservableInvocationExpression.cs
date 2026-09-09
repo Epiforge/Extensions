@@ -11,16 +11,14 @@ public class ObservableInvocationExpression
     #endregion TestMethod Methods
 
     [TestMethod]
-    [DataRow(false)]
-    [DataRow(true)]
-    public void ArgumentChangePropagation(bool useDirectSubscription)
+    public void ArgumentChangePropagation()
     {
         var john = TestPerson.CreateJohn();
         var emily = TestPerson.CreateEmily();
         var firstParameter = Expression.Parameter(typeof(TestPerson));
         var secondParameter = Expression.Parameter(typeof(TestPerson));
         var testPersonNamePropertyInfo = typeof(TestPerson).GetProperty(nameof(TestPerson.Name))!;
-        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe<int>(Expression.Lambda(Expression.Invoke((Expression<Func<string, string, int>>)((p1, p2) => p1.Length + p2.Length), Expression.MakeMemberAccess(firstParameter, testPersonNamePropertyInfo), Expression.MakeMemberAccess(secondParameter, testPersonNamePropertyInfo)), firstParameter, secondParameter), john, emily))
         {
             Assert.AreEqual(9, expr.Evaluation.Result);
@@ -31,9 +29,7 @@ public class ObservableInvocationExpression
     }
 
     [TestMethod]
-    [DataRow(false)]
-    [DataRow(true)]
-    public void ArgumentFaultPropagation(bool useDirectSubscription)
+    public void ArgumentFaultPropagation()
     {
         var john = TestPerson.CreateJohn();
         var emily = TestPerson.CreateEmily();
@@ -41,7 +37,7 @@ public class ObservableInvocationExpression
         var secondParameter = Expression.Parameter(typeof(TestPerson));
         var testPersonNamePropertyInfo = typeof(TestPerson).GetProperty(nameof(TestPerson.Name))!;
         var stringLengthPropertyInfo = typeof(string).GetProperty(nameof(string.Length))!;
-        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe<int>(Expression.Lambda(Expression.Invoke((Expression<Func<int, int, int>>)((p1, p2) => p1 + p2), Expression.MakeMemberAccess(Expression.MakeMemberAccess(firstParameter, testPersonNamePropertyInfo), stringLengthPropertyInfo), Expression.MakeMemberAccess(Expression.MakeMemberAccess(secondParameter, testPersonNamePropertyInfo), stringLengthPropertyInfo)), firstParameter, secondParameter), john, emily))
         {
             Assert.IsNull(expr.Evaluation.Fault);
@@ -54,16 +50,14 @@ public class ObservableInvocationExpression
     }
 
     [TestMethod]
-    [DataRow(false)]
-    [DataRow(true)]
-    public void ExpressionFaultPropagation(bool useDirectSubscription)
+    public void ExpressionFaultPropagation()
     {
         var john = TestPerson.CreateJohn();
         var emily = TestPerson.CreateEmily();
         var firstParameter = Expression.Parameter(typeof(TestPerson));
         var secondParameter = Expression.Parameter(typeof(TestPerson));
         var testPersonNamePropertyInfo = typeof(TestPerson).GetProperty(nameof(TestPerson.Name))!;
-        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe<int>(Expression.Lambda(Expression.Invoke((Expression<Func<string, string, int>>)((p1, p2) => p1.Length + p2.Length), Expression.MakeMemberAccess(firstParameter, testPersonNamePropertyInfo), Expression.MakeMemberAccess(secondParameter, testPersonNamePropertyInfo)), firstParameter, secondParameter), john, emily))
         {
             Assert.IsNull(expr.Evaluation.Fault);
@@ -76,9 +70,7 @@ public class ObservableInvocationExpression
     }
 
     [TestMethod]
-    [DataRow(false)]
-    [DataRow(true)]
-    public void LambdaDelegateValue(bool useDirectSubscription)
+    public void LambdaDelegateValue()
     {
         Func<TestPerson, TestPerson, TestPerson> @delegate = (p1, p2) =>
             CombinePeople(p1, p2);
@@ -86,31 +78,27 @@ public class ObservableInvocationExpression
         var emily = TestPerson.CreateEmily();
         var firstParameter = Expression.Parameter(typeof(TestPerson));
         var secondParameter = Expression.Parameter(typeof(TestPerson));
-        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe<TestPerson>(Expression.Lambda(Expression.Invoke(Expression.Constant(@delegate), firstParameter, secondParameter), firstParameter, secondParameter), john, emily))
             Assert.AreEqual("John Emily", expr.Evaluation.Result!.Name);
         Assert.AreEqual(0, observer.CachedObservableExpressions);
     }
 
     [TestMethod]
-    [DataRow(false)]
-    [DataRow(true)]
-    public void LambdaValue(bool useDirectSubscription)
+    public void LambdaValue()
     {
         var john = TestPerson.CreateJohn();
         var emily = TestPerson.CreateEmily();
         var firstParameter = Expression.Parameter(typeof(TestPerson));
         var secondParameter = Expression.Parameter(typeof(TestPerson));
-        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe<TestPerson>(Expression.Lambda(Expression.Invoke((Expression<Func<TestPerson, TestPerson, TestPerson>>)((p1, p2) => CombinePeople(p1, p2)), firstParameter, secondParameter), firstParameter, secondParameter), john, emily))
             Assert.AreEqual("John Emily", expr.Evaluation.Result!.Name);
         Assert.AreEqual(0, observer.CachedObservableExpressions);
     }
 
     [TestMethod]
-    [DataRow(false)]
-    [DataRow(true)]
-    public void LocalMethodDelegateValue(bool useDirectSubscription)
+    public void LocalMethodDelegateValue()
     {
         TestPerson localMethod(TestPerson p1, TestPerson p2) =>
             CombinePeople(p1, p2);
@@ -119,23 +107,21 @@ public class ObservableInvocationExpression
         var emily = TestPerson.CreateEmily();
         var firstParameter = Expression.Parameter(typeof(TestPerson));
         var secondParameter = Expression.Parameter(typeof(TestPerson));
-        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe<TestPerson>(Expression.Lambda(Expression.Invoke(Expression.Constant(@delegate), firstParameter, secondParameter), firstParameter, secondParameter), john, emily))
             Assert.AreEqual("John Emily", expr.Evaluation.Result!.Name);
         Assert.AreEqual(0, observer.CachedObservableExpressions);
     }
 
     [TestMethod]
-    [DataRow(false)]
-    [DataRow(true)]
-    public void MethodDelegateValue(bool useDirectSubscription)
+    public void MethodDelegateValue()
     {
         Func<TestPerson, TestPerson, TestPerson> @delegate = CombinePeople;
         var john = TestPerson.CreateJohn();
         var emily = TestPerson.CreateEmily();
         var firstParameter = Expression.Parameter(typeof(TestPerson));
         var secondParameter = Expression.Parameter(typeof(TestPerson));
-        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe<TestPerson>(Expression.Lambda(Expression.Invoke(Expression.Constant(@delegate), firstParameter, secondParameter), firstParameter, secondParameter), john, emily))
             Assert.AreEqual("John Emily", expr.Evaluation.Result!.Name);
         Assert.AreEqual(0, observer.CachedObservableExpressions);

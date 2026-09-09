@@ -10,13 +10,21 @@ public class SubscriptionAgreement
             node == parameter ? replacement : base.VisitParameter(node);
     }
 
+    /// <summary>
+    /// Asserts that the graph attaches exactly the subscriptions the analyzer's plan names for an eligible expression
+    /// </summary>
+    /// <remarks>
+    /// The observer is pinned to the graph deliberately. Direct subscription defaults to <c>true</c> and this overload of <c>Observe</c> honors it, so an observer left at its default takes the fast path and both sides of the comparison become the plan — under which a plan that under-subscribes agrees with its own execution and passes
+    /// </remarks>
     static void AssertAgreement<TResult>(Expression<Func<Recorded, TResult>> lambda, Recorded subject, ExpressionObserverOptions? options = null)
     {
         var log = subject.Log;
         var normalized = new ParameterReplacer(lambda.Parameters[0], Expression.Constant(subject, typeof(Recorded))).Visit(lambda.Body);
-        var plan = new Epiforge.Extensions.Expressions.Observable.DirectSubscriptionAnalyzer(options ?? new ExpressionObserverOptions()).Plan(normalized);
+        var observerOptions = options ?? new ExpressionObserverOptions();
+        var plan = new Epiforge.Extensions.Expressions.Observable.DirectSubscriptionAnalyzer(observerOptions).Plan(normalized);
         Assert.IsTrue(plan.IsEligible, plan.ToString());
-        var observer = options is null ? new ExpressionObserver() : new ExpressionObserver(options);
+        observerOptions.UseDirectSubscription = false;
+        var observer = new ExpressionObserver(observerOptions);
         using (observer.Observe(lambda, subject))
         {
             var planned = Planned(plan, log);
@@ -187,7 +195,7 @@ public class SubscriptionAgreement
         var second = new Recorded(log) { Rank = 20 };
         var subject = new Recorded(log) { Rank = 1 };
         var other = first;
-        var observer = new ExpressionObserver();
+        var observer = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = true });
         using (var earlier = observer.Observe(s => s.Rank + other.Rank, subject))
         {
             other = second;

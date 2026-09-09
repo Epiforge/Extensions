@@ -4,13 +4,11 @@ namespace Epiforge.Extensions.Expressions.Tests.Observable;
 public class ObservableNewArrayInitExpression
 {
     [TestMethod]
-    [DataRow(false)]
-    [DataRow(true)]
-    public void InitializerFaultPropagation(bool useDirectSubscription)
+    public void InitializerFaultPropagation()
     {
         var john = TestPerson.CreateJohn();
         var emily = TestPerson.CreateEmily();
-        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe(() => string.Concat(new string?[] { john.Name!.Length.ToString(), emily.Name!.Length.ToString() })))
         {
             Assert.IsNull(expr.Evaluation.Fault);

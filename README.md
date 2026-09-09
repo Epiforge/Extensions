@@ -352,8 +352,9 @@ This is deliberate: holding a grouping at the position of its key's first occurr
 Call `ObserveOrderBy` on the query, or on a grouping, when you want a defined order.
 
 Reach for `foreach` rather than the indexer, because the difference between them is larger than it looks and grows with the collection.
-An enumeration takes the query's lock once and then walks a list, while the indexer takes that lock again for every element you ask for; on a large collection it must also descend a tree to find each one, because a query keeps its elements' positions in one so that a change repairs only what it touched.
-Walking ten thousand elements by index instead of by enumerator measured between sixty-seven and seventy-nine times slower; at a hundred elements it was ten to fifteen, and there the repeated locking is the whole of it.
+An enumeration takes the query's lock once and then walks a list, while the indexer takes that lock again for every element you ask for; on a large collection it must also find each one in a tree, because a query keeps its elements' positions in one so that a change repairs only what it touched.
+A query does remember the position it handed out last and searches outward from there, so asking for positions in order, or near one another, costs a fraction of asking for them at random, and what remains is mostly the repeated locking rather than the search.
+Walking ten thousand elements by index instead of by enumerator measured between thirty and fifty times slower in order, and around two hundred times out of order; at a hundred elements it was about fifteen, and there the repeated locking is the whole of it.
 Where you do need elements by position more than once, copy the query's contents and index the copy.
 
 Since the `ExpressionObserver` has a number of options governing its behavior, you may optionally pass one you've made to the constructor of `CollectionObserver` to ensure those options are obeyed when Observable Expressions are created to enable your Observable Queries.
@@ -416,7 +417,9 @@ The zero is exact rather than rounded: a property change that does not move an e
 
 **What decides both is the size of the view the operator sees, not the size of your collection.** Filter ten thousand elements down to a thousand and then sort, and you are on the small-view side of the sorting crossover, where DynamicData wins; grouping that same thousand puts you well on this library's side of the grouping one.
 
-**Allocation does not cross.** At every size measured, this library allocates less for the same work: nothing at all for a filtered view, about a third of DynamicData's for grouping, about seven tenths for sorting.
+**Allocation does not cross.** At every size measured, this library allocates less for the same work: nothing at all for a filtered view, 0.31x DynamicData's for grouping, 0.71x for sorting.
+
+**The propagation advantage is largest at the sizes most applications use, and it narrows above them.** Per property change above the floor, this library costs 6.8 ns at a thousand elements, 9.2 ns at ten thousand and 55.0 ns at a hundred thousand, against 190.7, 212.5 and 406.8 ns — a lead of 27.9x, then 23.1x, then 7.4x. The allocation figure is unchanged across all three sizes; the time figure is not. A hundred thousand observations do not fit in cache, and a library which has driven its own per-change work to near zero has nothing left to hide a cache miss behind. The advantage shrinks from very large to large.
 
 **Composition behaves.** Ordering or grouping a filtered view costs each library close to the sum of its parts rather than more, so a chain does not change which one to prefer — only the size of the view arriving at each stage does.
 

@@ -4,15 +4,13 @@ namespace Epiforge.Extensions.Expressions.Tests.Observable;
 public class ObservableConditionalExpression
 {
     [TestMethod]
-    [DataRow(false)]
-    [DataRow(true)]
-    public void FaultPropagationIfFalse(bool useDirectSubscription)
+    public void FaultPropagationIfFalse()
     {
         var john = TestPerson.CreateJohn();
         john.Name = null;
         var emily = TestPerson.CreateEmily();
         emily.Name = null;
-        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe((p1, p2) => p1.Name != null ? p1.Name.Length : p2.Name!.Length, john, emily))
         {
             Assert.IsNotNull(expr.Evaluation.Fault);
@@ -27,15 +25,13 @@ public class ObservableConditionalExpression
     }
 
     [TestMethod]
-    [DataRow(false)]
-    [DataRow(true)]
-    public void FaultPropagationIfTrue(bool useDirectSubscription)
+    public void FaultPropagationIfTrue()
     {
         var john = TestPerson.CreateJohn();
         john.Name = null;
         var emily = TestPerson.CreateEmily();
         emily.Name = null;
-        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe((p1, p2) => p2.Name == null ? p1.Name!.Length : p2.Name.Length, john, emily))
         {
             Assert.IsNotNull(expr.Evaluation.Fault);
@@ -50,14 +46,12 @@ public class ObservableConditionalExpression
     }
 
     [TestMethod]
-    [DataRow(false)]
-    [DataRow(true)]
-    public void FaultPropagationTest(bool useDirectSubscription)
+    public void FaultPropagationTest()
     {
         var john = TestPerson.CreateJohn();
         john.Name = null;
         var emily = TestPerson.CreateEmily();
-        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe((p1, p2) => p1.Name!.Length > 0 ? p1.Name : p2.Name, john, emily))
         {
             Assert.IsNotNull(expr.Evaluation.Fault);
@@ -68,12 +62,10 @@ public class ObservableConditionalExpression
     }
 
     [TestMethod]
-    [DataRow(false)]
-    [DataRow(true)]
-    public void FaultShortCircuiting(bool useDirectSubscription)
+    public void FaultShortCircuiting()
     {
         var john = TestPerson.CreateJohn();
-        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
+        var observer = ExpressionObserverHelpers.Create();
 #pragma warning disable CS8625 // Cannot convert null literal to non-nullable reference type.
         using (var expr = observer.Observe<TestPerson, TestPerson, string>((p1, p2) => p1.Name!.Length > 0 ? p1.Name! : p2.Name!, john, null))
 #pragma warning restore CS8625 // Cannot convert null literal to non-nullable reference type.
@@ -85,14 +77,12 @@ public class ObservableConditionalExpression
     }
 
     [TestMethod]
-    [DataRow(false)]
-    [DataRow(true)]
-    public void PropertyChanges(bool useDirectSubscription)
+    public void PropertyChanges()
     {
         var john = TestPerson.CreateJohn();
         var emily = TestPerson.CreateEmily();
         var values = new BlockingCollection<string>();
-        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe((p1, p2) => string.IsNullOrEmpty(p1.Name) ? p2.Name : p1.Name, john, emily))
         {
             void propertyChanged(object? sender, PropertyChangedEventArgs e) =>
@@ -114,13 +104,11 @@ public class ObservableConditionalExpression
     }
 
     [TestMethod]
-    [DataRow(false)]
-    [DataRow(true)]
-    public void ValueShortCircuiting(bool useDirectSubscription)
+    public void ValueShortCircuiting()
     {
         var john = TestPerson.CreateJohn();
         var emily = TestPerson.CreateEmily();
-        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe((p1, p2) => p1.Name!.Length > 0 ? p1.Name : p2.Name, john, emily))
             Assert.AreEqual(john.Name, expr.Evaluation.Result);
         Assert.AreEqual(0, observer.CachedObservableExpressions);

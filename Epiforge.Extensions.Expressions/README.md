@@ -259,7 +259,9 @@ The zero is exact rather than rounded: a property change that does not move an e
 
 **What decides both is the size of the view the operator sees, not the size of your collection.** Filter ten thousand elements down to a thousand and then sort, and you are on the small-view side of the sorting crossover, where DynamicData wins; grouping that same thousand puts you well on this library's side of the grouping one.
 
-**Allocation does not cross.** At every size measured, this library allocates less for the same work: nothing at all for a filtered view, about a third of DynamicData's for grouping, about seven tenths for sorting.
+**Allocation does not cross.** At every size measured, this library allocates less for the same work: nothing at all for a filtered view, 0.31x DynamicData's for grouping, 0.71x for sorting.
+
+**The propagation advantage is largest at the sizes most applications use, and it narrows above them.** Per property change above the floor, this library costs 6.8 ns at a thousand elements, 9.2 ns at ten thousand and 55.0 ns at a hundred thousand, against 190.7, 212.5 and 406.8 ns — a lead of 27.9x, then 23.1x, then 7.4x. The allocation figure is unchanged across all three sizes; the time figure is not. A hundred thousand observations do not fit in cache, and a library which has driven its own per-change work to near zero has nothing left to hide a cache miss behind. The advantage shrinks from very large to large.
 
 **Composition behaves.** Ordering or grouping a filtered view costs each library close to the sum of its parts rather than more, so a chain does not change which one to prefer — only the size of the view arriving at each stage does.
 

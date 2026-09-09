@@ -4,13 +4,11 @@ namespace Epiforge.Extensions.Expressions.Tests.Observable;
 public class ObservableBinaryExpression
 {
     [TestMethod]
-    [DataRow(false)]
-    [DataRow(true)]
-    public void EvaluationFault(bool useDirectSubscription)
+    public void EvaluationFault()
     {
         var john = TestPerson.CreateJohn();
         TestPerson? noOne = null;
-        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
+        var observer = ExpressionObserverHelpers.Create();
 #pragma warning disable CS8604 // Possible null reference argument.
         using (var expr = observer.Observe(() => john + noOne))
 #pragma warning restore CS8604 // Possible null reference argument.
@@ -19,13 +17,11 @@ public class ObservableBinaryExpression
     }
 
     [TestMethod]
-    [DataRow(false)]
-    [DataRow(true)]
-    public void FaultPropagation(bool useDirectSubscription)
+    public void FaultPropagation()
     {
         var john = TestPerson.CreateJohn();
         var emily = TestPerson.CreateEmily();
-        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe((p1, p2) => p1.Name!.Length + p2.Name!.Length, john, emily))
         {
             Assert.IsNull(expr.Evaluation.Fault);
@@ -41,14 +37,12 @@ public class ObservableBinaryExpression
     }
 
     [TestMethod]
-    [DataRow(false)]
-    [DataRow(true)]
-    public void PropertyChanges(bool useDirectSubscription)
+    public void PropertyChanges()
     {
         var john = TestPerson.CreateJohn();
         var emily = TestPerson.CreateEmily();
         var values = new BlockingCollection<int>();
-        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe((p1, p2) => p1.Name!.Length + p2.Name!.Length, john, emily))
         {
             void propertyChanged(object? sender, PropertyChangedEventArgs e) => values.Add(expr.Evaluation.Result);

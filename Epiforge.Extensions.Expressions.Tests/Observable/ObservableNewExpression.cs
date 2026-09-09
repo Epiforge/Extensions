@@ -4,12 +4,10 @@ namespace Epiforge.Extensions.Expressions.Tests.Observable;
 public class ObservableNewExpression
 {
     [TestMethod]
-    [DataRow(false)]
-    [DataRow(true)]
-    public void ArgumentFaultPropagation(bool useDirectSubscription)
+    public void ArgumentFaultPropagation()
     {
         var john = TestPerson.CreateJohn();
-        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe(() => new TestPerson(john.Name!.Length.ToString())))
         {
             Assert.IsNull(expr.Evaluation.Fault);
@@ -22,27 +20,23 @@ public class ObservableNewExpression
     }
 
     [TestMethod]
-    [DataRow(false)]
-    [DataRow(true)]
-    public void EvaluationFault(bool useDirectSubscription)
+    public void EvaluationFault()
     {
-        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
+        var observer = ExpressionObserverHelpers.Create();
         using (var expr = observer.Observe(() => new EquatableList<string>(null!)))
             Assert.IsNotNull(expr.Evaluation.Fault);
         Assert.AreEqual(0, observer.CachedObservableExpressions);
     }
 
     [TestMethod]
-    [DataRow(false)]
-    [DataRow(true)]
-    public async Task ValueAsyncDisposalAsync(bool useDirectSubscription)
+    public async Task ValueAsyncDisposalAsync()
     {
         var john = AsyncDisposableTestPerson.CreateJohn();
         AsyncDisposableTestPerson? first, second;
         var disposedTcs = new TaskCompletionSource<object?>();
         var options = new ExpressionObserverOptions();
         options.AddConstructedTypeDisposal(typeof(AsyncDisposableTestPerson));
-        var observer = ExpressionObserverHelpers.Create(useDirectSubscription, options);
+        var observer = ExpressionObserverHelpers.Create(options);
         using (var expr = observer.Observe(() => new AsyncDisposableTestPerson(john.Name!.Length.ToString())))
         {
             Assert.IsNull(expr.Evaluation.Fault);
@@ -64,15 +58,13 @@ public class ObservableNewExpression
     }
 
     [TestMethod]
-    [DataRow(false)]
-    [DataRow(true)]
-    public void ValueDisposal(bool useDirectSubscription)
+    public void ValueDisposal()
     {
         var john = SyncDisposableTestPerson.CreateJohn();
         SyncDisposableTestPerson? first, second;
         var options = new ExpressionObserverOptions();
         options.AddConstructedTypeDisposal(typeof(SyncDisposableTestPerson));
-        var observer = ExpressionObserverHelpers.Create(useDirectSubscription, options);
+        var observer = ExpressionObserverHelpers.Create(options);
         using (var expr = observer.Observe(() => new SyncDisposableTestPerson(john.Name!.Length.ToString())))
         {
             Assert.IsNull(expr.Evaluation.Fault);
