@@ -83,19 +83,24 @@ The shortcut handles an expression built from these:
 
 * the argument, constants, and captured locals
 * fields, on anything above — including static fields
-* properties and indexers whose target is one of the above
 * static properties
-* operators, where one resolved to a method needs a return type nothing could dispose — `==` on strings qualifies
-* method calls, on that same condition, where the target and every argument are themselves handled — `string.IsNullOrEmpty(e.Name)` qualifies
+* properties and indexers whose target is one of the above
+* a property read through something which can change, such as `e => e.Name.Length` or `e => e.Manager.Rank`, which follows the value as it moves and re-subscribes where it lands
+* `?:`, `&&`, `||` and `??`, whose deferred operands take their subscriptions the first time an evaluation reaches them, which is where the graph attaches its nodes for them
+* a call to the get method of a property or an indexer, which is how an indexer written in C# arrives, read as the member or index access it stands for
+* object construction, object initializers and array initializers
+* an invocation of a literal lambda, as a formula or rule engine building expression trees at run time commonly emits, reduced to the body it would have evaluated
+* method calls and operators resolved to a method, unless the observer disposes of what one returned and what it is made on or given can change
+* a property whose change notifications you have told the observer to ignore, when nothing it is read through can change, read once and kept
 
-Everything else builds the graph: `?:`, `&&`, `||` and `??`; anything read through a property, such as `e => e.Name.Length`; a call to the get method of a property or an indexer, which is how an indexer written in C# arrives; object and collection construction; and anything you have configured the observer to ignore notifications for or to dispose.
+What builds the graph instead: a kind of expression not in that list, such as a lambda passed as an argument or an array built from bounds; an indexer whose target can change; a member read on a value type which can notify; a call or operator whose return value the observer disposes of and whose target or arguments can change; a read of an ignored property through something which can change; and an expression deferring more than sixty-four operands.
 
 To find out about a particular expression, ask:
 
 ```csharp
 var analysis = new DirectSubscriptionAnalyzer(options).Analyze(expression.Body);
-// analysis.IsEligible is false
-// analysis.Ineligibility is DirectSubscriptionIneligibility.DeferredBranch
+// analysis.IsEligible says whether the shortcut handles it
+// analysis.Ineligibility says why not, such as DirectSubscriptionIneligibility.ValueRequiresDisposal
 // analysis.IneligibleExpression is the part responsible
 ```
 
