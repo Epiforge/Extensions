@@ -4,7 +4,10 @@
 /// Prices a raise against many observations of one object, including raises for a property none of them watches
 /// </summary>
 /// <remarks>
-/// Both mechanisms register once with a source's event and keep their own list of what is attached to it, so a raise walks one entry of the object's invocation list either way and then one list of their own. Where they part is what that walk does: the fast path looks for the first attachment which wants the name reported and returns before entering a propagation where none does, while the graph invokes every attachment's handler and each of them decides for itself and returns. What that is worth has never been measured, and the shape which makes it matter is an entity announcing several properties for one change while an observation watches one of them
+/// Both mechanisms register once with a source's event and keep their own list of what is attached to it, so a raise walks one entry of the object's invocation list either way and then one list of their own. Where they part is what that walk does: the fast path looks for the first attachment which wants the name reported and returns before entering a propagation where none does, while the graph invokes every attachment's handler and each of them decides for itself and returns
+/// </remarks>
+/// <remarks>
+/// How long each list is turns on something else entirely, which the first form of this instrument measured instead of what it meant to. The graph caches a node per expression, so many observations of one expression over one object share one graph and one attachment; the fast path caches nothing across observations and attaches one apiece. The shared arms therefore compare one attachment against a thousand and report the cache rather than the dispatch. The distinct arms give every observation its own constant so that neither mechanism can share, which is what isolates what a raise costs once both are walking the same number of attachments
 /// </remarks>
 /// <remarks>
 /// The subject passes pre-allocated arguments, so a raise allocates nothing and what these arms report is the mechanisms' own cost rather than a floor the subject sets. Every observation is constructed once, outside the measurement
@@ -15,55 +18,112 @@ public class NotificationFanOutBenchmarks
     const int observationCount = 1000;
     const int raises = 1000;
 
+    static readonly PropertyInfo endProperty = typeof(BenchmarkTicker).GetProperty(nameof(BenchmarkTicker.End))!;
+
     static readonly Expression<Func<BenchmarkTicker, bool>> watchesEnd = ticker => ticker.End > 0;
 
+    /// <summary>
+    /// Yields an expression watching the same property as every other and equal to none of them, so that neither mechanism can serve two observations of it from one node
+    /// </summary>
+    static Expression<Func<BenchmarkTicker, bool>> WatchesEndDistinctly(int which)
+    {
+        var ticker = Expression.Parameter(typeof(BenchmarkTicker), "ticker");
+        return Expression.Lambda<Func<BenchmarkTicker, bool>>(Expression.GreaterThan(Expression.MakeMemberAccess(ticker, endProperty), Expression.Constant((long)-which - 1)), ticker);
+    }
+
+    IObservableExpression<BenchmarkTicker, bool>[] aDefaultDistinctObservations = null!;
     IObservableExpression<BenchmarkTicker, bool>[] aDefaultObservations = null!;
     ExpressionObserver aDefaultObserver = null!;
+    IObservableExpression<BenchmarkTicker, bool>[] graphDistinctObservations = null!;
     IObservableExpression<BenchmarkTicker, bool>[] graphObservations = null!;
     ExpressionObserver graphObserver = null!;
+    BenchmarkTicker aDefaultDistinctTicker = null!;
     BenchmarkTicker aDefaultTicker = null!;
+    BenchmarkTicker graphDistinctTicker = null!;
     BenchmarkTicker graphTicker = null!;
 
     [Benchmark(Baseline = true)]
-    public void WatchedPropertyDefault()
+    public void SharedWatchedPropertyDefault()
     {
         for (var i = 0; i < raises; ++i)
             aDefaultTicker.End = i + 1;
     }
 
     [Benchmark]
-    public void WatchedPropertyGraph()
+    public void SharedWatchedPropertyGraph()
     {
         for (var i = 0; i < raises; ++i)
             graphTicker.End = i + 1;
     }
 
     [Benchmark]
-    public void UnwatchedPropertyDefault()
+    public void SharedUnwatchedPropertyDefault()
     {
         for (var i = 0; i < raises; ++i)
             aDefaultTicker.Idle = i + 1;
     }
 
     [Benchmark]
-    public void UnwatchedPropertyGraph()
+    public void SharedUnwatchedPropertyGraph()
     {
         for (var i = 0; i < raises; ++i)
             graphTicker.Idle = i + 1;
     }
 
     [Benchmark]
-    public void MultiRaiseDefault()
+    public void SharedMultiRaiseDefault()
     {
         for (var i = 0; i < raises; ++i)
             aDefaultTicker.Advance(1);
     }
 
     [Benchmark]
-    public void MultiRaiseGraph()
+    public void SharedMultiRaiseGraph()
     {
         for (var i = 0; i < raises; ++i)
             graphTicker.Advance(1);
+    }
+
+    [Benchmark]
+    public void DistinctWatchedPropertyDefault()
+    {
+        for (var i = 0; i < raises; ++i)
+            aDefaultDistinctTicker.End = i + 1;
+    }
+
+    [Benchmark]
+    public void DistinctWatchedPropertyGraph()
+    {
+        for (var i = 0; i < raises; ++i)
+            graphDistinctTicker.End = i + 1;
+    }
+
+    [Benchmark]
+    public void DistinctUnwatchedPropertyDefault()
+    {
+        for (var i = 0; i < raises; ++i)
+            aDefaultDistinctTicker.Idle = i + 1;
+    }
+
+    [Benchmark]
+    public void DistinctUnwatchedPropertyGraph()
+    {
+        for (var i = 0; i < raises; ++i)
+            graphDistinctTicker.Idle = i + 1;
+    }
+
+    [Benchmark]
+    public void DistinctMultiRaiseDefault()
+    {
+        for (var i = 0; i < raises; ++i)
+            aDefaultDistinctTicker.Advance(1);
+    }
+
+    [Benchmark]
+    public void DistinctMultiRaiseGraph()
+    {
+        for (var i = 0; i < raises; ++i)
+            graphDistinctTicker.Advance(1);
     }
 
     [GlobalCleanup]
@@ -72,7 +132,9 @@ public class NotificationFanOutBenchmarks
         for (var i = 0; i < observationCount; ++i)
         {
             aDefaultObservations[i].Dispose();
+            aDefaultDistinctObservations[i].Dispose();
             graphObservations[i].Dispose();
+            graphDistinctObservations[i].Dispose();
         }
     }
 
@@ -83,12 +145,19 @@ public class NotificationFanOutBenchmarks
         graphObserver = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = false });
         aDefaultTicker = new BenchmarkTicker();
         graphTicker = new BenchmarkTicker();
+        aDefaultDistinctTicker = new BenchmarkTicker();
+        graphDistinctTicker = new BenchmarkTicker();
         aDefaultObservations = new IObservableExpression<BenchmarkTicker, bool>[observationCount];
+        aDefaultDistinctObservations = new IObservableExpression<BenchmarkTicker, bool>[observationCount];
         graphObservations = new IObservableExpression<BenchmarkTicker, bool>[observationCount];
+        graphDistinctObservations = new IObservableExpression<BenchmarkTicker, bool>[observationCount];
         for (var i = 0; i < observationCount; ++i)
         {
+            var distinct = WatchesEndDistinctly(i);
             aDefaultObservations[i] = aDefaultObserver.Observe(watchesEnd, aDefaultTicker);
+            aDefaultDistinctObservations[i] = aDefaultObserver.Observe(distinct, aDefaultDistinctTicker);
             graphObservations[i] = graphObserver.Observe(watchesEnd, graphTicker);
+            graphDistinctObservations[i] = graphObserver.Observe(distinct, graphDistinctTicker);
         }
     }
 }
