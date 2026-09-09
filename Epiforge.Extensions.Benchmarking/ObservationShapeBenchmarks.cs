@@ -14,10 +14,16 @@ public class ObservationShapeBenchmarks
     static readonly Expression<Func<KeyValuePair<int, BenchmarkPerson>, int>> pairStaticMethodCall = pair => Math.Abs(pair.Value.Rank);
     static readonly Expression<Func<KeyValuePair<int, BenchmarkPerson>, int>> pairTwoMethodCalls = pair => pair.Value.Rank.CompareTo(0).CompareTo(0);
     static readonly Expression<Func<KeyValuePair<int, BenchmarkPerson>, KeyValuePair<int, int>>> pairProjection = pair => new KeyValuePair<int, int>(pair.Key, pair.Value.Rank);
+    static readonly Expression<Func<KeyValuePair<int, BenchmarkPerson>, BenchmarkBox>> pairConstruction = pair => new BenchmarkBox(pair.Value.Rank);
+    static readonly Expression<Func<KeyValuePair<int, BenchmarkPerson>, BenchmarkBox>> pairMemberInitialization = pair => new BenchmarkBox { First = pair.Value.Rank };
 
     IObservableExpression<KeyValuePair<int, BenchmarkPerson>, KeyValuePair<int, int>>[] constantKeyProjections = null!;
+    IObservableExpression<KeyValuePair<int, BenchmarkPerson>, BenchmarkBox>[] constructions = null!;
     ExpressionObserver expressionObserver = null!;
+    IObservableExpression<KeyValuePair<int, BenchmarkPerson>, BenchmarkBox>[] fastPathConstructions = null!;
+    IObservableExpression<KeyValuePair<int, BenchmarkPerson>, BenchmarkBox>[] fastPathMemberInitializations = null!;
     IObservableExpression<KeyValuePair<int, BenchmarkPerson>, KeyValuePair<int, int>>[] fastPathProjections = null!;
+    IObservableExpression<KeyValuePair<int, BenchmarkPerson>, BenchmarkBox>[] memberInitializations = null!;
     IObservableExpression<KeyValuePair<int, BenchmarkPerson>, int>[] memberReads = null!;
     IObservableExpression<KeyValuePair<int, BenchmarkPerson>, int>[] methodCalls = null!;
     IObservableExpression<KeyValuePair<int, BenchmarkPerson>, int>[] methodCallsWithNoArguments = null!;
@@ -33,6 +39,28 @@ public class ObservationShapeBenchmarks
         for (var i = 0; i < elementCount; ++i)
             people[i].Rank ^= 1;
     }
+
+    /// <summary>
+    /// Constructing a reference type per change, with and without a member initializer, on each mechanism
+    /// </summary>
+    /// <remarks>
+    /// A member initialization used to write a changed binding into the object it had already produced, which allocated nothing further and announced nothing at all. It now constructs, so the excess of these arms over the member read is what that correction costs per notification, and the excess of the initialized arm over the constructed one is what the binding writes cost
+    /// </remarks>
+    [Benchmark]
+    public void ChangeEveryValueConstructed() =>
+        ChangeEveryValue();
+
+    [Benchmark]
+    public void ChangeEveryValueConstructedWithDirectSubscriptionAllowed() =>
+        ChangeEveryValue();
+
+    [Benchmark]
+    public void ChangeEveryValueMemberInitialized() =>
+        ChangeEveryValue();
+
+    [Benchmark]
+    public void ChangeEveryValueMemberInitializedWithDirectSubscriptionAllowed() =>
+        ChangeEveryValue();
 
     [Benchmark]
     public void ChangeEveryValueMemberRead() =>
@@ -88,11 +116,39 @@ public class ObservationShapeBenchmarks
             constantKeyProjections[i].Dispose();
     }
 
+    [GlobalCleanup(Target = nameof(ChangeEveryValueConstructed))]
+    public void CleanupConstructions()
+    {
+        for (var i = 0; i < elementCount; ++i)
+            constructions[i].Dispose();
+    }
+
+    [GlobalCleanup(Target = nameof(ChangeEveryValueConstructedWithDirectSubscriptionAllowed))]
+    public void CleanupFastPathConstructions()
+    {
+        for (var i = 0; i < elementCount; ++i)
+            fastPathConstructions[i].Dispose();
+    }
+
+    [GlobalCleanup(Target = nameof(ChangeEveryValueMemberInitializedWithDirectSubscriptionAllowed))]
+    public void CleanupFastPathMemberInitializations()
+    {
+        for (var i = 0; i < elementCount; ++i)
+            fastPathMemberInitializations[i].Dispose();
+    }
+
     [GlobalCleanup(Target = nameof(ChangeEveryValueProjectedWithDirectSubscriptionAllowed))]
     public void CleanupFastPathProjections()
     {
         for (var i = 0; i < elementCount; ++i)
             fastPathProjections[i].Dispose();
+    }
+
+    [GlobalCleanup(Target = nameof(ChangeEveryValueMemberInitialized))]
+    public void CleanupMemberInitializations()
+    {
+        for (var i = 0; i < elementCount; ++i)
+            memberInitializations[i].Dispose();
     }
 
     [GlobalCleanup(Target = nameof(ChangeEveryValueMemberRead))]
@@ -164,6 +220,35 @@ public class ObservationShapeBenchmarks
             constantKeyProjections[i] = expressionObserver.ObserveWithoutOptimization(pairConstantKeyProjection, new KeyValuePair<int, BenchmarkPerson>(i, people[i]));
     }
 
+    [GlobalSetup(Target = nameof(ChangeEveryValueConstructed))]
+    public void SetupConstructions()
+    {
+        SetupObserver();
+        constructions = new IObservableExpression<KeyValuePair<int, BenchmarkPerson>, BenchmarkBox>[elementCount];
+        for (var i = 0; i < elementCount; ++i)
+            constructions[i] = expressionObserver.ObserveWithoutOptimization(pairConstruction, new KeyValuePair<int, BenchmarkPerson>(i, people[i]));
+    }
+
+    [GlobalSetup(Target = nameof(ChangeEveryValueConstructedWithDirectSubscriptionAllowed))]
+    public void SetupFastPathConstructions()
+    {
+        SetupPeople();
+        expressionObserver = new ExpressionObserver();
+        fastPathConstructions = new IObservableExpression<KeyValuePair<int, BenchmarkPerson>, BenchmarkBox>[elementCount];
+        for (var i = 0; i < elementCount; ++i)
+            fastPathConstructions[i] = expressionObserver.ObserveWithoutOptimization(pairConstruction, new KeyValuePair<int, BenchmarkPerson>(i, people[i]));
+    }
+
+    [GlobalSetup(Target = nameof(ChangeEveryValueMemberInitializedWithDirectSubscriptionAllowed))]
+    public void SetupFastPathMemberInitializations()
+    {
+        SetupPeople();
+        expressionObserver = new ExpressionObserver();
+        fastPathMemberInitializations = new IObservableExpression<KeyValuePair<int, BenchmarkPerson>, BenchmarkBox>[elementCount];
+        for (var i = 0; i < elementCount; ++i)
+            fastPathMemberInitializations[i] = expressionObserver.ObserveWithoutOptimization(pairMemberInitialization, new KeyValuePair<int, BenchmarkPerson>(i, people[i]));
+    }
+
     [GlobalSetup(Target = nameof(ChangeEveryValueProjectedWithDirectSubscriptionAllowed))]
     public void SetupFastPathProjections()
     {
@@ -172,6 +257,15 @@ public class ObservationShapeBenchmarks
         fastPathProjections = new IObservableExpression<KeyValuePair<int, BenchmarkPerson>, KeyValuePair<int, int>>[elementCount];
         for (var i = 0; i < elementCount; ++i)
             fastPathProjections[i] = expressionObserver.ObserveWithoutOptimization(pairProjection, new KeyValuePair<int, BenchmarkPerson>(i, people[i]));
+    }
+
+    [GlobalSetup(Target = nameof(ChangeEveryValueMemberInitialized))]
+    public void SetupMemberInitializations()
+    {
+        SetupObserver();
+        memberInitializations = new IObservableExpression<KeyValuePair<int, BenchmarkPerson>, BenchmarkBox>[elementCount];
+        for (var i = 0; i < elementCount; ++i)
+            memberInitializations[i] = expressionObserver.ObserveWithoutOptimization(pairMemberInitialization, new KeyValuePair<int, BenchmarkPerson>(i, people[i]));
     }
 
     [GlobalSetup(Target = nameof(ChangeEveryValueMemberRead))]
