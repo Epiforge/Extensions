@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Expressions.Observable;
+﻿namespace Epiforge.Extensions.Expressions.Observable;
 
 class ObservableBinaryExpression(ExpressionObserver observer, BinaryExpression binaryExpression, bool deferEvaluation) :
     ObservableExpression(observer, binaryExpression, deferEvaluation),
@@ -137,5 +137,5 @@ class ObservableBinaryExpression(ExpressionObserver observer, BinaryExpression b
     }
 
     void IObservableExpressionDependent.OnDependencyEvaluationChanged(ObservableExpression dependency) =>
-        Evaluate();
+        EvaluateOnce();
 }

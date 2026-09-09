@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Expressions.Observable;
+﻿namespace Epiforge.Extensions.Expressions.Observable;
 
 sealed class ObservableInvocationExpression(ExpressionObserver observer, InvocationExpression invocationExpression, bool deferEvaluation) :
     ObservableExpression(observer, invocationExpression, deferEvaluation),
@@ -111,7 +111,7 @@ sealed class ObservableInvocationExpression(ExpressionObserver observer, Invocat
     void IObservableExpressionDependent.OnDependencyEvaluationChanged(ObservableExpression dependency)
     {
         if (ReferenceEquals(dependency, observableExpression))
-            Evaluate();
+            EvaluateOnce();
         else if (ReferenceEquals(dependency, observableDelegateExpression))
             OnObservableDelegateExpressionEvaluationChanged();
         else

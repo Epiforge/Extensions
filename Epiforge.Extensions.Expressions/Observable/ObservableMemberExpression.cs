@@ -101,7 +101,7 @@ sealed class ObservableMemberExpression(ExpressionObserver observer, MemberExpre
         getMethod is not null && observer.IsMethodReturnValueDisposed(getMethod);
 
     void IObservableExpressionDependent.OnDependencyEvaluationChanged(ObservableExpression dependency) =>
-        Evaluate();
+        EvaluateOnce();
 
     void ObservableExpressionValuePropertyChanged(object? sender, EventArgs eventArgs)
     {

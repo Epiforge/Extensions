@@ -96,7 +96,7 @@ sealed class ObservableIndexExpression(ExpressionObserver observer, IndexExpress
         getMethod is not null && observer.IsMethodReturnValueDisposed(getMethod);
 
     void IObservableExpressionDependent.OnDependencyEvaluationChanged(ObservableExpression dependency) =>
-        Evaluate();
+        EvaluateOnce();
 
     [SuppressMessage("Code Analysis", "CA1502: Avoid excessive complexity")]
     void ObjectValueCollectionChanged(object? sender, EventArgs eventArgs)

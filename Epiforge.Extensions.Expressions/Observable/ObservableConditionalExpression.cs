@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Expressions.Observable;
+﻿namespace Epiforge.Extensions.Expressions.Observable;
 
 sealed class ObservableConditionalExpression(ExpressionObserver observer, ConditionalExpression conditionalExpression, bool deferEvaluation) :
     ObservableExpression(observer, conditionalExpression, deferEvaluation),
@@ -105,5 +105,5 @@ sealed class ObservableConditionalExpression(ExpressionObserver observer, Condit
     }
 
     void IObservableExpressionDependent.OnDependencyEvaluationChanged(ObservableExpression dependency) =>
-        Evaluate();
+        EvaluateOnce();
 }

@@ -78,6 +78,7 @@ abstract class ObservableExpression :
 
     protected readonly object? defaultResult;
     int deferringEvaluation;
+    int evaluating;
     Expression? expression;
 #if IS_NET_9_0_OR_GREATER
     readonly Lock dependentsAccess = new();
@@ -133,7 +134,19 @@ abstract class ObservableExpression :
     void DisposeIfNecessaryAndPossible(object? value)
     {
         if (GetShouldValueBeDisposed())
-            observer.DisposeIfPossible(value);
+        {
+            if (!observer.PreferAsyncDisposal && value is IDisposable preferredDisposable)
+                preferredDisposable.Dispose();
+            else if (value is IAsyncDisposable asyncDisposable)
+            {
+                if (observer.BlockOnAsyncDisposal)
+                    asyncDisposable.DisposeAsync().AsTask().Wait();
+                else
+                    Task.Run(async () => await asyncDisposable.DisposeAsync().ConfigureAwait(false));
+            }
+            else if (value is IDisposable disposable)
+                disposable.Dispose();
+        }
     }
 
     protected void DisposeValueIfNecessaryAndPossible() =>
@@ -146,13 +159,34 @@ abstract class ObservableExpression :
     internal void EvaluateIfDeferred()
     {
         if (Volatile.Read(ref deferringEvaluation) != 0 && Interlocked.Exchange(ref deferringEvaluation, 0) != 0)
-            Evaluate();
+            EvaluateOnce();
     }
 
     protected void EvaluateIfNotDeferred()
     {
         if (Volatile.Read(ref deferringEvaluation) == 0)
+            EvaluateOnce();
+    }
+
+    /// <summary>
+    /// Evaluates unless this observation is already evaluating, which is what a dependency announcing to it does while it is reading that very dependency
+    /// </summary>
+    /// <remarks>
+    /// Reading a deferred observation's evaluation both resolves it and announces that its value changed, and the thing which read it is often a dependent part way through its own evaluation, on the line which reads it. Left alone, that announcement re-enters the dependent's evaluation, which completes against the now resolved dependency, after which the outer evaluation carries on and does the same work a second time. Both produce the same value, which is why nothing has reported it, and for a node producing something the observer disposes of it makes and discards one more of them than the expression requires.
+    /// An evaluation in progress has not yet finished reading what it depends on, so it will read what the announcement was telling it. That is what makes this safe rather than a dropped notification, and it is also the limit of it: a node which reads one dependency into a local and then reads another whose resolution changes the first would compute against the local it took. No node here does that in a way which can be reached, every dependency being read through the evaluation property rather than held across the reading of another, but that is an argument from the shape of ten evaluations rather than a guarantee, and the differential fuzz is what stands behind it.
+    /// </remarks>
+    private protected void EvaluateOnce()
+    {
+        if (Interlocked.CompareExchange(ref evaluating, 1, 0) != 0)
+            return;
+        try
+        {
             Evaluate();
+        }
+        finally
+        {
+            Volatile.Write(ref evaluating, 0);
+        }
     }
 
     protected virtual bool GetShouldValueBeDisposed() =>

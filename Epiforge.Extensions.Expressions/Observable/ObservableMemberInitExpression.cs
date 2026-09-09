@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Expressions.Observable;
+﻿namespace Epiforge.Extensions.Expressions.Observable;
 
 sealed class ObservableMemberInitExpression(ExpressionObserver observer, MemberInitExpression memberInitExpression, bool deferEvaluation) :
     ObservableExpression(observer, memberInitExpression, deferEvaluation),
@@ -93,7 +93,7 @@ sealed class ObservableMemberInitExpression(ExpressionObserver observer, MemberI
     }
 
     void IObservableExpressionDependent.OnDependencyEvaluationChanged(ObservableExpression dependency) =>
-        Evaluate();
+        EvaluateOnce();
 
     protected override void OnInitialization()
     {

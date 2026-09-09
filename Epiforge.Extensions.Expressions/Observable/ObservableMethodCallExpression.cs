@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Expressions.Observable;
+﻿namespace Epiforge.Extensions.Expressions.Observable;
 
 sealed class ObservableMethodCallExpression(ExpressionObserver observer, MethodCallExpression methodCallExpression, bool deferEvaluation) :
     ObservableExpression(observer, methodCallExpression, deferEvaluation),
@@ -125,5 +125,5 @@ sealed class ObservableMethodCallExpression(ExpressionObserver observer, MethodC
     }
 
     void IObservableExpressionDependent.OnDependencyEvaluationChanged(ObservableExpression dependency) =>
-        Evaluate();
+        EvaluateOnce();
 }

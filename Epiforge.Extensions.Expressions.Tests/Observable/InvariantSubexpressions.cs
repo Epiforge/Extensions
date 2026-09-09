@@ -195,13 +195,13 @@ public class InvariantSubexpressions
     }
 
     /// <summary>
-    /// Records that the graph makes a deferred call twice the first time a branch reaches it, when what the call is reached through was deferred along with it
+    /// A deferred call reached through something deferred along with it, which the graph once made twice the first time a branch reached it and now makes once
     /// </summary>
     /// <remarks>
-    /// The call's evaluation begins by reading the evaluation of the object it is made on, and reading a deferred node's evaluation both resolves that node and announces that its value changed. The announcement reaches this same call, which is a dependent of that object, and re-enters the call's evaluation; the inner evaluation completes against the now resolved object, and the outer one, still on its first line, then does the same work again. The value which results is correct and the call has been made twice, which for a call producing a value that must be disposed of means one more of them made and discarded than the shape requires. It cannot happen where the call is not deferred, because there the object is resolved while the call is being constructed and reading it announces nothing. This is written down so that it is not found a third time; closing it means keeping a node from re-entering its own evaluation, which is the graph's to do and not the analyzer's
+    /// The call's evaluation begins by reading the evaluation of the object it is made on, and reading a deferred node's evaluation both resolves that node and announces that its value changed. The announcement reaches this same call, which is a dependent of that object, and used to re-enter the call's evaluation; the inner evaluation completed against the now resolved object and the outer one, still on its first line, then did the same work again. Both produced the same value, which is why nothing reported it, and one query was made and discarded for nothing. An evaluation in progress now declines to be re-entered, having not yet read what it depends on and being about to read exactly what the announcement was telling it
     /// </remarks>
     [TestMethod]
-    public void TheGraphMakesADeferredCallTwiceWhenWhatItIsReachedThroughIsAlsoDeferred()
+    public void TheGraphMakesADeferredCallOnceWhenWhatItIsReachedThroughIsAlsoDeferred()
     {
         var log = new SubscriptionLog();
         var subject = new Recorded(log) { Rank = 5, Score = 0 };
@@ -211,10 +211,10 @@ public class InvariantSubexpressions
         {
             subject.Score = 1;
             Assert.AreEqual(5, expression.Evaluation.Result);
-            Assert.AreEqual(2, source.Opened, "the graph no longer makes a deferred call twice, so this row has been fixed and should say so");
-            Assert.AreEqual(1, source.Closed, "the query the repeated call replaced was not disposed of when it was replaced");
+            Assert.AreEqual(1, source.Opened, "the graph made a deferred call more than once the first time a branch reached it");
+            Assert.AreEqual(0, source.Closed, "a query was disposed of while the observation was still using it");
         }
-        Assert.AreEqual(2, source.Closed);
+        Assert.AreEqual(1, source.Closed);
         Assert.AreEqual(0, log.Outstanding);
     }
 
