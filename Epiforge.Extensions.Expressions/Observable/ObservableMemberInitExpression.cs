@@ -4,7 +4,7 @@ sealed class ObservableMemberInitExpression(ExpressionObserver observer, MemberI
     ObservableExpression(observer, memberInitExpression, deferEvaluation),
     IObservableExpressionDependent
 {
-    IReadOnlyDictionary<ObservableExpression, (MemberInfo Member, ObservableExpressionSubscription? Subscription)>? memberAssignmentObservableExpressions;
+    (ObservableExpression Expression, MemberInfo Member, ObservableExpressionSubscription? Subscription)[]? memberAssignments;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     ObservableNewExpression? newObservableExpression;
     ObservableExpressionSubscription? newObservableExpressionSubscription;
@@ -23,12 +23,13 @@ sealed class ObservableMemberInitExpression(ExpressionObserver observer, MemberI
                     newObservableExpression.UnsubscribeDependent(newObservableExpressionDependency);
                 newObservableExpression.Dispose();
             }
-            if (memberAssignmentObservableExpressions is not null)
-                foreach (var kv in memberAssignmentObservableExpressions)
+            if (memberAssignments is { } disposingMemberAssignments)
+                for (int i = 0, ii = disposingMemberAssignments.Length; i < ii; ++i)
                 {
-                    if (kv.Value.Subscription is { } memberAssignmentDependency)
-                        kv.Key.UnsubscribeDependent(memberAssignmentDependency);
-                    kv.Key.Dispose();
+                    var memberAssignment = disposingMemberAssignments[i];
+                    if (memberAssignment.Subscription is { } memberAssignmentDependency)
+                        memberAssignment.Expression.UnsubscribeDependent(memberAssignmentDependency);
+                    memberAssignment.Expression.Dispose();
                 }
             RemovedFromCache();
         }
@@ -53,13 +54,14 @@ sealed class ObservableMemberInitExpression(ExpressionObserver observer, MemberI
             else
             {
                 var value = newObservableExpression?.Construct();
-                if (memberAssignmentObservableExpressions is not null)
-                    foreach (var kv in memberAssignmentObservableExpressions)
+                if (memberAssignments is { } evaluatingMemberAssignments)
+                    for (int i = 0, ii = evaluatingMemberAssignments.Length; i < ii; ++i)
                     {
-                        if (kv.Value.Member is FieldInfo field)
-                            field.SetValue(value, kv.Key.Evaluation.Result);
-                        else if (kv.Value.Member is PropertyInfo property)
-                            property.FastSetValue(value, kv.Key.Evaluation.Result);
+                        var memberAssignment = evaluatingMemberAssignments[i];
+                        if (memberAssignment.Member is FieldInfo field)
+                            field.SetValue(value, memberAssignment.Expression.Evaluation.Result);
+                        else if (memberAssignment.Member is PropertyInfo property)
+                            property.FastSetValue(value, memberAssignment.Expression.Evaluation.Result);
                         else
                             throw new NotSupportedException("Cannot handle member that is not a field or property");
                     }
@@ -78,14 +80,14 @@ sealed class ObservableMemberInitExpression(ExpressionObserver observer, MemberI
         newObservableExpression?.ShouldConstructedValueBeDisposed ?? false;
 
     /// <summary>
-    /// Yields the fault of the first member assignment which has one, written as a loop here rather than through the shared helper because these expressions are the keys of a dictionary rather than a list
+    /// Yields the fault of the first member assignment which has one, written as a loop here rather than through the shared helper because these are triples rather than observations alone
     /// </summary>
     Exception? FirstMemberAssignmentFault()
     {
-        if (memberAssignmentObservableExpressions is null)
+        if (memberAssignments is not { } faultingMemberAssignments)
             return null;
-        foreach (var memberAssignmentObservableExpression in memberAssignmentObservableExpressions.Keys)
-            if (memberAssignmentObservableExpression.Evaluation.Fault is { } fault)
+        for (int i = 0, ii = faultingMemberAssignments.Length; i < ii; ++i)
+            if (faultingMemberAssignments[i].Expression.Evaluation.Fault is { } fault)
                 return fault;
         return null;
     }
@@ -97,7 +99,7 @@ sealed class ObservableMemberInitExpression(ExpressionObserver observer, MemberI
     {
         if (MemberInitExpression.NewExpression.Type.IsValueType)
             throw new NotSupportedException("Member initialization expressions of value types are not supported");
-        var memberAssignmentObservableExpressions = new Dictionary<ObservableExpression, (MemberInfo Member, ObservableExpressionSubscription? Subscription)>(ObservableExpressionEqualityComparer.Default);
+        var memberAssignments = new List<(ObservableExpression Expression, MemberInfo Member, ObservableExpressionSubscription? Subscription)>();
         try
         {
             newObservableExpression = (ObservableNewExpression)observer.GetObservableExpression(MemberInitExpression.NewExpression, IsDeferringEvaluation);
@@ -110,12 +112,12 @@ sealed class ObservableMemberInitExpression(ExpressionObserver observer, MemberI
                 if (binding is MemberAssignment memberAssignmentBinding)
                 {
                     var memberAssignmentObservableExpression = observer.GetObservableExpression(memberAssignmentBinding.Expression, IsDeferringEvaluation);
-                    memberAssignmentObservableExpressions.Add(memberAssignmentObservableExpression, (memberAssignmentBinding.Member, memberAssignmentObservableExpression.CanChange ? memberAssignmentObservableExpression.SubscribeDependent(this) : null));
+                    memberAssignments.Add((memberAssignmentObservableExpression, memberAssignmentBinding.Member, memberAssignmentObservableExpression.CanChange ? memberAssignmentObservableExpression.SubscribeDependent(this) : null));
                 }
                 else
                     throw new NotSupportedException("Only member assignment bindings are supported in member init expressions");
             }
-            this.memberAssignmentObservableExpressions = memberAssignmentObservableExpressions;
+            this.memberAssignments = memberAssignments.ToArray();
             EvaluateIfNotDeferred();
         }
         catch (Exception ex)
@@ -126,11 +128,12 @@ sealed class ObservableMemberInitExpression(ExpressionObserver observer, MemberI
                     newObservableExpression.UnsubscribeDependent(newObservableExpressionDependency);
                 newObservableExpression.Dispose();
             }
-            foreach (var kv in memberAssignmentObservableExpressions)
+            for (int i = 0, ii = memberAssignments.Count; i < ii; ++i)
             {
-                if (kv.Value.Subscription is { } memberAssignmentDependency)
-                    kv.Key.UnsubscribeDependent(memberAssignmentDependency);
-                kv.Key.Dispose();
+                var memberAssignment = memberAssignments[i];
+                if (memberAssignment.Subscription is { } memberAssignmentDependency)
+                    memberAssignment.Expression.UnsubscribeDependent(memberAssignmentDependency);
+                memberAssignment.Expression.Dispose();
             }
             ExceptionDispatchInfo.Capture(ex).Throw();
         }

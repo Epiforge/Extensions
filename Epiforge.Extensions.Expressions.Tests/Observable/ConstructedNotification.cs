@@ -6,6 +6,7 @@ public class ConstructedNotification
     public sealed class Box
     {
         public int First;
+        public int Second;
         public int[]? Values;
 
         public Box()
@@ -28,10 +29,10 @@ public class ConstructedNotification
         }
 
         public override bool Equals(object? obj) =>
-            obj is Box other && First == other.First && SameValues(Values, other.Values);
+            obj is Box other && First == other.First && Second == other.Second && SameValues(Values, other.Values);
 
         public override int GetHashCode() =>
-            HashCode.Combine(First, Values is null ? -1 : Values.Length);
+            HashCode.Combine(First, Second, Values is null ? -1 : Values.Length);
     }
 
     public sealed class Counted :
@@ -79,6 +80,30 @@ public class ConstructedNotification
     [DataRow(true)]
     public void AnArrayInitializerBoundIntoAMemberInitializer(bool useDirectSubscription) =>
         Assert.AreEqual(1, AnnouncementsForOneChange(useDirectSubscription, s => new Box { Values = new[] { s.Rank } }));
+
+    /// <summary>
+    /// Two bindings whose expressions are equal, which the observer resolves to one cached node
+    /// </summary>
+    /// <remarks>
+    /// Written before any change to how the bindings are held, because whether this throws today decides whether replacing that structure is a correction or only a saving
+    /// </remarks>
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void TwoBindingsReadingTheSameThing(bool useDirectSubscription)
+    {
+        var subject = new Counted { Rank = 3 };
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
+        using var expression = observer.Observe(s => new Box { First = s.Rank, Second = s.Rank }, subject);
+        Assert.IsNull(expression.Evaluation.Fault);
+        var result = (Box)expression.Evaluation.Result!;
+        Assert.AreEqual(3, result.First);
+        Assert.AreEqual(3, result.Second);
+        subject.Rank = 4;
+        var changed = (Box)expression.Evaluation.Result!;
+        Assert.AreEqual(4, changed.First);
+        Assert.AreEqual(4, changed.Second);
+    }
 
     /// <summary>
     /// Counts what an observation announces when an argument it reads changes exactly once
