@@ -225,6 +225,50 @@ static class QueryFootprintReport
         return new(allocated, retained, afterDispose);
     }
 
+    /// <summary>
+    /// Measures what a live grouped view retains in this library, sixteen ways over the collection
+    /// </summary>
+    /// <remarks>
+    /// Grouping was never measured for retention, only filtering, and the two are not the same shape in either library: a grouping here is a collection per group, and DynamicData's is a keyed cache per group. The question this answers is how much headroom there is before an index kept per occurrence — which would cost roughly a treap node and a dictionary entry per element — would put this library behind
+    /// </remarks>
+    static ComparisonReading MeasureExpressionsGrouping(int elementCount)
+    {
+        var observer = new CollectionObserver();
+        var source = BenchmarkPerson.CreateCollection(elementCount);
+        var baseline = Settle();
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var sourceQuery = observer.ObserveReadOnlyList(source);
+        var groupBy = sourceQuery.ObserveGroupBy(person => person.Rank % 16);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+        var retained = Settle() - baseline;
+        groupBy.Dispose();
+        sourceQuery.Dispose();
+        groupBy = null;
+        sourceQuery = null;
+        observer = null;
+        var afterDispose = Settle() - baseline;
+        GC.KeepAlive(source);
+        return new(allocated, retained, afterDispose);
+    }
+
+    static ComparisonReading MeasureDynamicDataCacheGrouping(int elementCount)
+    {
+        var source = BenchmarkPerson.CreateCollection(elementCount);
+        var cache = new SourceCache<BenchmarkPerson, string>(person => person.Name);
+        cache.AddOrUpdate(source);
+        var baseline = Settle();
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var groups = cache.Connect().AutoRefresh(person => person.Rank).Group(person => person.Rank % 16).AsObservableCache();
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+        var retained = Settle() - baseline;
+        groups.Dispose();
+        groups = null;
+        var afterDispose = Settle() - baseline;
+        GC.KeepAlive(source);
+        GC.KeepAlive(cache);
+        return new(allocated, retained, afterDispose);
+    }
+
     static ComparisonReading MeasureDynamicDataCacheItself(int elementCount)
     {
         var source = BenchmarkPerson.CreateCollection(elementCount);
@@ -303,6 +347,8 @@ static class QueryFootprintReport
         report.AppendLine();
         report.AppendLine("Every row is the same predicate over the same collection. `Retained` is what the standing view occupies once settled, above whatever the caller holds anyway: the collection for this library and for DynamicData's list, the collection and the cache for DynamicData's cache. **What the cache itself retains is its own row**, because a caller who has an `ObservableCollection<T>` and adopts DynamicData pays for that as well as for the view.");
         report.AppendLine();
+        report.AppendLine("**The last two rows group rather than filter**, sixteen ways, because grouping had never been measured for retention and the two operators are not the same shape in either library — a grouping here is a collection per group and DynamicData's is a keyed cache per group.");
+        report.AppendLine();
         report.AppendLine("**Read the `Retained` column and disregard `After dispose` on any row whose work happens inline.** A method which builds an object graph, drops it, and then measures from that same frame reads its own dead locals as live: the source-level variable is null and the reference the JIT spilled elsewhere in the frame is not. `The collection alone, then released` demonstrates this with no library involved at all — it creates a collection, drops it, and still reads 96 B per element — so a residue on any inline row is the harness's and says nothing about what that row built.");
         report.AppendLine();
         report.AppendLine("**The `five cycles` rows are the ones which measure release, because their cycle bodies are separate methods which have returned before anything is measured.** Each builds and drops the whole arrangement five times under one baseline. Compare each against its own `five cycles` counterpart and never against an inline row; a figure which grows with the number of cycles is memory lost on every query a process builds. `five cycles then one over ten elements` ends on a tiny graph, so a residue which is really the most recently built graph would collapse there.");
@@ -324,7 +370,9 @@ static class QueryFootprintReport
                 ("DynamicData list, five build-and-drop cycles", MeasureDynamicDataListFilterOverFiveCycles),
                 ("DynamicData cache, the cache alone", MeasureDynamicDataCacheItself),
                 ("DynamicData cache, the view over it", MeasureDynamicDataCacheFilter),
-                ("DynamicData list, the view over the collection", MeasureDynamicDataListFilter)
+                ("DynamicData list, the view over the collection", MeasureDynamicDataListFilter),
+                ("Expressions, a grouped view", MeasureExpressionsGrouping),
+                ("DynamicData cache, a grouped view over it", MeasureDynamicDataCacheGrouping)
             })
             {
                 var reading = measure(elementCount);
