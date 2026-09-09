@@ -22,7 +22,7 @@ sealed class ObservableCollectionGroupByQuery<TKey, TElement> :
 
     readonly object access;
     IReadOnlyList<IObservableGrouping<TKey, TElement>>? enumerationSnapshot;
-    readonly NullableKeyDictionary<TKey, (ObservableRangeCollection<TElement> collection, IObservableGrouping<TKey, TElement> grouping)> collectionAndGroupingByKey;
+    readonly NullableKeyDictionary<TKey, (ObservableRangeCollection<TElement> collection, IObservableGrouping<TKey, TElement> grouping, GroupingElementPositions<TElement> positions)> collectionAndGroupingByKey;
     readonly ObservableRangeCollection<IObservableGrouping<TKey, TElement>> groupings;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     IObservableCollectionQuery<Tuple<TElement, TKey>>? select;
@@ -57,13 +57,14 @@ sealed class ObservableCollectionGroupByQuery<TKey, TElement> :
             collection = collectionObserver.ExpressionObserver.Logger is { } logger ? new(logger) : new();
             var grouping = new ObservableGrouping<TKey, TElement>(collectionObserver, key, collectionObserver.GetObservableCollectionQuery(collection));
             grouping.Initialize();
-            collectionAndGrouping = (collection, grouping);
+            collectionAndGrouping = (collection, grouping, new());
             collectionAndGroupingByKey.Add(key, collectionAndGrouping);
             groupings.Add(grouping);
         }
         else
             collection = collectionAndGrouping.collection;
         collection.Add(element);
+        collectionAndGrouping.positions.Append(element);
     }
 
     protected override bool Dispose(bool disposing)
@@ -74,7 +75,7 @@ sealed class ObservableCollectionGroupByQuery<TKey, TElement> :
             if (removedFromCache)
                 lock (access)
                 {
-                    foreach (var (_, grouping) in collectionAndGroupingByKey.Values)
+                    foreach (var (_, grouping, _) in collectionAndGroupingByKey.Values)
                         ((ObservableGrouping<TKey, TElement>)grouping).InternalDispose();
                     if (groupings is not null)
                         groupings.CollectionChanged -= GroupingsCollectionChanged;
@@ -119,7 +120,9 @@ sealed class ObservableCollectionGroupByQuery<TKey, TElement> :
         if (collectionAndGroupingByKey.TryGetValue(key, out var collectionAndGrouping))
         {
             var collection = collectionAndGrouping.collection;
-            collection.Remove(element);
+            if (!collectionAndGrouping.positions.TryTakeFirstPosition(element, out var index))
+                return;
+            collection.RemoveAt(index);
             if (collection.Count == 0)
             {
                 collectionAndGroupingByKey.Remove(key);
@@ -145,7 +148,10 @@ sealed class ObservableCollectionGroupByQuery<TKey, TElement> :
                         elementsByKey.Add(key, [element]);
                 foreach (var (key, collectionAndGrouping) in collectionAndGroupingByKey.ToList())
                     if (elementsByKey.TryGetValue(key, out var retained))
+                    {
                         collectionAndGrouping.collection.Reset(retained);
+                        collectionAndGrouping.positions.Reset(retained);
+                    }
                     else
                     {
                         collectionAndGroupingByKey.Remove(key);
