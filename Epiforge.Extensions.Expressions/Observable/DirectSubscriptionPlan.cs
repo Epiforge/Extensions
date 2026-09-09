@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Expressions.Observable;
+﻿namespace Epiforge.Extensions.Expressions.Observable;
 
 /// <summary>
 /// Represents the analysis of an expression together with the subscriptions an observation of it would make directly, in the order the graph would make them
@@ -8,17 +8,25 @@ namespace Epiforge.Extensions.Expressions.Observable;
 /// </remarks>
 public readonly record struct DirectSubscriptionPlan
 {
-    internal DirectSubscriptionPlan(DirectSubscriptionAnalysis analysis, IReadOnlyList<DirectSubscription>? subscriptions, IReadOnlyList<Expression>? deferredGroups, IReadOnlyList<Expression>? links)
+    internal DirectSubscriptionPlan(DirectSubscriptionAnalysis analysis, IReadOnlyList<DirectSubscription>? subscriptions, IReadOnlyList<Expression>? deferredGroups, IReadOnlyList<Expression>? links, IReadOnlyList<(Expression Expression, bool Disposed)>? held)
     {
         Analysis = analysis;
         this.deferredGroups = deferredGroups;
+        this.held = held;
         this.links = links;
         this.subscriptions = subscriptions;
     }
 
     readonly IReadOnlyList<Expression>? deferredGroups;
+    readonly IReadOnlyList<(Expression Expression, bool Disposed)>? held;
     readonly IReadOnlyList<Expression>? links;
     readonly IReadOnlyList<DirectSubscription>? subscriptions;
+
+    /// <summary>
+    /// Gets the subexpressions the observation resolves once and then holds, each paired with whether the observer disposes of what it produced
+    /// </summary>
+    internal IReadOnlyList<(Expression Expression, bool Disposed)> Held =>
+        held ?? [];
 
     /// <summary>
     /// Gets whether the expression can be observed by subscribing directly to its change sources, and when it cannot, which part of it is responsible

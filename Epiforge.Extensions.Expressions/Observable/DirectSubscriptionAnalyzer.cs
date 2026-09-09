@@ -67,6 +67,7 @@ public sealed class DirectSubscriptionAnalyzer
         readonly List<int> parents = [];
 
         internal readonly List<Expression> DeferredGroups = [];
+        internal readonly List<(Expression Expression, bool Disposed)> Held = [];
         internal readonly List<Expression> Links = [];
         internal readonly List<DirectSubscription> Subscriptions = [];
 
@@ -76,6 +77,17 @@ public sealed class DirectSubscriptionAnalyzer
         {
             owners.Add(owner);
             Subscriptions.Add(subscription);
+        }
+
+        /// <summary>
+        /// Records a subexpression the observation is to resolve once and then hold, sameness being expression equality rather than node identity so that a formula reading one thing twice holds it once, as the graph's cache of nodes does
+        /// </summary>
+        internal void AddHeld(Expression expression, bool disposed)
+        {
+            for (int i = 0, ii = Held.Count; i < ii; ++i)
+                if (ExpressionEqualityComparer.Default.Equals(Held[i].Expression, expression))
+                    return;
+            Held.Add((expression, disposed));
         }
 
         internal void AddLinked(Expression owner, Expression target, string propertyName)
@@ -235,6 +247,28 @@ public sealed class DirectSubscriptionAnalyzer
             UnaryExpression unaryExpression when unaryExpression.NodeType is ExpressionType.Quote => true,
             _ => false
         };
+
+    /// <summary>
+    /// Determines whether the value of an expression is one the graph produces once and then holds for the life of an observation
+    /// </summary>
+    /// <remarks>
+    /// The graph gives every subexpression a node holding its last evaluation and re-evaluates that node only when something it depends on announces. A call whose object and arguments cannot change is therefore made exactly once, however many times the observation is re-evaluated, and its value is disposed of exactly once. Such a call is not fixed, because it cannot be resolved without invoking something, but it is a value the fast path may hold rather than recompute, and holding it is what lets the two mechanisms agree about how many of those values are made
+    /// </remarks>
+    bool IsInvariant(Expression expression) =>
+        IsFixed(expression) || expression switch
+        {
+            MethodCallExpression methodCallExpression => (methodCallExpression.Object is not { } target || IsInvariant(target)) && AreInvariant(methodCallExpression.Arguments),
+            UnaryExpression unaryExpression when unaryExpression.Method is null && unaryExpression.NodeType is ExpressionType.Convert or ExpressionType.ConvertChecked => IsInvariant(unaryExpression.Operand),
+            _ => false
+        };
+
+    bool AreInvariant(ReadOnlyCollection<Expression> expressions)
+    {
+        for (int i = 0, ii = expressions.Count; i < ii; ++i)
+            if (!IsInvariant(expressions[i]))
+                return false;
+        return true;
+    }
 
     static bool CannotNotify(Type type) =>
         type.IsSealed && !typeof(INotifyPropertyChanged).IsAssignableFrom(type) && !typeof(INotifyCollectionChanged).IsAssignableFrom(type) && !typeof(INotifyDictionaryChanged).IsAssignableFrom(type);
@@ -416,10 +450,17 @@ public sealed class DirectSubscriptionAnalyzer
     /// <remarks>
     /// A method is refused when the graph would dispose of what it returned, which is the same question asked of a property read: what only the graph does, only the graph may be asked to do. Both terms are needed. A return type sealed and implementing neither disposal interface can never be disposed by anyone, whatever the options say, and a return type which could be disposed is only ever disposed of when the observer has been told to dispose of that method's return values, whether by registration or by <c>DisposeWhenDiscardedAttribute</c> on the return parameter. Note that the observer disposes of every static method's return value unless told otherwise, so a static method returning an unsealed type stays refused under the default options
     /// </remarks>
+    /// <remarks>
+    /// A call whose value is disposed of is admitted when nothing it reads can change, because the observation then holds what the call produced instead of making it again, which is what the graph's node for that call does, and disposes of that one value when it is discarded. What stays refused is a call whose value is disposed of and whose operands can change, since matching the graph there means disposing of each value as the next replaces it, which holding alone does not do
+    /// </remarks>
     DirectSubscriptionAnalysis AnalyzeMethodCall(MethodCallExpression methodCallExpression, Planner? planner)
     {
         if (!ExpressionObserverOptions.CannotBeDisposed(methodCallExpression.Method.ReturnType) && isMethodReturnValueDisposed(methodCallExpression.Method))
-            return new(methodCallExpression, DirectSubscriptionIneligibility.ValueRequiresDisposal);
+        {
+            if (!IsInvariant(methodCallExpression))
+                return new(methodCallExpression, DirectSubscriptionIneligibility.ValueRequiresDisposal);
+            planner?.AddHeld(methodCallExpression, true);
+        }
         if (methodCallExpression.Object is { } target)
         {
             var targetAnalysis = AnalyzeNode(target, planner);
@@ -524,7 +565,7 @@ public sealed class DirectSubscriptionAnalyzer
         ArgumentNullException.ThrowIfNull(expression);
         var planner = new Planner();
         var analysis = Resolved(expression, planner);
-        return analysis.IsEligible ? new(analysis, planner.Subscriptions.ToArray(), planner.DeferredGroups.ToArray(), planner.Links.ToArray()) : new(analysis, null, null, null);
+        return analysis.IsEligible ? new(analysis, planner.Subscriptions.ToArray(), planner.DeferredGroups.ToArray(), planner.Links.ToArray(), planner.Held.ToArray()) : new(analysis, null, null, null, null);
     }
 
     DirectSubscriptionAnalysis Resolved(Expression expression, Planner planner)

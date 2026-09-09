@@ -7,11 +7,8 @@ public sealed class BenchmarkValueQuery :
     IDisposable,
     INotifyPropertyChanged
 {
-    internal BenchmarkValueQuery(BenchmarkPersonWithPartner person)
-    {
+    internal BenchmarkValueQuery(BenchmarkPersonWithPartner person) =>
         this.person = person;
-        person.PropertyChanged += PersonPropertyChanged;
-    }
 
     readonly BenchmarkPersonWithPartner person;
 
@@ -20,37 +17,30 @@ public sealed class BenchmarkValueQuery :
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    public void Dispose()
-    {
-        person.PropertyChanged -= PersonPropertyChanged;
+    public void Dispose() =>
         PropertyChanged = null;
-    }
-
-    void PersonPropertyChanged(object? sender, PropertyChangedEventArgs e) =>
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Value)));
 }
 
 /// <summary>
-/// The same object without disposal, sealed and implementing neither disposal interface, which is what makes the shape reading through it eligible today and therefore the ceiling the disposable one is measured against
+/// The same object without disposal, sealed and implementing neither disposal interface, which is what makes the shape reading through it eligible whatever the options say and therefore the ceiling the disposable one is measured against
 /// </summary>
+/// <remarks>
+/// Neither this nor its disposable twin subscribes to the person it reads. An earlier form of both did, and the plain one, having no disposal to detach in, left a handler on every person for every element of every invocation, which grew without bound across a run and inflated exactly the arms this instrument exists to compare. These arms construct and discard rather than mutate, so what is lost by not subscribing is nothing they measure
+/// </remarks>
 public sealed class BenchmarkPlainValue :
     INotifyPropertyChanged
 {
-    internal BenchmarkPlainValue(BenchmarkPersonWithPartner person)
-    {
+    internal BenchmarkPlainValue(BenchmarkPersonWithPartner person) =>
         this.person = person;
-        person.PropertyChanged += PersonPropertyChanged;
-    }
 
     readonly BenchmarkPersonWithPartner person;
 
     public object? Value =>
         person.Rank;
 
+#pragma warning disable CS0067 // The event is never used
     public event PropertyChangedEventHandler? PropertyChanged;
-
-    void PersonPropertyChanged(object? sender, PropertyChangedEventArgs e) =>
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Value)));
+#pragma warning restore CS0067
 }
 
 /// <summary>

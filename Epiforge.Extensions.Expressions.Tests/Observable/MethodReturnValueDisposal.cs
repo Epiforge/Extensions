@@ -43,17 +43,20 @@ public class MethodReturnValueDisposal
         Assert.AreEqual(0, log.Outstanding);
     }
 
+    /// <summary>
+    /// A call whose value is disposed of and whose argument can change, which neither mechanism may hold and which the fast path therefore still refuses
+    /// </summary>
     [TestMethod]
-    public void ACallWhoseReturnValueIsDisposedBuildsTheGraph()
+    public void ACallWhoseReturnValueIsDisposedAndWhoseArgumentCanChangeBuildsTheGraph()
     {
         var log = new SubscriptionLog();
         var subject = new Recorded(log) { Rank = 2 };
         var observer = ExpressionObserverHelpers.Create();
-        using (var expression = observer.Observe(s => s.Held().Rank, subject))
+        using (var expression = observer.Observe(s => s.HeldAt(s.Rank).Score, subject))
         {
-            Assert.AreNotEqual(0, observer.CachedObservableExpressions, "the analyzer admitted a call whose return value the observer disposes of");
-            Assert.AreEqual(2, expression.Evaluation.Result);
-            subject.Rank = 7;
+            Assert.AreNotEqual(0, observer.CachedObservableExpressions, "the analyzer admitted a call whose value is disposed of and whose argument can change");
+            Assert.AreEqual(0, expression.Evaluation.Result);
+            subject.Score = 7;
             Assert.AreEqual(7, expression.Evaluation.Result);
         }
         Assert.AreEqual(0, log.Outstanding);

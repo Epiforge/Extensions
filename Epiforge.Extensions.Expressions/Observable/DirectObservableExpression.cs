@@ -1,10 +1,38 @@
 ﻿namespace Epiforge.Extensions.Expressions.Observable;
 
+/// <summary>
+/// Marks a slot which no evaluation has resolved yet, which a value of <c>null</c> cannot be mistaken for
+/// </summary>
+sealed class DirectSlotUnresolved
+{
+}
+
+/// <summary>
+/// Holds the fault a slot's resolution threw, so that what is behind the slot is done once whether it returned or threw
+/// </summary>
+sealed class DirectSlotFault(Exception exception)
+{
+    internal readonly ExceptionDispatchInfo Info = ExceptionDispatchInfo.Capture(exception);
+}
+
 abstract class DirectObservableExpression(ExpressionObserver observer, Type type) :
     ObservableExpression(observer, type, false)
 {
     private protected static readonly bool[] noDeferredGroups = [];
+    private protected static readonly object?[] noHeld = [];
     private protected static readonly object?[] noLinks = [];
+
+    internal static readonly object Unresolved = new DirectSlotUnresolved();
+
+    /// <summary>
+    /// Yields what a slot holds, throwing again the fault its resolution threw where that is what it holds
+    /// </summary>
+    internal static object? Unwrap(object? slot)
+    {
+        if (slot is DirectSlotFault fault)
+            fault.Info.Throw();
+        return slot;
+    }
 
     internal static object? Resolve(Expression expression, object? argument) =>
         expression switch
@@ -127,12 +155,14 @@ class DirectObservableExpression<TArgument, TResult> :
     static readonly bool sharesBooleanBoxes = typeof(TResult) == typeof(bool);
     static readonly TResult trueResult = typeof(TResult) == typeof(bool) ? (TResult)(object)true : default!;
 
-    internal DirectObservableExpression(ExpressionObserver observer, Expression<Func<TArgument, TResult>> lambdaExpression, DirectSubscriptionSite[] sites, Func<TArgument, object?[], bool[], object?[], TResult> evaluate, TArgument argument, object?[] values) :
+    internal DirectObservableExpression(ExpressionObserver observer, Expression<Func<TArgument, TResult>> lambdaExpression, DirectSubscriptionSite[] sites, Func<TArgument, object?[], bool[], object?[], object?[], TResult> evaluate, TArgument argument, object?[] values, object?[] held, int[] disposedHeldSlots) :
         base(observer, lambdaExpression.Body.Type)
     {
         this.argument = argument;
         comparesBeforeBoxing = typeof(TResult).IsValueType && lambdaExpression.Body.Type == typeof(TResult);
+        this.disposedHeldSlots = disposedHeldSlots;
         this.evaluate = evaluate;
+        this.held = held;
         this.lambdaExpression = lambdaExpression;
         this.sites = sites;
         this.values = values;
@@ -140,10 +170,25 @@ class DirectObservableExpression<TArgument, TResult> :
 
     private protected readonly TArgument argument;
     readonly bool comparesBeforeBoxing;
-    private protected readonly Func<TArgument, object?[], bool[], object?[], TResult> evaluate;
+    readonly int[] disposedHeldSlots;
+    private protected readonly Func<TArgument, object?[], bool[], object?[], object?[], TResult> evaluate;
+    private protected readonly object?[] held;
     readonly Expression<Func<TArgument, TResult>> lambdaExpression;
     private protected readonly DirectSubscriptionSite[] sites;
     private protected readonly object?[] values;
+
+    /// <summary>
+    /// Disposes of what every held slot the observer disposes of resolved to, which is once each because a held value is resolved once and never replaced
+    /// </summary>
+    protected override bool DisposeCore()
+    {
+        if (!base.DisposeCore())
+            return false;
+        for (var i = 0; i < disposedHeldSlots.Length; ++i)
+            if (held[disposedHeldSlots[i]] is { } value && !ReferenceEquals(value, Unresolved) && value is not DirectSlotFault)
+                observer.DisposeIfPossible(value);
+        return true;
+    }
 
     private protected override Expression Materialize() =>
         ExpressionObserver.ReplaceParametersWithoutOptimization(lambdaExpression, argument)!;
@@ -155,7 +200,7 @@ class DirectObservableExpression<TArgument, TResult> :
     {
         try
         {
-            var value = evaluate(argument, values, noDeferredGroups, noLinks);
+            var value = evaluate(argument, values, noDeferredGroups, noLinks, held);
             if (!IsCurrentResult(value))
                 Evaluation = (null, Box(value));
             observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{Expression} evaluated directly: {Value}", Expression, value);
@@ -199,8 +244,8 @@ class DirectObservableExpression<TArgument, TResult> :
 class DeferringDirectObservableExpression<TArgument, TResult> :
     DirectObservableExpression<TArgument, TResult>
 {
-    internal DeferringDirectObservableExpression(ExpressionObserver observer, Expression<Func<TArgument, TResult>> lambdaExpression, DirectSubscriptionSite[] sites, Func<TArgument, object?[], bool[], object?[], TResult> evaluate, TArgument argument, object?[] values, bool[] reached) :
-        base(observer, lambdaExpression, sites, evaluate, argument, values) =>
+    internal DeferringDirectObservableExpression(ExpressionObserver observer, Expression<Func<TArgument, TResult>> lambdaExpression, DirectSubscriptionSite[] sites, Func<TArgument, object?[], bool[], object?[], object?[], TResult> evaluate, TArgument argument, object?[] values, object?[] held, int[] disposedHeldSlots, bool[] reached) :
+        base(observer, lambdaExpression, sites, evaluate, argument, values, held, disposedHeldSlots) =>
         this.reached = reached;
 
     long attachedGroups;
@@ -251,7 +296,7 @@ class DeferringDirectObservableExpression<TArgument, TResult> :
         {
             try
             {
-                var value = evaluate(argument, values, reached, Links);
+                var value = evaluate(argument, values, reached, Links, held);
                 var again = AttachNewlyReached();
                 if (!moved && AttachChangedLinks())
                     again = moved = true;
@@ -286,8 +331,8 @@ class DeferringDirectObservableExpression<TArgument, TResult> :
 sealed class LinkingDirectObservableExpression<TArgument, TResult> :
     DeferringDirectObservableExpression<TArgument, TResult>
 {
-    internal LinkingDirectObservableExpression(ExpressionObserver observer, Expression<Func<TArgument, TResult>> lambdaExpression, DirectSubscriptionSite[] sites, Func<TArgument, object?[], bool[], object?[], TResult> evaluate, TArgument argument, object?[] values, bool[] reached, object?[] links, int[] linkSites) :
-        base(observer, lambdaExpression, sites, evaluate, argument, values, reached)
+    internal LinkingDirectObservableExpression(ExpressionObserver observer, Expression<Func<TArgument, TResult>> lambdaExpression, DirectSubscriptionSite[] sites, Func<TArgument, object?[], bool[], object?[], object?[], TResult> evaluate, TArgument argument, object?[] values, object?[] held, int[] disposedHeldSlots, bool[] reached, object?[] links, int[] linkSites) :
+        base(observer, lambdaExpression, sites, evaluate, argument, values, held, disposedHeldSlots, reached)
     {
         attachedLinks = links.Length == 0 ? links : new object?[links.Length];
         linkAttachments = linkSites.Length == 0 ? [] : new DirectSubscriptionAttachment?[linkSites.Length];

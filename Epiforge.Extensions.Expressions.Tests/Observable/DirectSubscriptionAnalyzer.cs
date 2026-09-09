@@ -162,22 +162,44 @@ public class DirectSubscriptionAnalyzer
         Assert.IsTrue(analysis.IsEligible, analysis.ToString());
     }
 
+    /// <summary>
+    /// A call whose value is disposed of but whose operands cannot change is admitted, because the observation holds what it produced instead of making it again, which is what the graph's node for that call does
+    /// </summary>
     [TestMethod]
-    public void MethodCallReturningUnsealedTypeIsIneligibleWhenItsReturnValueIsAttributed()
+    public void MethodCallWhoseReturnValueIsAttributedIsEligibleWhenNothingItReadsCanChange()
     {
         var body = (MethodCallExpression)BodyOfRecorded<Recorded>(recorded => recorded.Held());
+        var analysis = Analyzer().Analyze(body);
+        Assert.IsTrue(analysis.IsEligible, analysis.ToString());
+    }
+
+    [TestMethod]
+    public void MethodCallWhoseReturnValueIsAttributedIsIneligibleWhenAnArgumentCanChange()
+    {
+        var body = (MethodCallExpression)BodyOfRecorded<Recorded>(recorded => recorded.HeldAt(recorded.Rank));
         var analysis = Analyzer().Analyze(body);
         Assert.IsFalse(analysis.IsEligible);
         Assert.AreEqual(DirectSubscriptionIneligibility.ValueRequiresDisposal, analysis.Ineligibility);
     }
 
     [TestMethod]
-    public void MethodCallReturningUnsealedTypeIsIneligibleWhenRegisteredForDisposal()
+    public void MethodCallRegisteredForDisposalIsEligibleWhenNothingItReadsCanChange()
     {
         var options = new ExpressionObserverOptions();
         Assert.IsTrue(options.AddMethodReturnValueDisposal(typeof(Recorded).GetMethod(nameof(Recorded.Self))!));
         var body = (MethodCallExpression)BodyOfRecorded<Recorded>(recorded => recorded.Self());
         var analysis = new Epiforge.Extensions.Expressions.Observable.DirectSubscriptionAnalyzer(options).Analyze(body);
+        Assert.IsTrue(analysis.IsEligible, analysis.ToString());
+    }
+
+    /// <summary>
+    /// A call reached through something which can change is not one either mechanism holds, whatever its arguments are
+    /// </summary>
+    [TestMethod]
+    public void MethodCallWhoseReturnValueIsAttributedIsIneligibleWhenItsTargetCanChange()
+    {
+        var body = (MethodCallExpression)BodyOfRecorded<Recorded>(recorded => recorded.Next!.Held());
+        var analysis = Analyzer().Analyze(body);
         Assert.IsFalse(analysis.IsEligible);
         Assert.AreEqual(DirectSubscriptionIneligibility.ValueRequiresDisposal, analysis.Ineligibility);
     }
@@ -273,6 +295,9 @@ public class DirectSubscriptionAnalyzer
         Assert.AreEqual(DirectSubscriptionIneligibility.ValueRequiresDisposal, analysis.Ineligibility);
     }
 
+    /// <summary>
+    /// The static method here reads the argument, so it is not a call either mechanism holds, and the blanket disposal of static return values therefore still refuses it
+    /// </summary>
     [TestMethod]
     public void StaticMethodReturningUnsealedTypeIsEligibleWhenStaticDisposalIsExcluded()
     {

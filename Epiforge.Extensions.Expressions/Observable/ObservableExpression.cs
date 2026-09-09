@@ -1,4 +1,4 @@
-namespace Epiforge.Extensions.Expressions.Observable;
+﻿namespace Epiforge.Extensions.Expressions.Observable;
 
 abstract class ObservableExpression :
     PlainSyncDisposable
@@ -133,19 +133,7 @@ abstract class ObservableExpression :
     void DisposeIfNecessaryAndPossible(object? value)
     {
         if (GetShouldValueBeDisposed())
-        {
-            if (!observer.PreferAsyncDisposal && value is IDisposable preferredDisposable)
-                preferredDisposable.Dispose();
-            else if (value is IAsyncDisposable asyncDisposable)
-            {
-                if (observer.BlockOnAsyncDisposal)
-                    asyncDisposable.DisposeAsync().AsTask().Wait();
-                else
-                    Task.Run(async () => await asyncDisposable.DisposeAsync().ConfigureAwait(false));
-            }
-            else if (value is IDisposable disposable)
-                disposable.Dispose();
-        }
+            observer.DisposeIfPossible(value);
     }
 
     protected void DisposeValueIfNecessaryAndPossible() =>

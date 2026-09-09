@@ -109,6 +109,13 @@ public class Recorded(SubscriptionLog log) :
     public Recorded Held() =>
         this;
 
+    /// <summary>
+    /// The same method taking an argument, so that a caller can give it one which can change and make the call something neither mechanism may hold
+    /// </summary>
+    [return: DisposeWhenDiscarded]
+    public Recorded HeldAt(int rank) =>
+        this;
+
     public event PropertyChangedEventHandler? PropertyChanged
     {
         add
