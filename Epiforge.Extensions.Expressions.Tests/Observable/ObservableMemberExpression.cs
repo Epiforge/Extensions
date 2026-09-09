@@ -51,12 +51,14 @@ public class ObservableMemberExpression
     #endregion TestMethod Classes
 
     [TestMethod]
-    public void Closure()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void Closure(bool useDirectSubscription)
     {
         var x = 3;
         var john = TestPerson.CreateJohn();
         var emily = TestPerson.CreateEmily();
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using (var expr = observer.Observe(p1 => p1.Name == null ? x : emily.Name!.Length, john))
         {
             Assert.AreEqual(5, expr.Evaluation.Result);
@@ -67,10 +69,12 @@ public class ObservableMemberExpression
     }
 
     [TestMethod]
-    public void ClosureFieldValueCollectionChanged()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void ClosureFieldValueCollectionChanged(bool useDirectSubscription)
     {
         var collection = new CollectionChangeOnlyNotifier();
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using (var expr = observer.Observe(() => collection.Count))
         {
             Assert.AreEqual(0, expr.Evaluation.Result);
@@ -83,12 +87,14 @@ public class ObservableMemberExpression
     }
 
     [TestMethod]
-    public void DoNotListen()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void DoNotListen(bool useDirectSubscription)
     {
         var test = new TestObject { Unheard = true };
         var options = new ExpressionObserverOptions();
         options.AddIgnoredPropertyChangeNotification(typeof(TestObject).GetProperty(nameof(TestObject.Unheard))!);
-        var observer = ExpressionObserverHelpers.Create(options);
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription, options);
         using (var expr = observer.Observe(p1 => p1.Unheard, test))
         {
             Assert.IsTrue(expr.Evaluation.Result);
@@ -99,21 +105,25 @@ public class ObservableMemberExpression
     }
 
     [TestMethod]
-    public void FieldValue()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void FieldValue(bool useDirectSubscription)
     {
         var team = (developer: TestPerson.CreateJohn(), artist: TestPerson.CreateEmily());
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using (var expr = observer.Observe(p1 => p1.artist.Name, team))
             Assert.AreEqual("Emily", expr.Evaluation.Result);
         Assert.AreEqual(0, observer.CachedObservableExpressions);
     }
 
     [TestMethod]
-    public void ObjectFaultPropagation()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void ObjectFaultPropagation(bool useDirectSubscription)
     {
         var john = TestPerson.CreateJohn();
         var emily = TestPerson.CreateEmily();
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using (var expr = observer.Observe((p1, p2) => (p1.Name!.Length > 0 ? p1 : p2).Name, john, emily))
         {
             Assert.IsNull(expr.Evaluation.Fault);
@@ -126,16 +136,20 @@ public class ObservableMemberExpression
     }
 
     [TestMethod]
-    public void StaticPropertyValue()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void StaticPropertyValue(bool useDirectSubscription)
     {
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using (var expr = observer.Observe(() => Environment.UserName))
             Assert.AreEqual(Environment.UserName, expr.Evaluation.Result);
         Assert.AreEqual(0, observer.CachedObservableExpressions);
     }
 
     [TestMethod]
-    public async Task ValueAsyncDisposalAsync()
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task ValueAsyncDisposalAsync(bool useDirectSubscription)
     {
         var john = AsyncDisposableTestPerson.CreateJohn();
         var emily = AsyncDisposableTestPerson.CreateEmily();
@@ -143,7 +157,7 @@ public class ObservableMemberExpression
         var disposedTcs = new TaskCompletionSource<object?>();
         var options = new ExpressionObserverOptions();
         options.AddExpressionValueDisposal(() => new TestObject().AsyncDisposable);
-        var observer = ExpressionObserverHelpers.Create(options);
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription, options);
         using (var expr = observer.Observe(p1 => p1.AsyncDisposable, testObject))
         {
             Assert.AreSame(john, expr.Evaluation.Result);
@@ -163,14 +177,16 @@ public class ObservableMemberExpression
     }
 
     [TestMethod]
-    public void ValueDisposal()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void ValueDisposal(bool useDirectSubscription)
     {
         var john = SyncDisposableTestPerson.CreateJohn();
         var emily = SyncDisposableTestPerson.CreateEmily();
         var testObject = new TestObject { SyncDisposable = john };
         var options = new ExpressionObserverOptions();
         options.AddExpressionValueDisposal(() => new TestObject().SyncDisposable);
-        var observer = ExpressionObserverHelpers.Create(options);
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription, options);
         using (var expr = observer.Observe(p1 => p1.SyncDisposable, testObject))
         {
             Assert.AreSame(john, expr.Evaluation.Result);

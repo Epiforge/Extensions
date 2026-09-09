@@ -4,9 +4,11 @@ namespace Epiforge.Extensions.Expressions.Tests.Observable;
 public class ObservableUnaryExpression
 {
     [TestMethod]
-    public void Cast()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void Cast(bool useDirectSubscription)
     {
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using (var expr = observer.Observe(p1 => (double)p1, 3))
         {
             Assert.IsNull(expr.Evaluation.Fault);
@@ -17,20 +19,24 @@ public class ObservableUnaryExpression
     }
 
     [TestMethod]
-    public void EvaluationFault()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void EvaluationFault(bool useDirectSubscription)
     {
         TestPerson? noOne = null;
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using (var expr = observer.Observe(() => -noOne!))
             Assert.IsNotNull(expr.Evaluation.Fault);
         Assert.AreEqual(0, observer.CachedObservableExpressions);
     }
 
     [TestMethod]
-    public void FaultPropagation()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void FaultPropagation(bool useDirectSubscription)
     {
         var john = TestPerson.CreateJohn();
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using (var expr = observer.Observe(p1 => -p1.Name!.Length, john))
         {
             Assert.IsNull(expr.Evaluation.Fault);
@@ -43,10 +49,12 @@ public class ObservableUnaryExpression
     }
 
     [TestMethod]
-    public void NullableConversion()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void NullableConversion(bool useDirectSubscription)
     {
         var john = TestPerson.CreateJohn();
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using (var expr = observer.Observe(p1 => (p1 == null || p1.Name == null ? (int?)null : p1.Name.Length) + 3, john))
         {
             Assert.IsTrue(expr.Evaluation.Result == 7);
@@ -59,11 +67,13 @@ public class ObservableUnaryExpression
     }
 
     [TestMethod]
-    public void PropertyChanges()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void PropertyChanges(bool useDirectSubscription)
     {
         var john = TestPerson.CreateJohn();
         var values = new BlockingCollection<int>();
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using (var expr = observer.Observe(p1 => -p1.Name!.Length, john))
         {
             void propertyChanged(object? sender, PropertyChangedEventArgs e) =>
@@ -82,7 +92,9 @@ public class ObservableUnaryExpression
     }
 
     [TestMethod]
-    public async Task ValueAsyncDisposalAsync()
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task ValueAsyncDisposalAsync(bool useDirectSubscription)
     {
         var people = new ObservableCollection<AsyncDisposableTestPerson>
         {
@@ -90,7 +102,7 @@ public class ObservableUnaryExpression
         };
         AsyncDisposableTestPerson? newPerson;
         var disposedTcs = new TaskCompletionSource<object?>();
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using (var expr = observer.Observe(p => -p[0], people))
         {
             newPerson = expr.Evaluation.Result;
@@ -110,14 +122,16 @@ public class ObservableUnaryExpression
     }
 
     [TestMethod]
-    public void ValueDisposal()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void ValueDisposal(bool useDirectSubscription)
     {
         var people = new ObservableCollection<SyncDisposableTestPerson>
         {
             SyncDisposableTestPerson.CreateJohn()
         };
         SyncDisposableTestPerson? newPerson;
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using (var expr = observer.Observe(p => -p[0], people))
         {
             newPerson = expr.Evaluation.Result;

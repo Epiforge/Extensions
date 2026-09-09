@@ -28,12 +28,14 @@ public class ObservableIndexExpression
     }
 
     [TestMethod]
-    public void ArgumentChanges()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void ArgumentChanges(bool useDirectSubscription)
     {
         var reversedNumbersList = Enumerable.Range(1, 10).Reverse().ToImmutableList();
         var john = TestPerson.CreateJohn();
         var values = new BlockingCollection<int>();
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using (var expr = observer.Observe((p1, p2) => p1[p2.Name!.Length], reversedNumbersList, john))
         {
             void propertyChanged(object? sender, PropertyChangedEventArgs e) =>
@@ -52,11 +54,13 @@ public class ObservableIndexExpression
     }
 
     [TestMethod]
-    public void ArgumentFaultPropagation()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void ArgumentFaultPropagation(bool useDirectSubscription)
     {
         var numbers = new ObservableCollection<int>(Enumerable.Range(0, 10));
         var john = TestPerson.CreateJohn();
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using (var expr = observer.Observe((p1, p2) => p1[p2.Name!.Length], numbers, john))
         {
             Assert.IsNull(expr.Evaluation.Fault);
@@ -69,11 +73,13 @@ public class ObservableIndexExpression
     }
 
     [TestMethod]
-    public void CollectionChanges()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void CollectionChanges(bool useDirectSubscription)
     {
         var numbers = new ObservableRangeCollection<int>(Enumerable.Range(1, 10));
         var values = new BlockingCollection<int>();
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using (var expr = observer.Observe(p1 => p1[5], numbers))
         {
             void propertyChanged(object? sender, PropertyChangedEventArgs e) =>
@@ -104,11 +110,13 @@ public class ObservableIndexExpression
     }
 
     [TestMethod]
-    public void DictionaryChanges()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void DictionaryChanges(bool useDirectSubscription)
     {
         var perfectNumbers = new ObservableDictionary<int, int>(Enumerable.Range(1, 10).ToDictionary(i => i, i => i * i));
         var values = new BlockingCollection<int>();
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using (var expr = observer.Observe(p1 => p1[5], perfectNumbers))
         {
             void propertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -136,10 +144,12 @@ public class ObservableIndexExpression
     }
 
     [TestMethod]
-    public void ManualCreation()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void ManualCreation(bool useDirectSubscription)
     {
         var people = new List<TestPerson>() { TestPerson.CreateEmily() };
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using (var expr = observer.Observe(Expression.Lambda<Func<string>>(Expression.MakeMemberAccess(Expression.MakeIndex(Expression.Constant(people), typeof(List<TestPerson>).GetProperties().First(p => p.GetIndexParameters().Length > 0), new Expression[] { Expression.Constant(0) }), typeof(TestPerson).GetProperty(nameof(TestPerson.Name))!))))
         {
             Assert.IsNull(expr.Evaluation.Fault);
@@ -149,13 +159,15 @@ public class ObservableIndexExpression
     }
 
     [TestMethod]
-    public void ObjectChanges()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void ObjectChanges(bool useDirectSubscription)
     {
         var john = TestPerson.CreateJohn();
         var men = new ObservableCollection<TestPerson> { john };
         var emily = TestPerson.CreateEmily();
         var women = new ObservableCollection<TestPerson> { emily };
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using (var expr = observer.Observe((p1, p2) => (p1.Count > 0 ? p1 : p2)[0], men, women))
         {
             Assert.AreSame(john, expr.Evaluation.Result);
@@ -166,12 +178,14 @@ public class ObservableIndexExpression
     }
 
     [TestMethod]
-    public void ObjectFaultPropagation()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void ObjectFaultPropagation(bool useDirectSubscription)
     {
         var numbers = new ObservableCollection<int>(Enumerable.Range(0, 10));
         var otherNumbers = new ObservableCollection<int>(Enumerable.Range(0, 10));
         var john = TestPerson.CreateJohn();
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using (var expr = observer.Observe((p1, p2, p3) => (p3.Name!.Length == 0 ? p1 : p2)[0], numbers, otherNumbers, john))
         {
             Assert.IsNull(expr.Evaluation.Fault);
@@ -184,10 +198,12 @@ public class ObservableIndexExpression
     }
 
     [TestMethod]
-    public void ObjectValueChanges()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void ObjectValueChanges(bool useDirectSubscription)
     {
         var numbers = new TestObservableRangeCollection<int>(Enumerable.Range(0, 10));
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using (var expr = observer.Observe(p1 => p1[0], numbers))
         {
             Assert.AreEqual(expr.Evaluation.Result, 0);
@@ -198,10 +214,12 @@ public class ObservableIndexExpression
     }
 
     [TestMethod]
-    public void ObjectValueChangesNotifiedByTheIndexerConvention()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void ObjectValueChangesNotifiedByTheIndexerConvention(bool useDirectSubscription)
     {
         var numbers = new TestObservableRangeCollection<int>(Enumerable.Range(0, 10));
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using (var expr = observer.Observe(p1 => p1[0], numbers))
         {
             Assert.AreEqual(expr.Evaluation.Result, 0);
@@ -212,7 +230,9 @@ public class ObservableIndexExpression
     }
 
     [TestMethod]
-    public async Task ValueAsyncDisposalAsync()
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task ValueAsyncDisposalAsync(bool useDirectSubscription)
     {
         var john = AsyncDisposableTestPerson.CreateJohn();
         var emily = AsyncDisposableTestPerson.CreateEmily();
@@ -220,7 +240,7 @@ public class ObservableIndexExpression
         var disposedTcs = new TaskCompletionSource<object?>();
         var options = new ExpressionObserverOptions();
         options.AddExpressionValueDisposal(() => new ObservableCollection<AsyncDisposableTestPerson>()[0]);
-        var observer = ExpressionObserverHelpers.Create(options);
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription, options);
         using (var expr = observer.Observe(p => p[0], people))
         {
             Assert.AreSame(john, expr.Evaluation.Result);
@@ -238,14 +258,16 @@ public class ObservableIndexExpression
     }
 
     [TestMethod]
-    public void ValueDisposal()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void ValueDisposal(bool useDirectSubscription)
     {
         var john = SyncDisposableTestPerson.CreateJohn();
         var emily = SyncDisposableTestPerson.CreateEmily();
         var people = new ObservableCollection<SyncDisposableTestPerson> { john };
         var options = new ExpressionObserverOptions();
         options.AddExpressionValueDisposal(() => new ObservableCollection<SyncDisposableTestPerson>()[0]);
-        var observer = ExpressionObserverHelpers.Create(options);
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription, options);
         using (var expr = observer.Observe(p => p[0], people))
         {
             Assert.AreSame(john, expr.Evaluation.Result);

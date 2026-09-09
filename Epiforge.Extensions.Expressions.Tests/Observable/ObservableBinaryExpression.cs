@@ -4,11 +4,13 @@ namespace Epiforge.Extensions.Expressions.Tests.Observable;
 public class ObservableBinaryExpression
 {
     [TestMethod]
-    public void EvaluationFault()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void EvaluationFault(bool useDirectSubscription)
     {
         var john = TestPerson.CreateJohn();
         TestPerson? noOne = null;
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
 #pragma warning disable CS8604 // Possible null reference argument.
         using (var expr = observer.Observe(() => john + noOne))
 #pragma warning restore CS8604 // Possible null reference argument.
@@ -17,11 +19,13 @@ public class ObservableBinaryExpression
     }
 
     [TestMethod]
-    public void FaultPropagation()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void FaultPropagation(bool useDirectSubscription)
     {
         var john = TestPerson.CreateJohn();
         var emily = TestPerson.CreateEmily();
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using (var expr = observer.Observe((p1, p2) => p1.Name!.Length + p2.Name!.Length, john, emily))
         {
             Assert.IsNull(expr.Evaluation.Fault);
@@ -37,12 +41,14 @@ public class ObservableBinaryExpression
     }
 
     [TestMethod]
-    public void PropertyChanges()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void PropertyChanges(bool useDirectSubscription)
     {
         var john = TestPerson.CreateJohn();
         var emily = TestPerson.CreateEmily();
         var values = new BlockingCollection<int>();
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using (var expr = observer.Observe((p1, p2) => p1.Name!.Length + p2.Name!.Length, john, emily))
         {
             void propertyChanged(object? sender, PropertyChangedEventArgs e) => values.Add(expr.Evaluation.Result);
@@ -61,7 +67,9 @@ public class ObservableBinaryExpression
     }
 
     [TestMethod]
-    public async Task ValueAsyncDisposalAsync()
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task ValueAsyncDisposalAsync(bool useDirectSubscription)
     {
         var people = new ObservableCollection<AsyncDisposableTestPerson>
         {
@@ -70,7 +78,7 @@ public class ObservableBinaryExpression
         };
         var disposedTcs = new TaskCompletionSource<object?>();
         AsyncDisposableTestPerson? newPerson;
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using (var expr = observer.Observe(p => p[0] + p[1], people))
         {
             newPerson = expr.Evaluation.Result;
@@ -90,7 +98,9 @@ public class ObservableBinaryExpression
     }
 
     [TestMethod]
-    public void ValueDisposal()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void ValueDisposal(bool useDirectSubscription)
     {
         var people = new ObservableCollection<SyncDisposableTestPerson>
         {
@@ -98,7 +108,7 @@ public class ObservableBinaryExpression
             SyncDisposableTestPerson.CreateEmily()
         };
         SyncDisposableTestPerson? newPerson;
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using (var expr = observer.Observe(p => p[0] + p[1], people))
         {
             newPerson = expr.Evaluation.Result;

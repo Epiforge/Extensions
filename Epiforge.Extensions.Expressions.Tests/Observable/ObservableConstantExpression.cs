@@ -4,11 +4,13 @@ namespace Epiforge.Extensions.Expressions.Tests.Observable;
 public class ObservableConstantExpression
 {
     [TestMethod]
-    public void ValueCollectionChanged()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void ValueCollectionChanged(bool useDirectSubscription)
     {
         var collection = new ObservableCollection<string>();
         var notifications = 0;
-        var observer = new ExpressionObserver();
+        var observer = new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = useDirectSubscription });
         using (var expr = observer.Observe(c => c, collection))
         {
             void propertyChanged(object? sender, PropertyChangedEventArgs e) => ++notifications;

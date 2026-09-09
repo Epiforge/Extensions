@@ -54,10 +54,12 @@ public class ObservableMemberInitExpression
     #endregion
 
     [TestMethod]
-    public void ClassFields()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void ClassFields(bool useDirectSubscription)
     {
         var emily = TestPerson.CreateEmily();
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using (var expr = observer.Observe(() => new FieldyTestPerson { Name = emily.Name! }))
         {
             Assert.IsNull(expr.Evaluation.Fault);
@@ -72,10 +74,12 @@ public class ObservableMemberInitExpression
     }
 
     [TestMethod]
-    public void ClassProperties()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void ClassProperties(bool useDirectSubscription)
     {
         var emily = TestPerson.CreateEmily();
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using (var expr = observer.Observe(() => new TestPerson { Name = emily.Name! }))
         {
             Assert.IsNull(expr.Evaluation.Fault);
@@ -90,10 +94,12 @@ public class ObservableMemberInitExpression
     }
 
     [TestMethod]
-    public void MemberAssignmentFaultPropagation()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void MemberAssignmentFaultPropagation(bool useDirectSubscription)
     {
         var emily = TestPerson.CreateEmily();
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using (var expr = observer.Observe(() => new ThrowyTestPerson("Emily") { Name = emily.Name! }))
         {
             Assert.IsNull(expr.Evaluation.Fault);
@@ -110,10 +116,12 @@ public class ObservableMemberInitExpression
     }
 
     [TestMethod]
-    public void NewFaultPropagation()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void NewFaultPropagation(bool useDirectSubscription)
     {
         var emily = TestPerson.CreateEmily();
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using (var expr = observer.Observe(() => new ThrowyTestPerson(emily.Name!) { Name = "Emily" }))
         {
             Assert.IsNull(expr.Evaluation.Fault);
@@ -130,18 +138,22 @@ public class ObservableMemberInitExpression
     }
 
     [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
     [ExpectedException(typeof(NotSupportedException))]
-    public void StructFields() =>
-        ExpressionObserverHelpers.Create().Observe(() => new StructyTestPerson { Name = TestPerson.CreateEmily().Name! });
+    public void StructFields(bool useDirectSubscription) =>
+        ExpressionObserverHelpers.Create(useDirectSubscription).Observe(() => new StructyTestPerson { Name = TestPerson.CreateEmily().Name! });
 
     [TestMethod]
-    public async Task ValueAsyncDisposalAsync()
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task ValueAsyncDisposalAsync(bool useDirectSubscription)
     {
         AsyncDisposableTestPerson? emily;
         var disposedTcs = new TaskCompletionSource<object?>();
         var options = new ExpressionObserverOptions();
         options.AddExpressionValueDisposal(() => new AsyncDisposableTestPerson());
-        var observer = ExpressionObserverHelpers.Create(options);
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription, options);
         using (var expr = observer.Observe(() => new AsyncDisposableTestPerson { Name = "Emily" }))
         {
             Assert.IsNull(expr.Evaluation.Fault);
@@ -155,12 +167,14 @@ public class ObservableMemberInitExpression
     }
 
     [TestMethod]
-    public void ValueDisposal()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void ValueDisposal(bool useDirectSubscription)
     {
         SyncDisposableTestPerson? emily;
         var options = new ExpressionObserverOptions();
         options.AddExpressionValueDisposal(() => new SyncDisposableTestPerson());
-        var observer = ExpressionObserverHelpers.Create(options);
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription, options);
         using (var expr = observer.Observe(() => new SyncDisposableTestPerson { Name = "Emily" }))
         {
             Assert.IsNull(expr.Evaluation.Fault);

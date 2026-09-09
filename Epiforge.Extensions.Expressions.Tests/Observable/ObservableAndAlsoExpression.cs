@@ -4,10 +4,12 @@ namespace Epiforge.Extensions.Expressions.Tests.Observable;
 public class ObservableAndAlsoExpression
 {
     [TestMethod]
-    public void ACountGuardHoldsWhenTheCollectionShrinksInOneEvent()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void ACountGuardHoldsWhenTheCollectionShrinksInOneEvent(bool useDirectSubscription)
     {
         var numbers = new ObservableRangeCollection<int>(new[] { 0, 1, 2, 3 });
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using (var expr = observer.Observe(() => numbers.Count == 4 && numbers[2] == 2))
         {
             Assert.IsNull(expr.Evaluation.Fault);
@@ -20,10 +22,12 @@ public class ObservableAndAlsoExpression
     }
 
     [TestMethod]
-    public void ACountGuardHoldsWhenTheCollectionShrinksOneElementAtATime()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void ACountGuardHoldsWhenTheCollectionShrinksOneElementAtATime(bool useDirectSubscription)
     {
         var numbers = new ObservableRangeCollection<int>(new[] { 0, 1, 2, 3 });
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using (var expr = observer.Observe(() => numbers.Count == 4 && numbers[2] == 2))
         {
             Assert.IsNull(expr.Evaluation.Fault);
@@ -38,11 +42,13 @@ public class ObservableAndAlsoExpression
     }
 
     [TestMethod]
-    public void FaultPropagation()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void FaultPropagation(bool useDirectSubscription)
     {
         var john = TestPerson.CreateJohn();
         var emily = TestPerson.CreateEmily();
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using (var expr = observer.Observe((p1, p2) => p1.Name!.Length > 0 && p2.Name!.Length > 0, john, emily))
         {
             Assert.IsNull(expr.Evaluation.Fault);
@@ -58,11 +64,13 @@ public class ObservableAndAlsoExpression
     }
 
     [TestMethod]
-    public void FaultShortCircuiting()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void FaultShortCircuiting(bool useDirectSubscription)
     {
         var john = TestPerson.CreateJohn();
         TestPerson? noOne = null;
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
 #pragma warning disable CS8602 // Dereference of a possibly null reference.
         using (var expr = observer.Observe((p1, p2) => string.IsNullOrEmpty(p1.Name) && string.IsNullOrEmpty(p2.Name), john, noOne))
 #pragma warning restore CS8602 // Dereference of a possibly null reference.
@@ -74,12 +82,14 @@ public class ObservableAndAlsoExpression
     }
 
     [TestMethod]
-    public void PropertyChanges()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void PropertyChanges(bool useDirectSubscription)
     {
         var john = TestPerson.CreateJohn();
         var emily = TestPerson.CreateEmily();
         var values = new BlockingCollection<bool>();
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using (var expr = observer.Observe((p1, p2) => p1.Name!.Length == 1 && p2.Name!.Length == 1, john, emily))
         {
             void propertyChanged(object? sender, PropertyChangedEventArgs e) => values.Add(expr.Evaluation.Result);
@@ -98,11 +108,13 @@ public class ObservableAndAlsoExpression
     }
 
     [TestMethod]
-    public void ValueShortCircuiting()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void ValueShortCircuiting(bool useDirectSubscription)
     {
         var john = TestPerson.CreateJohn();
         var emily = TestPerson.CreateEmily();
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using (var expr = observer.Observe((p1, p2) => p1.Name!.Length == 1 && p2.Name!.Length > 3, john, emily))
             Assert.IsFalse(expr.Evaluation.Result);
         Assert.AreEqual(0, observer.CachedObservableExpressions);

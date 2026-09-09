@@ -15,10 +15,12 @@ public class ObservableMethodCallExpression
     #endregion TestMethod Methods
 
     [TestMethod]
-    public void ActuallyAProperty()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void ActuallyAProperty(bool useDirectSubscription)
     {
         var emily = TestPerson.CreateEmily();
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using (var expr = observer.Observe(Expression.Lambda<Func<string>>(Expression.Call(Expression.Constant(emily), typeof(TestPerson).GetProperty(nameof(TestPerson.Name))!.GetMethod!))))
         {
             Assert.IsNull(expr.Evaluation.Fault);
@@ -31,11 +33,13 @@ public class ObservableMethodCallExpression
     }
 
     [TestMethod]
-    public void ArgumentFaultPropagation()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void ArgumentFaultPropagation(bool useDirectSubscription)
     {
         var john = TestPerson.CreateJohn();
         var emily = TestPerson.CreateEmily();
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using (var expr = observer.Observe(() => CombinePeople(john.Name!.Length > 3 ? john : null!, emily)))
         {
             Assert.IsNull(expr.Evaluation.Fault);
@@ -48,11 +52,13 @@ public class ObservableMethodCallExpression
     }
 
     [TestMethod]
-    public void ObjectFaultPropagation()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void ObjectFaultPropagation(bool useDirectSubscription)
     {
         var john = TestPerson.CreateJohn();
         var emily = TestPerson.CreateEmily();
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using (var expr = observer.Observe(() => (john.Name!.Length > 3 ? this : null!).CombinePeople(john, emily)))
         {
             Assert.IsNull(expr.Evaluation.Fault);
@@ -65,7 +71,9 @@ public class ObservableMethodCallExpression
     }
 
     [TestMethod]
-    public async Task ValueAsyncDisposalAsync()
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task ValueAsyncDisposalAsync(bool useDirectSubscription)
     {
         var john = AsyncDisposableTestPerson.CreateJohn();
         var emily = AsyncDisposableTestPerson.CreateEmily();
@@ -73,7 +81,7 @@ public class ObservableMethodCallExpression
         var disposedTcs = new TaskCompletionSource<object?>();
         var options = new ExpressionObserverOptions();
         options.AddExpressionValueDisposal(() => CombineAsyncDisposablePeople(null!, null!));
-        var observer = ExpressionObserverHelpers.Create(options);
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription, options);
         using (var expr = observer.Observe(() => CombineAsyncDisposablePeople(john.Name!.Length > 3 ? john : emily, emily)))
         {
             Assert.IsNull(expr.Evaluation.Fault);
@@ -94,14 +102,16 @@ public class ObservableMethodCallExpression
     }
 
     [TestMethod]
-    public void ValueDisposal()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void ValueDisposal(bool useDirectSubscription)
     {
         var john = SyncDisposableTestPerson.CreateJohn();
         var emily = SyncDisposableTestPerson.CreateEmily();
         SyncDisposableTestPerson? first, second;
         var options = new ExpressionObserverOptions();
         options.AddExpressionValueDisposal(() => CombineSyncDisposablePeople(null!, null!));
-        var observer = ExpressionObserverHelpers.Create(options);
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription, options);
         using (var expr = observer.Observe(() => CombineSyncDisposablePeople(john.Name!.Length > 3 ? john : emily, emily)))
         {
             Assert.IsNull(expr.Evaluation.Fault);

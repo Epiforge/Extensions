@@ -4,11 +4,13 @@ namespace Epiforge.Extensions.Expressions.Tests.Observable;
 public class ObservableCoalesceExpression
 {
     [TestMethod]
-    public void FaultPropagation()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void FaultPropagation(bool useDirectSubscription)
     {
         var john = TestPerson.CreateJohn();
         var emily = TestPerson.CreateEmily();
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using (var expr = observer.Observe((p1, p2) => p1.Name!.ToString() ?? p2.Name!.ToString(), john, emily))
         {
             Assert.IsNull(expr.Evaluation.Fault);
@@ -22,10 +24,12 @@ public class ObservableCoalesceExpression
     }
 
     [TestMethod]
-    public void FaultShortCircuiting()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void FaultShortCircuiting(bool useDirectSubscription)
     {
         var john = TestPerson.CreateJohn();
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
 #pragma warning disable CS8625 // Cannot convert null literal to non-nullable reference type.
         using (var expr = observer.Observe<TestPerson, TestPerson, string>((p1, p2) => p1.Name ?? p2.Name!, john, null))
 #pragma warning restore CS8625 // Cannot convert null literal to non-nullable reference type.
@@ -58,9 +62,11 @@ public class ObservableCoalesceExpression
     #endregion Implicit Conversion TestMethod Classes
 
     [TestMethod]
-    public void ImplicitConversion()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void ImplicitConversion(bool useDirectSubscription)
     {
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using (var expr = observer.Observe(() => new A() ?? new B()))
         {
             Assert.IsNull(expr.Evaluation.Fault);
@@ -70,21 +76,25 @@ public class ObservableCoalesceExpression
     }
 
     [TestMethod]
-    public void ImplicitConversionFailure()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void ImplicitConversionFailure(bool useDirectSubscription)
     {
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using (var expr = observer.Observe(() => new A() ?? new C()))
             Assert.IsNotNull(expr.Evaluation.Fault);
         Assert.AreEqual(0, observer.CachedObservableExpressions);
     }
 
     [TestMethod]
-    public void PropertyChanges()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void PropertyChanges(bool useDirectSubscription)
     {
         var john = TestPerson.CreateJohn();
         var emily = TestPerson.CreateEmily();
         var values = new BlockingCollection<string>();
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using (var expr = observer.Observe((p1, p2) => p1.Name ?? p2.Name, john, emily))
         {
             void propertyChanged(object? sender, PropertyChangedEventArgs e) =>
@@ -106,11 +116,13 @@ public class ObservableCoalesceExpression
     }
 
     [TestMethod]
-    public void ValueShortCircuiting()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void ValueShortCircuiting(bool useDirectSubscription)
     {
         var john = TestPerson.CreateJohn();
         var emily = TestPerson.CreateEmily();
-        var observer = ExpressionObserverHelpers.Create();
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using (var expr = observer.Observe((p1, p2) => p1.Name ?? p2.Name, john, emily))
             Assert.AreEqual(john.Name, expr.Evaluation.Result);
         Assert.AreEqual(0, observer.CachedObservableExpressions);
