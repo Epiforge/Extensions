@@ -12,6 +12,8 @@ public class SteadyStateBenchmarks
     const int elementCount = 1000;
     const int rounds = 10;
 
+    static readonly PropertyInfo rankProperty = typeof(BenchmarkPersonWithPartner).GetProperty(nameof(BenchmarkPersonWithPartner.Rank))!;
+
     static readonly BenchmarkValueSource values = new();
     static readonly BenchmarkWeight weight = new();
 
@@ -20,13 +22,16 @@ public class SteadyStateBenchmarks
     static readonly Expression<Func<BenchmarkPersonWithPartner, bool>> unheldCall = person => person.Rank + weight.Scale() > 0;
 
     /// <summary>
-    /// The shape a formula engine emits, whose call the analyzer holds because nothing it reads can change
+    /// The shape a formula engine emits, whose call the analyzer holds because nothing it reads can change, summed with a member read so that a notification reaches the observation at all
     /// </summary>
+    /// <remarks>
+    /// The member read is load bearing, and its absence was a defect in the first form of this instrument. The query these arms open does not subscribe to the person it reads, a form of it which did having leaked a handler per element per invocation, so with nothing else in the expression a change to that person announced to nothing and the steady arms measured a floor rather than a re-evaluation. Reading the person alongside the call drives the notification without putting a subscription back inside the query
+    /// </remarks>
     static Expression<Func<BenchmarkPersonWithPartner, bool>> BuildHeldFormula()
     {
         var person = Expression.Parameter(typeof(BenchmarkPersonWithPartner), "person");
         Expression<Func<BenchmarkPersonWithPartner, int>> read = element => (int)values.Open(element).Value!;
-        return Expression.Lambda<Func<BenchmarkPersonWithPartner, bool>>(Expression.GreaterThan(Expression.Invoke(read, person), Expression.Constant(0)), person);
+        return Expression.Lambda<Func<BenchmarkPersonWithPartner, bool>>(Expression.GreaterThan(Expression.Add(Expression.MakeMemberAccess(person, rankProperty), Expression.Invoke(read, person)), Expression.Constant(0)), person);
     }
 
     CollectionObserver aDefault = null!;
