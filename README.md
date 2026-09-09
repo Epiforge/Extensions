@@ -29,6 +29,8 @@ Supports `net6.0`, `net7.0`, `net8.0`, `net9.0`, and `net10.0`.
         - [Fields Are Read Once](#fields-are-read-once)
     - [Observable Queries](#observable-queries)
       - [How Observable Queries Work and When to Use Them](#how-observable-queries-work-and-when-to-use-them)
+      - [Choosing Between Observable Queries and DynamicData](#choosing-between-observable-queries-and-dynamicdata)
+        - [What It Costs](#what-it-costs)
   - [Platforms](#platforms)
     - [ Windows](#-windows)
 - [License](#license)
