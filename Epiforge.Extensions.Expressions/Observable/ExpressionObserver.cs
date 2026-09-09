@@ -818,7 +818,7 @@ public class ExpressionObserver :
         var compiled = optimizing ? compiledOptimizedLambdas : compiledLambdas;
         if (compiled.TryGetValue(lambdaExpression, out var evaluator))
             return evaluator;
-        var observed = optimizing ? (LambdaExpression)Optimizer!(lambdaExpression) : lambdaExpression;
+        var observed = InvocationReducer.Reduce(optimizing ? (LambdaExpression)Optimizer!(lambdaExpression) : lambdaExpression);
         var plan = (directSubscriptionAnalyzer ??= new DirectSubscriptionAnalyzer(this)).Plan(observed.Body);
         if (!plan.IsEligible)
         {
