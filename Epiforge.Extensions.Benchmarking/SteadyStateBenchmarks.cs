@@ -20,6 +20,7 @@ public class SteadyStateBenchmarks
     static readonly Expression<Func<BenchmarkPersonWithPartner, bool>> heldFormula = BuildHeldFormula();
     static readonly Expression<Func<BenchmarkPersonWithPartner, bool>> rankComparison = person => person.Rank > 0;
     static readonly Expression<Func<BenchmarkPersonWithPartner, bool>> unheldCall = person => person.Rank + weight.Scale() > 0;
+    static readonly Expression<Func<BenchmarkPersonWithCachedEventArguments, bool>> cachedRankComparison = person => person.Rank > 0;
 
     /// <summary>
     /// The shape a formula engine emits, whose call the analyzer holds because nothing it reads can change, summed with a member read so that a notification reaches the observation at all
@@ -36,7 +37,41 @@ public class SteadyStateBenchmarks
 
     CollectionObserver aDefault = null!;
     CollectionObserver graph = null!;
+    ObservableRangeCollection<BenchmarkPersonWithCachedEventArguments> cachedPeople = null!;
     ObservableRangeCollection<BenchmarkPersonWithPartner> people = null!;
+
+    /// <summary>
+    /// The same comparison over a subject which passes pre-allocated notification arguments, which is what an application whose entities do so actually pays
+    /// </summary>
+    /// <remarks>
+    /// Every other arm's subject allocates a changing and a changed argument for each raise, and that is the subject's cost rather than either mechanism's. These arms remove it, so that the difference between a pair here and the corresponding pair above is what the floor was worth, measured rather than assumed
+    /// </remarks>
+    [Benchmark]
+    public void CachedRankComparisonDefaultConstruct() =>
+        RunCached(aDefault, 0);
+
+    [Benchmark]
+    public void CachedRankComparisonDefaultSteady() =>
+        RunCached(aDefault, rounds);
+
+    [Benchmark]
+    public void CachedRankComparisonGraphConstruct() =>
+        RunCached(graph, 0);
+
+    [Benchmark]
+    public void CachedRankComparisonGraphSteady() =>
+        RunCached(graph, rounds);
+
+    void RunCached(CollectionObserver observer, int notifying)
+    {
+        var sourceQuery = observer.ObserveReadOnlyList(cachedPeople);
+        var where = sourceQuery.ObserveWhere(cachedRankComparison);
+        for (var round = 0; round < notifying; ++round)
+            for (int i = 0, ii = cachedPeople.Count; i < ii; ++i)
+                cachedPeople[i].Rank = round + 1;
+        where.Dispose();
+        sourceQuery.Dispose();
+    }
 
     [Benchmark]
     public void HeldFormulaDefaultConstruct() =>
@@ -103,5 +138,9 @@ public class SteadyStateBenchmarks
         aDefault = new CollectionObserver(new ExpressionObserver());
         graph = new CollectionObserver(new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = false }));
         people = BenchmarkPersonWithPartner.CreateCollection(elementCount);
+        var cached = new List<BenchmarkPersonWithCachedEventArguments>(elementCount);
+        for (var i = 0; i < elementCount; ++i)
+            cached.Add(new BenchmarkPersonWithCachedEventArguments(i));
+        cachedPeople = new ObservableRangeCollection<BenchmarkPersonWithCachedEventArguments>(cached);
     }
 }
