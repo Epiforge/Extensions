@@ -26,7 +26,7 @@ sealed class ObservableCollectionLookupQuery<TKey, TElement> :
 
     readonly object access;
     IReadOnlyList<IObservableGrouping<TKey, TElement>>? enumerationSnapshot;
-    readonly Dictionary<TKey, (ObservableRangeCollection<TElement> collection, IObservableGrouping<TKey, TElement> grouping, GroupingElementPositions<TElement> positions)> collectionAndGroupingByKey;
+    readonly Dictionary<TKey, (ObservableRangeCollection<TElement> collection, IObservableGrouping<TKey, TElement> grouping)> collectionAndGroupingByKey;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     readonly IObservableDictionaryQuery<TKey, IObservableGrouping<TKey, TElement>> groupingByKey;
     readonly ObservableRangeCollection<IObservableGrouping<TKey, TElement>> groupings;
@@ -59,7 +59,7 @@ sealed class ObservableCollectionLookupQuery<TKey, TElement> :
                 var collection = collectionObserver.ExpressionObserver.Logger is { } logger ? new ObservableRangeCollection<TElement>(logger) : new ObservableRangeCollection<TElement>();
                 var grouping = new ObservableGrouping<TKey, TElement>(collectionObserver, key, collectionObserver.GetObservableCollectionQuery(collection));
                 grouping.Initialize();
-                var collectionAndGrouping = (collection, grouping, new GroupingElementPositions<TElement>());
+                var collectionAndGrouping = (collection, grouping);
                 collectionAndGroupingByKey.Add(key, collectionAndGrouping);
                 groupings.Add(grouping);
                 return grouping;
@@ -142,14 +142,13 @@ sealed class ObservableCollectionLookupQuery<TKey, TElement> :
             collection = collectionObserver.ExpressionObserver.Logger is { } logger ? new(logger) : new();
             var grouping = new ObservableGrouping<TKey, TElement>(collectionObserver, key, collectionObserver.GetObservableCollectionQuery(collection));
             grouping.Initialize();
-            collectionAndGrouping = (collection, grouping, new());
+            collectionAndGrouping = (collection, grouping);
             collectionAndGroupingByKey.Add(key, collectionAndGrouping);
             groupings.Add(grouping);
         }
         else
             collection = collectionAndGrouping.collection;
         collection.Add(element);
-        collectionAndGrouping.positions.Append(element);
     }
 
     void ICollection<KeyValuePair<TKey, IObservableGrouping<TKey, TElement>>>.Clear() =>
@@ -183,7 +182,7 @@ sealed class ObservableCollectionLookupQuery<TKey, TElement> :
                 {
                     groupingByKey.Dispose();
                     groupingsQuery.Dispose();
-                    foreach (var (_, grouping, _) in collectionAndGroupingByKey.Values)
+                    foreach (var (_, grouping) in collectionAndGroupingByKey.Values)
                         ((ObservableGrouping<TKey, TElement>)grouping).InternalDispose();
                     if (groupings is not null)
                         groupings.CollectionChanged -= GroupingsCollectionChanged;
@@ -246,8 +245,7 @@ sealed class ObservableCollectionLookupQuery<TKey, TElement> :
         if (collectionAndGroupingByKey.TryGetValue(key, out var collectionAndGrouping))
         {
             var collection = collectionAndGrouping.collection;
-            if (collectionAndGrouping.positions.TryTakeFirstPosition(element, out var index))
-                collection.RemoveAt(index);
+            collection.Remove(element);
         }
     }
 
@@ -269,7 +267,6 @@ sealed class ObservableCollectionLookupQuery<TKey, TElement> :
                     if (!elementsByKey.TryGetValue(key, out var retained))
                         retained = [];
                     collectionAndGrouping.collection.Reset(retained);
-                    collectionAndGrouping.positions.Reset(retained);
                 }
                 foreach (var (key, keyElements) in elementsByKey)
                     if (!collectionAndGroupingByKey.ContainsKey(key))
