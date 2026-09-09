@@ -59,3 +59,27 @@ Extrapolating the measured per-invocation cost — arithmetic on two points, not
 ## What has not been measured
 
 What the reduction costs to perform, which is paid once per observation construction and is subtracted from every figure above. Whether the subscription set a reduced expression takes is the same one the graph takes for the invocation — the premise the whole widening rests on, and a test rather than a benchmark. Anything at a depth beyond two.
+
+## The after — the ceiling was taken in full
+
+An invocation of a literal lambda is now reduced to the body it would have evaluated, between the optimizer and the analysis, so what is planned and what is compiled are one tree containing no invocation. Same instrument, same day.
+
+| arm | before | after |
+|---|---:|---:|
+| one invocation, default options | 6,818.33 KB / 7,360.9 μs | **965.19 KB / 293.0 μs** |
+
+**It lands on all three fast path arms at 965.19 KB, to the hundredth of a kilobyte**, which is the same figure a bare `person.Rank > 0` costs. The prediction recorded before the run was 965.19 and about 300 μs.
+
+**7.06x less memory and 25.1x less time** for the shape a formula engine emits. The arm also leaves Gen2 entirely — it reported 15.6250 collections before and none after, so these observations stop being promoted.
+
+**Seven of eight arms are controls and held.** Six are byte-identical; `InvocationGraph` moved 2.52 KB, which is 0.037% and inside the drift band for a graph arm. Every other arm pins its observer explicitly, so only the default-options arm could move, and only it did.
+
+## What this means at the depth an application actually reaches
+
+The graph charges 4,186.9 bytes per element for the first invocation and 3,831.5 for the second. The reduced form charges nothing for either: the fast path allocates 965.19 KB for a bare comparison, for a method call over it, for a nested pair, and now for an invocation. **An expression carrying ten invocations was costing roughly 41,000 bytes per element and now costs 988.4**, flat, because what the fast path charges for is the subscription to a source and the number of those did not change.
+
+**One gap, named rather than glossed:** the nested case has no default-options arm. That it also lands at 965.19 is an inference from the hand-inlined nested arm plus the test proving the nested invocation is now served by the fast path — sound, but not measured. One arm would close it.
+
+## Predictions scored
+
+Both exact. The figure and the arm it would land on were predicted to the hundredth of a kilobyte, and the controls were predicted not to move. **That is the third consecutive prediction on this instrument built by adding measured unit costs, and the third to land** — against the two magnitude predictions earlier in this document which reasoned from a node count and were both wrong and both low.
