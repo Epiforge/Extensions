@@ -12,6 +12,18 @@ sealed class ObservableNewExpression(ExpressionObserver observer, NewExpression 
 
     internal readonly NewExpression NewExpression = newExpression;
 
+    internal bool ShouldConstructedValueBeDisposed =>
+        observer.IsConstructedTypeDisposed(NewExpression.Type, constructorParameterTypes);
+
+    /// <summary>
+    /// Produces a new instance without disturbing this observation's own evaluation
+    /// </summary>
+    /// <remarks>
+    /// A member initialization observation constructs through this on every evaluation rather than reusing what this node last produced. Reusing it would alias one instance across every evaluation and across every other observation sharing this cached node, and a result whose reference never changes is a result the evaluation setter can never see as changed
+    /// </remarks>
+    internal object? Construct() =>
+        constructorInvoker is { } invoker ? Invoke(invoker, null, arguments) : Activator.CreateInstance(NewExpression.Type, arguments is { } evaluatedArguments ? EvaluationResults(evaluatedArguments) : []);
+
     protected override bool DisposeCore()
     {
         var removedFromCache = observer.ExpressionDisposed(this);
@@ -42,7 +54,7 @@ sealed class ObservableNewExpression(ExpressionObserver observer, NewExpression 
             }
             else
             {
-                var value = constructorInvoker is { } invoker ? Invoke(invoker, null, arguments) : Activator.CreateInstance(NewExpression.Type, arguments is { } evaluatedArguments ? EvaluationResults(evaluatedArguments) : []);
+                var value = Construct();
                 Evaluation = (null, value);
                 observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{NewExpression} evaluated: {Value}", NewExpression, value);
             }
@@ -55,7 +67,7 @@ sealed class ObservableNewExpression(ExpressionObserver observer, NewExpression 
     }
 
     protected override bool GetShouldValueBeDisposed() =>
-        observer.IsConstructedTypeDisposed(NewExpression.Type, constructorParameterTypes);
+        ShouldConstructedValueBeDisposed;
 
     void IObservableExpressionDependent.OnDependencyEvaluationChanged(ObservableExpression dependency) =>
         Evaluate();

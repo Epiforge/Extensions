@@ -3,6 +3,49 @@
 [TestClass]
 public class DifferentialFuzz
 {
+    public sealed class Built
+    {
+        public int First;
+        public string? Label;
+        public int Second;
+        public int[]? Values;
+
+        public Built()
+        {
+        }
+
+        public Built(int first, int second)
+        {
+            First = first;
+            Second = second;
+        }
+
+        static bool SameValues(int[]? left, int[]? right)
+        {
+            if (left is null || right is null)
+                return left is null && right is null;
+            if (left.Length != right.Length)
+                return false;
+            for (var i = 0; i < left.Length; ++i)
+                if (left[i] != right[i])
+                    return false;
+            return true;
+        }
+
+        public override bool Equals(object? obj) =>
+            obj is Built other && First == other.First && Second == other.Second && Label == other.Label && SameValues(Values, other.Values);
+
+        public override int GetHashCode() =>
+            HashCode.Combine(First, Second, Label, Values is null ? -1 : Values.Length);
+
+        public override string ToString()
+        {
+            var label = Label ?? "<null>";
+            var values = Values is null ? "<null>" : string.Join(",", Values);
+            return $"{First}/{Second}/{label}/{values}";
+        }
+    }
+
     public sealed class FieldHolder
     {
         public Recorded? Held;
@@ -57,6 +100,10 @@ public class DifferentialFuzz
     }
 
     static readonly PropertyInfo count = typeof(ObservableRangeCollection<Recorded>).GetProperty(nameof(ObservableRangeCollection<Recorded>.Count))!;
+    static readonly ConstructorInfo builtConstructor = typeof(Built).GetConstructor([typeof(int), typeof(int)])!;
+    static readonly FieldInfo builtFirst = typeof(Built).GetField(nameof(Built.First))!;
+    static readonly FieldInfo builtLabel = typeof(Built).GetField(nameof(Built.Label))!;
+    static readonly FieldInfo builtValues = typeof(Built).GetField(nameof(Built.Values))!;
     static readonly FieldInfo held = typeof(FieldHolder).GetField(nameof(FieldHolder.Held))!;
     static readonly FieldInfo heldItems = typeof(FieldHolder).GetField(nameof(FieldHolder.HeldItems))!;
     static readonly FieldInfo linked = typeof(Recorded).GetField(nameof(Recorded.Linked))!;
@@ -96,7 +143,7 @@ public class DifferentialFuzz
     }
 
     static Expression Boolean(Random rng, int depth, Sources sources) =>
-        depth <= 0 ? Expression.Constant(rng.Next(2) == 0) : (rng.Next(9) switch
+        depth <= 0 ? Expression.Constant(rng.Next(2) == 0) : (rng.Next(10) switch
         {
             0 => Expression.GreaterThan(Integer(rng, depth - 1, sources), Integer(rng, depth - 1, sources)),
             1 => Expression.LessThan(Integer(rng, depth - 1, sources), Integer(rng, depth - 1, sources)),
@@ -106,8 +153,17 @@ public class DifferentialFuzz
             5 => Expression.AndAlso(Boolean(rng, depth - 1, sources), Boolean(rng, depth - 1, sources)),
             6 => Expression.Equal(Text(rng, depth - 1, sources), Text(rng, depth - 1, sources)),
             7 => Expression.TypeIs(Text(rng, depth - 1, sources), typeof(string)),
+            8 => Expression.OrElse(Boolean(rng, depth - 1, sources), Boolean(rng, depth - 1, sources)),
             _ => Expression.Call(stringIsNullOrEmpty, Text(rng, depth - 1, sources))
         });
+
+    static Expression Constructed(Random rng, int depth, Sources sources) =>
+        rng.Next(3) switch
+        {
+            0 => Expression.New(builtConstructor, Integer(rng, depth - 1, sources), Integer(rng, depth - 1, sources)),
+            1 => Expression.MemberInit(Expression.New(typeof(Built)), Expression.Bind(builtFirst, Integer(rng, depth - 1, sources)), Expression.Bind(builtLabel, Text(rng, depth - 1, sources))),
+            _ => Expression.MemberInit(Expression.New(typeof(Built)), Expression.Bind(builtValues, Expression.NewArrayInit(typeof(int), Integer(rng, depth - 1, sources), Integer(rng, depth - 1, sources))), Expression.Bind(builtLabel, Text(rng, depth - 1, sources)))
+        };
 
     static Expression Integer(Random rng, int depth, Sources sources) =>
         depth <= 0 ? Leaf(rng, sources) : (rng.Next(7) switch
@@ -158,12 +214,12 @@ public class DifferentialFuzz
             _ => Expression.Constant(rng.Next(2) == 0 ? "s" : null, typeof(string))
         };
 
-    static Expression<Func<Recorded, object?>> Lambda(int seed, int depth, World world)
+    static Expression<Func<Recorded, object?>> Lambda(int seed, int depth, World world, bool constructed)
     {
         var rng = new Random(seed);
         var subject = Expression.Parameter(typeof(Recorded), "s");
         var sources = new Sources(subject, world.OtherMember, world.ItemsMember, world.HeldMember, world.HeldItemsMember, world.NumbersMember);
-        var body = rng.Next(3) switch
+        var body = constructed ? Constructed(rng, depth, sources) : rng.Next(3) switch
         {
             0 => Boolean(rng, depth, sources),
             1 => Text(rng, depth, sources),
@@ -314,12 +370,12 @@ public class DifferentialFuzz
         }
     }
 
-    static void RunProgram(int seed, int depth, int steps)
+    static void RunProgram(int seed, int depth, int steps, bool constructed = false)
     {
         var graphWorld = new World(seed, false);
         var fastWorld = new World(seed, true);
-        var graphLambda = Lambda(seed, depth, graphWorld);
-        var fastLambda = Lambda(seed, depth, fastWorld);
+        var graphLambda = Lambda(seed, depth, graphWorld, constructed);
+        var fastLambda = Lambda(seed, depth, fastWorld, constructed);
         Assert.AreEqual(graphLambda.ToString().Replace("value(", "@("), fastLambda.ToString().Replace("value(", "@("), $"seed {seed}: the two worlds were given different expressions");
         using var graphExpression = graphWorld.Observer.Observe(graphLambda, graphWorld.Subject);
         using var fastExpression = fastWorld.Observer.Observe(fastLambda, fastWorld.Subject);
@@ -335,6 +391,13 @@ public class DifferentialFuzz
             Assert.AreEqual(Describe(graphExpression.Evaluation), Describe(fastExpression.Evaluation), $"seed {seed}, step {step}: evaluation diverged for {graphLambda}");
             Assert.AreEqual(graphWorld.Notifications, fastWorld.Notifications, $"seed {seed}, step {step}: notification count diverged for {graphLambda}");
         }
+    }
+
+    [TestMethod]
+    public void ConstructedShapes()
+    {
+        for (var seed = 7000; seed < 7200; ++seed)
+            RunProgram(seed, 3, 14, true);
     }
 
     [TestMethod]

@@ -6,7 +6,7 @@ sealed class ObservableMemberInitExpression(ExpressionObserver observer, MemberI
 {
     IReadOnlyDictionary<ObservableExpression, (MemberInfo Member, ObservableExpressionSubscription? Subscription)>? memberAssignmentObservableExpressions;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
-    ObservableExpression? newObservableExpression;
+    ObservableNewExpression? newObservableExpression;
     ObservableExpressionSubscription? newObservableExpressionSubscription;
 
     internal readonly MemberInitExpression MemberInitExpression = memberInitExpression;
@@ -39,7 +39,7 @@ sealed class ObservableMemberInitExpression(ExpressionObserver observer, MemberI
     {
         try
         {
-            var (newObservableExpressionFault, newObservableExpressionResult) = newObservableExpression?.Evaluation ?? (null, null);
+            var newObservableExpressionFault = newObservableExpression?.Evaluation.Fault;
             if (newObservableExpressionFault is not null)
             {
                 Evaluation = (newObservableExpressionFault, defaultResult);
@@ -52,18 +52,19 @@ sealed class ObservableMemberInitExpression(ExpressionObserver observer, MemberI
             }
             else
             {
+                var value = newObservableExpression?.Construct();
                 if (memberAssignmentObservableExpressions is not null)
                     foreach (var kv in memberAssignmentObservableExpressions)
                     {
                         if (kv.Value.Member is FieldInfo field)
-                            field.SetValue(newObservableExpressionResult, kv.Key.Evaluation.Result);
+                            field.SetValue(value, kv.Key.Evaluation.Result);
                         else if (kv.Value.Member is PropertyInfo property)
-                            property.FastSetValue(newObservableExpressionResult, kv.Key.Evaluation.Result);
+                            property.FastSetValue(value, kv.Key.Evaluation.Result);
                         else
                             throw new NotSupportedException("Cannot handle member that is not a field or property");
                     }
-                Evaluation = (null, newObservableExpressionResult);
-                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{MemberInitExpression} evaluated: {Value}", MemberInitExpression, newObservableExpressionResult);
+                Evaluation = (null, value);
+                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{MemberInitExpression} evaluated: {Value}", MemberInitExpression, value);
             }
         }
         catch (Exception ex)
@@ -72,6 +73,9 @@ sealed class ObservableMemberInitExpression(ExpressionObserver observer, MemberI
             observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, ex, "{MemberInitExpression} faulted: {Fault}", MemberInitExpression, ex);
         }
     }
+
+    protected override bool GetShouldValueBeDisposed() =>
+        newObservableExpression?.ShouldConstructedValueBeDisposed ?? false;
 
     /// <summary>
     /// Yields the fault of the first member assignment which has one, written as a loop here rather than through the shared helper because these expressions are the keys of a dictionary rather than a list
@@ -86,39 +90,8 @@ sealed class ObservableMemberInitExpression(ExpressionObserver observer, MemberI
         return null;
     }
 
-    void IObservableExpressionDependent.OnDependencyEvaluationChanged(ObservableExpression dependency)
-    {
-        if (ReferenceEquals(dependency, newObservableExpression))
-        {
-            Evaluate();
-            return;
-        }
-        var memberAssignmentObservableExpression = dependency;
-        if (memberAssignmentObservableExpressions?.TryGetValue(memberAssignmentObservableExpression, out var assignment) ?? false)
-        {
-            var member = assignment.Member;
-            var (memberAssignmentObservableExpressionFault, memberAssignmentObservableExpressionResult) = memberAssignmentObservableExpression.Evaluation;
-            if (memberAssignmentObservableExpressionFault is not null)
-                Evaluation = (memberAssignmentObservableExpressionFault, defaultResult);
-            else
-            {
-                var intactResult = TryGetUndeferredResult(out var result) && result is not null;
-                if (!intactResult)
-                    result = newObservableExpression?.Evaluation.Result;
-                if (result is not null)
-                {
-                    if (member is FieldInfo field)
-                        field.SetValue(result, memberAssignmentObservableExpressionResult);
-                    else if (member is PropertyInfo property)
-                        property.FastSetValue(result, memberAssignmentObservableExpressionResult);
-                    else
-                        throw new NotSupportedException("Cannot handle member that is not a field or property");
-                }
-                if (!intactResult)
-                    Evaluation = (null, result);
-            }
-        }
-    }
+    void IObservableExpressionDependent.OnDependencyEvaluationChanged(ObservableExpression dependency) =>
+        Evaluate();
 
     protected override void OnInitialization()
     {
@@ -127,7 +100,7 @@ sealed class ObservableMemberInitExpression(ExpressionObserver observer, MemberI
         var memberAssignmentObservableExpressions = new Dictionary<ObservableExpression, (MemberInfo Member, ObservableExpressionSubscription? Subscription)>(ObservableExpressionEqualityComparer.Default);
         try
         {
-            newObservableExpression = observer.GetObservableExpression(MemberInitExpression.NewExpression, IsDeferringEvaluation);
+            newObservableExpression = (ObservableNewExpression)observer.GetObservableExpression(MemberInitExpression.NewExpression, IsDeferringEvaluation);
             if (newObservableExpression.CanChange)
                 newObservableExpressionSubscription = newObservableExpression.SubscribeDependent(this);
             var bindings = MemberInitExpression.Bindings;
