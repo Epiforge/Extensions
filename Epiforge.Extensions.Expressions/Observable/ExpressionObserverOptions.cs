@@ -354,6 +354,6 @@ public class ExpressionObserverOptions
         ArgumentNullException.ThrowIfNull(property);
         if (property.GetMethod is not { } getMethod)
             throw new ArgumentException("the property specified does not have a getter", nameof(property));
-        return IsMethodReturnValueDisposed(getMethod);
+        return RemoveMethodReturnValueDisposal(getMethod);
     }
 }

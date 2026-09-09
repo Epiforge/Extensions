@@ -183,6 +183,31 @@ public class Options
     /// <summary>
     /// The options answer the same question an observer built from them answers, which includes the attribute an observer has always honored and the options once did not
     /// </summary>
+    /// <summary>
+    /// Removal by property removed nothing and reported whether the value was disposed of instead, so a registration made through a property could not be undone through one
+    /// </summary>
+    [TestMethod]
+    public void UndoPropertyValueDisposal()
+    {
+        var options = new ExpressionObserverOptions();
+        var property = typeof(TestObject).GetProperty(nameof(TestObject.SyncDisposable))!;
+        Assert.IsTrue(options.AddPropertyValueDisposal(property));
+        Assert.IsTrue(options.IsPropertyValueDisposed(property));
+        Assert.IsTrue(options.RemovePropertyValueDisposal(property));
+        Assert.IsFalse(options.IsPropertyValueDisposed(property));
+        Assert.IsFalse(options.RemovePropertyValueDisposal(property));
+    }
+
+    [TestMethod]
+    public void UndoPropertyValueDisposalByExpression()
+    {
+        var options = new ExpressionObserverOptions();
+        Assert.IsTrue(options.AddExpressionValueDisposal(() => default(TestObject)!.SyncDisposable));
+        Assert.IsTrue(options.IsExpressionValueDisposed(() => default(TestObject)!.SyncDisposable));
+        Assert.IsTrue(options.RemoveExpressionValueDisposal(() => default(TestObject)!.SyncDisposable));
+        Assert.IsFalse(options.IsExpressionValueDisposed(() => default(TestObject)!.SyncDisposable));
+    }
+
     [TestMethod]
     public void DisposeMethodReturnValueDeclaredByAttribute() =>
         Assert.IsTrue(new ExpressionObserverOptions().IsMethodReturnValueDisposed(typeof(Recorded).GetMethod(nameof(Recorded.Held))!));
