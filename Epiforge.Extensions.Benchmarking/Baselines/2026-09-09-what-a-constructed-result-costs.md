@@ -50,3 +50,34 @@ The pattern holds that a prediction summing measured unit costs lands and a pred
 ## What has not been measured
 
 Whether the 64 bytes are the two boxed enumerators, which the change about to be made will decide. What the same shapes cost at other element counts. Whether the unexplained 24 bytes on every observed call and constructor is one term or two.
+
+## The after — the 64 bytes were the enumerators
+
+The bindings moved from a field typed `IReadOnlyDictionary<,>` to an array of triples walked by index, which removed both interface-typed walks, the dictionary and its comparer. Same instrument, same day.
+
+| arm | before | after |
+|---|---:|---:|
+| a member initializer, graph | 179.69 KB / 81.602 μs | **117.19 KB / 64.704 μs** |
+| a constructor, graph | 117.19 KB / 62.360 μs | 117.19 KB / 64.993 μs |
+
+**184.0 B per change to 120.0, and it lands on the constructor arm to the hundredth of a kilobyte.** Both shapes now decompose identically: 48 floor, 24 for the boxed value, 24 for the instance, 24 for the term still unexplained on every observed call and constructor. The prediction recorded before the run was 120 and that it would land on the constructor arm; it did both.
+
+**Fourteen of fourteen control arms are identical to the hundredth of a kilobyte.** Nothing else moved, which is what a change confined to one node's own storage should look like.
+
+**The time saving is real and the run is slower.** Every unchanged arm rose 2% to 5.5% between the two runs — the floor 8.077 to 8.283, the member read 39.871 to 41.410, the constructor 62.360 to 64.993 — so this pair carries about 4% of drift on byte-identical code. Against that band the member initializer's 81.602 to 64.704 is a 20.7% fall, and adjusted for the drift closer to 24%. It is far outside the band; the individual arm movements inside it decide nothing.
+
+## What the correction actually costs, finally
+
+Against the member read, which is what a binding change allocated before any of this:
+
+- **48 B per change**, which is the object constructed plus the term charged on every observed construction.
+- Not the 112 the first measurement showed. **64 of that 112 was enumeration the correction introduced by routing binding changes through `Evaluate()`, and it is gone.**
+- **0 on the fast path**, which never had the defect, never boxed an enumerator, and constructs an object per change for 24 bytes and nothing else.
+
+The release note's claim — one construction per evaluation — is now the whole truth rather than an understatement.
+
+## And a throw nobody had hit
+
+Written before the change, because whether it failed decided whether the array was a correction or only a saving: `new Box { First = source.Rank, Second = source.Rank }` threw `ArgumentException` from `Dictionary.Add` inside the node's own initialization, since the observer resolves two equal binding expressions to one cached node. **Shipped in 4.3.0 and 4.4.0, and dependent on mechanism** — the fast path never builds that node and served the same lambda without complaint. An array has no keys, so the shape now works on both.
+
+**Recorded and not fixed:** two bindings sharing a node subscribe to it twice from the same dependent, so a change evaluates the observation twice. The second evaluation produces an equal value and announces nothing, so it is correct and wasteful. Deduplicating means tracking which occurrence owns the subscription and keeping the disposal count right, which is not something to ride along with a correctness fix.
