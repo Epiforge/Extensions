@@ -110,6 +110,13 @@ sealed class ObservableMemberExpression(ExpressionObserver observer, MemberExpre
             Evaluate();
     }
 
+    /// <summary>
+    /// Evaluates a fixed member read even when evaluation is deferred, so that what it reads through is pinned when the observation is built rather than whenever a branch first reaches it
+    /// </summary>
+    /// <remarks>
+    /// Left deferred, a branch not taken until later reads whatever the field has been reassigned to in the meantime, while direct subscription resolves the same subexpression when the observation is constructed, and the two report different objects. Fixedness is asked of the analyzer rather than decided again here, so that one definition governs both mechanisms.
+    /// A field of a compiler generated type is excluded, and the exclusion is the whole reason this is narrow: evaluating such a field also attaches a subscription to its value's contents, which a branch not yet taken must not take. Pinning those requires separating a field read's evaluation from that attachment, which this does not do, so a captured local read only inside a deferred branch is not yet pinned
+    /// </remarks>
     protected override void OnInitialization()
     {
         try
@@ -135,6 +142,8 @@ sealed class ObservableMemberExpression(ExpressionObserver observer, MemberExpre
                     break;
             }
             EvaluateIfNotDeferred();
+            if (this.field is not null && !isFieldOfCompilerGeneratedType && DirectSubscriptionAnalyzer.IsFixed(MemberExpression))
+                EvaluateIfDeferred();
         }
         catch (Exception ex)
         {

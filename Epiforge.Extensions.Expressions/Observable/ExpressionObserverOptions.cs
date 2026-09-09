@@ -7,6 +7,10 @@ public class ExpressionObserverOptions
 {
     internal static readonly ConcurrentDictionary<MethodInfo, MethodInfo> GenericMethodToGenericMethodDefinition = new();
     internal static readonly ConcurrentDictionary<MethodInfo, PropertyInfo?> PropertyGetMethodToProperty = new();
+    internal static readonly ConcurrentDictionary<MethodInfo, bool> DisposeWhenDiscardedAttributeExistsByMethodInfo = [];
+
+    internal static bool DisposeWhenDiscardedAttributeExistsByMethodInfoValueFactory(MethodInfo method) =>
+        method.ReturnParameter.GetCustomAttributes(true).OfType<DisposeWhenDiscardedAttribute>().Any();
 
     internal static bool CannotBeDisposed(Type type) =>
         type.IsSealed && !IsDisposable(type);
@@ -264,7 +268,7 @@ public class ExpressionObserverOptions
     public bool IsMethodReturnValueDisposed(MethodInfo method)
     {
         ArgumentNullException.ThrowIfNull(method);
-        return method.IsStatic && DisposeStaticMethodReturnValues || DisposeMethodReturnValues.ContainsKey(method) || method.IsGenericMethod && DisposeMethodReturnValues.ContainsKey(GenericMethodToGenericMethodDefinition.GetOrAdd(method, GetGenericMethodDefinitionFromGenericMethod));
+        return method.IsStatic && DisposeStaticMethodReturnValues || DisposeMethodReturnValues.ContainsKey(method) || method.IsGenericMethod && DisposeMethodReturnValues.ContainsKey(GenericMethodToGenericMethodDefinition.GetOrAdd(method, GetGenericMethodDefinitionFromGenericMethod)) || DisposeWhenDiscardedAttributeExistsByMethodInfo.GetOrAdd(method, DisposeWhenDiscardedAttributeExistsByMethodInfoValueFactory);
     }
 
     /// <summary>

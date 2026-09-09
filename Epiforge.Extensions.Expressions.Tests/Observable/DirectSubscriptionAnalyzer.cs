@@ -150,12 +150,34 @@ public class DirectSubscriptionAnalyzer
         Assert.IsTrue(Analyzer().Analyze(body).IsEligible);
     }
 
+    /// <summary>
+    /// An unsealed return type alone no longer refuses, because a value the observer is not told to dispose of is not disposed of by either mechanism, whatever its type could have implemented
+    /// </summary>
     [TestMethod]
-    public void MethodCallReturningUnsealedTypeIsIneligible()
+    public void MethodCallReturningUnsealedTypeIsEligibleWhenItsReturnValueIsNotDisposed()
     {
-        var body = (MethodCallExpression)BodyOf<object>(person => person.Name!.Clone());
+        var body = (MethodCallExpression)BodyOfRecorded<Recorded>(recorded => recorded.Self());
         Assert.IsFalse(body.Method.ReturnType.IsSealed);
         var analysis = Analyzer().Analyze(body);
+        Assert.IsTrue(analysis.IsEligible, analysis.ToString());
+    }
+
+    [TestMethod]
+    public void MethodCallReturningUnsealedTypeIsIneligibleWhenItsReturnValueIsAttributed()
+    {
+        var body = (MethodCallExpression)BodyOfRecorded<Recorded>(recorded => recorded.Held());
+        var analysis = Analyzer().Analyze(body);
+        Assert.IsFalse(analysis.IsEligible);
+        Assert.AreEqual(DirectSubscriptionIneligibility.ValueRequiresDisposal, analysis.Ineligibility);
+    }
+
+    [TestMethod]
+    public void MethodCallReturningUnsealedTypeIsIneligibleWhenRegisteredForDisposal()
+    {
+        var options = new ExpressionObserverOptions();
+        Assert.IsTrue(options.AddMethodReturnValueDisposal(typeof(Recorded).GetMethod(nameof(Recorded.Self))!));
+        var body = (MethodCallExpression)BodyOfRecorded<Recorded>(recorded => recorded.Self());
+        var analysis = new Epiforge.Extensions.Expressions.Observable.DirectSubscriptionAnalyzer(options).Analyze(body);
         Assert.IsFalse(analysis.IsEligible);
         Assert.AreEqual(DirectSubscriptionIneligibility.ValueRequiresDisposal, analysis.Ineligibility);
     }
@@ -236,6 +258,29 @@ public class DirectSubscriptionAnalyzer
     [TestMethod]
     public void StaticFieldTargetIsEligible() =>
         Assert.IsTrue(Analyzer().Analyze(BodyOf<int>(person => StaticFieldHolder.Held.Rank)).IsEligible);
+
+    /// <summary>
+    /// The observer disposes of every static method's return value unless told otherwise, so the default options refuse one whose return type could be disposed
+    /// </summary>
+    [TestMethod]
+    public void StaticMethodReturningUnsealedTypeIsIneligible()
+    {
+        var body = (MethodCallExpression)BodyOf<object?>(person => Convert.ChangeType(person.NameGets, typeof(int)));
+        Assert.IsTrue(body.Method.IsStatic);
+        Assert.IsFalse(body.Method.ReturnType.IsSealed);
+        var analysis = Analyzer().Analyze(body);
+        Assert.IsFalse(analysis.IsEligible);
+        Assert.AreEqual(DirectSubscriptionIneligibility.ValueRequiresDisposal, analysis.Ineligibility);
+    }
+
+    [TestMethod]
+    public void StaticMethodReturningUnsealedTypeIsEligibleWhenStaticDisposalIsExcluded()
+    {
+        var options = new ExpressionObserverOptions { DisposeStaticMethodReturnValues = false };
+        var body = (MethodCallExpression)BodyOf<object?>(person => Convert.ChangeType(person.NameGets, typeof(int)));
+        var analysis = new Epiforge.Extensions.Expressions.Observable.DirectSubscriptionAnalyzer(options).Analyze(body);
+        Assert.IsTrue(analysis.IsEligible, analysis.ToString());
+    }
 
     [TestMethod]
     public void StaticPropertyIsEligibleWhenStaticDisposalIsExcluded()

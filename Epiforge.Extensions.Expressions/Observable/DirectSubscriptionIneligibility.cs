@@ -36,12 +36,12 @@ public enum DirectSubscriptionIneligibility
     IgnoredChangeNotification,
 
     /// <summary>
-    /// The value produced is registered for disposal, which only the graph performs
+    /// The value produced is one the graph disposes of, which only the graph performs
     /// </summary>
     ValueRequiresDisposal,
 
     /// <summary>
-    /// An operator implemented by a method is applied whose return type could implement a disposal interface, so the graph may dispose of the value it produces
+    /// An operator implemented by a method is applied whose return value the graph disposes of
     /// </summary>
     UserDefinedOperator,
 

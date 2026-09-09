@@ -96,6 +96,19 @@ public class Recorded(SubscriptionLog log) :
         }
     }
 
+    /// <summary>
+    /// Returns this object from an instance method whose return type is neither sealed nor disposable and which the observer has not been told to dispose of, which is the shape a formula function returning a domain object takes
+    /// </summary>
+    public Recorded Self() =>
+        this;
+
+    /// <summary>
+    /// Returns this object from a method whose return value an observer disposes of, declared by the attribute rather than by registration
+    /// </summary>
+    [return: DisposeWhenDiscarded]
+    public Recorded Held() =>
+        this;
+
     public event PropertyChangedEventHandler? PropertyChanged
     {
         add

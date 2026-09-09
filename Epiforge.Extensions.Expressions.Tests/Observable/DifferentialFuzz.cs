@@ -100,6 +100,7 @@ public class DifferentialFuzz
     }
 
     static readonly PropertyInfo count = typeof(ObservableRangeCollection<Recorded>).GetProperty(nameof(ObservableRangeCollection<Recorded>.Count))!;
+    static readonly Func<int, int> absoluteDelegate = Math.Abs;
     static readonly ConstructorInfo builtConstructor = typeof(Built).GetConstructor([typeof(int), typeof(int)])!;
     static readonly FieldInfo builtFirst = typeof(Built).GetField(nameof(Built.First))!;
     static readonly FieldInfo builtLabel = typeof(Built).GetField(nameof(Built.Label))!;
@@ -165,8 +166,27 @@ public class DifferentialFuzz
             _ => Expression.MemberInit(Expression.New(typeof(Built)), Expression.Bind(builtValues, Expression.NewArrayInit(typeof(int), Integer(rng, depth - 1, sources), Integer(rng, depth - 1, sources))), Expression.Bind(builtLabel, Text(rng, depth - 1, sources)))
         };
 
+    /// <summary>
+    /// Wraps an integer subexpression in an invocation, choosing evenly between the two shapes the reducer admits and the two it refuses
+    /// </summary>
+    /// <remarks>
+    /// The refused shapes are not wasted seeds. If the reducer ever admits one of them the fast world takes the fast path and diverges from the graph, which is precisely what a lambda reading its parameter twice or not at all would do, so these programs guard the refusal rather than exercise the admission
+    /// </remarks>
+    static Expression Invocation(Random rng, int depth, Sources sources)
+    {
+        var parameter = Expression.Parameter(typeof(int), "v");
+        var argument = Integer(rng, depth - 1, sources);
+        return rng.Next(4) switch
+        {
+            0 => Expression.Invoke(Expression.Lambda<Func<int, int>>(Expression.Negate(parameter), parameter), argument),
+            1 => Expression.Invoke(Expression.Lambda<Func<int, int>>(Expression.Subtract(parameter, Expression.Constant(1)), parameter), argument),
+            2 => Expression.Invoke(Expression.Lambda<Func<int, int>>(Expression.Add(parameter, parameter), parameter), argument),
+            _ => Expression.Invoke(Expression.Constant(absoluteDelegate), argument)
+        };
+    }
+
     static Expression Integer(Random rng, int depth, Sources sources) =>
-        depth <= 0 ? Leaf(rng, sources) : (rng.Next(7) switch
+        depth <= 0 ? Leaf(rng, sources) : (rng.Next(8) switch
         {
             0 => Expression.Add(Integer(rng, depth - 1, sources), Integer(rng, depth - 1, sources)),
             1 => Expression.Subtract(Integer(rng, depth - 1, sources), Integer(rng, depth - 1, sources)),
@@ -174,6 +194,7 @@ public class DifferentialFuzz
             3 => Expression.Divide(Integer(rng, depth - 1, sources), Integer(rng, depth - 1, sources)),
             4 => Expression.Negate(Integer(rng, depth - 1, sources)),
             5 => Expression.Condition(Boolean(rng, depth - 1, sources), Integer(rng, depth - 1, sources), Integer(rng, depth - 1, sources)),
+            6 => Invocation(rng, depth, sources),
             _ => Leaf(rng, sources)
         });
 

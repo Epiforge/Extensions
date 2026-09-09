@@ -33,6 +33,14 @@ public class Options
         public SyncDisposableTestPerson GetPersonNamedAfterType(Type type) =>
             new(type.Name);
 
+        /// <summary>
+        /// The same method, declaring by attribute what the other declares by registration
+        /// </summary>
+        [SuppressMessage("Performance", "CA1822:Mark members as static")]
+        [return: DisposeWhenDiscarded]
+        public SyncDisposableTestPerson GetAttributedPersonNamedAfterType(Type type) =>
+            new(type.Name);
+
         public SyncDisposableTestPerson GetPersonNamedAfterType<T>() =>
             GetPersonNamedAfterType(typeof(T));
     }
@@ -171,6 +179,17 @@ public class Options
         Assert.IsTrue(options.IsExpressionValueDisposed(() => new TestObject().GetSyncDisposableMethod()));
         Assert.IsTrue(options.RemoveExpressionValueDisposal(() => new TestObject().GetSyncDisposableMethod()));
     }
+
+    /// <summary>
+    /// The options answer the same question an observer built from them answers, which includes the attribute an observer has always honored and the options once did not
+    /// </summary>
+    [TestMethod]
+    public void DisposeMethodReturnValueDeclaredByAttribute() =>
+        Assert.IsTrue(new ExpressionObserverOptions().IsMethodReturnValueDisposed(typeof(Recorded).GetMethod(nameof(Recorded.Held))!));
+
+    [TestMethod]
+    public void DisposeMethodReturnValueOfAnUnattributedInstanceMethodIsNotAssumed() =>
+        Assert.IsFalse(new ExpressionObserverOptions().IsMethodReturnValueDisposed(typeof(Recorded).GetMethod(nameof(Recorded.Self))!));
 
     [TestMethod]
     public void DisposeMethodReturnValueThatCannotBeDisposedIsRefused() =>

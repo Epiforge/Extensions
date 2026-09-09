@@ -264,22 +264,23 @@ public sealed class DirectSubscriptionAnalyzer
     /// </summary>
     /// <param name="options">The options which decide which change sources are subscribed to</param>
     public DirectSubscriptionAnalyzer(ExpressionObserverOptions options) :
-        this(Validated(options).ConstantExpressionsListenForCollectionChanged, options.ConstantExpressionsListenForDictionaryChanged, options.MemberExpressionsListenToGeneratedTypesFieldValuesForCollectionChanged, options.MemberExpressionsListenToGeneratedTypesFieldValuesForDictionaryChanged, options.IsIgnoredPropertyChangeNotification, options.IsPropertyValueDisposed)
+        this(Validated(options).ConstantExpressionsListenForCollectionChanged, options.ConstantExpressionsListenForDictionaryChanged, options.MemberExpressionsListenToGeneratedTypesFieldValuesForCollectionChanged, options.MemberExpressionsListenToGeneratedTypesFieldValuesForDictionaryChanged, options.IsIgnoredPropertyChangeNotification, options.IsMethodReturnValueDisposed, options.IsPropertyValueDisposed)
     {
     }
 
     internal DirectSubscriptionAnalyzer(ExpressionObserver observer) :
-        this(observer.ConstantExpressionsListenForCollectionChanged, observer.ConstantExpressionsListenForDictionaryChanged, observer.MemberExpressionsListenToGeneratedTypesFieldValuesForCollectionChanged, observer.MemberExpressionsListenToGeneratedTypesFieldValuesForDictionaryChanged, observer.IsIgnoredPropertyChangeNotification, observer.IsPropertyValueDisposed)
+        this(observer.ConstantExpressionsListenForCollectionChanged, observer.ConstantExpressionsListenForDictionaryChanged, observer.MemberExpressionsListenToGeneratedTypesFieldValuesForCollectionChanged, observer.MemberExpressionsListenToGeneratedTypesFieldValuesForDictionaryChanged, observer.IsIgnoredPropertyChangeNotification, observer.IsMethodReturnValueDisposed, observer.IsPropertyValueDisposed)
     {
     }
 
-    DirectSubscriptionAnalyzer(bool constantsListenForCollectionChanged, bool constantsListenForDictionaryChanged, bool generatedTypeFieldsListenForCollectionChanged, bool generatedTypeFieldsListenForDictionaryChanged, Func<PropertyInfo, bool> isIgnoredPropertyChangeNotification, Func<PropertyInfo, bool> isPropertyValueDisposed)
+    DirectSubscriptionAnalyzer(bool constantsListenForCollectionChanged, bool constantsListenForDictionaryChanged, bool generatedTypeFieldsListenForCollectionChanged, bool generatedTypeFieldsListenForDictionaryChanged, Func<PropertyInfo, bool> isIgnoredPropertyChangeNotification, Func<MethodInfo, bool> isMethodReturnValueDisposed, Func<PropertyInfo, bool> isPropertyValueDisposed)
     {
         this.constantsListenForCollectionChanged = constantsListenForCollectionChanged;
         this.constantsListenForDictionaryChanged = constantsListenForDictionaryChanged;
         this.generatedTypeFieldsListenForCollectionChanged = generatedTypeFieldsListenForCollectionChanged;
         this.generatedTypeFieldsListenForDictionaryChanged = generatedTypeFieldsListenForDictionaryChanged;
         this.isIgnoredPropertyChangeNotification = isIgnoredPropertyChangeNotification;
+        this.isMethodReturnValueDisposed = isMethodReturnValueDisposed;
         this.isPropertyValueDisposed = isPropertyValueDisposed;
     }
 
@@ -288,6 +289,7 @@ public sealed class DirectSubscriptionAnalyzer
     readonly bool generatedTypeFieldsListenForCollectionChanged;
     readonly bool generatedTypeFieldsListenForDictionaryChanged;
     readonly Func<PropertyInfo, bool> isIgnoredPropertyChangeNotification;
+    readonly Func<MethodInfo, bool> isMethodReturnValueDisposed;
     readonly Func<PropertyInfo, bool> isPropertyValueDisposed;
 
     /// <summary>
@@ -408,9 +410,15 @@ public sealed class DirectSubscriptionAnalyzer
         return DirectSubscriptionAnalysis.Eligible;
     }
 
+    /// <summary>
+    /// Determines whether an expression invoking a method can be observed by subscribing directly to its change sources, and when it can, plans the subscriptions its target and arguments take
+    /// </summary>
+    /// <remarks>
+    /// A method is refused when the graph would dispose of what it returned, which is the same question asked of a property read: what only the graph does, only the graph may be asked to do. Both terms are needed. A return type sealed and implementing neither disposal interface can never be disposed by anyone, whatever the options say, and a return type which could be disposed is only ever disposed of when the observer has been told to dispose of that method's return values, whether by registration or by <c>DisposeWhenDiscardedAttribute</c> on the return parameter. Note that the observer disposes of every static method's return value unless told otherwise, so a static method returning an unsealed type stays refused under the default options
+    /// </remarks>
     DirectSubscriptionAnalysis AnalyzeMethodCall(MethodCallExpression methodCallExpression, Planner? planner)
     {
-        if (!ExpressionObserverOptions.CannotBeDisposed(methodCallExpression.Method.ReturnType))
+        if (!ExpressionObserverOptions.CannotBeDisposed(methodCallExpression.Method.ReturnType) && isMethodReturnValueDisposed(methodCallExpression.Method))
             return new(methodCallExpression, DirectSubscriptionIneligibility.ValueRequiresDisposal);
         if (methodCallExpression.Object is { } target)
         {
@@ -495,14 +503,14 @@ public sealed class DirectSubscriptionAnalyzer
             MethodCallExpression methodCallExpression => AnalyzeMethodCall(methodCallExpression, planner),
             NewExpression newExpression => AnalyzeNew(newExpression, planner),
             NewArrayExpression newArrayExpression => AnalyzeNewArray(newArrayExpression, planner),
-            BinaryExpression binaryExpression when binaryExpression.Method is { } binaryOperator && !ExpressionObserverOptions.CannotBeDisposed(binaryOperator.ReturnType) => new(binaryExpression, DirectSubscriptionIneligibility.UserDefinedOperator),
+            BinaryExpression binaryExpression when binaryExpression.Method is { } binaryOperator && !ExpressionObserverOptions.CannotBeDisposed(binaryOperator.ReturnType) && isMethodReturnValueDisposed(binaryOperator) => new(binaryExpression, DirectSubscriptionIneligibility.UserDefinedOperator),
             BinaryExpression binaryExpression when IsShortCircuiting(binaryExpression) => AnalyzeShortCircuiting(binaryExpression, planner),
             BinaryExpression binaryExpression when binaryExpression.Conversion is not null => new(binaryExpression, DirectSubscriptionIneligibility.UnsupportedExpressionKind),
             BinaryExpression binaryExpression => AnalyzeNode(binaryExpression.Left, planner) is { IsEligible: false } left ? left : AnalyzeNode(binaryExpression.Right, planner),
             ConditionalExpression conditionalExpression => AnalyzeConditional(conditionalExpression, planner),
             TypeBinaryExpression typeBinaryExpression when typeBinaryExpression.NodeType is not ExpressionType.TypeAs => AnalyzeNode(typeBinaryExpression.Expression, planner),
             UnaryExpression unaryExpression when unaryExpression.NodeType is ExpressionType.Quote => DirectSubscriptionAnalysis.Eligible,
-            UnaryExpression unaryExpression when unaryExpression.Method is { } unaryOperator && !ExpressionObserverOptions.CannotBeDisposed(unaryOperator.ReturnType) => new(unaryExpression, DirectSubscriptionIneligibility.UserDefinedOperator),
+            UnaryExpression unaryExpression when unaryExpression.Method is { } unaryOperator && !ExpressionObserverOptions.CannotBeDisposed(unaryOperator.ReturnType) && isMethodReturnValueDisposed(unaryOperator) => new(unaryExpression, DirectSubscriptionIneligibility.UserDefinedOperator),
             UnaryExpression unaryExpression => AnalyzeNode(unaryExpression.Operand, planner),
             _ => new(expression, DirectSubscriptionIneligibility.UnsupportedExpressionKind)
         };

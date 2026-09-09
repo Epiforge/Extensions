@@ -67,6 +67,13 @@ public class InvocationCeilingBenchmarks
     public void NestedInlinedDirect() =>
         ConstructAndDispose(direct, nestedInlined);
 
+    /// <summary>
+    /// Closes the gap the first run of this instrument left named: that a nested invocation also falls to the floor was an inference from the hand-inlined arm, and this measures it
+    /// </summary>
+    [Benchmark]
+    public void NestedInvocationDefault() =>
+        ConstructAndDispose(aDefault, nestedInvocation);
+
     [Benchmark]
     public void NestedInvocationGraph() =>
         ConstructAndDispose(graph, nestedInvocation);
