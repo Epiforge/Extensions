@@ -84,3 +84,19 @@ Sharing across observations. The graph serves two observations of one expression
 The graph makes a deferred call **twice** the first time a branch reaches it, when what the call is reached through was deferred along with it. The call's evaluation begins by reading its object's evaluation; reading a deferred node both resolves it and announces that it changed; the announcement reaches the call, which is that object's dependent, and re-enters the call's evaluation. The inner evaluation completes against the resolved object and the outer one, still on its first line, repeats it.
 
 The value is correct and the work is doubled. For a call producing something that must be disposed of, it is one more of them made and discarded than the shape requires — on exactly the shape an application's formula engine emits inside a conditional or a short circuit. It is recorded by `TheGraphMakesADeferredCallTwiceWhenWhatItIsReachedThroughIsAlsoDeferred`, and its counterpart `TheGraphMakesACallWhichIsNotDeferredOnce` identifies deferral as what it turns on.
+
+## The sixteen bytes, recovered and scored
+
+An observation carried a separate reference to each piece of state belonging to its lambda. All of it already lives on the `DirectEvaluator` every observation of that lambda shares, so it now carries one reference to that instead: `sites`, `lambdaExpression` and `disposedHeldSlots` are gone from the observation, and `linkSites` from the observation which follows a link. Same instrument, same day.
+
+Three figures were predicted before the run, from the field accounting alone. All three landed to the hundredth of a kilobyte.
+
+| arm | predicted | measured | before |
+|---|---:|---:|---:|
+| a comparison, fast path | about 965.2 KB | **965.19 KB** | 980.81 KB |
+| plain formula, fast path | about 1,160.5 KB | **1,160.50 KB** | 1,183.94 KB |
+| disposable formula, default options | about 1,183.9 KB | **1,183.94 KB** | 1,207.38 KB |
+
+The comparison arm pays only the two recovered fields, sixteen bytes per element, and returns exactly to the figure it has held on this shape since the invocation instrument was first run. The two formula arms follow a link and recover eight more, twenty-four bytes each. The held call's own slot still costs 24.0 bytes per element — 1,183.94 against 1,160.50 — the same figure as the run before, which is the arithmetic closing twice on the same number.
+
+**A control moved and is not explained.** `DisposableFormulaGraph` went 7,923.80 to 8,045.65 KB, up 1.5%, on an arm this change cannot reach: the graph observer short-circuits before an evaluator is ever built. The other two graph arms were byte-stable across the same two runs — `PlainFormulaGraph` identical to the hundredth, `RankComparisonGraph` within 0.03 KB — so it is not instrument drift. It is the only arm reaching Gen2 in quantity and its Gen1 count moved with it, which makes collection timing the likeliest cause, but that is a guess and it has not been checked. A third run would settle it.

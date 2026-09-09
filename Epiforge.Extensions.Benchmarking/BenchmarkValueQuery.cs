@@ -15,10 +15,16 @@ public sealed class BenchmarkValueQuery :
     public object? Value =>
         person.Rank;
 
+#pragma warning disable CS0067 // The event is never used
     public event PropertyChangedEventHandler? PropertyChanged;
+#pragma warning restore CS0067
 
-    public void Dispose() =>
-        PropertyChanged = null;
+    /// <summary>
+    /// Releases nothing, this standing in for a query object only so far as being one the observer is told to dispose of and must therefore account for
+    /// </summary>
+    public void Dispose()
+    {
+    }
 }
 
 /// <summary>
