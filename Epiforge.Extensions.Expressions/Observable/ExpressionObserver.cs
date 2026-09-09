@@ -852,7 +852,7 @@ public class ExpressionObserver :
             var sites = new DirectSubscriptionSite[subscriptions.Count];
             for (var i = 0; i < sites.Length; ++i)
                 sites[i] = Site(subscriptions[i], observed, fixedSubexpressions, plan.Links);
-            evaluator = new DirectEvaluator(Expression.Lambda<Func<TArgument, object?[], bool[], object?[], object?[], TResult>>(body, observed.Parameters[0], values, reached, links, held).Compile(), [.. fixedSubexpressions], sites, plan.DeferredGroups.Count, plan.Links.Count, plan.Held);
+            evaluator = new DirectEvaluator(lambdaExpression, Expression.Lambda<Func<TArgument, object?[], bool[], object?[], object?[], TResult>>(body, observed.Parameters[0], values, reached, links, held).Compile(), [.. fixedSubexpressions], sites, plan.DeferredGroups.Count, plan.Links.Count, plan.Held);
         }
         compiled.AddOrUpdate(lambdaExpression, evaluator);
         return evaluator;
@@ -897,7 +897,7 @@ public class ExpressionObserver :
 
     DirectObservableExpression<TArgument, TResult>? DirectObservation<TArgument, TResult>(Expression<Func<TArgument, TResult>> lambdaExpression, TArgument argument, bool optimize)
     {
-        if (!UseDirectSubscription || CompiledLambda(lambdaExpression, optimize) is not { Sites: { } sites } evaluator)
+        if (!UseDirectSubscription || CompiledLambda(lambdaExpression, optimize) is not { Sites: not null } evaluator)
             return null;
         var fixedSubexpressions = evaluator.FixedSubexpressions;
         var values = fixedSubexpressions.Length == 0 ? [] : new object?[fixedSubexpressions.Length];
@@ -909,12 +909,11 @@ public class ExpressionObserver :
         }
         var evaluate = (Func<TArgument, object?[], bool[], object?[], object?[], TResult>)evaluator.Evaluate;
         object?[] held = evaluator.HeldCount == 0 ? [] : Unresolved(evaluator.HeldCount);
-        var disposedHeldSlots = evaluator.DisposedHeldSlots;
         DirectObservableExpression<TArgument, TResult> directObservableExpression = evaluator.LinkCount > 0
-            ? new LinkingDirectObservableExpression<TArgument, TResult>(this, lambdaExpression, sites, evaluate, argument, values, held, disposedHeldSlots, evaluator.DeferredGroupCount == 0 ? [] : new bool[evaluator.DeferredGroupCount], new object?[evaluator.LinkCount], evaluator.LinkSites)
+            ? new LinkingDirectObservableExpression<TArgument, TResult>(this, evaluator, evaluate, argument, values, held, evaluator.DeferredGroupCount == 0 ? [] : new bool[evaluator.DeferredGroupCount], new object?[evaluator.LinkCount])
             : evaluator.DeferredGroupCount > 0
-            ? new DeferringDirectObservableExpression<TArgument, TResult>(this, lambdaExpression, sites, evaluate, argument, values, held, disposedHeldSlots, new bool[evaluator.DeferredGroupCount])
-            : new DirectObservableExpression<TArgument, TResult>(this, lambdaExpression, sites, evaluate, argument, values, held, disposedHeldSlots);
+            ? new DeferringDirectObservableExpression<TArgument, TResult>(this, evaluator, evaluate, argument, values, held, new bool[evaluator.DeferredGroupCount])
+            : new DirectObservableExpression<TArgument, TResult>(this, evaluator, evaluate, argument, values, held);
         directObservableExpression.Initialize();
         directObservableExpression.IsInitialized = true;
         return directObservableExpression;

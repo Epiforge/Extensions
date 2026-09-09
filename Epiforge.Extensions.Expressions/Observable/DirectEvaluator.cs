@@ -9,13 +9,15 @@ sealed class DirectEvaluator
         DisposedHeldSlots = [];
         Evaluate = null!;
         FixedSubexpressions = [];
+        LambdaExpression = null!;
         LinkSites = [];
     }
 
-    internal DirectEvaluator(Delegate evaluate, Expression[] fixedSubexpressions, DirectSubscriptionSite[] sites, int deferredGroupCount, int linkCount, IReadOnlyList<(Expression Expression, bool Disposed)> held)
+    internal DirectEvaluator(LambdaExpression lambdaExpression, Delegate evaluate, Expression[] fixedSubexpressions, DirectSubscriptionSite[] sites, int deferredGroupCount, int linkCount, IReadOnlyList<(Expression Expression, bool Disposed)> held)
     {
         DeferredGroupCount = deferredGroupCount;
         Evaluate = evaluate;
+        LambdaExpression = lambdaExpression;
         FixedSubexpressions = fixedSubexpressions;
         HeldCount = held.Count;
         var disposedHeldSlots = new List<int>();
@@ -39,5 +41,6 @@ sealed class DirectEvaluator
     internal readonly int[] LinkSites;
     internal readonly Delegate Evaluate;
     internal readonly Expression[] FixedSubexpressions;
+    internal readonly LambdaExpression LambdaExpression;
     internal readonly DirectSubscriptionSite[]? Sites;
 }

@@ -155,26 +155,28 @@ class DirectObservableExpression<TArgument, TResult> :
     static readonly bool sharesBooleanBoxes = typeof(TResult) == typeof(bool);
     static readonly TResult trueResult = typeof(TResult) == typeof(bool) ? (TResult)(object)true : default!;
 
-    internal DirectObservableExpression(ExpressionObserver observer, Expression<Func<TArgument, TResult>> lambdaExpression, DirectSubscriptionSite[] sites, Func<TArgument, object?[], bool[], object?[], object?[], TResult> evaluate, TArgument argument, object?[] values, object?[] held, int[] disposedHeldSlots) :
-        base(observer, lambdaExpression.Body.Type)
+    /// <summary>
+    /// Instantiates an observation which evaluates by invoking a compiled delegate rather than by building a graph of observable expressions
+    /// </summary>
+    /// <remarks>
+    /// Everything belonging to the lambda rather than to this observation of it is reached through the evaluator, which every observation of that lambda shares, so that an observation carries a reference to it instead of one to each. What remains here is what differs between two observations of one lambda: the argument, the values resolved for it, and the slots its held subexpressions resolve into
+    /// </remarks>
+    internal DirectObservableExpression(ExpressionObserver observer, DirectEvaluator evaluator, Func<TArgument, object?[], bool[], object?[], object?[], TResult> evaluate, TArgument argument, object?[] values, object?[] held) :
+        base(observer, evaluator.LambdaExpression.Body.Type)
     {
         this.argument = argument;
-        comparesBeforeBoxing = typeof(TResult).IsValueType && lambdaExpression.Body.Type == typeof(TResult);
-        this.disposedHeldSlots = disposedHeldSlots;
+        comparesBeforeBoxing = typeof(TResult).IsValueType && evaluator.LambdaExpression.Body.Type == typeof(TResult);
         this.evaluate = evaluate;
+        this.evaluator = evaluator;
         this.held = held;
-        this.lambdaExpression = lambdaExpression;
-        this.sites = sites;
         this.values = values;
     }
 
     private protected readonly TArgument argument;
     readonly bool comparesBeforeBoxing;
-    readonly int[] disposedHeldSlots;
     private protected readonly Func<TArgument, object?[], bool[], object?[], object?[], TResult> evaluate;
+    private protected readonly DirectEvaluator evaluator;
     private protected readonly object?[] held;
-    readonly Expression<Func<TArgument, TResult>> lambdaExpression;
-    private protected readonly DirectSubscriptionSite[] sites;
     private protected readonly object?[] values;
 
     /// <summary>
@@ -184,14 +186,15 @@ class DirectObservableExpression<TArgument, TResult> :
     {
         if (!base.DisposeCore())
             return false;
-        for (var i = 0; i < disposedHeldSlots.Length; ++i)
-            if (held[disposedHeldSlots[i]] is { } value && !ReferenceEquals(value, Unresolved) && value is not DirectSlotFault)
+        var disposed = evaluator.DisposedHeldSlots;
+        for (var i = 0; i < disposed.Length; ++i)
+            if (held[disposed[i]] is { } value && !ReferenceEquals(value, Unresolved) && value is not DirectSlotFault)
                 observer.DisposeIfPossible(value);
         return true;
     }
 
     private protected override Expression Materialize() =>
-        ExpressionObserver.ReplaceParametersWithoutOptimization(lambdaExpression, argument)!;
+        ExpressionObserver.ReplaceParametersWithoutOptimization(evaluator.LambdaExpression, argument)!;
 
     private protected static object? Box(TResult value) =>
         sharesBooleanBoxes ? BooleanBoxes.Box(EqualityComparer<TResult>.Default.Equals(value, trueResult)) : value;
@@ -224,7 +227,7 @@ class DirectObservableExpression<TArgument, TResult> :
     {
         try
         {
-            Attach(sites, argument, values, noLinks);
+            Attach(evaluator.Sites!, argument, values, noLinks);
             EvaluateIfNotDeferred();
         }
         catch (Exception ex)
@@ -244,8 +247,8 @@ class DirectObservableExpression<TArgument, TResult> :
 class DeferringDirectObservableExpression<TArgument, TResult> :
     DirectObservableExpression<TArgument, TResult>
 {
-    internal DeferringDirectObservableExpression(ExpressionObserver observer, Expression<Func<TArgument, TResult>> lambdaExpression, DirectSubscriptionSite[] sites, Func<TArgument, object?[], bool[], object?[], object?[], TResult> evaluate, TArgument argument, object?[] values, object?[] held, int[] disposedHeldSlots, bool[] reached) :
-        base(observer, lambdaExpression, sites, evaluate, argument, values, held, disposedHeldSlots) =>
+    internal DeferringDirectObservableExpression(ExpressionObserver observer, DirectEvaluator evaluator, Func<TArgument, object?[], bool[], object?[], object?[], TResult> evaluate, TArgument argument, object?[] values, object?[] held, bool[] reached) :
+        base(observer, evaluator, evaluate, argument, values, held) =>
         this.reached = reached;
 
     long attachedGroups;
@@ -280,7 +283,7 @@ class DeferringDirectObservableExpression<TArgument, TResult> :
                 var exchanged = Interlocked.CompareExchange(ref attachedGroups, current | bit, current);
                 if (exchanged == current)
                 {
-                    attached |= AttachDeferred(sites, group + 1, argument, values, Links);
+                    attached |= AttachDeferred(evaluator.Sites!, group + 1, argument, values, Links);
                     break;
                 }
                 current = exchanged;
@@ -331,19 +334,17 @@ class DeferringDirectObservableExpression<TArgument, TResult> :
 sealed class LinkingDirectObservableExpression<TArgument, TResult> :
     DeferringDirectObservableExpression<TArgument, TResult>
 {
-    internal LinkingDirectObservableExpression(ExpressionObserver observer, Expression<Func<TArgument, TResult>> lambdaExpression, DirectSubscriptionSite[] sites, Func<TArgument, object?[], bool[], object?[], object?[], TResult> evaluate, TArgument argument, object?[] values, object?[] held, int[] disposedHeldSlots, bool[] reached, object?[] links, int[] linkSites) :
-        base(observer, lambdaExpression, sites, evaluate, argument, values, held, disposedHeldSlots, reached)
+    internal LinkingDirectObservableExpression(ExpressionObserver observer, DirectEvaluator evaluator, Func<TArgument, object?[], bool[], object?[], object?[], TResult> evaluate, TArgument argument, object?[] values, object?[] held, bool[] reached, object?[] links) :
+        base(observer, evaluator, evaluate, argument, values, held, reached)
     {
         attachedLinks = links.Length == 0 ? links : new object?[links.Length];
-        linkAttachments = linkSites.Length == 0 ? [] : new DirectSubscriptionAttachment?[linkSites.Length];
+        linkAttachments = evaluator.LinkSites.Length == 0 ? [] : new DirectSubscriptionAttachment?[evaluator.LinkSites.Length];
         this.links = links;
-        this.linkSites = linkSites;
     }
 
     readonly object?[] attachedLinks;
     readonly DirectSubscriptionAttachment?[] linkAttachments;
     readonly object?[] links;
-    readonly int[] linkSites;
 
     private protected override object?[] Links =>
         links;
@@ -360,6 +361,8 @@ sealed class LinkingDirectObservableExpression<TArgument, TResult> :
             var attached = attachedLinks[i];
             if (ReferenceEquals(current, attached) || !ReferenceEquals(Interlocked.CompareExchange(ref attachedLinks[i], current, attached), attached))
                 continue;
+            var sites = evaluator.Sites!;
+            var linkSites = evaluator.LinkSites;
             for (var s = 0; s < linkSites.Length; ++s)
             {
                 var site = sites[linkSites[s]];
