@@ -139,7 +139,7 @@ sealed class ObservableInvocationExpression(ExpressionObserver observer, Invocat
             if (InvocationExpression.Expression is LambdaExpression)
             {
                 var invocationExpressionArguments = InvocationExpression.Arguments;
-                var subscriptions = new ObservableExpressionSubscription?[invocationExpressionArguments.Count];
+                ObservableExpressionSubscription?[] subscriptions = invocationExpressionArguments.Count == 0 ? [] : new ObservableExpressionSubscription?[invocationExpressionArguments.Count];
                 observableArgumentSubscriptions = subscriptions;
                 for (int i = 0, ii = invocationExpressionArguments.Count; i < ii; ++i)
                 {

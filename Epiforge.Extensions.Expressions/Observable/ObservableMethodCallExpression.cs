@@ -91,7 +91,7 @@ sealed class ObservableMethodCallExpression(ExpressionObserver observer, MethodC
                     objectSubscription = @object.SubscribeDependent(this);
             }
             var methodCallExpressionArguments = MethodCallExpression.Arguments;
-            var subscriptions = new ObservableExpressionSubscription?[methodCallExpressionArguments.Count];
+            ObservableExpressionSubscription?[] subscriptions = methodCallExpressionArguments.Count == 0 ? [] : new ObservableExpressionSubscription?[methodCallExpressionArguments.Count];
             argumentSubscriptions = subscriptions;
             for (int i = 0, ii = methodCallExpressionArguments.Count; i < ii; ++i)
             {

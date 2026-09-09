@@ -80,7 +80,7 @@ sealed class ObservableNewExpression(ExpressionObserver observer, NewExpression 
             constructor = NewExpression.Constructor;
             constructorInvoker = constructor?.GetFastInvoker();
             var newExpressionArguments = NewExpression.Arguments;
-            var subscriptions = new ObservableExpressionSubscription?[newExpressionArguments.Count];
+            ObservableExpressionSubscription?[] subscriptions = newExpressionArguments.Count == 0 ? [] : new ObservableExpressionSubscription?[newExpressionArguments.Count];
             argumentSubscriptions = subscriptions;
             for (int i = 0, ii = newExpressionArguments.Count; i < ii; ++i)
             {
