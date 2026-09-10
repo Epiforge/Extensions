@@ -111,6 +111,7 @@ public class DifferentialFuzz
     static readonly FieldInfo numbers = typeof(FieldHolder).GetField(nameof(FieldHolder.Numbers))!;
     static readonly PropertyInfo numbersIndexer = typeof(ObservableRangeCollection<int>).GetProperty("Item")!;
     static readonly PropertyInfo next = typeof(Recorded).GetProperty(nameof(Recorded.Next))!;
+    static readonly PropertyInfo announcing = typeof(Recorded).GetProperty(nameof(Recorded.Announcing))!;
     static readonly PropertyInfo rank = typeof(Recorded).GetProperty(nameof(Recorded.Rank))!;
     static readonly PropertyInfo score = typeof(Recorded).GetProperty(nameof(Recorded.Score))!;
     static readonly PropertyInfo stringLength = typeof(string).GetProperty(nameof(string.Length))!;
@@ -198,9 +199,13 @@ public class DifferentialFuzz
             _ => Leaf(rng, sources)
         });
 
+    /// <remarks>
+    /// Case twelve reads a getter which announces that another property changed while it is being read, which re-enters the observation reading it and re-enters the two mechanisms a different number of times. They owe each other the same value and the same fault regardless, and until this case existed no generated expression could tell whether they paid it
+    /// </remarks>
     static Expression Leaf(Random rng, Sources sources) =>
-        rng.Next(13) switch
+        rng.Next(14) switch
         {
+            12 => Expression.MakeMemberAccess(sources.Subject, announcing),
             11 => Expression.MakeIndex(sources.Numbers, numbersIndexer, [Expression.Constant(rng.Next(0, 3))]),
             10 => Expression.MakeMemberAccess(Expression.MakeMemberAccess(sources.Subject, tag), stringLength),
             9 => Expression.MakeMemberAccess(Expression.Field(sources.Other, linked), rank),

@@ -46,6 +46,7 @@ public sealed class SubscriptionLog
 public class Recorded(SubscriptionLog log) :
     INotifyPropertyChanged
 {
+    int announced;
     Recorded? next;
     PropertyChangedEventHandler? propertyChanged;
     int rank;
@@ -93,6 +94,27 @@ public class Recorded(SubscriptionLog log) :
         {
             score = value;
             propertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Score)));
+        }
+    }
+
+    /// <summary>
+    /// Reads as a constant and announces that <see cref="Score" /> changed while being read, for its first few reads only
+    /// </summary>
+    /// <remarks>
+    /// A getter which announces while it is being read re-enters the observation reading it, and the two mechanisms do not re-enter the same number of times: the graph reads such a getter once and the fast path once per re-entry. They owe each other the same value and the same fault all the same, which is what this exists to let the differential fuzz check, that region having been outside it until 10 September.
+    /// The bound is not a convenience. An unbounded form of this cannot be run at all, because the recursion it causes ends in a stack overflow, which cannot be caught and would take the test host with it.
+    /// Reading as a constant is not a convenience either, and this returned <see cref="Rank" /> for one run before the fuzz refused it on three seeds at once. A property whose value moves while nothing announces that it moved is not observable by any means: one mechanism holds what it read before the move and the other reads again after it, and both are right. What is under test here is whether re-entry during an evaluation changes the answer, so the value has to be one that cannot change for any other reason
+    /// </remarks>
+    public int Announcing
+    {
+        get
+        {
+            if (announced < 3)
+            {
+                ++announced;
+                propertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Score)));
+            }
+            return 1;
         }
     }
 
