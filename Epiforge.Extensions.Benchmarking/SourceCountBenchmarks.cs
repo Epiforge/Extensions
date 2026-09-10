@@ -1,13 +1,16 @@
 namespace Epiforge.Extensions.Benchmarking;
 
 /// <summary>
-/// Prices construction and raises in the shape an application laying out a grid has, which is many source objects carrying a few attachments each
+/// Prices raises in the shape an application laying out a grid has, which is many source objects carrying a few attachments each
 /// </summary>
 /// <remarks>
-/// <see cref="NotificationFanOutBenchmarks" /> measures the opposite shape, one object carrying a thousand attachments, and every conclusion about how a source finds the attachments which want a reported name has so far been drawn from it. A structure which makes that search cheap when the list is long can be pure overhead when the list is six, and it is paid on construction rather than on notification, which is the path a grid spends its time on. These arms exist so that a change justified by the fan-out instrument has somewhere to be disproved
+/// <see cref="NotificationFanOutBenchmarks" /> measures the opposite shape, one object carrying a thousand attachments, and every conclusion about how a source finds the attachments which want a reported name had been drawn from it alone. These arms were added so that a name index justified by that instrument had somewhere to be disproved, and they disproved it: in this shape the fast path wins every arm, and the graph's advantage on the fan-out instrument was node sharing rather than a better way of finding attachments
 /// </remarks>
 /// <remarks>
-/// Six observations of each source, each watching a different property of it, which is a row of six columns. One raise is of the property one of the six watches and five do not; the other is of a property none of them watches. The subject passes pre-allocated arguments, so a raise allocates nothing of its own
+/// One observation of each source per column, each watching a different property of it, which is a row. One raise is of the property one column watches and the rest do not; the other is of a property none of them watches. The subject passes pre-allocated arguments, so a raise allocates nothing of its own
+/// </remarks>
+/// <remarks>
+/// Construction was measured here until 10 September and is now measured by <see cref="SourceWidthConstructionBenchmarks" />, because these arms retain two sets of observations for the whole run and a construct arm allocating on top of that live set measured the garbage collector rather than construction: at twelve columns its time rose tenfold while its allocation per observation fell, and collections reached the second generation
 /// </remarks>
 [MemoryDiagnoser]
 public class SourceCountBenchmarks
@@ -16,7 +19,7 @@ public class SourceCountBenchmarks
     const int sourceCount = 1000;
 
     /// <remarks>
-    /// The first three include <see cref="BenchmarkSlice.End" />, which every arm raises, so that the narrowest width still has a watched column; the first six are the set this instrument carried when its figures were first recorded, so that width six reproduces them
+    /// The first three include <see cref="BenchmarkSlice.End" />, which every arm raises, so that the narrowest width still has a watched column. The first six are the set this instrument carried when its figures were first recorded, which was expected to make width six reproduce them and does not: widening <see cref="BenchmarkSlice" /> to carry twelve columns made every slice larger, so the arms came back within 3.8% rather than identical. Holding the expressions identical does not hold the subject identical
     /// </remarks>
     static readonly Expression<Func<BenchmarkSlice, bool>>[] columns =
     [
@@ -37,42 +40,20 @@ public class SourceCountBenchmarks
     static ExpressionObserver Observer(bool useDirectSubscription) =>
         useDirectSubscription ? new ExpressionObserver() : new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = false });
 
-    static void ConstructAndDispose(ExpressionObserver observer, BenchmarkSlice[] slices, int columnCount)
-    {
-        var observations = new IObservableExpression<BenchmarkSlice, bool>[sourceCount * columnCount];
-        for (var i = 0; i < sourceCount; ++i)
-            for (var column = 0; column < columnCount; ++column)
-                observations[i * columnCount + column] = observer.Observe(columns[column], slices[i]);
-        for (var i = 0; i < observations.Length; ++i)
-            observations[i].Dispose();
-    }
-
     IObservableExpression<BenchmarkSlice, bool>[] aDefaultObservations = null!;
     ExpressionObserver aDefaultObserver = null!;
     BenchmarkSlice[] aDefaultSlices = null!;
-    ExpressionObserver aDefaultConstructionObserver = null!;
-    BenchmarkSlice[] aDefaultConstructionSlices = null!;
     IObservableExpression<BenchmarkSlice, bool>[] graphObservations = null!;
     ExpressionObserver graphObserver = null!;
     BenchmarkSlice[] graphSlices = null!;
-    ExpressionObserver graphConstructionObserver = null!;
-    BenchmarkSlice[] graphConstructionSlices = null!;
 
     /// <remarks>
-    /// How many of <see cref="columns" /> each slice is observed through, which is the width of a row. Both mechanisms charge per attachment on a source, so what this varies is the term the ratio between them is a slope of
+    /// How many of <see cref="columns" /> each slice is observed through, which is the width of a row. This was added to confirm that each mechanism charges a constant amount per attachment on a source, and it refuted that: both charge more per attachment as the row widens, the graph by 2.17x across this range against the fast path's 1.59x, so the advantage grows with width instead of holding. What the widths vary is therefore not the slope of a line but a working set
     /// </remarks>
     [Params(3, 6, 12)]
     public int Columns { get; set; }
 
     [Benchmark(Baseline = true)]
-    public void ManySourcesConstructDefault() =>
-        ConstructAndDispose(aDefaultConstructionObserver, aDefaultConstructionSlices, Columns);
-
-    [Benchmark]
-    public void ManySourcesConstructGraph() =>
-        ConstructAndDispose(graphConstructionObserver, graphConstructionSlices, Columns);
-
-    [Benchmark]
     public void ManySourcesWatchedRaiseDefault()
     {
         for (var pass = 0; pass < raisePasses; ++pass)
@@ -117,18 +98,12 @@ public class SourceCountBenchmarks
     [GlobalSetup]
     public void Setup()
     {
-        aDefaultConstructionObserver = Observer(true);
-        graphConstructionObserver = Observer(false);
         aDefaultObserver = Observer(true);
         graphObserver = Observer(false);
-        aDefaultConstructionSlices = new BenchmarkSlice[sourceCount];
-        graphConstructionSlices = new BenchmarkSlice[sourceCount];
         aDefaultSlices = new BenchmarkSlice[sourceCount];
         graphSlices = new BenchmarkSlice[sourceCount];
         for (var i = 0; i < sourceCount; ++i)
         {
-            aDefaultConstructionSlices[i] = new BenchmarkSlice();
-            graphConstructionSlices[i] = new BenchmarkSlice();
             aDefaultSlices[i] = new BenchmarkSlice();
             graphSlices[i] = new BenchmarkSlice();
         }
