@@ -255,6 +255,9 @@ public sealed class DirectSubscriptionAnalyzer
     /// The graph gives every subexpression a node holding its last evaluation and re-evaluates that node only when something it depends on announces. A call whose object and arguments cannot change is therefore made exactly once, however many times the observation is re-evaluated, and its value is disposed of exactly once. Such a call is not fixed, because it cannot be resolved without invoking something, but it is a value the fast path may hold rather than recompute, and holding it is what lets the two mechanisms agree about how many of those values are made
     /// </remarks>
     /// <remarks>
+    /// A constructor is the same case with nothing left to qualify. What it produces is decided by its arguments and by nothing else, so arguments which cannot change mean a value which is constructed once however often the observation is re-evaluated, which is again what the graph's node for it does. A constructor taking no arguments is invariant for the same reason rather than in spite of it
+    /// </remarks>
+    /// <remarks>
     /// A property whose change notifications are ignored is the same case reached by another road. The graph's node for one subscribes to nothing, so it reads the property when it is first evaluated and keeps what it read for the life of the observation, however often the property changes afterwards. Reading it afresh on every evaluation is what the fast path would otherwise do and is what the refusal of these existed to prevent; holding it reads it once, which is what the graph does
     /// </remarks>
     bool IsInvariant(Expression expression) =>
@@ -262,6 +265,7 @@ public sealed class DirectSubscriptionAnalyzer
         {
             MethodCallExpression methodCallExpression => (methodCallExpression.Object is not { } target || IsInvariant(target)) && AreInvariant(methodCallExpression.Arguments),
             MemberExpression { Member: PropertyInfo property } memberExpression when isIgnoredPropertyChangeNotification(property) => memberExpression.Expression is not { } target || IsInvariant(target),
+            NewExpression newExpression => AreInvariant(newExpression.Arguments),
             UnaryExpression unaryExpression when unaryExpression.Method is null && unaryExpression.NodeType is ExpressionType.Convert or ExpressionType.ConvertChecked => IsInvariant(unaryExpression.Operand),
             _ => false
         };
@@ -497,10 +501,17 @@ public sealed class DirectSubscriptionAnalyzer
     /// <remarks>
     /// A constructor is not a method: its value is of the constructed type exactly and never of a type derived from it, so the sealed test which a method's declared return type requires does not apply. What is left is whether the type implements either disposal interface, because the options can be told to dispose what an expression constructed and a value of a type implementing neither cannot be disposed by anyone, whatever the options say
     /// </remarks>
+    /// <remarks>
+    /// Where the type is disposable the construction is admitted if it is invariant, and is then held: constructed when an evaluation first reaches it, kept for the life of the observation and disposed once with it, which is how many times the graph constructs and disposes it. A construction over an argument which can change stays refused, because there the graph constructs a new value when that argument moves and disposes the one it replaced, and a slot filled once would hold the first value forever
+    /// </remarks>
     DirectSubscriptionAnalysis AnalyzeNew(NewExpression newExpression, Planner? planner)
     {
         if (ExpressionObserverOptions.IsDisposable(newExpression.Type))
-            return new(newExpression, DirectSubscriptionIneligibility.ValueRequiresDisposal);
+        {
+            if (!IsInvariant(newExpression))
+                return new(newExpression, DirectSubscriptionIneligibility.ValueRequiresDisposal);
+            planner?.AddHeld(newExpression, true);
+        }
         for (int i = 0, ii = newExpression.Arguments.Count; i < ii; ++i)
         {
             var argumentAnalysis = AnalyzeNode(newExpression.Arguments[i], planner);

@@ -4,7 +4,7 @@ namespace Epiforge.Extensions.Expressions.Tests.Observable;
 /// Pins which of the analyzer's remaining refusals of a value requiring disposal are the case a held slot already solves, and which are a different case wearing the same refusal
 /// </summary>
 /// <remarks>
-/// A method call whose return value is disposed of is admitted when the call is invariant and is then held: made once, kept, disposed once, which is what the graph's node for it does. Three sites still refuse outright — a constructed value, a read of a property registered for disposal, and an indexer read of one — and they do not all deserve the same treatment.
+/// A method call whose return value is disposed of is admitted when the call is invariant and is then held: made once, kept, disposed once, which is what the graph's node for it does. Three sites refused outright until 10 September — a constructed value, a read of a property registered for disposal, and an indexer read of one — and they do not all deserve the same treatment, so only the first of them was narrowed.
 /// A constructor's value is decided by its arguments and nothing else, so invariant arguments mean the value never changes and holding it once agrees with the graph exactly. A property registered for disposal is not that case even when what it is read through cannot change, because the property itself can announce: the graph re-reads it and disposes what it replaced, and a slot filled once would go stale and leak the rest. These rows record the distinction so that the constructed case can be admitted without the other two being admitted alongside it by resemblance
 /// </remarks>
 [TestClass]
@@ -65,18 +65,18 @@ public class ConstructedDisposables
     }
 
     /// <summary>
-    /// The analyzer refuses a constructed disposable today however invariant its arguments are, so an observation of one runs on the graph whatever the options say
+    /// The analyzer admits a constructed disposable whose arguments are invariant and holds it, constructing and disposing it as many times as the graph does, which is once each
     /// </summary>
     /// <remarks>
-    /// When this row reads 0 the refusal has been narrowed to match the method call's, and the two rows below it are what must not have moved with it
+    /// The two rows below are what must not have moved with this one: a construction over a changing argument, and a read of a property registered for disposal, neither of which a slot filled once can serve
     /// </remarks>
     [TestMethod]
-    public void AConstructedDisposableIsRefusedByTheAnalyzer()
+    public void AnInvariantConstructedDisposableIsHeld()
     {
         var (cached, constructions, disposals) = ObserveConstantConstruction(true);
-        Assert.AreNotEqual(0, cached, "the analyzer admitted a constructed disposable");
-        Assert.AreEqual(1, constructions, "the refused shape did not construct exactly once");
-        Assert.AreEqual(1, disposals, "the refused shape did not dispose exactly once");
+        Assert.AreEqual(0, cached, "the analyzer refused a constructed disposable whose arguments cannot change");
+        Assert.AreEqual(1, constructions, "the held shape did not construct exactly once");
+        Assert.AreEqual(1, disposals, "the held shape did not dispose exactly once");
     }
 
     /// <summary>
