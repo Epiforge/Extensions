@@ -13,9 +13,20 @@ public class FormulaShapeBenchmarks
 
     static readonly BenchmarkValueSource values = new();
 
+    static readonly Expression<Func<BenchmarkPersonWithPartner, bool>> constructedFormula = BuildConstructedFormula();
     static readonly Expression<Func<BenchmarkPersonWithPartner, bool>> disposableFormula = BuildFormula(false);
     static readonly Expression<Func<BenchmarkPersonWithPartner, bool>> plainFormula = BuildFormula(true);
     static readonly Expression<Func<BenchmarkPersonWithPartner, bool>> rankComparison = person => person.Rank > 0;
+
+    /// <summary>
+    /// Builds the same shape reaching its value through a constructor rather than through a method, which is the asymmetry the constructed arms price: until 10 September a factory call was admitted where <c>new</c> of the same type was refused, for no reason either mechanism gave
+    /// </summary>
+    static Expression<Func<BenchmarkPersonWithPartner, bool>> BuildConstructedFormula()
+    {
+        var person = Expression.Parameter(typeof(BenchmarkPersonWithPartner), "person");
+        Expression<Func<BenchmarkPersonWithPartner, int>> read = element => (int)new BenchmarkValueQuery(element).Value!;
+        return Expression.Lambda<Func<BenchmarkPersonWithPartner, bool>>(Expression.GreaterThan(Expression.Invoke(read, person), Expression.Constant(0)), person);
+    }
 
     /// <summary>
     /// Builds the shape the formula engine of an application emits: an invocation of a literal lambda whose body calls through a captured object and reads a notifying value from what it returned
@@ -47,6 +58,20 @@ public class FormulaShapeBenchmarks
     [Benchmark]
     public void DisposableFormulaGraph() =>
         ConstructAndDispose(graph, disposableFormula);
+
+    /// <summary>
+    /// The same value reached by constructing the disposable rather than obtaining it from a method, with direct subscription left at its default
+    /// </summary>
+    /// <remarks>
+    /// Where this lands says whether the constructor is served by the same held slot the call is. Landing on <see cref="DisposableFormulaDefault" /> means the two roads to one value now cost the same; landing on the graph arm below means the narrowing admitted the shape without the slot reaching it
+    /// </remarks>
+    [Benchmark]
+    public void ConstructedFormulaDefault() =>
+        ConstructAndDispose(aDefault, constructedFormula);
+
+    [Benchmark]
+    public void ConstructedFormulaGraph() =>
+        ConstructAndDispose(graph, constructedFormula);
 
     [Benchmark]
     public void PlainFormulaDirect() =>
