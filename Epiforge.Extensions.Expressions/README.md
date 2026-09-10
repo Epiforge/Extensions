@@ -88,12 +88,12 @@ The shortcut handles an expression built from these:
 * a property read through something which can change, such as `e => e.Name.Length` or `e => e.Manager.Rank`, which follows the value as it moves and re-subscribes where it lands
 * `?:`, `&&`, `||` and `??`, whose deferred operands take their subscriptions the first time an evaluation reaches them, which is where the graph attaches its nodes for them
 * a call to the get method of a property or an indexer, which is how an indexer written in C# arrives, read as the member or index access it stands for
-* object construction, object initializers and array initializers
+* object construction, object initializers and array initializers, including construction of a value the observer disposes of when nothing the constructor is given can change, made once and disposed once
 * an invocation of a literal lambda, as a formula or rule engine building expression trees at run time commonly emits, reduced to the body it would have evaluated
 * method calls and operators resolved to a method, unless the observer disposes of what one returned and what it is made on or given can change
 * a property whose change notifications you have told the observer to ignore, when nothing it is read through can change, read once and kept
 
-What builds the graph instead: a kind of expression not in that list, such as a lambda passed as an argument or an array built from bounds; an indexer whose target can change; a member read on a value type which can notify; a call or operator whose return value the observer disposes of and whose target or arguments can change; a read of an ignored property through something which can change; and an expression deferring more than sixty-four operands.
+What builds the graph instead: a kind of expression not in that list, such as a lambda passed as an argument or an array built from bounds; an indexer whose target can change; a member read on a value type which can notify; a call or operator whose return value the observer disposes of and whose target or arguments can change; a construction whose value the observer disposes of and whose arguments can change; a read of a property or an indexer you have registered for disposal, whatever it is read through, because the property can announce and the graph replaces and disposes of its value when it does; a read of an ignored property through something which can change; and an expression deferring more than sixty-four operands.
 
 To find out about a particular expression, ask:
 
