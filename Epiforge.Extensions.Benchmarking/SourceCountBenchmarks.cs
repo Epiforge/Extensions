@@ -12,10 +12,12 @@ namespace Epiforge.Extensions.Benchmarking;
 [MemoryDiagnoser]
 public class SourceCountBenchmarks
 {
-    const int columnCount = 6;
     const int raisePasses = 100;
     const int sourceCount = 1000;
 
+    /// <remarks>
+    /// The first three include <see cref="BenchmarkSlice.End" />, which every arm raises, so that the narrowest width still has a watched column; the first six are the set this instrument carried when its figures were first recorded, so that width six reproduces them
+    /// </remarks>
     static readonly Expression<Func<BenchmarkSlice, bool>>[] columns =
     [
         slice => slice.Amount > 0,
@@ -23,13 +25,19 @@ public class SourceCountBenchmarks
         slice => slice.End > 0,
         slice => slice.Rate > 0,
         slice => slice.Start > 0,
-        slice => slice.Weight > 0
+        slice => slice.Weight > 0,
+        slice => slice.Billable > 0,
+        slice => slice.Cost > 0,
+        slice => slice.Margin > 0,
+        slice => slice.Offset > 0,
+        slice => slice.Tax > 0,
+        slice => slice.Total > 0
     ];
 
     static ExpressionObserver Observer(bool useDirectSubscription) =>
         useDirectSubscription ? new ExpressionObserver() : new ExpressionObserver(new ExpressionObserverOptions { UseDirectSubscription = false });
 
-    static void ConstructAndDispose(ExpressionObserver observer, BenchmarkSlice[] slices)
+    static void ConstructAndDispose(ExpressionObserver observer, BenchmarkSlice[] slices, int columnCount)
     {
         var observations = new IObservableExpression<BenchmarkSlice, bool>[sourceCount * columnCount];
         for (var i = 0; i < sourceCount; ++i)
@@ -50,13 +58,19 @@ public class SourceCountBenchmarks
     ExpressionObserver graphConstructionObserver = null!;
     BenchmarkSlice[] graphConstructionSlices = null!;
 
+    /// <remarks>
+    /// How many of <see cref="columns" /> each slice is observed through, which is the width of a row. Both mechanisms charge per attachment on a source, so what this varies is the term the ratio between them is a slope of
+    /// </remarks>
+    [Params(3, 6, 12)]
+    public int Columns { get; set; }
+
     [Benchmark(Baseline = true)]
     public void ManySourcesConstructDefault() =>
-        ConstructAndDispose(aDefaultConstructionObserver, aDefaultConstructionSlices);
+        ConstructAndDispose(aDefaultConstructionObserver, aDefaultConstructionSlices, Columns);
 
     [Benchmark]
     public void ManySourcesConstructGraph() =>
-        ConstructAndDispose(graphConstructionObserver, graphConstructionSlices);
+        ConstructAndDispose(graphConstructionObserver, graphConstructionSlices, Columns);
 
     [Benchmark]
     public void ManySourcesWatchedRaiseDefault()
@@ -118,13 +132,13 @@ public class SourceCountBenchmarks
             aDefaultSlices[i] = new BenchmarkSlice();
             graphSlices[i] = new BenchmarkSlice();
         }
-        aDefaultObservations = new IObservableExpression<BenchmarkSlice, bool>[sourceCount * columnCount];
-        graphObservations = new IObservableExpression<BenchmarkSlice, bool>[sourceCount * columnCount];
+        aDefaultObservations = new IObservableExpression<BenchmarkSlice, bool>[sourceCount * Columns];
+        graphObservations = new IObservableExpression<BenchmarkSlice, bool>[sourceCount * Columns];
         for (var i = 0; i < sourceCount; ++i)
-            for (var column = 0; column < columnCount; ++column)
+            for (var column = 0; column < Columns; ++column)
             {
-                aDefaultObservations[i * columnCount + column] = aDefaultObserver.Observe(columns[column], aDefaultSlices[i]);
-                graphObservations[i * columnCount + column] = graphObserver.Observe(columns[column], graphSlices[i]);
+                aDefaultObservations[i * Columns + column] = aDefaultObserver.Observe(columns[column], aDefaultSlices[i]);
+                graphObservations[i * Columns + column] = graphObserver.Observe(columns[column], graphSlices[i]);
             }
     }
 }

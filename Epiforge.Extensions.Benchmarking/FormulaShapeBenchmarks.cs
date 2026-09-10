@@ -4,7 +4,7 @@
 /// Prices the shape a formula engine emits when it reaches its data through a method whose return value the observer disposes of, against the same shape reaching through one it does not
 /// </summary>
 /// <remarks>
-/// The analyzer refuses a method call whose return value is disposed of, because the fast path holds no value of its own and so can neither hold what such a call produced nor dispose of it. The plain arms are the same expression through a sealed type implementing neither disposal interface, which the analyzer admits today, and they are therefore the ceiling: what the disposable shape would cost if the fast path could hold what it produced. Every operand of the call in these expressions is a constant once the parameter has been replaced, which is the whole reason holding it once would be enough
+/// The analyzer refused a method call whose return value is disposed of until 9 September, because the fast path held no value of its own and so could neither hold what such a call produced nor dispose of it. It now holds one in a slot resolved on first read, so the disposable arms are served rather than refused and the plain arms are no longer a ceiling but the control the served shape is measured against. Every operand of the call in these expressions is a constant once the parameter has been replaced, which is what makes holding it once sufficient and is the whole reason the slot is correct rather than merely faster
 /// </remarks>
 [MemoryDiagnoser]
 public class FormulaShapeBenchmarks
@@ -38,7 +38,7 @@ public class FormulaShapeBenchmarks
     /// The disposable shape observed with direct subscription left at its default
     /// </summary>
     /// <remarks>
-    /// Landing on the graph arm below it to the printed digit is the proof that the analyzer refused the shape rather than served it, which is what makes the plain arms a ceiling rather than a saving already taken
+    /// Where this arm lands is what the instrument reports. Landing on the graph arm below it would mean the analyzer refused the shape; landing on <see cref="PlainFormulaDirect" /> means it is served, and the distance above that arm is what the slot itself costs. The tests asserting that no observable expression was cached are what prove service by construction rather than by position
     /// </remarks>
     [Benchmark]
     public void DisposableFormulaDefault() =>
