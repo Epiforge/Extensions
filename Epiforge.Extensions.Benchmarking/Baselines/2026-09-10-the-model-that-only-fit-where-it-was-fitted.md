@@ -66,3 +66,33 @@ The width-independence of the 1.87x was relayed to the Tachyon working group as 
 ## What has not been measured
 
 Construction at any width, cleanly — every figure on record is contaminated by the retained live set. Whether the per-attachment rise is locality or something else, which a width sweep holding total object count constant would separate. Any width above twelve or below three.
+
+## The after — the defect was a third of it
+
+The construct arms now run in `SourceWidthConstructionBenchmarks`, which retains no observations. Same day, same machine.
+
+| width | fast path ns/obs, contaminated → clean | graph ns/obs | time ratio | allocation ratio |
+|---:|---|---:|---:|---:|
+| 3 | 163.0 → **156.5** (−4.0%) | 2,850.1 | **18.21x** | 3.70x |
+| 6 | 180.7 → **172.5** (−4.5%) | 2,829.4 | **16.40x** | 3.79x |
+| 12 | 893.8 → **591.4** (−33.8%) | 5,399.5 | 9.13x | 3.81x |
+
+The prediction recorded above was an either/or: the twelve-column figure either falls into the 163–181 band, in which case the resident set was the cause, or it stays near 893.8, in which case the cliff is intrinsic and the defect claim should be withdrawn. **Neither happened.** It fell by a third and stopped at 591.4, with Gen2 collections rising from 109.375 to 164.063. So the resident set accounted for about a third of the inflation and two thirds of it is intrinsic to constructing and disposing twelve thousand coexisting observations in one operation. Posing it as an either/or was the error — two causes were available and the question was their proportion, not which one.
+
+What that leaves is a clean reading at three and six columns and none at twelve. The graph's per-observation construction is flat at about 2,840 ns across the two clean widths while the fast path's is 156.5 and 172.5, which is **16.40x at six columns and 18.21x at three**. The 18.39x withdrawn above came from the contaminated six-column pair; **the honest figure for a six-column grid is 16.4x**, and it was withdrawn correctly and restored lower.
+
+**The allocation ratio is the robust one: 3.70x, 3.79x, 3.81x — stable across every width including the one where timing is meaningless**, because allocation is counted rather than timed and the collector cannot distort it.
+
+## The raise arms moved in a way worth recording
+
+Re-running them after the construct arms left the class was meant to be a formality. Two widths were:
+
+| width | watched ratio | unwatched ratio |
+|---:|---:|---:|
+| 3 | 2.453 (was 2.433) | 1.646 (was 1.622) |
+| 6 | 3.038 (was 3.124) | 1.843 (was 1.824) |
+| 12 | **2.161 (was 2.754)** | 2.263 (was 2.215) |
+
+**The rising unwanted-raise ratio replicated** — 1.646, 1.843, 2.263 against 1.622, 1.824, 2.215, every width within 2.2%. That is the claim the retraction to the working group rests on and it now has two runs behind it. The watched ratio is still non-monotone, peaking at six.
+
+But the twelve-column watched arm moved 25.5% on the fast path while the graph's moved 1.5%, against deviations of 1.1% and 0.8%. The only change was that the class stopped allocating two thousand slices it never used. **Removing two thousand unused objects from a setup moved a measured arm by twenty-five percent**, which is larger than several differences elsewhere in this file that have been attributed to mechanism. Absolute figures at twelve columns are not stable enough to quote, and the stable quantities in this family are the allocation ratios and the three- and six-column timings.
