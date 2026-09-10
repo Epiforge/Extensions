@@ -250,7 +250,7 @@ These are from the benchmarks in this repository, against DynamicData 9.4.33 at 
 | A property change that does not alter a filtered view | **0 B**, **7.3 ns** | 608 B, 192.4 ns |
 | An element changing group | **578 B**, **236.9 ns** | 1,891 B, 604.8 ns |
 | An element moving in a sorted view | **292 B**, 1,259.5 ns | 414 B, **984.4 ns** |
-| Building a filtered view | **965 KB**, **294 μs** | 4,119 KB, 2,169 μs |
+| Building a filtered view | **973 KB**, **293 μs** | 4,119 KB, 2,169 μs |
 | What a live filtered view holds | **934 B** per element | 1,865 B per element |
 
 The zero is exact rather than rounded: a property change that does not move an element in or out of a filtered view allocates nothing here, at a thousand, ten thousand and a hundred thousand elements alike. This library re-evaluates the predicate in place and stays silent when the answer has not moved; DynamicData's model is a stream of change sets, so a refresh has to materialize one. Neither is a defect. **One library pays per change and the other pays per change that matters.**

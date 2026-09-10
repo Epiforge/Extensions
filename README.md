@@ -241,12 +241,17 @@ The shortcut handles an expression built from these:
 
 * the argument, constants, and captured locals
 * fields, on anything above — including static fields
-* properties and indexers whose target is one of the above
 * static properties
-* operators, where one resolved to a method needs a return type nothing could dispose — `==` on strings qualifies
-* method calls, on that same condition, where the target and every argument are themselves handled — `string.IsNullOrEmpty(e.Name)` qualifies
+* properties and indexers whose target is one of the above
+* a property read through something which can change, such as `e => e.Name.Length` or `e => e.Manager.Rank`, which follows the value as it moves and re-subscribes where it lands
+* `?:`, `&&`, `||` and `??`, whose deferred operands take their subscriptions the first time an evaluation reaches them, which is where the graph attaches its nodes for them
+* a call to the get method of a property or an indexer, which is how an indexer written in C# arrives, read as the member or index access it stands for
+* object construction, object initializers and array initializers, including construction of a value the observer disposes of when nothing the constructor is given can change, made once and disposed once
+* an invocation of a literal lambda, as a formula or rule engine building expression trees at run time commonly emits, reduced to the body it would have evaluated
+* method calls and operators resolved to a method, unless the observer disposes of what one returned and what it is made on or given can change
+* a property whose change notifications you have told the observer to ignore, when nothing it is read through can change, read once and kept
 
-Everything else builds the graph: `?:`, `&&`, `||` and `??`; anything read through a property, such as `e => e.Name.Length`; a call to the get method of a property or an indexer, which is how an indexer written in C# arrives; object and collection construction; and anything you have configured the observer to ignore notifications for or to dispose.
+What builds the graph instead: a kind of expression not in that list, such as a lambda passed as an argument or an array built from bounds; an indexer whose target can change; a member read on a value type which can notify; a call or operator whose return value the observer disposes of and whose target or arguments can change; a construction whose value the observer disposes of and whose arguments can change; a read of a property or an indexer you have registered for disposal, whatever it is read through, because the property can announce and the graph replaces and disposes of its value when it does; a read of an ignored property through something which can change; and an expression deferring more than sixty-four operands.
 
 To find out about a particular expression, ask:
 
@@ -403,7 +408,7 @@ These are from the benchmarks in this repository, against DynamicData 9.4.33 at 
 | A property change that does not alter a filtered view | **0 B**, **7.3 ns** | 608 B, 192.4 ns |
 | An element changing group | **578 B**, **236.9 ns** | 1,891 B, 604.8 ns |
 | An element moving in a sorted view | **292 B**, 1,259.5 ns | 414 B, **984.4 ns** |
-| Building a filtered view | **965 KB**, **294 μs** | 4,119 KB, 2,169 μs |
+| Building a filtered view | **973 KB**, **293 μs** | 4,119 KB, 2,169 μs |
 | What a live filtered view holds | **934 B** per element | 1,865 B per element |
 
 The zero is exact rather than rounded: a property change that does not move an element in or out of a filtered view allocates nothing here, at a thousand, ten thousand and a hundred thousand elements alike. This library re-evaluates the predicate in place and stays silent when the answer has not moved; DynamicData's model is a stream of change sets, so a refresh has to materialize one. Neither is a defect. **One library pays per change and the other pays per change that matters.**
