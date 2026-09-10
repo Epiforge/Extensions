@@ -247,18 +247,18 @@ These are from the benchmarks in this repository, against DynamicData 9.4.33 at 
 
 | | This library | DynamicData |
 |---|---|---|
-| A property change that does not alter a filtered view | **0 B**, **7.3 ns** | 608 B, 192.4 ns |
+| A property change that does not alter a filtered view | **0 B**, **7.8 ns** | 608 B, 199.1 ns |
 | An element changing group | **578 B**, **236.9 ns** | 1,891 B, 604.8 ns |
 | An element moving in a sorted view | **292 B**, 1,259.5 ns | 414 B, **984.4 ns** |
-| Building a filtered view | **973 KB**, **293 μs** | 4,119 KB, 2,169 μs |
-| What a live filtered view holds | **934 B** per element | 1,865 B per element |
+| Building a filtered view | **973 KB**, **295 μs** | 4,119 KB, 2,267 μs |
+| What a live filtered view holds | **942 B** per element | 1,865 B per element |
 
 The zero is exact rather than rounded: a property change that does not move an element in or out of a filtered view allocates nothing here, at a thousand, ten thousand and a hundred thousand elements alike. This library re-evaluates the predicate in place and stays silent when the answer has not moved; DynamicData's model is a stream of change sets, so a refresh has to materialize one. Neither is a defect. **One library pays per change and the other pays per change that matters.**
 
 **Two of those rows move with the size of the view, in opposite directions, and this is the part worth reading twice.**
 
 - **Sorting.** DynamicData's cost per move grows with the collection while this library's barely does, so the two cross at about **1,400** elements. Below that DynamicData is 1.28x faster; at four thousand this library is 1.72x faster and at ten thousand 2.98x.
-- **Grouping.** The reverse. DynamicData's cost per migration is flat while this library's grows, so the two cross at about **7,900** elements. Below that this library is 2.55x faster; at ten thousand DynamicData is 1.18x faster — though it holds about twice the memory to do it, 1,954 B per element against 1,024.
+- **Grouping.** The reverse. DynamicData's cost per migration is flat while this library's grows, so the two cross at about **7,900** elements. Below that this library is 2.55x faster; at ten thousand DynamicData is 1.18x faster — though it holds about twice the memory to do it, 1,954 B per element against 1,032.
 
 **The grouping crossover is a trade rather than an oversight, and knowing which side of it you want is more useful than the number.** A grouping here keeps its elements in the order they were added, so moving one out of its old group means finding it first, which is work proportional to the size of that group. DynamicData's groups are keyed rather than positional, so a removal is a dictionary operation and costs the same whatever the group holds. If you need the elements of a group in a stable order, that is what you are paying for. If you do not, DynamicData's shape is cheaper once groups get large. **A lookup built with `ObserveToLookup` is the same shape as a grouping here and behaves the same way.**
 
