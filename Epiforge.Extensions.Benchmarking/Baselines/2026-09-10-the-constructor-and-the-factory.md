@@ -39,7 +39,13 @@ Every fast-path control rose by **exactly 7.81 KB, which is 8.0 bytes per elemen
 
 Three arms of different shapes moving by the identical amount to the hundredth of a kilobyte is one reference-sized field added to every observation, not drift. `2026-09-09-what-an-invocation-costs.md` records the fast path's floor as 988.4 bytes per element for a bare comparison; **it is now 996.4**, and every figure in this family measured against that floor is 8 bytes per element stale.
 
-The change made this round adds no field, so the cause is earlier and this instrument only just caught it, the previous run of it predating several library changes. The leading candidate is the `evaluating` field added to `ObservableExpression` for the re-entry guard, which `DirectObservableExpression` inherits — **this is a candidate and not a finding**, because whether that field predates the earlier run of this instrument cannot be read from the reports, and the graph controls do not settle it either: two of three moved consistently with eight bytes per node and the third moved 64 bytes per element in the opposite direction.
+The change made this round adds no field, so the cause is earlier and this instrument only just caught it, the previous run of it predating several library changes.
+
+**It is the re-entry guard, and it is not recoverable.** `ObservableExpression.cs` was last written 134 minutes *after* `2026-09-09-what-a-disposable-formula-costs.md`, which recorded the earlier run of this instrument; `DirectObservableExpression.cs` was last written 16 minutes *before* it. So the eight bytes were added to the base class rather than to the fast path's own class, and the only change to that base class in that window was the `evaluating` field and the `EvaluateOnce` guard around it.
+
+The obvious recovery — move the field down to the mechanism that uses it — does not exist, because both use it: `DirectObservableExpression` reaches `EvaluateIfNotDeferred` and so takes the guard exactly as a graph node does. Nor is the field removable in favour of something smaller, since `Interlocked.CompareExchange` needs a machine word to work on and cannot be given a `bool`.
+
+So the honest statement of the floor is that **it rose from 988.4 to 996.4 bytes per element, and the eight bytes are the price of a guard which stopped a deferred evaluation from making and discarding one more disposable than the expression required.** That is a good trade recorded as one, rather than an unexplained drift. What remains unsettled is only whether the eight bytes are that field's own width or padding it displaced, which the source cannot say and which does not change the conclusion.
 
 ## Predictions scored
 
@@ -50,4 +56,4 @@ The change made this round adds no field, so the cause is earlier and this instr
 
 ## What has not been measured
 
-Where the eight bytes come from. Whether the constructed shape's advantage over the factory shape survives a target that is not a captured constant. Any depth beyond one construction.
+Whether the constructed shape's advantage over the factory shape survives a target that is not a captured constant. Any depth beyond one construction.
