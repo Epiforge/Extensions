@@ -23,6 +23,7 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
     }
 
     readonly object access;
+    NullableKeyDictionary<TElement, ObservableCollectionRankQuery<TElement>>? cachedRankQueries;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     ObservableCollectionOrderingComparer<TElement>? comparer;
     List<TElement>? enumerationSnapshot;
@@ -44,6 +45,17 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
         }
     }
 
+    public override int CachedObservableQueries
+    {
+        get
+        {
+            var count = base.CachedObservableQueries;
+            lock (access)
+                count += cachedRankQueries?.Values.Sum(rankQuery => 1 + rankQuery.CachedObservableQueries) ?? 0;
+            return count;
+        }
+    }
+
     public override int Count
     {
         get
@@ -52,6 +64,11 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
                 return results.Count;
         }
     }
+
+    /// <summary>
+    /// Occurs when the key of an element in the ordering changes, whether or not the element moves
+    /// </summary>
+    internal event EventHandler? KeysChanged;
 
     protected override bool Dispose(bool disposing)
     {
@@ -158,6 +175,24 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
         }
     }
 
+    [return: DisposeWhenDiscarded]
+    internal IObservableScalarQuery<(int Ahead, int Tied)> ObserveRank(TElement element)
+    {
+        ObservableCollectionRankQuery<TElement> rankQuery;
+        lock (access)
+        {
+            cachedRankQueries ??= [];
+            if (!cachedRankQueries.TryGetValue(element, out rankQuery!))
+            {
+                rankQuery = new ObservableCollectionRankQuery<TElement>(collectionObserver, this, element);
+                cachedRankQueries.Add(element, rankQuery);
+            }
+            ++rankQuery.Observations;
+        }
+        rankQuery.Initialize();
+        return rankQuery.AsScoped();
+    }
+
     protected override void OnInitialization()
     {
         lock (access)
@@ -176,6 +211,70 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
                 selection.PropertyChanged += SelectionPropertyChanged;
             }
             SetOperationFault();
+        }
+    }
+
+    internal bool QueryDisposed(ObservableCollectionRankQuery<TElement> rankQuery)
+    {
+        lock (access)
+        {
+            var remaining = --rankQuery.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
+            {
+                cachedRankQueries!.Remove(rankQuery.Element);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Counts the occurrences which sort strictly ahead of an element and those which sort level with it, the element's own included
+    /// </summary>
+    /// <remarks>
+    /// Two searches over the distinct elements in order, the first for the earliest which does not sort ahead of the element and the second, starting there, for the earliest which sorts after it; the weights before each are the counts. Each search finds its nodes from the one before, as the search for an insertion point does
+    /// </remarks>
+    internal (Exception? Fault, (int Ahead, int Tied) Result) RankOf(TElement element)
+    {
+        lock (access)
+        {
+            if (OperationFault is { } fault)
+                return (fault, default);
+            if (!nodesByElement.ContainsKey(element))
+                return (ExceptionHelper.SequenceContainsNoMatchingElement, default);
+            var elementComparables = comparer!.ComparablesOf(element);
+            PrefixWeightedSequenceNode<TElement>? finger = null;
+            var fingerIndex = 0;
+            var low = 0;
+            var high = positions.Count;
+            while (low < high)
+            {
+                var middle = low + (high - low) / 2;
+                var node = finger is null ? positions.NodeAt(middle) : positions.NodeAtFrom(finger, fingerIndex, middle);
+                finger = node;
+                fingerIndex = middle;
+                if (comparer!.CompareWithComparablesOf(element, ref elementComparables, node.Item) > 0)
+                    low = middle + 1;
+                else
+                    high = middle;
+            }
+            var firstLevel = low;
+            high = positions.Count;
+            while (low < high)
+            {
+                var middle = low + (high - low) / 2;
+                var node = finger is null ? positions.NodeAt(middle) : positions.NodeAtFrom(finger, fingerIndex, middle);
+                finger = node;
+                fingerIndex = middle;
+                if (comparer!.CompareWithComparablesOf(element, ref elementComparables, node.Item) >= 0)
+                    low = middle + 1;
+                else
+                    high = middle;
+            }
+            var ahead = positions.PrefixWeightBefore(firstLevel);
+            return (null, (ahead, positions.PrefixWeightBefore(low) - ahead));
         }
     }
 
@@ -270,14 +369,19 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
     /// <remarks>
     /// The payload is walked by index rather than through a query over it, because a key change carries a single item and the query allocates two iterators and their enumerators to deliver it
     /// </remarks>
+    /// <remarks>
+    /// A key change is reported after the notifications of any move it caused have been raised and the lock released, so that what hears of it reads an ordering already settled
+    /// </remarks>
     void SelectionCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
-        using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
-        lock (access)
-            if (e.NewItems is { } newItems)
-                for (int i = 0, ii = newItems.Count; i < ii; ++i)
-                    if (newItems[i] is Tuple<TElement, IComparable> keyedElement)
-                        RepositionElementWithAccess(keyedElement.Item1);
+        using (var notificationDeferral = DeferNotificationsUntilMutationCompletes())
+            lock (access)
+                if (e.NewItems is { } newItems)
+                    for (int i = 0, ii = newItems.Count; i < ii; ++i)
+                        if (newItems[i] is Tuple<TElement, IComparable> keyedElement)
+                            RepositionElementWithAccess(keyedElement.Item1);
+        if (e.Action is NotifyCollectionChangedAction.Replace)
+            KeysChanged?.Invoke(this, EventArgs.Empty);
     }
 
     void SelectionPropertyChanged(object? sender, PropertyChangedEventArgs e)

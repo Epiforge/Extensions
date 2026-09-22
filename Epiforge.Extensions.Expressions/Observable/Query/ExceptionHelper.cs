@@ -19,4 +19,7 @@ static class ExceptionHelper
 
     public static InvalidOperationException SequenceContainsNoElements =>
         new("Sequence contains no elements");
+
+    public static InvalidOperationException SequenceContainsNoMatchingElement =>
+        new("Sequence contains no matching element");
 }

@@ -109,10 +109,11 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     readonly NullableKeyDictionary<Expression<Func<TElement, bool>>?, ObservableCollectionAnyQuery<TElement>> cachedAnyQueries = new(ExpressionEqualityComparer.Default!);
     readonly NullableKeyDictionary<TElement, ObservableCollectionAppendQuery<TElement>> cachedAppendQueries = [];
     readonly Dictionary<Expression, ObservableQuery> cachedAverageQueries = new(ExpressionEqualityComparer.Default);
-    readonly Dictionary<int, ObservableCollectionComparisonQuery<TElement>> cachedComparisonQueries = [];
+    readonly Dictionary<(int soughtComparison, IComparer<TElement> comparer), ObservableCollectionComparisonQuery<TElement>> cachedComparisonQueries = [];
     readonly Dictionary<IObservableCollectionQuery<TElement>, ObservableCollectionConcatQuery<TElement>> cachedConcatQueries = [];
     ObservableCollectionCountQuery<TElement>? cachedCountQuery;
     readonly Dictionary<(Expression keySelector, object keyEqualityComparer), ObservableQuery> cachedGroupByQueries = new(CachedGroupByQueryEqualityComparer.Default);
+    Dictionary<Func<int, int>, ObservableCollectionIndexForCountQuery<TElement>>? cachedIndexForCountQueries;
     readonly Dictionary<(Index? index, bool outOfRangeIsDefault), ObservableQuery> cachedIndexQueries = [];
     ObservableCollectionIndividualChangesQuery<TElement>? cachedIndividualChangeQuery;
     readonly Dictionary<IReadOnlyList<(Expression<Func<TElement, IComparable>> selector, bool isDescending)>, ObservableCollectionOrderByQuery<TElement>> cachedOrderByQueries = new(CachedOrderByQueryEqualityComparer.Default);
@@ -224,6 +225,8 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
                 count += cachedCountQuery is null ? 0 : 1 + cachedCountQuery.CachedObservableQueries;
             lock (cachedGroupByQueriesAccess)
                 count += cachedGroupByQueries.Values.Sum(groupByQuery => 1 + groupByQuery.CachedObservableQueries);
+            lock (cachedIndexQueriesAccess)
+                count += cachedIndexForCountQueries?.Values.Sum(indexForCountQuery => 1 + indexForCountQuery.CachedObservableQueries) ?? 0;
             lock (cachedIndexQueriesAccess)
                 count += cachedIndexQueries.Values.Sum(indexQuery => 1 + indexQuery.CachedObservableQueries);
             lock (cachedIndividualChangeQueryAccess)
@@ -578,15 +581,16 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         ObserveSelect(element => (TResult)(object)element!);
 
     [return: DisposeWhenDiscarded]
-    internal IObservableScalarQuery<TElement> ObserveComparison(int soughtComparison)
+    internal IObservableScalarQuery<TElement> ObserveComparison(int soughtComparison, IComparer<TElement> comparer)
     {
+        ArgumentNullException.ThrowIfNull(comparer);
         ObservableCollectionComparisonQuery<TElement> comparisonQuery;
         lock (cachedComparisonQueriesAccess)
         {
-            if (!cachedComparisonQueries.TryGetValue(soughtComparison, out comparisonQuery!))
+            if (!cachedComparisonQueries.TryGetValue((soughtComparison, comparer), out comparisonQuery!))
             {
-                comparisonQuery = new ObservableCollectionComparisonQuery<TElement>(collectionObserver, this, soughtComparison);
-                cachedComparisonQueries.Add(soughtComparison, comparisonQuery);
+                comparisonQuery = new ObservableCollectionComparisonQuery<TElement>(collectionObserver, this, soughtComparison, comparer);
+                cachedComparisonQueries.Add((soughtComparison, comparer), comparisonQuery);
             }
             ++comparisonQuery.Observations;
         }
@@ -595,19 +599,44 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     }
 
     [return: DisposeWhenDiscarded]
-    IObservableScalarQuery<TResult> ObserveComparison<TResult>(Expression<Func<TElement, TResult>> selector, int soughtComparison)
+    IObservableScalarQuery<TResult> ObserveComparison<TResult>(Expression<Func<TElement, TResult>> selector, int soughtComparison, IComparer<TResult> comparer)
     {
         ArgumentNullException.ThrowIfNull(selector);
+        ArgumentNullException.ThrowIfNull(comparer);
         var select = ObserveSelect(selector);
         try
         {
-            var comparison = ((ScopedObservableCollectionQuery<TResult>)select).query.ObserveComparison(soughtComparison);
+            var comparison = ((ScopedObservableCollectionQuery<TResult>)select).query.ObserveComparison(soughtComparison, comparer);
             comparison.Disposed += (_, _) => select.Dispose();
             return comparison;
         }
         catch
         {
             select.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Pairs each element with its key, seeks the pair whose key compares as sought, and returns the element of that pair
+    /// </summary>
+    [return: DisposeWhenDiscarded]
+    IObservableScalarQuery<TElement> ObserveComparisonBy<TKey>(Expression<Func<TElement, TKey>> keySelector, int soughtComparison, IComparer<TKey> comparer)
+    {
+        ArgumentNullException.ThrowIfNull(keySelector);
+        ArgumentNullException.ThrowIfNull(comparer);
+        var parameter = Expression.Parameter(typeof(TElement), "element");
+        var keyed = Expression.Lambda<Func<TElement, (TElement, TKey)>>(Expression.New(typeof((TElement, TKey)).GetConstructor([typeof(TElement), typeof(TKey)])!, parameter, LambdaInvocationRewriter.Apply(keySelector, parameter) ?? Expression.Invoke(keySelector, parameter)), parameter);
+        var comparison = ObserveComparison(keyed, soughtComparison, new ObservableCollectionKeyComparer<TElement, TKey>(comparer));
+        try
+        {
+            var element = comparison.ObserveTransform(ObservableCollectionKeyComparer<TElement, TKey>.ElementOf);
+            element.Disposed += (_, _) => comparison.Dispose();
+            return element;
+        }
+        catch
+        {
+            comparison.Dispose();
             throw;
         }
     }
@@ -687,6 +716,25 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TElement> ObserveElementAt(int index) =>
         ObserveIndex(new Index(Math.Abs(index), index < 0), false);
+
+    [return: DisposeWhenDiscarded]
+    public IObservableScalarQuery<TElement> ObserveElementAt(Func<int, int> indexForCount)
+    {
+        ArgumentNullException.ThrowIfNull(indexForCount);
+        ObservableCollectionIndexForCountQuery<TElement> indexForCountQuery;
+        lock (cachedIndexQueriesAccess)
+        {
+            cachedIndexForCountQueries ??= [];
+            if (!cachedIndexForCountQueries.TryGetValue(indexForCount, out indexForCountQuery!))
+            {
+                indexForCountQuery = new ObservableCollectionIndexForCountQuery<TElement>(collectionObserver, this, indexForCount);
+                cachedIndexForCountQueries.Add(indexForCount, indexForCountQuery);
+            }
+            ++indexForCountQuery.Observations;
+        }
+        indexForCountQuery.Initialize();
+        return indexForCountQuery.AsScoped();
+    }
 
     [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TElement> ObserveElementAtOrDefault(int index) =>
@@ -839,19 +887,51 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
 
     [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TElement> ObserveMax() =>
-        ObserveComparison(1);
+        ObserveComparison(1, Comparer<TElement>.Default);
+
+    [return: DisposeWhenDiscarded]
+    public IObservableScalarQuery<TElement> ObserveMax(IComparer<TElement> comparer) =>
+        ObserveComparison(1, comparer);
 
     [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TResult> ObserveMax<TResult>(Expression<Func<TElement, TResult>> selector) =>
-        ObserveComparison(selector, 1);
+        ObserveComparison(selector, 1, Comparer<TResult>.Default);
+
+    [return: DisposeWhenDiscarded]
+    public IObservableScalarQuery<TResult> ObserveMax<TResult>(Expression<Func<TElement, TResult>> selector, IComparer<TResult> comparer) =>
+        ObserveComparison(selector, 1, comparer);
+
+    [return: DisposeWhenDiscarded]
+    public IObservableScalarQuery<TElement> ObserveMaxBy<TKey>(Expression<Func<TElement, TKey>> keySelector) =>
+        ObserveComparisonBy(keySelector, 1, Comparer<TKey>.Default);
+
+    [return: DisposeWhenDiscarded]
+    public IObservableScalarQuery<TElement> ObserveMaxBy<TKey>(Expression<Func<TElement, TKey>> keySelector, IComparer<TKey> comparer) =>
+        ObserveComparisonBy(keySelector, 1, comparer);
 
     [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TElement> ObserveMin() =>
-        ObserveComparison(-1);
+        ObserveComparison(-1, Comparer<TElement>.Default);
+
+    [return: DisposeWhenDiscarded]
+    public IObservableScalarQuery<TElement> ObserveMin(IComparer<TElement> comparer) =>
+        ObserveComparison(-1, comparer);
 
     [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TResult> ObserveMin<TResult>(Expression<Func<TElement, TResult>> selector) =>
-        ObserveComparison(selector, -1);
+        ObserveComparison(selector, -1, Comparer<TResult>.Default);
+
+    [return: DisposeWhenDiscarded]
+    public IObservableScalarQuery<TResult> ObserveMin<TResult>(Expression<Func<TElement, TResult>> selector, IComparer<TResult> comparer) =>
+        ObserveComparison(selector, -1, comparer);
+
+    [return: DisposeWhenDiscarded]
+    public IObservableScalarQuery<TElement> ObserveMinBy<TKey>(Expression<Func<TElement, TKey>> keySelector) =>
+        ObserveComparisonBy(keySelector, -1, Comparer<TKey>.Default);
+
+    [return: DisposeWhenDiscarded]
+    public IObservableScalarQuery<TElement> ObserveMinBy<TKey>(Expression<Func<TElement, TKey>> keySelector, IComparer<TKey> comparer) =>
+        ObserveComparisonBy(keySelector, -1, comparer);
 
     [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<TResult> ObserveOfType<TResult>()
@@ -914,6 +994,27 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         }
         prependQuery.Initialize();
         return prependQuery.AsScoped();
+    }
+
+    [return: DisposeWhenDiscarded]
+    public IObservableScalarQuery<(int Ahead, int Tied)> ObserveRank(TElement element, Expression<Func<TElement, IComparable>> selector, bool isDescending) =>
+        ObserveRank(element, (selector, isDescending));
+
+    [return: DisposeWhenDiscarded]
+    public IObservableScalarQuery<(int Ahead, int Tied)> ObserveRank(TElement element, params (Expression<Func<TElement, IComparable>> selector, bool isDescending)[] selectorsAndDirections)
+    {
+        var orderBy = ObserveOrderBy(selectorsAndDirections);
+        try
+        {
+            var rank = ((ObservableCollectionOrderByQuery<TElement>)((ScopedObservableCollectionQuery<TElement>)orderBy).query).ObserveRank(element);
+            rank.Disposed += (_, _) => orderBy.Dispose();
+            return rank;
+        }
+        catch
+        {
+            orderBy.Dispose();
+            throw;
+        }
     }
 
     [return: DisposeWhenDiscarded]
@@ -1346,7 +1447,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
                 throw new InvalidOperationException("an observation was released more times than it was acquired");
             if (remaining == 0)
             {
-                cachedComparisonQueries.Remove(comparisonQuery.SoughtComparison);
+                cachedComparisonQueries.Remove((comparisonQuery.SoughtComparison, comparisonQuery.Comparer));
                 return true;
             }
         }
@@ -1395,6 +1496,22 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
             if (remaining == 0)
             {
                 cachedCountQuery = null;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    internal bool QueryDisposed(ObservableCollectionIndexForCountQuery<TElement> indexForCountQuery)
+    {
+        lock (cachedIndexQueriesAccess)
+        {
+            var remaining = --indexForCountQuery.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
+            {
+                cachedIndexForCountQueries!.Remove(indexForCountQuery.IndexForCount);
                 return true;
             }
         }

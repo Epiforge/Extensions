@@ -220,6 +220,9 @@ class ScopedObservableCollectionQuery<TElement> :
     public IObservableScalarQuery<TElement> ObserveElementAt(int index) =>
         query.ObserveElementAt(index);
 
+    public IObservableScalarQuery<TElement> ObserveElementAt(Func<int, int> indexForCount) =>
+        query.ObserveElementAt(indexForCount);
+
     public IObservableScalarQuery<TElement> ObserveElementAtOrDefault(int index) =>
         query.ObserveElementAtOrDefault(index);
 
@@ -259,14 +262,38 @@ class ScopedObservableCollectionQuery<TElement> :
     public IObservableScalarQuery<TElement> ObserveMax() =>
         query.ObserveMax();
 
+    public IObservableScalarQuery<TElement> ObserveMax(IComparer<TElement> comparer) =>
+        query.ObserveMax(comparer);
+
     public IObservableScalarQuery<TResult> ObserveMax<TResult>(Expression<Func<TElement, TResult>> selector) =>
         query.ObserveMax<TResult>(selector);
+
+    public IObservableScalarQuery<TResult> ObserveMax<TResult>(Expression<Func<TElement, TResult>> selector, IComparer<TResult> comparer) =>
+        query.ObserveMax<TResult>(selector, comparer);
+
+    public IObservableScalarQuery<TElement> ObserveMaxBy<TKey>(Expression<Func<TElement, TKey>> keySelector) =>
+        query.ObserveMaxBy<TKey>(keySelector);
+
+    public IObservableScalarQuery<TElement> ObserveMaxBy<TKey>(Expression<Func<TElement, TKey>> keySelector, IComparer<TKey> comparer) =>
+        query.ObserveMaxBy<TKey>(keySelector, comparer);
 
     public IObservableScalarQuery<TElement> ObserveMin() =>
         query.ObserveMin();
 
+    public IObservableScalarQuery<TElement> ObserveMin(IComparer<TElement> comparer) =>
+        query.ObserveMin(comparer);
+
     public IObservableScalarQuery<TResult> ObserveMin<TResult>(Expression<Func<TElement, TResult>> selector) =>
         query.ObserveMin<TResult>(selector);
+
+    public IObservableScalarQuery<TResult> ObserveMin<TResult>(Expression<Func<TElement, TResult>> selector, IComparer<TResult> comparer) =>
+        query.ObserveMin<TResult>(selector, comparer);
+
+    public IObservableScalarQuery<TElement> ObserveMinBy<TKey>(Expression<Func<TElement, TKey>> keySelector) =>
+        query.ObserveMinBy<TKey>(keySelector);
+
+    public IObservableScalarQuery<TElement> ObserveMinBy<TKey>(Expression<Func<TElement, TKey>> keySelector, IComparer<TKey> comparer) =>
+        query.ObserveMinBy<TKey>(keySelector, comparer);
 
     public IObservableCollectionQuery<TResult> ObserveOfType<TResult>() =>
         query.ObserveOfType<TResult>();
@@ -282,6 +309,12 @@ class ScopedObservableCollectionQuery<TElement> :
 
     public IObservableCollectionQuery<TElement> ObservePrepend(TElement element) =>
         query.ObservePrepend(element);
+
+    public IObservableScalarQuery<(int Ahead, int Tied)> ObserveRank(TElement element, Expression<Func<TElement, IComparable>> selector, bool isDescending) =>
+        query.ObserveRank(element, selector, isDescending);
+
+    public IObservableScalarQuery<(int Ahead, int Tied)> ObserveRank(TElement element, params (Expression<Func<TElement, IComparable>> selector, bool isDescending)[] selectorsAndDirections) =>
+        query.ObserveRank(element, selectorsAndDirections);
 
     public IObservableCollectionQuery<TResult> ObserveSelect<TResult>(Expression<Func<TElement, TResult>> selector) =>
         query.ObserveSelect<TResult>(selector);

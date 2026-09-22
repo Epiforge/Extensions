@@ -1,6 +1,6 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-sealed class ObservableCollectionComparisonQuery<TResult>(CollectionObserver collectionObserver, ObservableCollectionQuery<TResult> observableCollectionQuery, int soughtComparison) :
+sealed class ObservableCollectionComparisonQuery<TResult>(CollectionObserver collectionObserver, ObservableCollectionQuery<TResult> observableCollectionQuery, int soughtComparison, IComparer<TResult> comparer) :
     ObservableScalarQuery<TResult>(collectionObserver)
 {
 #if IS_NET_9_0_OR_GREATER
@@ -8,7 +8,7 @@ sealed class ObservableCollectionComparisonQuery<TResult>(CollectionObserver col
 #else
     readonly object access = new();
 #endif
-    readonly Comparer<TResult> comparer = Comparer<TResult>.Default;
+    internal readonly IComparer<TResult> Comparer = comparer;
     internal readonly int SoughtComparison = soughtComparison;
 
     protected override bool Dispose(bool disposing)
@@ -43,7 +43,7 @@ sealed class ObservableCollectionComparisonQuery<TResult>(CollectionObserver col
                     while (enumerator.MoveNext())
                     {
                         var enumeratorValue = enumerator.Current;
-                        if (comparer.Compare(enumeratorValue, value) == SoughtComparison)
+                        if (Math.Sign(Comparer.Compare(enumeratorValue, value)) == SoughtComparison)
                             value = enumeratorValue;
                     }
                     Evaluation = (null, value);
@@ -59,7 +59,7 @@ sealed class ObservableCollectionComparisonQuery<TResult>(CollectionObserver col
                     for (var i = 1; i < observableCollectionQuery.Count; i++)
                     {
                         var indexerValue = observableCollectionQuery[i];
-                        if (comparer.Compare(indexerValue, value) == SoughtComparison)
+                        if (Math.Sign(Comparer.Compare(indexerValue, value)) == SoughtComparison)
                             value = indexerValue;
                     }
                     Evaluation = (null, value);
@@ -79,15 +79,15 @@ sealed class ObservableCollectionComparisonQuery<TResult>(CollectionObserver col
             else if (e.Action is not NotifyCollectionChangedAction.Move)
             {
                 var value = Evaluation.Result;
-                if (e.OldItems is { } oldItems && oldItems.Cast<TResult>().Any(oldItem => comparer.Compare(value, oldItem) == 0))
+                if (e.OldItems is { } oldItems && oldItems.Cast<TResult>().Any(oldItem => Comparer.Compare(value, oldItem) == 0))
                 {
                     if (e.NewItems is { } replacingItems)
                     {
                         var valueScan = value;
                         foreach (var newValue in replacingItems.Cast<TResult>())
-                            if (comparer.Compare(newValue, valueScan) == SoughtComparison)
+                            if (Math.Sign(Comparer.Compare(newValue, valueScan)) == SoughtComparison)
                                 valueScan = newValue;
-                        if (comparer.Compare(valueScan, value) != 0)
+                        if (Comparer.Compare(valueScan, value) != 0)
                         {
                             Evaluation = (null, valueScan);
                             return;
@@ -99,9 +99,9 @@ sealed class ObservableCollectionComparisonQuery<TResult>(CollectionObserver col
                 {
                     var valueScan = value;
                     foreach (var newValue in newItems.Cast<TResult>())
-                        if (comparer.Compare(newValue, valueScan) == SoughtComparison)
+                        if (Math.Sign(Comparer.Compare(newValue, valueScan)) == SoughtComparison)
                             valueScan = newValue;
-                    if (comparer.Compare(valueScan, value) != 0)
+                    if (Comparer.Compare(valueScan, value) != 0)
                         Evaluation = (null, valueScan);
                 }
             }
