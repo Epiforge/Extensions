@@ -5,7 +5,7 @@
     <PropertyGroup>
         <Product>Epiforge.Extensions.Expressions</Product>
         <Version>6.0.0</Version>
-        <PackageValidationBaselineVersion>5.0.0</PackageValidationBaselineVersion>
+        <PackageValidationBaselineVersion>6.0.0</PackageValidationBaselineVersion>
         <Description>This package assists in operating with expressions.</Description>
     </PropertyGroup>
 
