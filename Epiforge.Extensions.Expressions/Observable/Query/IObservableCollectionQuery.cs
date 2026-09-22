@@ -242,6 +242,7 @@ public interface IObservableCollectionQuery<TElement> :
     /// Continuously returns the maximum value in the collection
     /// </summary>
     /// <returns>The maximum value in the collection</returns>
+    /// <remarks>Each change to the collection costs a number of comparisons logarithmic in the number of distinct values, whether or not it disturbs the result, and constructing the query costs as many for each element; the query holds each distinct value once</remarks>
     [return: DisposeWhenDiscarded]
     IObservableScalarQuery<TElement> ObserveMax();
 
@@ -250,6 +251,7 @@ public interface IObservableCollectionQuery<TElement> :
     /// </summary>
     /// <param name="comparer">An <see cref="IComparer{T}"/> to compare values</param>
     /// <returns>The maximum value in the collection</returns>
+    /// <remarks>Each change to the collection costs a number of comparisons logarithmic in the number of distinct values, whether or not it disturbs the result, and constructing the query costs as many for each element; the query holds each distinct value once</remarks>
     [return: DisposeWhenDiscarded]
     IObservableScalarQuery<TElement> ObserveMax(IComparer<TElement> comparer);
 
@@ -259,6 +261,7 @@ public interface IObservableCollectionQuery<TElement> :
     /// <typeparam name="TResult">The type of the maximum value</typeparam>
     /// <param name="selector">A transform function to apply to each element</param>
     /// <returns>The maximum value in the collection</returns>
+    /// <remarks>Each change to the collection costs a number of comparisons logarithmic in the number of distinct values, whether or not it disturbs the result, and constructing the query costs as many for each element; the query holds each distinct value once</remarks>
     [return: DisposeWhenDiscarded]
     IObservableScalarQuery<TResult> ObserveMax<TResult>(Expression<Func<TElement, TResult>> selector);
 
@@ -269,7 +272,7 @@ public interface IObservableCollectionQuery<TElement> :
     /// <param name="selector">A transform function to apply to each element</param>
     /// <param name="comparer">An <see cref="IComparer{T}"/> to compare values</param>
     /// <returns>The maximum value in the collection</returns>
-    /// <remarks>The comparer is given only the values the selector produced, and a value is re-read only when something the selector reads announces a change, so a comparer which consults anything else is not told when that changes</remarks>
+    /// <remarks>The comparer is given only the values the selector produced, and a value is re-read only when something the selector reads announces a change, so a comparer which consults anything else is not told when that changes. Each change to the collection costs a number of comparisons logarithmic in the number of distinct values, whether or not it disturbs the result, and constructing the query costs as many for each element; the query holds each distinct value once</remarks>
     [return: DisposeWhenDiscarded]
     IObservableScalarQuery<TResult> ObserveMax<TResult>(Expression<Func<TElement, TResult>> selector, IComparer<TResult> comparer);
 
@@ -279,7 +282,7 @@ public interface IObservableCollectionQuery<TElement> :
     /// <typeparam name="TKey">The type of the key</typeparam>
     /// <param name="keySelector">A function to extract the key for each element</param>
     /// <returns>The element with the maximum key</returns>
-    /// <remarks>Where more than one element has the maximum key, which of them is returned is not specified; a caller which needs one in particular supplies a comparer which breaks the tie. The comparer is given only the keys the selector produced, and a key is re-read only when something the selector reads announces a change, so a comparer which consults anything else is not told when that changes</remarks>
+    /// <remarks>Where more than one element has the maximum key, which of them is returned is not specified; a caller which needs one in particular supplies a comparer which breaks the tie. The comparer is given only the keys the selector produced, and a key is re-read only when something the selector reads announces a change, so a comparer which consults anything else is not told when that changes. Each change to the collection costs a number of comparisons logarithmic in the number of distinct values, whether or not it disturbs the result, and constructing the query costs as many for each element; the query holds each distinct value once</remarks>
     [return: DisposeWhenDiscarded]
     IObservableScalarQuery<TElement> ObserveMaxBy<TKey>(Expression<Func<TElement, TKey>> keySelector);
 
@@ -290,7 +293,7 @@ public interface IObservableCollectionQuery<TElement> :
     /// <param name="keySelector">A function to extract the key for each element</param>
     /// <param name="comparer">An <see cref="IComparer{T}"/> to compare keys</param>
     /// <returns>The element with the maximum key</returns>
-    /// <remarks>Where more than one element has the maximum key, which of them is returned is not specified; a caller which needs one in particular supplies a comparer which breaks the tie. The comparer is given only the keys the selector produced, and a key is re-read only when something the selector reads announces a change, so a comparer which consults anything else is not told when that changes</remarks>
+    /// <remarks>Where more than one element has the maximum key, which of them is returned is not specified; a caller which needs one in particular supplies a comparer which breaks the tie. The comparer is given only the keys the selector produced, and a key is re-read only when something the selector reads announces a change, so a comparer which consults anything else is not told when that changes. Each change to the collection costs a number of comparisons logarithmic in the number of distinct values, whether or not it disturbs the result, and constructing the query costs as many for each element; the query holds each distinct value once</remarks>
     [return: DisposeWhenDiscarded]
     IObservableScalarQuery<TElement> ObserveMaxBy<TKey>(Expression<Func<TElement, TKey>> keySelector, IComparer<TKey> comparer);
 
@@ -298,6 +301,7 @@ public interface IObservableCollectionQuery<TElement> :
     /// Continuously returns the minimum value in the collection
     /// </summary>
     /// <returns>The minimum value in the collection</returns>
+    /// <remarks>Each change to the collection costs a number of comparisons logarithmic in the number of distinct values, whether or not it disturbs the result, and constructing the query costs as many for each element; the query holds each distinct value once</remarks>
     [return: DisposeWhenDiscarded]
     IObservableScalarQuery<TElement> ObserveMin();
 
@@ -306,6 +310,7 @@ public interface IObservableCollectionQuery<TElement> :
     /// </summary>
     /// <param name="comparer">An <see cref="IComparer{T}"/> to compare values</param>
     /// <returns>The minimum value in the collection</returns>
+    /// <remarks>Each change to the collection costs a number of comparisons logarithmic in the number of distinct values, whether or not it disturbs the result, and constructing the query costs as many for each element; the query holds each distinct value once</remarks>
     [return: DisposeWhenDiscarded]
     IObservableScalarQuery<TElement> ObserveMin(IComparer<TElement> comparer);
 
@@ -315,6 +320,7 @@ public interface IObservableCollectionQuery<TElement> :
     /// <typeparam name="TResult">The type of the minimum value</typeparam>
     /// <param name="selector">A transform function to apply to each element</param>
     /// <returns>The minimum value in the collection</returns>
+    /// <remarks>Each change to the collection costs a number of comparisons logarithmic in the number of distinct values, whether or not it disturbs the result, and constructing the query costs as many for each element; the query holds each distinct value once</remarks>
     [return: DisposeWhenDiscarded]
     IObservableScalarQuery<TResult> ObserveMin<TResult>(Expression<Func<TElement, TResult>> selector);
 
@@ -325,7 +331,7 @@ public interface IObservableCollectionQuery<TElement> :
     /// <param name="selector">A transform function to apply to each element</param>
     /// <param name="comparer">An <see cref="IComparer{T}"/> to compare values</param>
     /// <returns>The minimum value in the collection</returns>
-    /// <remarks>The comparer is given only the values the selector produced, and a value is re-read only when something the selector reads announces a change, so a comparer which consults anything else is not told when that changes</remarks>
+    /// <remarks>The comparer is given only the values the selector produced, and a value is re-read only when something the selector reads announces a change, so a comparer which consults anything else is not told when that changes. Each change to the collection costs a number of comparisons logarithmic in the number of distinct values, whether or not it disturbs the result, and constructing the query costs as many for each element; the query holds each distinct value once</remarks>
     [return: DisposeWhenDiscarded]
     IObservableScalarQuery<TResult> ObserveMin<TResult>(Expression<Func<TElement, TResult>> selector, IComparer<TResult> comparer);
 
@@ -335,7 +341,7 @@ public interface IObservableCollectionQuery<TElement> :
     /// <typeparam name="TKey">The type of the key</typeparam>
     /// <param name="keySelector">A function to extract the key for each element</param>
     /// <returns>The element with the minimum key</returns>
-    /// <remarks>Where more than one element has the minimum key, which of them is returned is not specified; a caller which needs one in particular supplies a comparer which breaks the tie. The comparer is given only the keys the selector produced, and a key is re-read only when something the selector reads announces a change, so a comparer which consults anything else is not told when that changes</remarks>
+    /// <remarks>Where more than one element has the minimum key, which of them is returned is not specified; a caller which needs one in particular supplies a comparer which breaks the tie. The comparer is given only the keys the selector produced, and a key is re-read only when something the selector reads announces a change, so a comparer which consults anything else is not told when that changes. Each change to the collection costs a number of comparisons logarithmic in the number of distinct values, whether or not it disturbs the result, and constructing the query costs as many for each element; the query holds each distinct value once</remarks>
     [return: DisposeWhenDiscarded]
     IObservableScalarQuery<TElement> ObserveMinBy<TKey>(Expression<Func<TElement, TKey>> keySelector);
 
@@ -346,7 +352,7 @@ public interface IObservableCollectionQuery<TElement> :
     /// <param name="keySelector">A function to extract the key for each element</param>
     /// <param name="comparer">An <see cref="IComparer{T}"/> to compare keys</param>
     /// <returns>The element with the minimum key</returns>
-    /// <remarks>Where more than one element has the minimum key, which of them is returned is not specified; a caller which needs one in particular supplies a comparer which breaks the tie. The comparer is given only the keys the selector produced, and a key is re-read only when something the selector reads announces a change, so a comparer which consults anything else is not told when that changes</remarks>
+    /// <remarks>Where more than one element has the minimum key, which of them is returned is not specified; a caller which needs one in particular supplies a comparer which breaks the tie. The comparer is given only the keys the selector produced, and a key is re-read only when something the selector reads announces a change, so a comparer which consults anything else is not told when that changes. Each change to the collection costs a number of comparisons logarithmic in the number of distinct values, whether or not it disturbs the result, and constructing the query costs as many for each element; the query holds each distinct value once</remarks>
     [return: DisposeWhenDiscarded]
     IObservableScalarQuery<TElement> ObserveMinBy<TKey>(Expression<Func<TElement, TKey>> keySelector, IComparer<TKey> comparer);
 
