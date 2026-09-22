@@ -1,7 +1,7 @@
 namespace Epiforge.Extensions.Expressions.Observable;
 
 /// <summary>
-/// Replaces every invocation of a literal lambda in an expression with the body that invocation would have evaluated, so that what is analyzed and what is compiled contain no invocation the analyzer would refuse
+/// Replaces every invocation of a literal lambda in an expression with the body that invocation would have evaluated, and every default value with the constant it evaluates to, so that what is analyzed and what is compiled contain no invocation or default value the analyzer would refuse
 /// </summary>
 /// <remarks>
 /// The graph performs the same reduction in <see cref="ObservableInvocationExpression"/>, substituting each argument's evaluated value where this substitutes the argument expression itself; the two were measured to take the same subscriptions, which is what makes admitting the reduced form an agreement with the graph rather than an approximation of it. A parameter referenced other than exactly once is refused: referenced twice, the argument would be evaluated twice where the graph evaluates it once, and referenced not at all, the argument would be dropped along with the subscription the graph still takes for it
@@ -22,6 +22,15 @@ sealed class InvocationReducer :
         }
     }
 
+    /// <summary>
+    /// Yields the constant a default value evaluates to, which the graph also substitutes for it when it replaces parameters, so that the two mechanisms observe the same constant
+    /// </summary>
+    /// <remarks>
+    /// A value type's default is its zeroed instance, which is not necessarily what its parameterless constructor produces, so it is made without running one; a nullable value type's default is null
+    /// </remarks>
+    internal static ConstantExpression Constant(DefaultExpression defaultExpression) =>
+        Expression.Constant(defaultExpression.Type.IsValueType && Nullable.GetUnderlyingType(defaultExpression.Type) is null ? RuntimeHelpers.GetUninitializedObject(defaultExpression.Type) : null, defaultExpression.Type);
+
     internal static LambdaExpression Reduce(LambdaExpression lambdaExpression) =>
         (LambdaExpression)new InvocationReducer().Visit(lambdaExpression);
 
@@ -36,6 +45,9 @@ sealed class InvocationReducer :
                 return false;
         return true;
     }
+
+    protected override Expression VisitDefault(DefaultExpression node) =>
+        node.Type == typeof(void) ? node : Constant(node);
 
     protected override Expression VisitInvocation(InvocationExpression node)
     {

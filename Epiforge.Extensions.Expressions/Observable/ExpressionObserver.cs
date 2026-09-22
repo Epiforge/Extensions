@@ -46,6 +46,8 @@ public class ExpressionObserver :
                 return Expression.Condition(ReplaceParameters(parameterTranslation, conditionalExpression.Test), ReplaceParameters(parameterTranslation, conditionalExpression.IfTrue), ReplaceParameters(parameterTranslation, conditionalExpression.IfFalse), conditionalExpression.Type);
             case ConstantExpression constantExpression:
                 return constantExpression;
+            case DefaultExpression defaultExpression when defaultExpression.Type != typeof(void):
+                return InvocationReducer.Constant(defaultExpression);
             case InvocationExpression invocationExpression:
                 return Expression.Invoke(ReplaceParameters(parameterTranslation, invocationExpression.Expression), [..invocationExpression.Arguments.Select(argument => ReplaceParameters(parameterTranslation, argument))]);
             case IndexExpression indexExpression:

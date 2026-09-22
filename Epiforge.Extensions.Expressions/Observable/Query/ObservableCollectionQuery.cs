@@ -367,9 +367,11 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     public int IndexOf(TElement item)
     {
         if (!HasIndexerPenalty)
+        {
             for (int i = 0, ii = Count; i < ii; ++i)
                 if (EqualityComparer<TElement>.Default.Equals(this[i], item))
                     return i;
+        }
         else
         {
             var enumerating = -1;

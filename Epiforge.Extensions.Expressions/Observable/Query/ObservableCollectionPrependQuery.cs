@@ -13,6 +13,9 @@ sealed class ObservableCollectionPrependQuery<TElement>(CollectionObserver colle
     public override int Count =>
         sequenceCount + 1;
 
+    internal override bool HasIndexerPenalty =>
+        sequence.HasIndexerPenalty;
+
     protected override bool Dispose(bool disposing)
     {
         if (disposing)

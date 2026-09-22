@@ -29,6 +29,9 @@ sealed class ObservableCollectionConcatQuery<TElement>(CollectionObserver collec
     public override int Count =>
         count;
 
+    internal override bool HasIndexerPenalty =>
+        true;
+
     protected override bool Dispose(bool disposing)
     {
         if (disposing)
