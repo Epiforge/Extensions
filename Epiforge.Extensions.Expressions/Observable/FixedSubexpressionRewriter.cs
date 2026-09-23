@@ -4,7 +4,7 @@
 /// Replaces every closure field chain in a lambda with a read from an array of values resolved when an observation is constructed, so that a fast path evaluates the same frozen inputs the graph caches in its nodes rather than dereferencing the closure afresh every time
 /// </summary>
 /// <remarks>
-/// Each operand whose evaluation the expression defers is also wrapped so that reaching it records the fact in an array the observation reads once the evaluation has returned, which is how the fast path learns that the subscriptions of that operand are now the graph's as well
+/// Each operand whose evaluation the expression defers is also wrapped so that reaching it records the fact in an array the observation reads once the evaluation has returned, which is how the fast path learns to attach the subscriptions it planned for that operand. A property read on a value type other than a primitive, and an operator whose method takes its operands by reference, reads what contains a held subexpression from a temporary, because a held subexpression is resolved inside a try and the compiler refuses to move such an operand into a temporary itself when one is evaluated after another
 /// </remarks>
 sealed class FixedSubexpressionRewriter :
     ExpressionVisitor
@@ -32,6 +32,7 @@ sealed class FixedSubexpressionRewriter :
     readonly IReadOnlyList<Expression> linkTargets;
     readonly ParameterExpression reached;
     readonly ParameterExpression values;
+    int holds;
     Expression? wrapping;
 
     internal List<Expression> FixedSubexpressions =>
@@ -43,6 +44,14 @@ sealed class FixedSubexpressionRewriter :
             if (ReferenceEquals(deferredGroups[i], node))
                 return i;
         return -1;
+    }
+
+    static bool HasParameterByReference(MethodInfo method)
+    {
+        foreach (var parameter in method.GetParameters())
+            if (parameter.ParameterType.IsByRef)
+                return true;
+        return false;
     }
 
     int HeldOf(Expression node)
@@ -61,6 +70,7 @@ sealed class FixedSubexpressionRewriter :
     /// </remarks>
     Expression Hold(int slot, Expression resolved, Type type)
     {
+        ++holds;
         var index = Expression.Constant(slot);
         var fault = Expression.Parameter(typeof(Exception), "fault");
         var resolving = Expression.TryCatch
@@ -70,6 +80,12 @@ sealed class FixedSubexpressionRewriter :
         );
         return Expression.Convert(Expression.Call(unwrapMethod, Expression.Condition(Expression.ReferenceEqual(Expression.ArrayIndex(held, index), unresolved), resolving, Expression.ArrayIndex(held, index), typeof(object))), type);
     }
+
+    /// <summary>
+    /// Whether a property read on an instance of a type is made on the instance itself rather than on a copy of it, which primitives are exempt from because nothing can change them
+    /// </summary>
+    static bool IsReadInPlace(Type type) =>
+        type.IsValueType && Type.GetTypeCode(type) == TypeCode.Object;
 
     int LinkOf(Expression node)
     {
@@ -124,5 +140,36 @@ sealed class FixedSubexpressionRewriter :
             visited = Hold(slot, visited, node.Type);
         var link = LinkOf(node);
         return link < 0 ? visited : Record(link, visited);
+    }
+
+    protected override Expression VisitBinary(BinaryExpression node)
+    {
+        var holding = holds;
+        var visited = base.VisitBinary(node);
+        if (holds == holding || visited is not BinaryExpression { Method: { } method, NodeType: not (ExpressionType.AndAlso or ExpressionType.OrElse or ExpressionType.Coalesce) } binaryExpression || !HasParameterByReference(method))
+            return visited;
+        var left = Expression.Variable(binaryExpression.Left.Type);
+        var right = Expression.Variable(binaryExpression.Right.Type);
+        return Expression.Block(binaryExpression.Type, [left, right], Expression.Assign(left, binaryExpression.Left), Expression.Assign(right, binaryExpression.Right), binaryExpression.Update(left, binaryExpression.Conversion, right));
+    }
+
+    protected override Expression VisitMember(MemberExpression node)
+    {
+        var holding = holds;
+        var visited = base.VisitMember(node);
+        if (holds == holding || visited is not MemberExpression { Member: PropertyInfo, Expression: { } instance } memberExpression || !IsReadInPlace(instance.Type))
+            return visited;
+        var copy = Expression.Variable(instance.Type);
+        return Expression.Block(memberExpression.Type, [copy], Expression.Assign(copy, instance), memberExpression.Update(copy));
+    }
+
+    protected override Expression VisitUnary(UnaryExpression node)
+    {
+        var holding = holds;
+        var visited = base.VisitUnary(node);
+        if (holds == holding || visited is not UnaryExpression { Method: { } method } unaryExpression || !HasParameterByReference(method))
+            return visited;
+        var operand = Expression.Variable(unaryExpression.Operand.Type);
+        return Expression.Block(unaryExpression.Type, [operand], Expression.Assign(operand, unaryExpression.Operand), unaryExpression.Update(operand));
     }
 }
