@@ -21,6 +21,23 @@ abstract class ObservableQuery :
             query.EndNotificationDeferral();
     }
 
+    /// <summary>
+    /// Holds what a query needs only while it defers notifications, created by the first mutation which defers them, so that a query which never changes allocates none of it
+    /// </summary>
+    sealed class NotificationDeferralState
+    {
+#if IS_NET_9_0_OR_GREATER
+        internal readonly Lock Access = new();
+#else
+        internal readonly object Access = new();
+#endif
+        internal int Depth;
+        internal object? First;
+        internal List<object>? Many;
+        internal object? Second;
+        internal object? Third;
+    }
+
     protected static readonly PropertyChangedEventArgs countPropertyChangedEventArgs = new(nameof(IReadOnlyList<>.Count));
     protected static readonly PropertyChangingEventArgs countPropertyChangingEventArgs = new(nameof(IReadOnlyList<>.Count));
 
@@ -31,22 +48,13 @@ abstract class ObservableQuery :
     }
 
     protected readonly CollectionObserver collectionObserver;
-    object? firstDeferredNotification;
-    List<object>? manyDeferredNotifications;
-    object? secondDeferredNotification;
-    object? thirdDeferredNotification;
+    NotificationDeferralState? deferralState;
 #if IS_NET_9_0_OR_GREATER
     readonly Lock lifetimeAccess = new();
 #else
     readonly object lifetimeAccess = new();
 #endif
     bool isInitialized;
-    int notificationDeferralDepth;
-#if IS_NET_9_0_OR_GREATER
-    readonly Lock notificationAccess = new();
-#else
-    readonly object notificationAccess = new();
-#endif
 
     internal int Observations;
 
@@ -55,14 +63,26 @@ abstract class ObservableQuery :
     public ICollectionObserver CollectionObserver =>
         collectionObserver;
 
+    NotificationDeferralState DeferralState
+    {
+        get
+        {
+            if (Volatile.Read(ref deferralState) is { } state)
+                return state;
+            state = new();
+            return Interlocked.CompareExchange(ref deferralState, state, null) ?? state;
+        }
+    }
+
     void BeginNotificationDeferral()
     {
+        var state = DeferralState;
 #if IS_NET_9_0_OR_GREATER
-        notificationAccess.Enter();
+        state.Access.Enter();
 #else
-        Monitor.Enter(notificationAccess);
+        Monitor.Enter(state.Access);
 #endif
-        ++notificationDeferralDepth;
+        ++state.Depth;
     }
 
     /// <summary>
@@ -76,33 +96,34 @@ abstract class ObservableQuery :
     /// </summary>
     private protected bool DeferNotification(object eventArguments)
     {
-        if (notificationDeferralDepth == 0)
+        if (Volatile.Read(ref deferralState) is not { Depth: > 0 } state)
             return false;
-        if (firstDeferredNotification is null)
-            firstDeferredNotification = eventArguments;
-        else if (secondDeferredNotification is null)
-            secondDeferredNotification = eventArguments;
-        else if (thirdDeferredNotification is null)
-            thirdDeferredNotification = eventArguments;
+        if (state.First is null)
+            state.First = eventArguments;
+        else if (state.Second is null)
+            state.Second = eventArguments;
+        else if (state.Third is null)
+            state.Third = eventArguments;
         else
-            (manyDeferredNotifications ??= []).Add(eventArguments);
+            (state.Many ??= []).Add(eventArguments);
         return true;
     }
 
     void EndNotificationDeferral()
     {
+        var state = deferralState!;
         object? first = null, second = null, third = null;
         List<object>? many = null;
-        if (--notificationDeferralDepth == 0)
+        if (--state.Depth == 0)
         {
-            first = firstDeferredNotification;
-            second = secondDeferredNotification;
-            third = thirdDeferredNotification;
-            many = manyDeferredNotifications;
-            firstDeferredNotification = null;
-            secondDeferredNotification = null;
-            thirdDeferredNotification = null;
-            manyDeferredNotifications = null;
+            first = state.First;
+            second = state.Second;
+            third = state.Third;
+            many = state.Many;
+            state.First = null;
+            state.Second = null;
+            state.Third = null;
+            state.Many = null;
         }
         try
         {
@@ -111,9 +132,9 @@ abstract class ObservableQuery :
         finally
         {
 #if IS_NET_9_0_OR_GREATER
-            notificationAccess.Exit();
+            state.Access.Exit();
 #else
-            Monitor.Exit(notificationAccess);
+            Monitor.Exit(state.Access);
 #endif
         }
     }
