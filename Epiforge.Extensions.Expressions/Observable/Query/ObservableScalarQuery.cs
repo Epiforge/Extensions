@@ -4,11 +4,11 @@ abstract class ObservableScalarQuery<TResult>(CollectionObserver collectionObser
     ObservableQuery(collectionObserver),
     IObservableScalarQuery<TResult>
 {
-    readonly Dictionary<Expression, ObservableQuery> cachedTransformQueries = new(ExpressionEqualityComparer.Default);
+    Dictionary<Expression, ObservableQuery>? cachedTransformQueries;
 #if IS_NET_9_0_OR_GREATER
-    readonly Lock cachedTransformQueriesAccess = new();
+    Lock? cachedQueriesAccess;
 #else
-    readonly object cachedTransformQueriesAccess = new();
+    object? cachedQueriesAccess;
 #endif
     (Exception? Fault, TResult Result) evaluation;
 
@@ -16,10 +16,28 @@ abstract class ObservableScalarQuery<TResult>(CollectionObserver collectionObser
     {
         get
         {
-            var count = 0;
-            lock (cachedTransformQueriesAccess)
-                count += cachedTransformQueries.Values.Sum(transformQuery => 1 + transformQuery.CachedObservableQueries);
-            return count;
+            if (Volatile.Read(ref cachedQueriesAccess) is not { } access)
+                return 0;
+            lock (access)
+                return cachedTransformQueries?.Values.Sum(transformQuery => 1 + transformQuery.CachedObservableQueries) ?? 0;
+        }
+    }
+
+    /// <summary>
+    /// Gets the lock guarding this query's caches of the queries built over it, created by whichever observation first needs it, so that a query nothing is built over allocates none
+    /// </summary>
+#if IS_NET_9_0_OR_GREATER
+    Lock CachedQueriesAccess
+#else
+    object CachedQueriesAccess
+#endif
+    {
+        get
+        {
+            if (Volatile.Read(ref cachedQueriesAccess) is { } access)
+                return access;
+            access = new();
+            return Interlocked.CompareExchange(ref cachedQueriesAccess, access, null) ?? access;
         }
     }
 
@@ -45,9 +63,9 @@ abstract class ObservableScalarQuery<TResult>(CollectionObserver collectionObser
     {
         ArgumentNullException.ThrowIfNull(transform);
         ObservableQuery transformQuery;
-        lock (cachedTransformQueriesAccess)
+        lock (CachedQueriesAccess)
         {
-            if (!cachedTransformQueries.TryGetValue(transform, out transformQuery!))
+            if (!(cachedTransformQueries ??= new(ExpressionEqualityComparer.Default)).TryGetValue(transform, out transformQuery!))
             {
                 transformQuery = new ObservableScalarTransformQuery<TResult, TTransform>(collectionObserver, this, transform);
                 cachedTransformQueries.Add(transform, transformQuery);
@@ -60,14 +78,14 @@ abstract class ObservableScalarQuery<TResult>(CollectionObserver collectionObser
 
     internal bool QueryDisposed<TTransform>(ObservableScalarTransformQuery<TResult, TTransform> query)
     {
-        lock (cachedTransformQueriesAccess)
+        lock (CachedQueriesAccess)
         {
             var remaining = --query.Observations;
             if (remaining < 0)
                 throw new InvalidOperationException("an observation was released more times than it was acquired");
             if (remaining == 0)
             {
-                cachedTransformQueries.Remove(query.Transform);
+                cachedTransformQueries!.Remove(query.Transform);
                 return true;
             }
         }

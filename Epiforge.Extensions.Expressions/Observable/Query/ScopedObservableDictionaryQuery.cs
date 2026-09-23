@@ -193,7 +193,7 @@ class ScopedObservableDictionaryQuery<TKey, TValue> :
         if (Volatile.Read(ref changeAccess) is { } access)
             lock (access)
                 DetachWithAccess();
-        query.Dispose();
+        query.Release();
         Disposed?.Invoke(this, e);
     }
 

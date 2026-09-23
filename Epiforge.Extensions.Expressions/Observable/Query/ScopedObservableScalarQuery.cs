@@ -114,7 +114,7 @@ sealed class ScopedObservableScalarQuery<TResult> :
         if (Volatile.Read(ref changeAccess) is { } access)
             lock (access)
                 DetachWithAccess();
-        query.Dispose();
+        query.Release();
         Disposed?.Invoke(this, e);
     }
 

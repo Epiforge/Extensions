@@ -36,9 +36,9 @@ abstract class ObservableQuery :
     object? secondDeferredNotification;
     object? thirdDeferredNotification;
 #if IS_NET_9_0_OR_GREATER
-    readonly Lock initializationAccess = new();
+    readonly Lock lifetimeAccess = new();
 #else
-    readonly object initializationAccess = new();
+    readonly object lifetimeAccess = new();
 #endif
     bool isInitialized;
     int notificationDeferralDepth;
@@ -120,7 +120,7 @@ abstract class ObservableQuery :
 
     internal void Initialize()
     {
-        lock (initializationAccess)
+        lock (lifetimeAccess)
         {
             if (isInitialized)
                 return;
@@ -169,6 +169,15 @@ abstract class ObservableQuery :
             base.OnPropertyChanged(propertyChangedEventArgs);
         else if (eventArguments is PropertyChangingEventArgs propertyChangingEventArgs)
             base.OnPropertyChanging(propertyChangingEventArgs);
+    }
+
+    /// <summary>
+    /// Releases one observation of this query, one release at a time and never during initialization, since disposal ignores a call made while another is under way and a release ignored is an observation never released
+    /// </summary>
+    internal void Release()
+    {
+        lock (lifetimeAccess)
+            Dispose();
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
