@@ -1,4 +1,0 @@
-﻿Queries create the caches through which they share the queries built over them, and the lock guarding those caches, only when the first such query is built, so a query nothing is built over no longer allocates 26 locks and 24 dictionaries: a source query fell from about 4.1 KB to 816 B, and building and disposing a seven-query chain over each of 256 one-element sources from 6,789 μs and 11.57 MB to 1,812 μs and 4.45 MB
-Fixed: releasing a query while another release of the same shared query was under way on another thread could be lost, leaving the shared query cached and subscribed to its source for as long as the source lived
-Fixed: ObserveUsingSynchronizationContext on a dictionary query delivered changes eventually and ObserveUsingSynchronizationContextEventually delivered them immediately
-Fixed: identical ObserveLast and ObserveLastOrDefault observations of a dictionary query each built a query of their own rather than sharing one
