@@ -4,6 +4,27 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>(Colle
     ObservableDictionaryQuery<TKey, TValue>(collectionObserver)
     where TKey : notnull
 {
+    static readonly ConditionalWeakTable<Expression<Func<TElement, TValue>>, ConditionalWeakTable<Expression<Func<TElement, TKey>>, Expression<Func<TElement, KeyValuePair<TKey, TValue>>>>> pairSelectors = [];
+
+    static Expression<Func<TElement, KeyValuePair<TKey, TValue>>> AddPairSelector(ConditionalWeakTable<Expression<Func<TElement, TKey>>, Expression<Func<TElement, KeyValuePair<TKey, TValue>>>> byKeySelector, Expression<Func<TElement, TKey>> keySelector, Expression<Func<TElement, TValue>> valueSelector) =>
+        byKeySelector.GetValue(keySelector, _ =>
+        {
+            var elementParameter = Expression.Parameter(typeof(TElement));
+            return Expression.Lambda<Func<TElement, KeyValuePair<TKey, TValue>>>(Expression.New(typeof(KeyValuePair<TKey, TValue>).GetConstructor([typeof(TKey), typeof(TValue)])!, LambdaInvocationRewriter.Apply(keySelector, elementParameter) ?? Expression.Invoke(keySelector, elementParameter), LambdaInvocationRewriter.Apply(valueSelector, elementParameter) ?? Expression.Invoke(valueSelector, elementParameter)), elementParameter);
+        });
+
+    /// <summary>
+    /// Yields the lambda pairing an element's key with its value, built once for each pair of selectors and kept for as long as both are, since the observer's caches of optimized and compiled lambdas match by reference
+    /// </summary>
+    /// <remarks>
+    /// The table is keyed first by the value selector because the library's own identity selector is the value selector whenever a caller names only a key, and a table keyed first by a selector which dies while the second key lives keeps its pairings until the inner table has been finalized twice
+    /// </remarks>
+    static Expression<Func<TElement, KeyValuePair<TKey, TValue>>> PairSelector(Expression<Func<TElement, TKey>> keySelector, Expression<Func<TElement, TValue>> valueSelector)
+    {
+        var byKeySelector = pairSelectors.GetValue(valueSelector, static _ => new());
+        return byKeySelector.TryGetValue(keySelector, out var pairSelector) ? pairSelector : AddPairSelector(byKeySelector, keySelector, valueSelector);
+    }
+
     readonly object access = new();
     IReadOnlyList<KeyValuePair<TKey, TValue>>? enumerationSnapshot;
     IReadOnlyList<TKey>? keysSnapshot;
@@ -164,8 +185,7 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>(Colle
 
     protected override void OnInitialization()
     {
-        var elementParameter = Expression.Parameter(typeof(TElement));
-        select = source.ObserveSelect(Expression.Lambda<Func<TElement, KeyValuePair<TKey, TValue>>>(Expression.New(typeof(KeyValuePair<TKey, TValue>).GetConstructor([typeof(TKey), typeof(TValue)])!, Expression.Invoke(KeySelector, elementParameter), Expression.Invoke(ValueSelector, elementParameter)), elementParameter));
+        select = source.ObserveSelect(PairSelector(KeySelector, ValueSelector));
         lock (access)
         {
             BuildClaimsWithAccess();

@@ -38,6 +38,86 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
 
     #endregion Cache Comparers
 
+    /// <summary>
+    /// Holds the lambdas a cast observes, built once for each pair of types, since the observer's caches of optimized and compiled lambdas match by reference
+    /// </summary>
+    static class CastLambdas<TResult>
+    {
+        internal static readonly Expression<Func<TKey, TValue, bool>> IsResult = (key, value) => value is TResult;
+        internal static readonly Expression<Func<TKey, TValue, TKey>> Key = (key, value) => key;
+        internal static readonly Expression<Func<TKey, TValue, TResult>> Value = (key, value) => (TResult)(object)value!;
+    }
+
+    /// <summary>
+    /// Holds the lambda over a key-value pair observed in place of a caller's predicate, built once for each predicate and kept for as long as its caller keeps the predicate, since the observer's caches of optimized and compiled lambdas match by reference
+    /// </summary>
+    static class PairPredicates
+    {
+        static readonly ConditionalWeakTable<Expression<Func<TKey, TValue, bool>>, Expression<Func<KeyValuePair<TKey, TValue>, bool>>> byPredicate = [];
+
+        internal static Expression<Func<KeyValuePair<TKey, TValue>, bool>> For(Expression<Func<TKey, TValue, bool>> predicate) =>
+            byPredicate.GetValue(predicate, static source =>
+            {
+                var keyValuePairParameter = Expression.Parameter(typeof(KeyValuePair<TKey, TValue>));
+                var keyExpression = Expression.Property(keyValuePairParameter, nameof(KeyValuePair<,>.Key));
+                var valueExpression = Expression.Property(keyValuePairParameter, nameof(KeyValuePair<,>.Value));
+                var predicateExpression = LambdaInvocationRewriter.Apply(source, keyExpression, valueExpression) ?? Expression.Invoke(source, keyExpression, valueExpression);
+                return Expression.Lambda<Func<KeyValuePair<TKey, TValue>, bool>>(predicateExpression, keyValuePairParameter);
+            });
+    }
+
+    /// <summary>
+    /// Holds the lambda over a key-value pair observed in place of a caller's key and value selectors, built once for each pair of selectors and kept for as long as its caller keeps both, since the observer's caches of optimized and compiled lambdas match by reference
+    /// </summary>
+    static class PairProjections<TResultKey, TResultValue>
+    {
+        static readonly ConditionalWeakTable<Expression<Func<TKey, TValue, TResultKey>>, ConditionalWeakTable<Expression<Func<TKey, TValue, TResultValue>>, Expression<Func<KeyValuePair<TKey, TValue>, KeyValuePair<TResultKey, TResultValue>>>>> byKeySelector = [];
+
+        static Expression<Func<KeyValuePair<TKey, TValue>, KeyValuePair<TResultKey, TResultValue>>> Add(ConditionalWeakTable<Expression<Func<TKey, TValue, TResultValue>>, Expression<Func<KeyValuePair<TKey, TValue>, KeyValuePair<TResultKey, TResultValue>>>> byValueSelector, Expression<Func<TKey, TValue, TResultKey>> keySelector, Expression<Func<TKey, TValue, TResultValue>> valueSelector) =>
+            byValueSelector.GetValue(valueSelector, _ =>
+            {
+                var sourceKeyValuePairParameter = Expression.Parameter(typeof(KeyValuePair<TKey, TValue>));
+                var sourceKeyExpression = Expression.Property(sourceKeyValuePairParameter, nameof(KeyValuePair<,>.Key));
+                var sourceValueExpression = Expression.Property(sourceKeyValuePairParameter, nameof(KeyValuePair<,>.Value));
+                var keyExpression = LambdaInvocationRewriter.Apply(keySelector, sourceKeyExpression, sourceValueExpression) ?? Expression.Invoke(keySelector, sourceKeyExpression, sourceValueExpression);
+                var valueExpression = LambdaInvocationRewriter.Apply(valueSelector, sourceKeyExpression, sourceValueExpression) ?? Expression.Invoke(valueSelector, sourceKeyExpression, sourceValueExpression);
+                var keyValuePairExpression = Expression.New(typeof(KeyValuePair<TResultKey, TResultValue>).GetConstructor([typeof(TResultKey), typeof(TResultValue)])!, keyExpression, valueExpression);
+                return Expression.Lambda<Func<KeyValuePair<TKey, TValue>, KeyValuePair<TResultKey, TResultValue>>>(keyValuePairExpression, sourceKeyValuePairParameter);
+            });
+
+        internal static Expression<Func<KeyValuePair<TKey, TValue>, KeyValuePair<TResultKey, TResultValue>>> For(Expression<Func<TKey, TValue, TResultKey>> keySelector, Expression<Func<TKey, TValue, TResultValue>> valueSelector)
+        {
+            var byValueSelector = byKeySelector.GetValue(keySelector, static _ => new());
+            return byValueSelector.TryGetValue(valueSelector, out var projection) ? projection : Add(byValueSelector, keySelector, valueSelector);
+        }
+    }
+
+    /// <summary>
+    /// Holds the lambda over a key-value pair observed in place of a caller's selector, built once for each selector and kept for as long as its caller keeps the selector, since the observer's caches of optimized and compiled lambdas match by reference
+    /// </summary>
+    static class PairSelectors<TElement>
+    {
+        static readonly ConditionalWeakTable<Expression<Func<TKey, TValue, TElement>>, Expression<Func<KeyValuePair<TKey, TValue>, TElement>>> bySelector = [];
+
+        internal static Expression<Func<KeyValuePair<TKey, TValue>, TElement>> For(Expression<Func<TKey, TValue, TElement>> selector) =>
+            bySelector.GetValue(selector, static source =>
+            {
+                var keyValuePairParameter = Expression.Parameter(typeof(KeyValuePair<TKey, TValue>));
+                var keyExpression = Expression.Property(keyValuePairParameter, nameof(KeyValuePair<,>.Key));
+                var valueExpression = Expression.Property(keyValuePairParameter, nameof(KeyValuePair<,>.Value));
+                var selectorExpression = LambdaInvocationRewriter.Apply(source, keyExpression, valueExpression) ?? Expression.Invoke(source, keyExpression, valueExpression);
+                return Expression.Lambda<Func<KeyValuePair<TKey, TValue>, TElement>>(selectorExpression, keyValuePairParameter);
+            });
+    }
+
+    /// <summary>
+    /// Holds the lambda selecting a value, built once for each pair of key and value types, since the observer's caches of optimized and compiled lambdas match by reference
+    /// </summary>
+    static class ValueLambdas
+    {
+        internal static readonly Expression<Func<TKey, TValue, TValue>> Selector = (key, value) => value;
+    }
+
     static readonly PropertyChangedEventArgs operationFaultPropertyChangedEventArgs = new(nameof(OperationFault));
     static readonly PropertyChangingEventArgs operationFaultPropertyChangingEventArgs = new(nameof(OperationFault));
 
@@ -403,10 +483,10 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
         ObservableDictionaryAllQuery<TKey, TValue> allQuery;
         lock (cachedAllQueriesAccess)
         {
-            if (!cachedAllQueries.TryGetValue(predicate, out allQuery!))
+            if (!cachedAllQueries.TryGetValue(key, out allQuery!))
             {
                 allQuery = new ObservableDictionaryAllQuery<TKey, TValue>(collectionObserver, this, key);
-                cachedAllQueries.Add(predicate, allQuery);
+                cachedAllQueries.Add(key, allQuery);
             }
             ++allQuery.Observations;
         }
@@ -441,10 +521,10 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
         ObservableDictionaryAnyQuery<TKey, TValue> anyQuery;
         lock (cachedAnyQueriesAccess)
         {
-            if (!cachedAnyQueries.TryGetValue(predicate, out anyQuery!))
+            if (!cachedAnyQueries.TryGetValue(key, out anyQuery!))
             {
                 anyQuery = new ObservableDictionaryAnyQuery<TKey, TValue>(collectionObserver, this, key);
-                cachedAnyQueries.Add(predicate, anyQuery);
+                cachedAnyQueries.Add(key, anyQuery);
             }
             ++anyQuery.Observations;
         }
@@ -454,7 +534,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
 
     [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TValue> ObserveAverage() =>
-        ObserveAverage((key, value) => value);
+        ObserveAverage(ValueLambdas.Selector);
 
     [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TResult> ObserveAverage<TResult>(Expression<Func<TKey, TValue, TResult>> selector)
@@ -475,7 +555,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
 
     [return: DisposeWhenDiscarded]
     public IObservableDictionaryQuery<TKey, TResult> ObserveCast<TResult>() =>
-        ObserveSelect((key, value) => key, (key, value) => (TResult)(object)value!);
+        ObserveSelect(CastLambdas<TResult>.Key, CastLambdas<TResult>.Value);
 
     [return: DisposeWhenDiscarded]
     public IObservableDictionaryQuery<TKey, TValue> ObserveConcurrently()
@@ -655,7 +735,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
 
     [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TValue> ObserveMax() =>
-        ObserveMax((key, value) => value);
+        ObserveMax(ValueLambdas.Selector);
 
     [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TResult> ObserveMax<TResult>(Expression<Func<TKey, TValue, TResult>> selector)
@@ -676,7 +756,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
 
     [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TValue> ObserveMin() =>
-        ObserveMin((key, value) => value);
+        ObserveMin(ValueLambdas.Selector);
 
     [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TResult> ObserveMin<TResult>(Expression<Func<TKey, TValue, TResult>> selector)
@@ -698,7 +778,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     [return: DisposeWhenDiscarded]
     public IObservableDictionaryQuery<TKey, TResult> ObserveOfType<TResult>()
     {
-        var where = ObserveWhere((key, value) => value is TResult);
+        var where = ObserveWhere(CastLambdas<TResult>.IsResult);
         try
         {
             var cast = where.ObserveCast<TResult>();
@@ -724,14 +804,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
         ArgumentNullException.ThrowIfNull(keySelector);
         ArgumentNullException.ThrowIfNull(valueSelector);
         ArgumentNullException.ThrowIfNull(equalityComparer);
-        var sourceKeyValuePairParameter = Expression.Parameter(typeof(KeyValuePair<TKey, TValue>));
-        var sourceKeyExpression = Expression.Property(sourceKeyValuePairParameter, nameof(KeyValuePair<,>.Key));
-        var sourceValueExpression = Expression.Property(sourceKeyValuePairParameter, nameof(KeyValuePair<,>.Value));
-        var keyExpression = LambdaInvocationRewriter.Apply(keySelector, sourceKeyExpression, sourceValueExpression) ?? Expression.Invoke(keySelector, sourceKeyExpression, sourceValueExpression);
-        var valueExpression = LambdaInvocationRewriter.Apply(valueSelector, sourceKeyExpression, sourceValueExpression) ?? Expression.Invoke(valueSelector, sourceKeyExpression, sourceValueExpression);
-        var keyValuePairExpression = Expression.New(typeof(KeyValuePair<TResultKey, TResultValue>).GetConstructor([typeof(TResultKey), typeof(TResultValue)])!, keyExpression, valueExpression);
-        var keyValuePairSelector = Expression.Lambda<Func<KeyValuePair<TKey, TValue>, KeyValuePair<TResultKey, TResultValue>>>(keyValuePairExpression, sourceKeyValuePairParameter);
-
+        var keyValuePairSelector = PairProjections<TResultKey, TResultValue>.For(keySelector, valueSelector);
         ObservableQuery selectQuery;
         var key = (keyValuePairSelector, equalityComparer);
         if (collectionObserver.ExpressionObserver.Optimizer is { } optimizer)
@@ -793,7 +866,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
 
     [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TValue> ObserveSum() =>
-        ObserveSum((key, value) => value);
+        ObserveSum(ValueLambdas.Selector);
 
     [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TResult> ObserveSum<TResult>(Expression<Func<TKey, TValue, TResult>> selector)
@@ -814,18 +887,14 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
 
     [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<TValue> ObserveToCollection() =>
-        ObserveToCollection((key, value) => value);
+        ObserveToCollection(ValueLambdas.Selector);
 
     [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<TElement> ObserveToCollection<TElement>(Expression<Func<TKey, TValue, TElement>> selector)
     {
         ArgumentNullException.ThrowIfNull(selector);
-        var keyValuePairParameter = Expression.Parameter(typeof(KeyValuePair<TKey, TValue>));
-        var keyExpression = Expression.Property(keyValuePairParameter, nameof(KeyValuePair<,>.Key));
-        var valueExpression = Expression.Property(keyValuePairParameter, nameof(KeyValuePair<,>.Value));
-        var selectorExpression = LambdaInvocationRewriter.Apply(selector, keyExpression, valueExpression) ?? Expression.Invoke(selector, keyExpression, valueExpression);
         ObservableQuery toCollectionQuery;
-        var key = Expression.Lambda<Func<KeyValuePair<TKey, TValue>, TElement>>(selectorExpression, keyValuePairParameter);
+        var key = PairSelectors<TElement>.For(selector);
         if (collectionObserver.ExpressionObserver.Optimizer is { } optimizer)
             key = (Expression<Func<KeyValuePair<TKey, TValue>, TElement>>)optimizer(key);
         lock (cachedToCollectionQueriesAccess)
@@ -908,12 +977,8 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     public IObservableDictionaryQuery<TKey, TValue> ObserveWhere(Expression<Func<TKey, TValue, bool>> predicate)
     {
         ArgumentNullException.ThrowIfNull(predicate);
-        var keyValuePairParameter = Expression.Parameter(typeof(KeyValuePair<TKey, TValue>));
-        var keyExpression = Expression.Property(keyValuePairParameter, nameof(KeyValuePair<,>.Key));
-        var valueExpression = Expression.Property(keyValuePairParameter, nameof(KeyValuePair<,>.Value));
-        var predicateExpression = LambdaInvocationRewriter.Apply(predicate, keyExpression, valueExpression) ?? Expression.Invoke(predicate, keyExpression, valueExpression);
         ObservableQuery whereQuery;
-        var key = Expression.Lambda<Func<KeyValuePair<TKey, TValue>, bool>>(predicateExpression, keyValuePairParameter);
+        var key = PairPredicates.For(predicate);
         if (collectionObserver.ExpressionObserver.Optimizer is { } optimizer)
             key = (Expression<Func<KeyValuePair<TKey, TValue>, bool>>)optimizer(key);
         lock (cachedWhereQueriesAccess)

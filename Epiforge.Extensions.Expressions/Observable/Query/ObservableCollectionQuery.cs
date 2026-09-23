@@ -101,6 +101,39 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
 
     #endregion Cache Comparers
 
+    /// <summary>
+    /// Holds the lambdas a cast observes, built once for each pair of types, since the observer's caches of optimized and compiled lambdas match by reference
+    /// </summary>
+    static class CastLambdas<TResult>
+    {
+        internal static readonly Expression<Func<TElement, bool>> IsResult = element => element is TResult;
+        internal static readonly Expression<Func<TElement, TResult>> Selector = element => (TResult)(object)element!;
+    }
+
+    /// <summary>
+    /// Holds the lambdas selecting an element and the key of a grouping of elements by themselves, built once for each element type, since the observer's caches of optimized and compiled lambdas match by reference
+    /// </summary>
+    static class IdentityLambdas
+    {
+        internal static readonly Expression<Func<IObservableGrouping<TElement, TElement>, TElement>> GroupingKey = grouping => grouping.Key;
+        internal static readonly Expression<Func<TElement, TElement>> Selector = element => element;
+    }
+
+    /// <summary>
+    /// Holds the lambda pairing an element with the key a key selector selects, built once for each key selector and kept for as long as its caller keeps the key selector, since the observer's caches of optimized and compiled lambdas match by reference
+    /// </summary>
+    static class KeyPairings<TKey>
+    {
+        static readonly ConditionalWeakTable<Expression<Func<TElement, TKey>>, Expression<Func<TElement, (TElement, TKey)>>> byKeySelector = [];
+
+        internal static Expression<Func<TElement, (TElement, TKey)>> For(Expression<Func<TElement, TKey>> keySelector) =>
+            byKeySelector.GetValue(keySelector, static source =>
+            {
+                var parameter = Expression.Parameter(typeof(TElement), "element");
+                return Expression.Lambda<Func<TElement, (TElement, TKey)>>(Expression.New(typeof((TElement, TKey)).GetConstructor([typeof(TElement), typeof(TKey)])!, parameter, LambdaInvocationRewriter.Apply(source, parameter) ?? Expression.Invoke(source, parameter)), parameter);
+            });
+    }
+
     static readonly PropertyChangedEventArgs operationFaultPropertyChangedEventArgs = new(nameof(OperationFault));
     static readonly PropertyChangingEventArgs operationFaultPropertyChangingEventArgs = new(nameof(OperationFault));
 
@@ -536,7 +569,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
 
     [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TElement> ObserveAverage() =>
-        ObserveAverage(element => element);
+        ObserveAverage(IdentityLambdas.Selector);
 
     [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<TElement> ObserveAppend(TElement element)
@@ -578,7 +611,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
 
     [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<TResult> ObserveCast<TResult>() =>
-        ObserveSelect(element => (TResult)(object)element!);
+        ObserveSelect(CastLambdas<TResult>.Selector);
 
     [return: DisposeWhenDiscarded]
     internal IObservableScalarQuery<TElement> ObserveComparison(int soughtComparison, IComparer<TElement> comparer)
@@ -625,9 +658,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         ArgumentNullException.ThrowIfNull(keySelector);
         ArgumentNullException.ThrowIfNull(comparer);
-        var parameter = Expression.Parameter(typeof(TElement), "element");
-        var keyed = Expression.Lambda<Func<TElement, (TElement, TKey)>>(Expression.New(typeof((TElement, TKey)).GetConstructor([typeof(TElement), typeof(TKey)])!, parameter, LambdaInvocationRewriter.Apply(keySelector, parameter) ?? Expression.Invoke(keySelector, parameter)), parameter);
-        var comparison = ObserveComparison(keyed, soughtComparison, new ObservableCollectionKeyComparer<TElement, TKey>(comparer));
+        var comparison = ObserveComparison(KeyPairings<TKey>.For(keySelector), soughtComparison, new ObservableCollectionKeyComparer<TElement, TKey>(comparer));
         try
         {
             var element = comparison.ObserveTransform(ObservableCollectionKeyComparer<TElement, TKey>.ElementOf);
@@ -699,10 +730,10 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     public IObservableCollectionQuery<TElement> ObserveDistinct(IEqualityComparer<TElement> comparer)
     {
         ArgumentNullException.ThrowIfNull(comparer);
-        var groupBy = ObserveGroupBy(element => element, comparer);
+        var groupBy = ObserveGroupBy(IdentityLambdas.Selector, comparer);
         try
         {
-            var select = groupBy.ObserveSelect(group => group.Key);
+            var select = groupBy.ObserveSelect(IdentityLambdas.GroupingKey);
             select.Disposed += (_, _) => groupBy.Dispose();
             return select;
         }
@@ -936,7 +967,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<TResult> ObserveOfType<TResult>()
     {
-        var where = ObserveWhere(element => element is TResult);
+        var where = ObserveWhere(CastLambdas<TResult>.IsResult);
         try
         {
             var cast = where.ObserveCast<TResult>();
@@ -1126,7 +1157,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
 
     [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TElement> ObserveSum() =>
-        ObserveSum(element => element);
+        ObserveSum(IdentityLambdas.Selector);
 
     [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<TResult> ObserveSum<TResult>(Expression<Func<TElement, TResult>> selector)
@@ -1161,7 +1192,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     [return: DisposeWhenDiscarded]
     public IObservableDictionaryQuery<TKey, TElement> ObserveToDictionary<TKey>(Expression<Func<TElement, TKey>> keySelector, IEqualityComparer<TKey> equalityComparer)
         where TKey : notnull =>
-        ObserveToDictionary(keySelector, element => element, equalityComparer);
+        ObserveToDictionary(keySelector, IdentityLambdas.Selector, equalityComparer);
 
     [return: DisposeWhenDiscarded]
     public IObservableDictionaryQuery<TKey, TValue> ObserveToDictionary<TKey, TValue>(Expression<Func<TElement, TKey>> keySelector, Expression<Func<TElement, TValue>> valueSelector)

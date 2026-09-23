@@ -5,11 +5,18 @@ sealed class ObservableCollectionLookupQuery<TKey, TElement> :
     IObservableLookupQuery<TKey, TElement>
     where TKey : notnull
 {
-    static Expression<Func<TElement, Tuple<TElement, TKey>>> WrapSelector(Expression<Func<TElement, TKey>> selector)
-    {
-        var parameter = Expression.Parameter(typeof(TElement), "element");
-        return Expression.Lambda<Func<TElement, Tuple<TElement, TKey>>>(Expression.New(typeof(Tuple<TElement, TKey>).GetConstructor([typeof(TElement), typeof(TKey)])!, parameter, Expression.Invoke(selector, parameter)), parameter);
-    }
+    static readonly Expression<Func<IObservableGrouping<TKey, TElement>, TKey>> groupingKey = grouping => grouping.Key;
+    static readonly ConditionalWeakTable<Expression<Func<TElement, TKey>>, Expression<Func<TElement, Tuple<TElement, TKey>>>> wrappedSelectors = [];
+
+    /// <summary>
+    /// Yields the lambda pairing an element with its key, built once for each key selector and kept for as long as the key selector is, since the observer's caches of optimized and compiled lambdas match by reference
+    /// </summary>
+    static Expression<Func<TElement, Tuple<TElement, TKey>>> WrapSelector(Expression<Func<TElement, TKey>> selector) =>
+        wrappedSelectors.GetValue(selector, static source =>
+        {
+            var parameter = Expression.Parameter(typeof(TElement), "element");
+            return Expression.Lambda<Func<TElement, Tuple<TElement, TKey>>>(Expression.New(typeof(Tuple<TElement, TKey>).GetConstructor([typeof(TElement), typeof(TKey)])!, parameter, LambdaInvocationRewriter.Apply(source, parameter) ?? Expression.Invoke(source, parameter)), parameter);
+        });
 
     public ObservableCollectionLookupQuery(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> source, Expression<Func<TElement, TKey>> keySelector, IEqualityComparer<TKey> keyEqualityComparer) :
         base(collectionObserver)
@@ -21,7 +28,7 @@ sealed class ObservableCollectionLookupQuery<TKey, TElement> :
         collectionAndGroupingByKey = new(KeyEqualityComparer);
         groupings = [];
         groupingsQuery = this.collectionObserver.ObserveReadOnlyList(groupings);
-        groupingByKey = groupingsQuery.ObserveToDictionary(g => g.Key);
+        groupingByKey = groupingsQuery.ObserveToDictionary(groupingKey);
     }
 
     readonly object access;

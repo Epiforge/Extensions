@@ -3,13 +3,20 @@ namespace Epiforge.Extensions.Expressions.Observable.Query;
 sealed class ObservableCollectionOrderByQuery<TElement> :
     ObservableCollectionQuery<TElement>
 {
-    static readonly ConcurrentDictionary<Expression<Func<TElement, IComparable>>, Expression<Func<TElement, Tuple<TElement, IComparable>>>> cachedWrappedSelectors = new(ExpressionEqualityComparer.Default);
+    static readonly ConditionalWeakTable<Expression<Func<TElement, IComparable>>, Expression<Func<TElement, Tuple<TElement, IComparable>>>> cachedWrappedSelectors = [];
+    static readonly ConcurrentDictionary<Expression<Func<TElement, IComparable>>, Expression<Func<TElement, Tuple<TElement, IComparable>>>> cachedWrappedStableSelectors = new(ExpressionEqualityComparer.Default);
 
     static Expression<Func<TElement, Tuple<TElement, IComparable>>> CachedWrappedSelectorsValueFactory(Expression<Func<TElement, IComparable>> selector)
     {
         var parameter = Expression.Parameter(typeof(TElement), "element");
         return Expression.Lambda<Func<TElement, Tuple<TElement, IComparable>>>(Expression.New(typeof(Tuple<TElement, IComparable>).GetConstructor([typeof(TElement), typeof(IComparable)])!, parameter, LambdaInvocationRewriter.Apply(selector, parameter) ?? Expression.Invoke(selector, parameter)), parameter);
     }
+
+    /// <summary>
+    /// Yields the lambda pairing an element with its key, shared among selectors equal in structure where every constant they hold compares by value, so that a caller writing a selector which captures nothing where it is used still shares one compilation, and otherwise kept for as long as the selector is, so that a selector holding a closure is never retained by this cache
+    /// </summary>
+    static Expression<Func<TElement, Tuple<TElement, IComparable>>> WrapSelector(Expression<Func<TElement, IComparable>> selector) =>
+        ExpressionKeyStability.IsStable(selector) ? cachedWrappedStableSelectors.GetOrAdd(selector, CachedWrappedSelectorsValueFactory) : cachedWrappedSelectors.GetValue(selector, CachedWrappedSelectorsValueFactory);
 
     public ObservableCollectionOrderByQuery(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> source, IReadOnlyList<(Expression<Func<TElement, IComparable>> keySelectorExpression, bool isDescending)> selectorsAndDirections) :
         base(collectionObserver)
@@ -197,7 +204,7 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
     {
         lock (access)
         {
-            selectionsAndDirections = SelectorsAndDirections.Select(t => (selection: source.ObserveSelect(cachedWrappedSelectors.GetOrAdd(t.keySelectorExpression, CachedWrappedSelectorsValueFactory)), t.isDescending)).ToList().AsReadOnly();
+            selectionsAndDirections = SelectorsAndDirections.Select(t => (selection: source.ObserveSelect(WrapSelector(t.keySelectorExpression)), t.isDescending)).ToList().AsReadOnly();
             comparer = new(access, selectionsAndDirections);
             var ordered = new List<TElement>();
             RebuildPositionsWithAccess(source.OrderBy(element => element, comparer).ToList(), ordered);
