@@ -9,32 +9,77 @@ sealed class ScopedObservableLookupQuery<TKey, TElement> :
         base(lookup)
     {
         this.lookup = lookup;
-        ((INotifyDictionaryChanged<TKey, IObservableGrouping<TKey, TElement>>)this.lookup).DictionaryChanged += LookupDictionaryChanged;
-        ((INotifyDictionaryChanged)this.lookup).DictionaryChanged += LookupDictionaryChangedBoxed;
     }
 
+    EventHandler<NotifyDictionaryChangedEventArgs<object?, object?>>? boxedDictionaryChanged;
+    EventHandler<NotifyDictionaryChangedEventArgs<TKey, IObservableGrouping<TKey, TElement>>>? dictionaryChanged;
     readonly ObservableCollectionLookupQuery<TKey, TElement> lookup;
-
-    public override void Dispose()
-    {
-        ((INotifyDictionaryChanged<TKey, IObservableGrouping<TKey, TElement>>)lookup).DictionaryChanged -= LookupDictionaryChanged;
-        ((INotifyDictionaryChanged)lookup).DictionaryChanged -= LookupDictionaryChangedBoxed;
-        base.Dispose();
-    }
-
-    event EventHandler<NotifyDictionaryChangedEventArgs<TKey, IObservableGrouping<TKey, TElement>>>? dictionaryChanged;
-    event EventHandler<NotifyDictionaryChangedEventArgs<object?, object?>>? boxedDictionaryChanged;
 
     event EventHandler<NotifyDictionaryChangedEventArgs<TKey, IObservableGrouping<TKey, TElement>>>? INotifyDictionaryChanged<TKey, IObservableGrouping<TKey, TElement>>.DictionaryChanged
     {
-        add => dictionaryChanged += value;
-        remove => dictionaryChanged -= value;
+        add
+        {
+            lock (ChangeAccess)
+            {
+                if (IsDisposed)
+                    return;
+                if (dictionaryChanged is null)
+                    ((INotifyDictionaryChanged<TKey, IObservableGrouping<TKey, TElement>>)lookup).DictionaryChanged += LookupDictionaryChanged;
+                dictionaryChanged += value;
+            }
+        }
+        remove
+        {
+            lock (ChangeAccess)
+            {
+                if (dictionaryChanged is null)
+                    return;
+                dictionaryChanged -= value;
+                if (dictionaryChanged is null)
+                    ((INotifyDictionaryChanged<TKey, IObservableGrouping<TKey, TElement>>)lookup).DictionaryChanged -= LookupDictionaryChanged;
+            }
+        }
     }
 
     event EventHandler<NotifyDictionaryChangedEventArgs<object?, object?>>? INotifyDictionaryChanged.DictionaryChanged
     {
-        add => boxedDictionaryChanged += value;
-        remove => boxedDictionaryChanged -= value;
+        add
+        {
+            lock (ChangeAccess)
+            {
+                if (IsDisposed)
+                    return;
+                if (boxedDictionaryChanged is null)
+                    ((INotifyDictionaryChanged)lookup).DictionaryChanged += LookupDictionaryChangedBoxed;
+                boxedDictionaryChanged += value;
+            }
+        }
+        remove
+        {
+            lock (ChangeAccess)
+            {
+                if (boxedDictionaryChanged is null)
+                    return;
+                boxedDictionaryChanged -= value;
+                if (boxedDictionaryChanged is null)
+                    ((INotifyDictionaryChanged)lookup).DictionaryChanged -= LookupDictionaryChangedBoxed;
+            }
+        }
+    }
+
+    private protected override void DetachWithAccess()
+    {
+        base.DetachWithAccess();
+        if (dictionaryChanged is not null)
+        {
+            ((INotifyDictionaryChanged<TKey, IObservableGrouping<TKey, TElement>>)lookup).DictionaryChanged -= LookupDictionaryChanged;
+            dictionaryChanged = null;
+        }
+        if (boxedDictionaryChanged is not null)
+        {
+            ((INotifyDictionaryChanged)lookup).DictionaryChanged -= LookupDictionaryChangedBoxed;
+            boxedDictionaryChanged = null;
+        }
     }
 
     void LookupDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, IObservableGrouping<TKey, TElement>> e) =>

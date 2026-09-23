@@ -8,20 +8,38 @@ class ScopedObservableDictionaryQuery<TKey, TValue> :
     {
         ArgumentNullException.ThrowIfNull(query);
         this.query = query;
-        this.query.PropertyChanged += QueryPropertyChanged;
-        this.query.PropertyChanging += QueryPropertyChanging;
     }
 
     EventHandler<NotifyDictionaryChangedEventArgs<object?, object?>>? boxedDictionaryChanged;
 #if IS_NET_9_0_OR_GREATER
-    readonly Lock changeAccess = new();
+    Lock? changeAccess;
 #else
-    readonly object changeAccess = new();
+    object? changeAccess;
 #endif
     NotifyCollectionChangedEventHandler? collectionChanged;
     EventHandler<NotifyDictionaryChangedEventArgs<TKey, TValue>>? dictionaryChanged;
+    PropertyChangedEventHandler? propertyChanged;
+    PropertyChangingEventHandler? propertyChanging;
     internal readonly ObservableDictionaryQuery<TKey, TValue> query;
     int disposed;
+
+    /// <summary>
+    /// Gets the lock guarding this wrapper's subscriptions to its query, created by whichever subscription first needs it, so that a wrapper nothing subscribes to allocates none
+    /// </summary>
+#if IS_NET_9_0_OR_GREATER
+    Lock ChangeAccess
+#else
+    object ChangeAccess
+#endif
+    {
+        get
+        {
+            if (Volatile.Read(ref changeAccess) is { } access)
+                return access;
+            access = new();
+            return Interlocked.CompareExchange(ref changeAccess, access, null) ?? access;
+        }
+    }
 
     public int CachedObservableQueries =>
         query.CachedObservableQueries;
@@ -32,16 +50,66 @@ class ScopedObservableDictionaryQuery<TKey, TValue> :
     public bool IsDisposed =>
         disposed != 0;
 
-    public event PropertyChangedEventHandler? PropertyChanged;
+    public event PropertyChangedEventHandler? PropertyChanged
+    {
+        add
+        {
+            lock (ChangeAccess)
+            {
+                if (IsDisposed)
+                    return;
+                if (propertyChanged is null)
+                    query.PropertyChanged += QueryPropertyChanged;
+                propertyChanged += value;
+            }
+        }
+        remove
+        {
+            lock (ChangeAccess)
+            {
+                if (propertyChanged is null)
+                    return;
+                propertyChanged -= value;
+                if (propertyChanged is null)
+                    query.PropertyChanged -= QueryPropertyChanged;
+            }
+        }
+    }
 
-    public event PropertyChangingEventHandler? PropertyChanging;
+    public event PropertyChangingEventHandler? PropertyChanging
+    {
+        add
+        {
+            lock (ChangeAccess)
+            {
+                if (IsDisposed)
+                    return;
+                if (propertyChanging is null)
+                    query.PropertyChanging += QueryPropertyChanging;
+                propertyChanging += value;
+            }
+        }
+        remove
+        {
+            lock (ChangeAccess)
+            {
+                if (propertyChanging is null)
+                    return;
+                propertyChanging -= value;
+                if (propertyChanging is null)
+                    query.PropertyChanging -= QueryPropertyChanging;
+            }
+        }
+    }
 
     public event NotifyCollectionChangedEventHandler? CollectionChanged
     {
         add
         {
-            lock (changeAccess)
+            lock (ChangeAccess)
             {
+                if (IsDisposed)
+                    return;
                 if (collectionChanged is null)
                     query.CollectionChanged += QueryCollectionChanged;
                 collectionChanged += value;
@@ -49,8 +117,10 @@ class ScopedObservableDictionaryQuery<TKey, TValue> :
         }
         remove
         {
-            lock (changeAccess)
+            lock (ChangeAccess)
             {
+                if (collectionChanged is null)
+                    return;
                 collectionChanged -= value;
                 if (collectionChanged is null)
                     query.CollectionChanged -= QueryCollectionChanged;
@@ -62,8 +132,10 @@ class ScopedObservableDictionaryQuery<TKey, TValue> :
     {
         add
         {
-            lock (changeAccess)
+            lock (ChangeAccess)
             {
+                if (IsDisposed)
+                    return;
                 if (dictionaryChanged is null)
                     query.DictionaryChanged += QueryDictionaryChanged;
                 dictionaryChanged += value;
@@ -71,8 +143,10 @@ class ScopedObservableDictionaryQuery<TKey, TValue> :
         }
         remove
         {
-            lock (changeAccess)
+            lock (ChangeAccess)
             {
+                if (dictionaryChanged is null)
+                    return;
                 dictionaryChanged -= value;
                 if (dictionaryChanged is null)
                     query.DictionaryChanged -= QueryDictionaryChanged;
@@ -84,8 +158,10 @@ class ScopedObservableDictionaryQuery<TKey, TValue> :
     {
         add
         {
-            lock (changeAccess)
+            lock (ChangeAccess)
             {
+                if (IsDisposed)
+                    return;
                 if (boxedDictionaryChanged is null)
                     ((INotifyDictionaryChanged)query).DictionaryChanged += QueryDictionaryChangedBoxed;
                 boxedDictionaryChanged += value;
@@ -93,15 +169,16 @@ class ScopedObservableDictionaryQuery<TKey, TValue> :
         }
         remove
         {
-            lock (changeAccess)
+            lock (ChangeAccess)
             {
+                if (boxedDictionaryChanged is null)
+                    return;
                 boxedDictionaryChanged -= value;
                 if (boxedDictionaryChanged is null)
                     ((INotifyDictionaryChanged)query).DictionaryChanged -= QueryDictionaryChangedBoxed;
             }
         }
     }
-
 
     public event EventHandler? Disposed;
 
@@ -113,28 +190,43 @@ class ScopedObservableDictionaryQuery<TKey, TValue> :
             return;
         var e = EventArgs.Empty;
         Disposing?.Invoke(this, e);
-        query.PropertyChanged -= QueryPropertyChanged;
-        query.PropertyChanging -= QueryPropertyChanging;
-        lock (changeAccess)
-        {
-            if (collectionChanged is not null)
-            {
-                query.CollectionChanged -= QueryCollectionChanged;
-                collectionChanged = null;
-            }
-            if (dictionaryChanged is not null)
-            {
-                query.DictionaryChanged -= QueryDictionaryChanged;
-                dictionaryChanged = null;
-            }
-            if (boxedDictionaryChanged is not null)
-            {
-                ((INotifyDictionaryChanged)query).DictionaryChanged -= QueryDictionaryChangedBoxed;
-                boxedDictionaryChanged = null;
-            }
-        }
+        if (Volatile.Read(ref changeAccess) is { } access)
+            lock (access)
+                DetachWithAccess();
         query.Dispose();
         Disposed?.Invoke(this, e);
+    }
+
+    /// <summary>
+    /// Detaches from the query every handler this wrapper attached on behalf of its own subscribers, and forgets those subscribers
+    /// </summary>
+    void DetachWithAccess()
+    {
+        if (collectionChanged is not null)
+        {
+            query.CollectionChanged -= QueryCollectionChanged;
+            collectionChanged = null;
+        }
+        if (dictionaryChanged is not null)
+        {
+            query.DictionaryChanged -= QueryDictionaryChanged;
+            dictionaryChanged = null;
+        }
+        if (boxedDictionaryChanged is not null)
+        {
+            ((INotifyDictionaryChanged)query).DictionaryChanged -= QueryDictionaryChangedBoxed;
+            boxedDictionaryChanged = null;
+        }
+        if (propertyChanged is not null)
+        {
+            query.PropertyChanged -= QueryPropertyChanged;
+            propertyChanged = null;
+        }
+        if (propertyChanging is not null)
+        {
+            query.PropertyChanging -= QueryPropertyChanging;
+            propertyChanging = null;
+        }
     }
 
     void QueryCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
@@ -147,10 +239,10 @@ class ScopedObservableDictionaryQuery<TKey, TValue> :
         boxedDictionaryChanged?.Invoke(this, e);
 
     void QueryPropertyChanged(object? sender, PropertyChangedEventArgs e) =>
-        PropertyChanged?.Invoke(this, e);
+        propertyChanged?.Invoke(this, e);
 
     void QueryPropertyChanging(object? sender, PropertyChangingEventArgs e) =>
-        PropertyChanging?.Invoke(this, e);
+        propertyChanging?.Invoke(this, e);
 
     public override string ToString() =>
         query.ToString() ?? string.Empty;

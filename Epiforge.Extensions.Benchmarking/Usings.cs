@@ -8,3 +8,4 @@ global using Epiforge.Extensions.Expressions.Observable.Query;
 global using System.ComponentModel;
 global using System.Linq.Expressions;
 global using System.Reflection;
+global using System.Runtime.CompilerServices;
