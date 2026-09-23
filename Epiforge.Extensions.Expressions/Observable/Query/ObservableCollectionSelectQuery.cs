@@ -1,7 +1,8 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
 sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> source, Expression<Func<TElement, TResult>> selector) :
-    ObservableCollectionQuery<TResult>(collectionObserver)
+    ObservableCollectionQuery<TResult>(collectionObserver),
+    IObservableQueryDependent
 {
     sealed class Projection(IObservableExpression<TElement, TResult> observableExpression, TResult committedResult)
     {
@@ -61,6 +62,7 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
     readonly PrefixWeightedSequence<Projection> positions = new();
     readonly EqualityComparer<TResult> resultComparer = EqualityComparer<TResult>.Default;
     internal readonly Expression<Func<TElement, TResult>> Selector = selector;
+    ObservableQuerySubscription? sourceSubscription;
 
     public override TResult this[int index]
     {
@@ -105,9 +107,7 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
                     for (int i = 0, ii = state.Nodes.Count; i < ii; ++i)
                         observableExpression.Dispose();
                 }
-                source.CollectionChanged -= SourceCollectionChanged;
-                source.PropertyChanging -= SourcePropertyChanging;
-                source.PropertyChanged -= SourcePropertyChanged;
+                source.UnsubscribeDependent(sourceSubscription!);
                 enumerationSnapshot = null;
                 enumerationSnapshotShared = false;
                 RemovedFromCache();
@@ -212,9 +212,7 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
                 foreach (var element in source)
                     ObserveElementWithAccess(element, positions.Count, faultList);
             OperationFault = faultList.Fault;
-            source.CollectionChanged += SourceCollectionChanged;
-            source.PropertyChanging += SourcePropertyChanging;
-            source.PropertyChanged += SourcePropertyChanged;
+            sourceSubscription = source.SubscribeDependent(this);
         }
     }
 
@@ -261,7 +259,22 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
     }
 
     [SuppressMessage("Maintainability", "CA1502: Avoid excessive complexity", Justification = @"Splitting this up into more methods is ¯\_(ツ)_/¯")]
-    void SourceCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    void IObservableQueryDependent.OnDependencyCollectionChanged(ObservableQuerySubscription subscription, NotifyCollectionChangedEventArgs e) =>
+        SourceCollectionChanged(e);
+
+    void IObservableQueryDependent.OnDependencyPropertyChanged(ObservableQuerySubscription subscription, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(Count))
+            OnPropertyChanged(e);
+    }
+
+    void IObservableQueryDependent.OnDependencyPropertyChanging(ObservableQuerySubscription subscription, PropertyChangingEventArgs e)
+    {
+        if (e.PropertyName == nameof(Count))
+            OnPropertyChanging(e);
+    }
+
+    void SourceCollectionChanged(NotifyCollectionChangedEventArgs e)
     {
         using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
         lock (access)
@@ -357,18 +370,6 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
             if (eventArgs is not null)
                 OnCollectionChanged(eventArgs);
         }
-    }
-
-    void SourcePropertyChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName == nameof(Count))
-            OnPropertyChanged(e);
-    }
-
-    void SourcePropertyChanging(object? sender, PropertyChangingEventArgs e)
-    {
-        if (e.PropertyName == nameof(Count))
-            OnPropertyChanging(e);
     }
 
     public override string ToString() =>

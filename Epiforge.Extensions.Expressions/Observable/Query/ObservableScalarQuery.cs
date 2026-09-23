@@ -5,39 +5,16 @@ abstract class ObservableScalarQuery<TResult>(CollectionObserver collectionObser
     IObservableScalarQuery<TResult>
 {
     Dictionary<Expression, ObservableQuery>? cachedTransformQueries;
-#if IS_NET_9_0_OR_GREATER
-    Lock? cachedQueriesAccess;
-#else
-    object? cachedQueriesAccess;
-#endif
     (Exception? Fault, TResult Result) evaluation;
 
     public override int CachedObservableQueries
     {
         get
         {
-            if (Volatile.Read(ref cachedQueriesAccess) is not { } access)
+            if (ExistingChildrenAccess is not { } access)
                 return 0;
             lock (access)
                 return cachedTransformQueries?.Values.Sum(transformQuery => 1 + transformQuery.CachedObservableQueries) ?? 0;
-        }
-    }
-
-    /// <summary>
-    /// Gets the lock guarding this query's caches of the queries built over it, created by whichever observation first needs it, so that a query nothing is built over allocates none
-    /// </summary>
-#if IS_NET_9_0_OR_GREATER
-    Lock CachedQueriesAccess
-#else
-    object CachedQueriesAccess
-#endif
-    {
-        get
-        {
-            if (Volatile.Read(ref cachedQueriesAccess) is { } access)
-                return access;
-            access = new();
-            return Interlocked.CompareExchange(ref cachedQueriesAccess, access, null) ?? access;
         }
     }
 
@@ -63,7 +40,7 @@ abstract class ObservableScalarQuery<TResult>(CollectionObserver collectionObser
     {
         ArgumentNullException.ThrowIfNull(transform);
         ObservableQuery transformQuery;
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             if (!(cachedTransformQueries ??= new(ExpressionEqualityComparer.Default)).TryGetValue(transform, out transformQuery!))
             {
@@ -78,7 +55,7 @@ abstract class ObservableScalarQuery<TResult>(CollectionObserver collectionObser
 
     internal bool QueryDisposed<TTransform>(ObservableScalarTransformQuery<TResult, TTransform> query)
     {
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var remaining = --query.Observations;
             if (remaining < 0)

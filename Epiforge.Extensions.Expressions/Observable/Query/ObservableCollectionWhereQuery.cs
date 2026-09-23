@@ -1,7 +1,8 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
 sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> source, Expression<Func<TElement, bool>> predicate) :
-    ObservableCollectionQuery<TElement>(collectionObserver)
+    ObservableCollectionQuery<TElement>(collectionObserver),
+    IObservableQueryDependent
 {
     sealed class SnapshotEnumerator :
         IEnumerator<TElement>
@@ -55,6 +56,7 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
     PropertyChangedEventHandler? observableExpressionPropertyChangedHandler;
     readonly Dictionary<IObservableExpression<TElement, bool>, (List<PrefixWeightedSequenceNode<IObservableExpression<TElement, bool>>> Nodes, Exception? Fault)> observableExpressionStates = [];
     internal readonly Expression<Func<TElement, bool>> Predicate = predicate;
+    ObservableQuerySubscription? sourceSubscription;
 
     public override TElement this[int index]
     {
@@ -95,7 +97,7 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
                     for (int i = 0, ii = state.Nodes.Count; i < ii; ++i)
                         observableExpression.Dispose();
                 }
-                source.CollectionChanged -= SourceCollectionChanged;
+                source.UnsubscribeDependent(sourceSubscription!);
                 enumerationSnapshot = null;
                 enumerationSnapshotShared = false;
                 RemovedFromCache();
@@ -219,7 +221,7 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
                     ObserveElementWithAccess(element, faultList, ref runningCount);
             count = runningCount;
             OperationFault = faultList.Fault;
-            source.CollectionChanged += SourceCollectionChanged;
+            sourceSubscription = source.SubscribeDependent(this);
         }
     }
 
@@ -261,7 +263,10 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
         SetBackedProperty(ref count, in value, countPropertyChangingEventArgs, countPropertyChangedEventArgs);
 
     [SuppressMessage("Maintainability", "CA1502: Avoid excessive complexity", Justification = @"Splitting this up into more methods is ¯\_(ツ)_/¯")]
-    void SourceCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    void IObservableQueryDependent.OnDependencyCollectionChanged(ObservableQuerySubscription subscription, NotifyCollectionChangedEventArgs e) =>
+        SourceCollectionChanged(e);
+
+    void SourceCollectionChanged(NotifyCollectionChangedEventArgs e)
     {
         using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
         lock (access)

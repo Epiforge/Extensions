@@ -47,21 +47,57 @@ abstract class ObservableQuery :
         Logger = collectionObserver.ExpressionObserver.Logger;
     }
 
+#if IS_NET_9_0_OR_GREATER
+    Lock? childrenAccess;
+#else
+    object? childrenAccess;
+#endif
     protected readonly CollectionObserver collectionObserver;
     NotificationDeferralState? deferralState;
+    int dependentSequence;
+    ObservableQuerySubscription? firstDependent;
 #if IS_NET_9_0_OR_GREATER
     readonly Lock lifetimeAccess = new();
 #else
     readonly object lifetimeAccess = new();
 #endif
     bool isInitialized;
+    ObservableQuerySubscription? lastDependent;
 
     internal int Observations;
 
     public virtual int CachedObservableQueries { get; } = 0;
 
+    /// <summary>
+    /// Gets the lock guarding what this query keeps of the queries built over it, which is its caches of them and its list of the queries derived from it, created by whichever first needs it, so that a query nothing is built over allocates none
+    /// </summary>
+#if IS_NET_9_0_OR_GREATER
+    private protected Lock ChildrenAccess
+#else
+    private protected object ChildrenAccess
+#endif
+    {
+        get
+        {
+            if (Volatile.Read(ref childrenAccess) is { } access)
+                return access;
+            access = new();
+            return Interlocked.CompareExchange(ref childrenAccess, access, null) ?? access;
+        }
+    }
+
     public ICollectionObserver CollectionObserver =>
         collectionObserver;
+
+#if IS_NET_9_0_OR_GREATER
+    private protected Lock? ExistingChildrenAccess =>
+#else
+    private protected object? ExistingChildrenAccess =>
+#endif
+        Volatile.Read(ref childrenAccess);
+
+    private protected bool HasDependents =>
+        Volatile.Read(ref firstDependent) is not null;
 
     NotificationDeferralState DeferralState
     {
@@ -151,18 +187,41 @@ abstract class ObservableQuery :
         }
     }
 
+    /// <summary>
+    /// Delivers a notification to the queries derived from this one, in the order they subscribed, skipping any which subscribed after delivery began, since such a query was built from the state this notification describes and would otherwise take it twice
+    /// </summary>
+    private protected void NotifyDependents(object eventArguments)
+    {
+        var bound = Volatile.Read(ref dependentSequence);
+        var current = Volatile.Read(ref firstDependent);
+        while (current is not null && unchecked(current.Sequence - bound) <= 0)
+        {
+            var following = current.Next;
+            if (!current.IsRemoved)
+            {
+                if (eventArguments is NotifyCollectionChangedEventArgs collectionChangedEventArgs)
+                    current.Dependent.OnDependencyCollectionChanged(current, collectionChangedEventArgs);
+                else if (eventArguments is PropertyChangedEventArgs propertyChangedEventArgs)
+                    current.Dependent.OnDependencyPropertyChanged(current, propertyChangedEventArgs);
+                else if (eventArguments is PropertyChangingEventArgs propertyChangingEventArgs)
+                    current.Dependent.OnDependencyPropertyChanging(current, propertyChangingEventArgs);
+            }
+            current = following;
+        }
+    }
+
     protected abstract void OnInitialization();
 
     protected override void OnPropertyChanged(PropertyChangedEventArgs e)
     {
         if (!DeferNotification(e))
-            base.OnPropertyChanged(e);
+            RaisePropertyChanged(e);
     }
 
     protected override void OnPropertyChanging(PropertyChangingEventArgs e)
     {
         if (!DeferNotification(e))
-            base.OnPropertyChanging(e);
+            RaisePropertyChanging(e);
     }
 
     void RaiseDeferredNotifications(object? first, object? second, object? third, List<object>? many)
@@ -187,9 +246,21 @@ abstract class ObservableQuery :
     private protected virtual void RaiseNotification(object eventArguments)
     {
         if (eventArguments is PropertyChangedEventArgs propertyChangedEventArgs)
-            base.OnPropertyChanged(propertyChangedEventArgs);
+            RaisePropertyChanged(propertyChangedEventArgs);
         else if (eventArguments is PropertyChangingEventArgs propertyChangingEventArgs)
-            base.OnPropertyChanging(propertyChangingEventArgs);
+            RaisePropertyChanging(propertyChangingEventArgs);
+    }
+
+    void RaisePropertyChanged(PropertyChangedEventArgs e)
+    {
+        NotifyDependents(e);
+        base.OnPropertyChanged(e);
+    }
+
+    void RaisePropertyChanging(PropertyChangingEventArgs e)
+    {
+        NotifyDependents(e);
+        base.OnPropertyChanging(e);
     }
 
     /// <summary>
@@ -204,4 +275,45 @@ abstract class ObservableQuery :
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     protected void RemovedFromCache() =>
         collectionObserver.ExpressionObserver.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_QueryDisposed, "Disposed observation of {Query}", this);
+
+    /// <summary>
+    /// Subscribes a query derived from this one to its notifications, which it will receive before any handler subscribed to this query's events
+    /// </summary>
+    internal ObservableQuerySubscription SubscribeDependent(IObservableQueryDependent dependent)
+    {
+        ArgumentNullException.ThrowIfNull(dependent);
+        lock (ChildrenAccess)
+        {
+            var sequence = unchecked(dependentSequence + 1);
+            var subscription = new ObservableQuerySubscription(dependent, sequence);
+            subscription.Previous = lastDependent;
+            if (lastDependent is null)
+                Volatile.Write(ref firstDependent, subscription);
+            else
+                lastDependent.Next = subscription;
+            lastDependent = subscription;
+            Volatile.Write(ref dependentSequence, sequence);
+            return subscription;
+        }
+    }
+
+    internal void UnsubscribeDependent(ObservableQuerySubscription subscription)
+    {
+        ArgumentNullException.ThrowIfNull(subscription);
+        lock (ChildrenAccess)
+        {
+            if (subscription.IsRemoved)
+                return;
+            subscription.IsRemoved = true;
+            if (subscription.Previous is null)
+                Volatile.Write(ref firstDependent, subscription.Next);
+            else
+                subscription.Previous.Next = subscription.Next;
+            if (subscription.Next is null)
+                lastDependent = subscription.Previous;
+            else
+                subscription.Next.Previous = subscription.Previous;
+            subscription.Previous = null;
+        }
+    }
 }

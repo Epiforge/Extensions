@@ -1,7 +1,8 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
 sealed class ObservableCollectionConcatQuery<TElement>(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> first, IObservableCollectionQuery<TElement> second) :
-    ObservableCollectionQuery<TElement>(collectionObserver)
+    ObservableCollectionQuery<TElement>(collectionObserver),
+    IObservableQueryDependent
 {
 #if IS_NET_9_0_OR_GREATER
     readonly Lock access = new();
@@ -10,7 +11,9 @@ sealed class ObservableCollectionConcatQuery<TElement>(CollectionObserver collec
 #endif
     int count;
     int firstCount;
+    ObservableQuerySubscription? firstSubscription;
     int secondCount;
+    ObservableQuerySubscription? secondSubscription;
 
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     internal readonly IObservableCollectionQuery<TElement> Second = second;
@@ -39,10 +42,14 @@ sealed class ObservableCollectionConcatQuery<TElement>(CollectionObserver collec
             var removedFromCache = first.QueryDisposed(this);
             if (removedFromCache)
             {
-                first.CollectionChanged -= FirstCollectionChanged;
-                first.PropertyChanged -= FirstPropertyChanged;
-                Second.CollectionChanged -= SecondCollectionChanged;
-                Second.PropertyChanged -= SecondPropertyChanged;
+                first.UnsubscribeDependent(firstSubscription!);
+                if (secondSubscription is { } subscription)
+                    ((ObservableQuery)Second).UnsubscribeDependent(subscription);
+                else
+                {
+                    Second.CollectionChanged -= SecondCollectionChanged;
+                    Second.PropertyChanged -= SecondPropertyChanged;
+                }
                 RemovedFromCache();
             }
             return removedFromCache;
@@ -50,7 +57,7 @@ sealed class ObservableCollectionConcatQuery<TElement>(CollectionObserver collec
         return true;
     }
 
-    void FirstCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    void FirstCollectionChanged(NotifyCollectionChangedEventArgs e)
     {
         lock (access)
         {
@@ -64,14 +71,25 @@ sealed class ObservableCollectionConcatQuery<TElement>(CollectionObserver collec
         }
     }
 
-    void FirstPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    public override IEnumerator<TElement> GetEnumerator() =>
+        first.Concat(Second).GetEnumerator();
+
+    void IObservableQueryDependent.OnDependencyCollectionChanged(ObservableQuerySubscription subscription, NotifyCollectionChangedEventArgs e)
+    {
+        lock (access)
+        {
+            if (subscription == firstSubscription)
+                FirstCollectionChanged(e);
+            else
+                SecondCollectionChanged(e);
+        }
+    }
+
+    void IObservableQueryDependent.OnDependencyPropertyChanged(ObservableQuerySubscription subscription, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(OperationFault))
             SetOperationFault();
     }
-
-    public override IEnumerator<TElement> GetEnumerator() =>
-        first.Concat(Second).GetEnumerator();
 
     protected override void OnInitialization()
     {
@@ -80,14 +98,21 @@ sealed class ObservableCollectionConcatQuery<TElement>(CollectionObserver collec
             firstCount = first.Count;
             secondCount = Second.Count;
             count = firstCount + secondCount;
-            first.CollectionChanged += FirstCollectionChanged;
-            first.PropertyChanged += FirstPropertyChanged;
-            Second.CollectionChanged += SecondCollectionChanged;
-            Second.PropertyChanged += SecondPropertyChanged;
+            firstSubscription = first.SubscribeDependent(this);
+            if (Second is ObservableQuery secondQuery)
+                secondSubscription = secondQuery.SubscribeDependent(this);
+            else
+            {
+                Second.CollectionChanged += SecondCollectionChanged;
+                Second.PropertyChanged += SecondPropertyChanged;
+            }
         }
     }
 
-    void SecondCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    void SecondCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
+        SecondCollectionChanged(e);
+
+    void SecondCollectionChanged(NotifyCollectionChangedEventArgs e)
     {
         lock (access)
         {

@@ -2,8 +2,10 @@ namespace Epiforge.Extensions.Expressions.Observable.Query;
 
 sealed class ObservableGrouping<TKey, TElement>(CollectionObserver collectionObserver, TKey key, ObservableCollectionQuery<TElement> groupQuery) :
     ObservableCollectionQuery<TElement>(collectionObserver),
-    IObservableGrouping<TKey, TElement>
+    IObservableGrouping<TKey, TElement>,
+    IObservableQueryDependent
 {
+    ObservableQuerySubscription? groupQuerySubscription;
     bool ownerDisposing;
 
     public override TElement this[int index] =>
@@ -20,9 +22,8 @@ sealed class ObservableGrouping<TKey, TElement>(CollectionObserver collectionObs
             return false;
         if (disposing)
         {
-            groupQuery.CollectionChanged -= GroupQueryCollectionChanged;
-            groupQuery.PropertyChanging -= GroupQueryPropertyChanging;
-            groupQuery.PropertyChanged -= GroupQueryPropertyChanged;
+            if (groupQuerySubscription is { } subscription)
+                groupQuery.UnsubscribeDependent(subscription);
             groupQuery.Dispose();
         }
         return true;
@@ -31,13 +32,13 @@ sealed class ObservableGrouping<TKey, TElement>(CollectionObserver collectionObs
     public override IEnumerator<TElement> GetEnumerator() =>
         groupQuery.GetEnumerator();
 
-    void GroupQueryCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
+    void IObservableQueryDependent.OnDependencyCollectionChanged(ObservableQuerySubscription subscription, NotifyCollectionChangedEventArgs e) =>
         OnCollectionChanged(e);
 
-    void GroupQueryPropertyChanged(object? sender, PropertyChangedEventArgs e) =>
+    void IObservableQueryDependent.OnDependencyPropertyChanged(ObservableQuerySubscription subscription, PropertyChangedEventArgs e) =>
         OnPropertyChanged(e);
 
-    void GroupQueryPropertyChanging(object? sender, PropertyChangingEventArgs e) =>
+    void IObservableQueryDependent.OnDependencyPropertyChanging(ObservableQuerySubscription subscription, PropertyChangingEventArgs e) =>
         OnPropertyChanging(e);
 
     internal void InternalDispose()
@@ -48,8 +49,6 @@ sealed class ObservableGrouping<TKey, TElement>(CollectionObserver collectionObs
 
     protected override void OnInitialization()
     {
-        groupQuery.CollectionChanged += GroupQueryCollectionChanged;
-        groupQuery.PropertyChanging += GroupQueryPropertyChanging;
-        groupQuery.PropertyChanged += GroupQueryPropertyChanged;
+        groupQuerySubscription = groupQuery.SubscribeDependent(this);
     }
 }

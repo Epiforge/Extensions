@@ -172,11 +172,6 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     Dictionary<Expression, ObservableQuery>? cachedSelectManyQueries;
     Dictionary<Expression<Func<TElement, bool>>, ObservableCollectionWhereQuery<TElement>>? cachedWhereQueries;
     ChildQueryCaches? childQueryCaches;
-#if IS_NET_9_0_OR_GREATER
-    Lock? cachedQueriesAccess;
-#else
-    object? cachedQueriesAccess;
-#endif
     Exception? operationFault;
 
     public abstract TElement this[int index] { get; }
@@ -197,7 +192,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         get
         {
-            if (Volatile.Read(ref cachedQueriesAccess) is not { } access)
+            if (ExistingChildrenAccess is not { } access)
                 return 0;
             var count = 0;
             lock (access)
@@ -234,24 +229,6 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
                 }
             }
             return count;
-        }
-    }
-
-    /// <summary>
-    /// Gets the lock guarding this query's caches of the queries built over it, created by whichever observation first needs it, so that a query nothing is built over allocates none
-    /// </summary>
-#if IS_NET_9_0_OR_GREATER
-    Lock CachedQueriesAccess
-#else
-    object CachedQueriesAccess
-#endif
-    {
-        get
-        {
-            if (Volatile.Read(ref cachedQueriesAccess) is { } access)
-                return access;
-            access = new();
-            return Interlocked.CompareExchange(ref cachedQueriesAccess, access, null) ?? access;
         }
     }
 
@@ -382,7 +359,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         value is TElement element ? IndexOf(element) : -1;
 
     private protected bool IsChangeObserved =>
-        CollectionChanged is not null;
+        CollectionChanged is not null || HasDependents;
 
     protected void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
     {
@@ -394,6 +371,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         var eventArgs = Logger?.IsEnabled(LogLevel.Trace) ?? false ? e.ToStringForLogging() : null;
         Logger?.LogTrace(Collections.EventIds.Epiforge_Extensions_Collections_RaisingCollectionChanged, "Raising CollectionChanged: {EventArgs}", eventArgs);
+        NotifyDependents(e);
         CollectionChanged?.Invoke(this, e);
         Logger?.LogTrace(Collections.EventIds.Epiforge_Extensions_Collections_RaisedCollectionChanged, "Raised CollectionChanged: {EventArgs}", eventArgs);
     }
@@ -449,7 +427,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         ArgumentNullException.ThrowIfNull(func);
         ArgumentNullException.ThrowIfNull(resultSelector);
         ObservableCollectionAggregateQuery<TElement, TAccumulate, TResult> aggregateQuery;
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var caches = childQueryCaches ??= new();
             var key = (seedFactory, func, resultSelector);
@@ -474,7 +452,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         var key = predicate;
         if (collectionObserver.ExpressionObserver.Optimizer is { } optimizer)
             key = (Expression<Func<TElement, bool>>)optimizer(key);
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var caches = childQueryCaches ??= new();
             if (!(caches.AllQueries ??= new(ExpressionEqualityComparer.Default)).TryGetValue(key, out allQuery!))
@@ -492,7 +470,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     public IObservableScalarQuery<bool> ObserveAny()
     {
         ObservableCollectionAnyQuery<TElement> anyQuery;
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var caches = childQueryCaches ??= new();
             if (!(caches.AnyQueries ??= new(ExpressionEqualityComparer.Default!)).TryGetValue(null, out anyQuery!))
@@ -514,7 +492,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         var key = predicate;
         if (collectionObserver.ExpressionObserver.Optimizer is { } optimizer)
             key = (Expression<Func<TElement, bool>>)optimizer(key);
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var caches = childQueryCaches ??= new();
             if (!(caches.AnyQueries ??= new(ExpressionEqualityComparer.Default!)).TryGetValue(key, out anyQuery!))
@@ -536,7 +514,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     public IObservableCollectionQuery<TElement> ObserveAppend(TElement element)
     {
         ObservableCollectionAppendQuery<TElement> appendQuery;
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var caches = childQueryCaches ??= new();
             if (!(caches.AppendQueries ??= []).TryGetValue(element, out appendQuery!))
@@ -558,7 +536,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         var key = selector;
         if (collectionObserver.ExpressionObserver.Optimizer is { } optimizer)
             key = (Expression<Func<TElement, TResult>>)optimizer(key);
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var caches = childQueryCaches ??= new();
             if (!(caches.AverageQueries ??= new(ExpressionEqualityComparer.Default)).TryGetValue(key, out averageQuery!))
@@ -581,7 +559,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         ArgumentNullException.ThrowIfNull(comparer);
         ObservableCollectionComparisonQuery<TElement> comparisonQuery;
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var caches = childQueryCaches ??= new();
             if (!(caches.ComparisonQueries ??= []).TryGetValue((soughtComparison, comparer), out comparisonQuery!))
@@ -643,7 +621,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         if (second is ScopedObservableCollectionQuery<TElement> scopedSecond)
             second = scopedSecond.query;
         ObservableCollectionConcatQuery<TElement> concatQuery;
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             if (!(cachedConcatQueries ??= []).TryGetValue(second, out concatQuery!))
             {
@@ -660,7 +638,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     public IObservableScalarQuery<int> ObserveCount()
     {
         ObservableCollectionCountQuery<TElement> countQuery;
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             countQuery = (childQueryCaches ??= new()).CountQuery ??= new ObservableCollectionCountQuery<TElement>(collectionObserver, this);
             ++countQuery.Observations;
@@ -718,7 +696,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         ArgumentNullException.ThrowIfNull(indexForCount);
         ObservableCollectionIndexForCountQuery<TElement> indexForCountQuery;
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var caches = childQueryCaches ??= new();
             caches.IndexForCountQueries ??= [];
@@ -784,7 +762,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     IObservableScalarQuery<TElement> ObserveIndex(Index? index, bool outOfRangeIsDefault)
     {
         ObservableCollectionIndexQuery<TElement> indexQuery;
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var caches = childQueryCaches ??= new();
             if (!(caches.IndexQueries ??= []).TryGetValue((index, outOfRangeIsDefault), out var cachedIndexQuery))
@@ -804,7 +782,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     public IObservableCollectionQuery<TElement> ObserveIndividualChanges()
     {
         ObservableCollectionIndividualChangesQuery<TElement> individualChangesQuery;
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             individualChangesQuery = (childQueryCaches ??= new()).IndividualChangeQuery ??= new ObservableCollectionIndividualChangesQuery<TElement>(collectionObserver, this);
             ++individualChangesQuery.Observations;
@@ -827,7 +805,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         if (collectionObserver.ExpressionObserver.Optimizer is { } optimizer)
             optimizedKeySelector = (Expression<Func<TElement, TKey>>)optimizer(optimizedKeySelector);
         var key = (optimizedKeySelector, keyEqualityComparer);
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var caches = childQueryCaches ??= new();
             if (!(caches.GroupByQueries ??= new(CachedGroupByQueryEqualityComparer.Default)).TryGetValue(key, out groupByQuery!))
@@ -966,7 +944,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         var key = selectorsAndDirections.ToList().AsReadOnly();
         if (collectionObserver.ExpressionObserver.Optimizer is { } optimizer)
             key = key.Select(selectorAndDirection => ((Expression<Func<TElement, IComparable>>)optimizer(selectorAndDirection.selector), selectorAndDirection.isDescending)).ToList().AsReadOnly();
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var caches = childQueryCaches ??= new();
             if (!(caches.OrderByQueries ??= new(CachedOrderByQueryEqualityComparer.Default)).TryGetValue(key, out orderByQuery!))
@@ -984,7 +962,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     public IObservableCollectionQuery<TElement> ObservePrepend(TElement element)
     {
         ObservableCollectionPrependQuery<TElement> prependQuery;
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var caches = childQueryCaches ??= new();
             if (!(caches.PrependQueries ??= []).TryGetValue(element, out prependQuery!))
@@ -1027,7 +1005,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         var key = selector;
         if (collectionObserver.ExpressionObserver.Optimizer is { } optimizer)
             key = (Expression<Func<TElement, TResult>>)optimizer(key);
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             if (!(cachedSelectQueries ??= new(ExpressionEqualityComparer.Default)).TryGetValue(key, out selectQuery!))
             {
@@ -1048,7 +1026,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         var key = selector;
         if (collectionObserver.ExpressionObserver.Optimizer is { } optimizer)
             key = (Expression<Func<TElement, IEnumerable<TResult>>>)optimizer(key);
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             if (!(cachedSelectManyQueries ??= new(ExpressionEqualityComparer.Default)).TryGetValue(key, out selectManyQuery!))
             {
@@ -1113,7 +1091,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     public IObservableCollectionQuery<TElement> ObserveSlice(Range range)
     {
         ObservableCollectionSliceQuery<TElement> sliceQuery;
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var caches = childQueryCaches ??= new();
             if (!(caches.SliceQueries ??= []).TryGetValue(range, out sliceQuery!))
@@ -1139,7 +1117,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         var key = selector;
         if (collectionObserver.ExpressionObserver.Optimizer is { } optimizer)
             key = (Expression<Func<TElement, TResult>>)optimizer(key);
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var caches = childQueryCaches ??= new();
             if (!(caches.SumQueries ??= new(ExpressionEqualityComparer.Default)).TryGetValue(key, out sumQuery!))
@@ -1183,7 +1161,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         var key = (keySelector, valueSelector, equalityComparer);
         if (collectionObserver.ExpressionObserver.Optimizer is { } optimizer)
             key = ((Expression<Func<TElement, TKey>>)optimizer(keySelector), (Expression<Func<TElement, TValue>>)optimizer(valueSelector), equalityComparer);
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var caches = childQueryCaches ??= new();
             if (!(caches.ToDictionaryQueries ??= new(CachedToDictionaryQueryEqualityComparer.Default)).TryGetValue(key, out toDictionaryQuery!))
@@ -1213,7 +1191,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         if (collectionObserver.ExpressionObserver.Optimizer is { } optimizer)
             optimizedKeySelector = (Expression<Func<TElement, TKey>>)optimizer(optimizedKeySelector);
         var key = (optimizedKeySelector, keyEqualityComparer);
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var caches = childQueryCaches ??= new();
             if (!(caches.ToLookupQueries ??= new(CachedLookupQueryEqualityComparer.Default)).TryGetValue(key, out lookupQuery!))
@@ -1234,7 +1212,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         ArgumentNullException.ThrowIfNull(synchronizationCallback);
         ObservableCollectionUsingSynchronizationCallbackQuery<TElement> usingSynchronizationCallbackQuery;
         var key = (context, synchronizationCallback);
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var caches = childQueryCaches ??= new();
             if (!(caches.UsingSynchronizationCallbackQueries ??= []).TryGetValue(key, out usingSynchronizationCallbackQuery!))
@@ -1255,7 +1233,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         ArgumentNullException.ThrowIfNull(synchronizationCallback);
         ObservableCollectionUsingSynchronizationCallbackEventuallyQuery<TElement> usingSynchronizationCallbackEventuallyQuery;
         var key = (context, synchronizationCallback);
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var caches = childQueryCaches ??= new();
             if (!(caches.UsingSynchronizationCallbackEventuallyQueries ??= []).TryGetValue(key, out usingSynchronizationCallbackEventuallyQuery!))
@@ -1274,7 +1252,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         ArgumentNullException.ThrowIfNull(synchronizationContext);
         ObservableCollectionUsingSynchronizationContextQuery<TElement> usingSynchronizationContextQuery;
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var caches = childQueryCaches ??= new();
             if (!(caches.UsingSynchronizationContextQueries ??= []).TryGetValue(synchronizationContext, out usingSynchronizationContextQuery!))
@@ -1293,7 +1271,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         ArgumentNullException.ThrowIfNull(synchronizationContext);
         ObservableCollectionUsingSynchronizationContextEventuallyQuery<TElement> usingSynchronizationContextEventuallyQuery;
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var caches = childQueryCaches ??= new();
             if (!(caches.UsingSynchronizationContextEventuallyQueries ??= []).TryGetValue(synchronizationContext, out usingSynchronizationContextEventuallyQuery!))
@@ -1312,7 +1290,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         ArgumentNullException.ThrowIfNull(lockObject);
         ObservableCollectionUsingSyncRootQuery<TElement> usingSyncRootQuery;
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var caches = childQueryCaches ??= new();
             if (!(caches.UsingSyncRootQueries ??= []).TryGetValue(lockObject, out usingSyncRootQuery!))
@@ -1331,7 +1309,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         ArgumentNullException.ThrowIfNull(lockObject);
         ObservableCollectionUsingSyncRootEventuallyQuery<TElement> usingSyncRootEventuallyQuery;
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var caches = childQueryCaches ??= new();
             if (!(caches.UsingSyncRootEventuallyQueries ??= []).TryGetValue(lockObject, out usingSyncRootEventuallyQuery!))
@@ -1353,7 +1331,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         var key = predicate;
         if (collectionObserver.ExpressionObserver.Optimizer is { } optimizer)
             key = (Expression<Func<TElement, bool>>)optimizer(key);
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             if (!(cachedWhereQueries ??= new(ExpressionEqualityComparer.Default)).TryGetValue(key, out whereQuery!))
             {
@@ -1372,7 +1350,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
 
     internal bool QueryDisposed<TAccumulate, TResult>(ObservableCollectionAggregateQuery<TElement, TAccumulate, TResult> aggregateQuery)
     {
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var remaining = --aggregateQuery.Observations;
             if (remaining < 0)
@@ -1388,7 +1366,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
 
     internal bool QueryDisposed(ObservableCollectionAllQuery<TElement> allQuery)
     {
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var remaining = --allQuery.Observations;
             if (remaining < 0)
@@ -1404,7 +1382,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
 
     internal bool QueryDisposed(ObservableCollectionAnyQuery<TElement> anyQuery)
     {
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var remaining = --anyQuery.Observations;
             if (remaining < 0)
@@ -1420,7 +1398,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
 
     internal bool QueryDisposed(ObservableCollectionAppendQuery<TElement> appendQuery)
     {
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var remaining = --appendQuery.Observations;
             if (remaining < 0)
@@ -1436,7 +1414,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
 
     internal bool QueryDisposed<TResult>(ObservableCollectionAverageQuery<TElement, TResult> averageQuery)
     {
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var remaining = --averageQuery.Observations;
             if (remaining < 0)
@@ -1452,7 +1430,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
 
     internal bool QueryDisposed(ObservableCollectionComparisonQuery<TElement> comparisonQuery)
     {
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var remaining = --comparisonQuery.Observations;
             if (remaining < 0)
@@ -1468,7 +1446,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
 
     internal bool QueryDisposed(ObservableCollectionConcatQuery<TElement> concatQuery)
     {
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var remaining = --concatQuery.Observations;
             if (remaining < 0)
@@ -1484,7 +1462,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
 
     internal bool QueryDisposed<TKey>(ObservableCollectionGroupByQuery<TKey, TElement> groupByQuery)
     {
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var remaining = --groupByQuery.Observations;
             if (remaining < 0)
@@ -1500,7 +1478,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
 
     internal bool QueryDisposed(ObservableCollectionCountQuery<TElement> countQuery)
     {
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var remaining = --countQuery.Observations;
             if (remaining < 0)
@@ -1516,7 +1494,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
 
     internal bool QueryDisposed(ObservableCollectionIndexForCountQuery<TElement> indexForCountQuery)
     {
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var remaining = --indexForCountQuery.Observations;
             if (remaining < 0)
@@ -1532,7 +1510,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
 
     internal bool QueryDisposed(ObservableCollectionIndexQuery<TElement> indexQuery)
     {
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var remaining = --indexQuery.Observations;
             if (remaining < 0)
@@ -1548,7 +1526,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
 
     internal bool QueryDisposed(ObservableCollectionIndividualChangesQuery<TElement> individualChangesQuery)
     {
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var remaining = --individualChangesQuery.Observations;
             if (remaining < 0)
@@ -1565,7 +1543,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     internal bool QueryDisposed<TKey>(ObservableCollectionLookupQuery<TKey, TElement> lookupQuery)
         where TKey : notnull
     {
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var remaining = --lookupQuery.Observations;
             if (remaining < 0)
@@ -1581,7 +1559,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
 
     internal bool QueryDisposed(ObservableCollectionOrderByQuery<TElement> orderByQuery)
     {
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var remaining = --orderByQuery.Observations;
             if (remaining < 0)
@@ -1597,7 +1575,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
 
     internal bool QueryDisposed(ObservableCollectionPrependQuery<TElement> prependQuery)
     {
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var remaining = --prependQuery.Observations;
             if (remaining < 0)
@@ -1613,7 +1591,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
 
     internal bool QueryDisposed<TResult>(ObservableCollectionSelectQuery<TElement, TResult> selectQuery)
     {
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var remaining = --selectQuery.Observations;
             if (remaining < 0)
@@ -1629,7 +1607,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
 
     internal bool QueryDisposed<TResult>(ObservableCollectionSelectManyQuery<TElement, TResult> selectManyQuery)
     {
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var remaining = --selectManyQuery.Observations;
             if (remaining < 0)
@@ -1645,7 +1623,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
 
     internal bool QueryDisposed(ObservableCollectionSliceQuery<TElement> sliceQuery)
     {
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var remaining = --sliceQuery.Observations;
             if (remaining < 0)
@@ -1661,7 +1639,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
 
     internal bool QueryDisposed<TResult>(ObservableCollectionSumQuery<TElement, TResult> sumQuery)
     {
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var remaining = --sumQuery.Observations;
             if (remaining < 0)
@@ -1678,7 +1656,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     internal bool QueryDisposed<TKey, TValue>(ObservableCollectionToDictionaryQuery<TElement, TKey, TValue> toDictionaryQuery)
         where TKey : notnull
     {
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var remaining = --toDictionaryQuery.Observations;
             if (remaining < 0)
@@ -1694,7 +1672,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
 
     internal bool QueryDisposed(ObservableCollectionUsingSynchronizationCallbackEventuallyQuery<TElement> usingSynchronizationCallbackEventuallyQuery)
     {
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var remaining = --usingSynchronizationCallbackEventuallyQuery.Observations;
             if (remaining < 0)
@@ -1710,7 +1688,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
 
     internal bool QueryDisposed(ObservableCollectionUsingSynchronizationCallbackQuery<TElement> usingSynchronizationCallbackQuery)
     {
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var remaining = --usingSynchronizationCallbackQuery.Observations;
             if (remaining < 0)
@@ -1726,7 +1704,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
 
     internal bool QueryDisposed(ObservableCollectionUsingSynchronizationContextEventuallyQuery<TElement> usingSynchronizationContextEventuallyQuery)
     {
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var remaining = --usingSynchronizationContextEventuallyQuery.Observations;
             if (remaining < 0)
@@ -1742,7 +1720,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
 
     internal bool QueryDisposed(ObservableCollectionUsingSynchronizationContextQuery<TElement> usingSynchronizationContextQuery)
     {
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var remaining = --usingSynchronizationContextQuery.Observations;
             if (remaining < 0)
@@ -1758,7 +1736,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
 
     internal bool QueryDisposed(ObservableCollectionUsingSyncRootEventuallyQuery<TElement> usingSyncRootEventuallyQuery)
     {
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var remaining = --usingSyncRootEventuallyQuery.Observations;
             if (remaining < 0)
@@ -1774,7 +1752,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
 
     internal bool QueryDisposed(ObservableCollectionUsingSyncRootQuery<TElement> usingSyncRootQuery)
     {
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var remaining = --usingSyncRootQuery.Observations;
             if (remaining < 0)
@@ -1790,7 +1768,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
 
     internal bool QueryDisposed(ObservableCollectionWhereQuery<TElement> whereQuery)
     {
-        lock (CachedQueriesAccess)
+        lock (ChildrenAccess)
         {
             var remaining = --whereQuery.Observations;
             if (remaining < 0)

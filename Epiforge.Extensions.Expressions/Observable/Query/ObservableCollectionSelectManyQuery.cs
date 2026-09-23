@@ -1,7 +1,8 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
 sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> source, Expression<Func<TElement, IEnumerable<TResult>>> selector) :
-    ObservableCollectionQuery<TResult>(collectionObserver)
+    ObservableCollectionQuery<TResult>(collectionObserver),
+    IObservableQueryDependent
 {
     readonly object access = new();
     int count;
@@ -10,6 +11,7 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
     readonly PrefixWeightedSequence<IEnumerable<TResult>?> positions = new();
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     IObservableCollectionQuery<IEnumerable<TResult>>? select;
+    ObservableQuerySubscription? selectSubscription;
     internal readonly Expression<Func<TElement, IEnumerable<TResult>>> Selector = selector;
 
     public override TResult this[int index]
@@ -84,9 +86,7 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
                     foreach (var enumerable in enumerableNodes.Keys)
                         if (enumerable is INotifyCollectionChanged collectionChangedNotifier)
                             collectionChangedNotifier.CollectionChanged -= CollectionChangedNotifierCollectionChanged;
-                    select!.CollectionChanged -= SelectCollectionChanged;
-                    select.PropertyChanged -= SelectPropertyChanged;
-                    select.PropertyChanging -= SelectPropertyChanging;
+                    ((ScopedObservableCollectionQuery<IEnumerable<TResult>>)select!).query.UnsubscribeDependent(selectSubscription!);
                     select.Dispose();
                     RemovedFromCache();
                 }
@@ -135,9 +135,7 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
             for (int i = 0, ii = select.Count; i < ii; ++i)
                 ObserveProjectionWithAccess(positions.Count, select[i]);
             count = positions.TotalWeight;
-            select.CollectionChanged += SelectCollectionChanged;
-            select.PropertyChanged += SelectPropertyChanged;
-            select.PropertyChanging += SelectPropertyChanging;
+            selectSubscription = ((ScopedObservableCollectionQuery<IEnumerable<TResult>>)select).query.SubscribeDependent(this);
         }
     }
 
@@ -155,7 +153,25 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
     }
 
     [SuppressMessage("Maintainability", "CA1502: Avoid excessive complexity", Justification = @"Splitting this up into more methods is ¯\_(ツ)_/¯")]
-    void SelectCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    void IObservableQueryDependent.OnDependencyCollectionChanged(ObservableQuerySubscription subscription, NotifyCollectionChangedEventArgs e) =>
+        SelectCollectionChanged(e);
+
+    void IObservableQueryDependent.OnDependencyPropertyChanged(ObservableQuerySubscription subscription, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(OperationFault))
+        {
+            OperationFault = select!.OperationFault;
+            OnPropertyChanged(e);
+        }
+    }
+
+    void IObservableQueryDependent.OnDependencyPropertyChanging(ObservableQuerySubscription subscription, PropertyChangingEventArgs e)
+    {
+        if (e.PropertyName == nameof(OperationFault))
+            OnPropertyChanging(e);
+    }
+
+    void SelectCollectionChanged(NotifyCollectionChangedEventArgs e)
     {
         using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
         lock (access)
@@ -236,21 +252,6 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
                 OnCollectionChanged(eventArgs);
             }
         }
-    }
-
-    void SelectPropertyChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName == nameof(OperationFault))
-        {
-            OperationFault = select!.OperationFault;
-            OnPropertyChanged(e);
-        }
-    }
-
-    void SelectPropertyChanging(object? sender, PropertyChangingEventArgs e)
-    {
-        if (e.PropertyName == nameof(OperationFault))
-            OnPropertyChanging(e);
     }
 
     void SetCount(int value) =>
