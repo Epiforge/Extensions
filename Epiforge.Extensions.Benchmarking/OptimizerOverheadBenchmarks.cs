@@ -3,7 +3,6 @@ namespace Epiforge.Extensions.Benchmarking;
 using System.Linq.Expressions;
 
 [MemoryDiagnoser]
-[SimpleJob(launchCount: 3)]
 public class OptimizerOverheadBenchmarks
 {
     static readonly Expression<Func<BenchmarkPerson, bool>> predicate = person => person.Rank % 2 == 0;

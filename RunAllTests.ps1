@@ -3,6 +3,6 @@ Get-ChildItem -Path $resultsDirectory -Filter '*.trx' -ErrorAction SilentlyConti
 foreach ($testProject in Get-ChildItem -Path $PSScriptRoot -Recurse -Filter '*.Tests.csproj')
 {
     Write-Host "Testing $($testProject.BaseName)" -ForegroundColor Cyan
-    dotnet test $testProject.FullName --logger "trx;LogFilePrefix=$($testProject.BaseName)" --results-directory $resultsDirectory
+    dotnet test $testProject.FullName --logger "trx;LogFilePrefix=$($testProject.BaseName)" --results-directory $resultsDirectory --blame-hang --blame-hang-timeout 1m --blame-hang-dump-type full
 }
 Get-ChildItem -Path $resultsDirectory -Directory -Filter 'Deploy_*' -ErrorAction SilentlyContinue | Remove-Item -Recurse

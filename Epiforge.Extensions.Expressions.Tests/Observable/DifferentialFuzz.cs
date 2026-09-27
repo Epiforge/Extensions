@@ -53,7 +53,7 @@ public class DifferentialFuzz
         public ObservableRangeCollection<int> Numbers = [1, 2, 3];
     }
 
-    sealed class Sources(ParameterExpression subject, MemberExpression other, MemberExpression items, MemberExpression held, MemberExpression heldItems, MemberExpression numbers)
+    sealed class Sources(ParameterExpression subject, MemberExpression other, MemberExpression items, MemberExpression held, MemberExpression heldItems, MemberExpression numbers, bool widened)
     {
         internal readonly MemberExpression Held = held;
         internal readonly MemberExpression HeldItems = heldItems;
@@ -61,6 +61,7 @@ public class DifferentialFuzz
         internal readonly MemberExpression Numbers = numbers;
         internal readonly MemberExpression Other = other;
         internal readonly ParameterExpression Subject = subject;
+        internal readonly bool Widened = widened;
     }
 
     sealed class World
@@ -177,8 +178,10 @@ public class DifferentialFuzz
     {
         var parameter = Expression.Parameter(typeof(int), "v");
         var argument = Integer(rng, depth - 1, sources);
-        return rng.Next(4) switch
+        var condition = Expression.Parameter(typeof(bool), "c");
+        return rng.Next(sources.Widened ? 5 : 4) switch
         {
+            4 => Expression.Invoke(Expression.Lambda<Func<bool, int, int>>(Expression.Condition(condition, parameter, Expression.Constant(0)), condition, parameter), Boolean(rng, depth - 1, sources), argument),
             0 => Expression.Invoke(Expression.Lambda<Func<int, int>>(Expression.Negate(parameter), parameter), argument),
             1 => Expression.Invoke(Expression.Lambda<Func<int, int>>(Expression.Subtract(parameter, Expression.Constant(1)), parameter), argument),
             2 => Expression.Invoke(Expression.Lambda<Func<int, int>>(Expression.Add(parameter, parameter), parameter), argument),
@@ -187,7 +190,7 @@ public class DifferentialFuzz
     }
 
     static Expression Integer(Random rng, int depth, Sources sources) =>
-        depth <= 0 ? Leaf(rng, sources) : (rng.Next(8) switch
+        depth <= 0 ? Leaf(rng, sources) : (rng.Next(sources.Widened ? 9 : 8) switch
         {
             0 => Expression.Add(Integer(rng, depth - 1, sources), Integer(rng, depth - 1, sources)),
             1 => Expression.Subtract(Integer(rng, depth - 1, sources), Integer(rng, depth - 1, sources)),
@@ -196,6 +199,7 @@ public class DifferentialFuzz
             4 => Expression.Negate(Integer(rng, depth - 1, sources)),
             5 => Expression.Condition(Boolean(rng, depth - 1, sources), Integer(rng, depth - 1, sources), Integer(rng, depth - 1, sources)),
             6 => Invocation(rng, depth, sources),
+            8 => Expression.TryCatch(Integer(rng, depth - 1, sources), Expression.Catch(typeof(NullReferenceException), Expression.Rethrow(typeof(int))), Expression.Catch(typeof(ArithmeticException), Integer(rng, depth - 1, sources))),
             _ => Leaf(rng, sources)
         });
 
@@ -240,11 +244,11 @@ public class DifferentialFuzz
             _ => Expression.Constant(rng.Next(2) == 0 ? "s" : null, typeof(string))
         };
 
-    static Expression<Func<Recorded, object?>> Lambda(int seed, int depth, World world, bool constructed)
+    static Expression<Func<Recorded, object?>> Lambda(int seed, int depth, World world, bool constructed, bool widened)
     {
         var rng = new Random(seed);
         var subject = Expression.Parameter(typeof(Recorded), "s");
-        var sources = new Sources(subject, world.OtherMember, world.ItemsMember, world.HeldMember, world.HeldItemsMember, world.NumbersMember);
+        var sources = new Sources(subject, world.OtherMember, world.ItemsMember, world.HeldMember, world.HeldItemsMember, world.NumbersMember, widened);
         var body = constructed ? Constructed(rng, depth, sources) : rng.Next(3) switch
         {
             0 => Boolean(rng, depth, sources),
@@ -396,12 +400,12 @@ public class DifferentialFuzz
         }
     }
 
-    static void RunProgram(int seed, int depth, int steps, bool constructed = false)
+    static void RunProgram(int seed, int depth, int steps, bool constructed = false, bool widened = false)
     {
         var graphWorld = new World(seed, false);
         var fastWorld = new World(seed, true);
-        var graphLambda = Lambda(seed, depth, graphWorld, constructed);
-        var fastLambda = Lambda(seed, depth, fastWorld, constructed);
+        var graphLambda = Lambda(seed, depth, graphWorld, constructed, widened);
+        var fastLambda = Lambda(seed, depth, fastWorld, constructed, widened);
         Assert.AreEqual(graphLambda.ToString().Replace("value(", "@("), fastLambda.ToString().Replace("value(", "@("), $"seed {seed}: the two worlds were given different expressions");
         using var graphExpression = graphWorld.Observer.Observe(graphLambda, graphWorld.Subject);
         using var fastExpression = fastWorld.Observer.Observe(fastLambda, fastWorld.Subject);
@@ -417,6 +421,10 @@ public class DifferentialFuzz
             Assert.AreEqual(Describe(graphExpression.Evaluation), Describe(fastExpression.Evaluation), $"seed {seed}, step {step}: evaluation diverged for {graphLambda}");
             Assert.AreEqual(graphWorld.Notifications, fastWorld.Notifications, $"seed {seed}, step {step}: notification count diverged for {graphLambda}");
         }
+        graphExpression.Dispose();
+        fastExpression.Dispose();
+        Assert.AreEqual(0, graphWorld.Observer.CachedObservableExpressions, $"seed {seed}: the graph kept nodes after the observation was disposed for {graphLambda}");
+        Assert.AreEqual(0, fastWorld.Observer.CachedObservableExpressions, $"seed {seed}: the fast path's observer kept nodes after the observation was disposed for {graphLambda}");
     }
 
     [TestMethod]
@@ -431,6 +439,16 @@ public class DifferentialFuzz
     {
         for (var seed = 5000; seed < 5150; ++seed)
             RunProgram(seed, 4, 12);
+    }
+
+    /// <summary>
+    /// Deep expressions drawn from a generator which can also invoke a literal lambda reading its parameter only in a branch, and catch a fault with a try, over seeds of their own so that every other method goes on generating exactly the programs it always has
+    /// </summary>
+    [TestMethod]
+    public void DeepExpressionsWithTriesAndBranchedArguments()
+    {
+        for (var seed = 13000; seed < 13150; ++seed)
+            RunProgram(seed, 4, 12, widened: true);
     }
 
     [TestMethod]

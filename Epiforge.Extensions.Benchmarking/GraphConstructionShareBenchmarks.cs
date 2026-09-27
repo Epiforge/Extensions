@@ -3,7 +3,6 @@ namespace Epiforge.Extensions.Benchmarking;
 using System.Linq.Expressions;
 
 [MemoryDiagnoser]
-[SimpleJob(launchCount: 3)]
 public class GraphConstructionShareBenchmarks
 {
     static readonly Expression<Func<BenchmarkPerson, int>> selector = person => person.Rank * 2;

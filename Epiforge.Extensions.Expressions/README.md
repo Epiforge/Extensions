@@ -1,11 +1,12 @@
 ﻿This library has useful tools for dealing with expressions:
+
 * `ExpressionEqualityComparer` - Defines methods to support the comparison of expression trees for equality
 * `ExpressionExtensions`, providing:
   * `Duplicate` - Duplicates the specified expression tree
   * `SubstituteMethods` - Recursively scans an expression tree to replace invocations of specific methods with replacement methods
 
-# Observable
-This library accepts a `LambdaExpression` and arguments to pass to it, dissects the `LambdaExpression`'s body, and hooks into change notification events for properties (`INotifyPropertyChanged`), collections (`INotifyCollectionChanged`), and dictionaries (`Epiforge.Extensions.Collections.INotifyDictionaryChanged`).
+# Observable Expressions
+An `ExpressionObserver` accepts a `LambdaExpression` and arguments to pass to it, dissects the lambda's body, and hooks into change notification events for properties (`INotifyPropertyChanged`), collections (`INotifyCollectionChanged`), and dictionaries (`Epiforge.Extensions.Collections.INotifyDictionaryChanged`).
 
 ```csharp
 // Employee implements INotifyPropertyChanged
@@ -15,7 +16,8 @@ var expr = observer.Observe(e => e.Name.Length, elizabeth);
 // expr subscribed to elizabeth's PropertyChanged
 ```
 
-Then, as changes involving any elements of the expression occur, a chain of automatic re-evaluation will get kicked off, possibly causing the observable expression's `Evaluation` property to change.
+## Following Changes
+As anything the expression reads changes, the expression re-evaluates, and its `Evaluation` property may change with it.
 
 ```csharp
 var elizabeth = Employee.GetByName("Elizabeth");
@@ -26,18 +28,7 @@ elizabeth.Name = "Lizzy";
 // expr.Evaluation.Result == 5
 ```
 
-Also, since exceptions may be encountered after an observable expression was created due to subsequent element changes, observable expressions include a `Fault` property in their evaluations, which will be set to the exception that was encountered during evaluation.
-
-```csharp
-var elizabeth = Employee.GetByName("Elizabeth");
-var observer = new ExpressionObserver();
-var expr = observer.Observe(e => e.Name.Length, elizabeth);
-// expr.Evaluation.Fault is null
-elizabeth.Name = null;
-// expr.Evaluation.Fault is NullReferenceException
-```
-
-Observable expressions raise property change events of their own, so listen for those (kinda the whole point)!
+An observable expression raises property change events of its own, and listening for them is the point of having one.
 
 ```csharp
 var elizabeth = Employee.GetByName("Elizabeth");
@@ -50,11 +41,11 @@ expr.PropertyChanged += (sender, e) =>
         var (fault, result) = expr.Evaluation;
         if (fault is not null)
         {
-            // Whoops
+            // handle the fault
         }
         else
         {
-            // Do something with result
+            // use the result
         }
     }
 };
@@ -64,7 +55,22 @@ While an expression is working out its new value it can pass through results tha
 
 Nor are you told anything at all when a change leaves the value where it found it. That is decided by a comparison, using the same equality the expression uses everywhere else, and it happens before `PropertyChanging` rather than after — so a handler for that event still reads the previous value, and a pair of events always means the value really moved.
 
-When you dispose of your observable expression, it will disconnect from all the events.
+## When Evaluation Fails
+An exception can arise long after an observable expression was created, because something it reads changed. It is not thrown; it becomes the `Fault` of the expression's evaluation.
+
+```csharp
+var elizabeth = Employee.GetByName("Elizabeth");
+var observer = new ExpressionObserver();
+var expr = observer.Observe(e => e.Name.Length, elizabeth);
+// expr.Evaluation.Fault is null
+elizabeth.Name = null;
+// expr.Evaluation.Fault is NullReferenceException
+```
+
+An expression tree built at run time can also catch a fault with `Expression.TryCatch`, which C# will not write in a lambda. The body is evaluated first; while it faults, the first catch block whose type the fault is supplies the value instead, and that block is evaluated only then. A catch block whose body is `Expression.Rethrow` lets the fault through, so faults which should always spread can be listed ahead of one catching `Exception`. Catch blocks with a variable or a filter, and finally and fault blocks, are not supported.
+
+## Disposing of an Observation
+When you dispose of an observable expression, it disconnects from all the events it subscribed to.
 
 ```csharp
 var elizabeth = Employee.GetByName("Elizabeth");
@@ -73,40 +79,12 @@ using (var expr = observer.Observe(e => e.Name.Length, elizabeth))
 {
     // expr subscribed to elizabeth's PropertyChanged
 }
-// expr unsubcribed from elizabeth's PropertyChanged
+// expr unsubscribed from elizabeth's PropertyChanged
 ```
 
-## How an Expression Gets Observed
-`Observe` takes a shortcut when it can and builds a graph when it cannot, deciding once when the observation is created. You receive the same values through the same events either way; the shortcut is just faster and lighter.
+Observable expressions also try to dispose of disposable objects they create in the course of their evaluation, when and where it makes sense. Use the `ExpressionObserverOptions` class for more direct control over this behavior.
 
-The shortcut handles an expression built from these:
-
-* the argument, constants, and captured locals
-* fields, on anything above — including static fields
-* static properties
-* properties and indexers whose target is one of the above
-* a property read through something which can change, such as `e => e.Name.Length` or `e => e.Manager.Rank`, which follows the value as it moves and re-subscribes where it lands
-* `?:`, `&&`, `||` and `??`, whose deferred operands take their subscriptions the first time an evaluation reaches them, which is where the graph attaches its nodes for them
-* a call to the get method of a property or an indexer, which is how an indexer written in C# arrives, read as the member or index access it stands for
-* object construction, object initializers and array initializers, including construction of a value the observer disposes of when nothing the constructor is given can change, made once and disposed once
-* an invocation of a literal lambda, as a formula or rule engine building expression trees at run time commonly emits, reduced to the body it would have evaluated
-* method calls and operators resolved to a method, unless the observer disposes of what one returned and what it is made on or given can change
-* a property whose change notifications you have told the observer to ignore, when nothing it is read through can change, read once and kept
-
-What builds the graph instead: a kind of expression not in that list, such as a lambda passed as an argument or an array built from bounds; an indexer whose target can change; a member read on a value type which can notify; a call or operator whose return value the observer disposes of and whose target or arguments can change; a construction whose value the observer disposes of and whose arguments can change; a read of a property or an indexer you have registered for disposal, whatever it is read through, because the property can announce and the graph replaces and disposes of its value when it does; a read of an ignored property through something which can change; and an expression deferring more than sixty-four operands.
-
-To find out about a particular expression, ask:
-
-```csharp
-var analysis = new DirectSubscriptionAnalyzer(options).Analyze(expression.Body);
-// analysis.IsEligible says whether the shortcut handles it
-// analysis.Ineligibility says why not, such as DirectSubscriptionIneligibility.ValueRequiresDisposal
-// analysis.IneligibleExpression is the part responsible
-```
-
-Hand the analyzer the same options you hand the observer, since some of them decide what gets subscribed to at all. Set `UseDirectSubscription` to `false` if you would rather always have the graph; it is `true` by default.
-
-### Fields Are Read Once
+## Fields Are Read Once
 Whatever a field held when an observation began is what that observation goes on using — a captured local, a field of your own class, and a static field alike. Assigning it afterward does not reach an observation that already exists. Static properties behave the same way, so `e => e.Hired < DateTime.Now` compares against the moment it was created for as long as it lives.
 
 ```csharp
@@ -119,9 +97,9 @@ high.Amount = 90000; // expr does not
 
 If you want the comparison to follow the value, do not assign the field — make the thing it points at a property of an object that notifies, and read that instead.
 
-Observable expressions will also try to automatically dispose of disposable objects they create in the course of their evaluation when and where it makes sense. Use the `ExpressionObserverOptions` class for more direct control over this behavior.
-You can use the `Optimizer` property to specify an optimization method to invoke automatically during the observable expression creation process.
-We recommend Tuomas Hietanen's [Linq.Expression.Optimizer](https://thorium.github.io/Linq.Expression.Optimizer), the utilization of which would look like so:
+## Optimizing Expressions
+The `Optimizer` property of `ExpressionObserverOptions` specifies an optimization method to invoke automatically while an observable expression is being created.
+We recommend Tuomas Hietanen's [Linq.Expression.Optimizer](https://thorium.github.io/Linq.Expression.Optimizer), the use of which looks like this:
 
 ```csharp
 var options = new ExpressionObserverOptions { Optimizer = ExpressionOptimizer.tryVisit };
@@ -146,21 +124,54 @@ var expr = observer.Observe<bool>(lambda, false, false);
 // (because Augustus De Morgan said they're essentially the same thing, but this involves less steps)
 ```
 
+Linq.Expression.Optimizer does not handle `Expression.TryCatch`, and `tryVisit` leaves any lambda containing one entirely unoptimized.
+
+## How an Expression Gets Observed
+`Observe` takes a shortcut when it can and builds a graph when it cannot, deciding once when the observation is created. You receive the same values through the same events either way; the shortcut is just faster and lighter.
+
+The shortcut handles an expression built from these:
+
+* the argument, constants, and captured locals
+* fields, on anything above — including static fields
+* static properties
+* properties and indexers whose target is one of the above
+* a property read through something which can change, such as `e => e.Name.Length` or `e => e.Manager.Rank`, which follows the value as it moves and re-subscribes where it lands
+* `?:`, `&&`, `||` and `??`, whose deferred operands take their subscriptions the first time an evaluation reaches them, which is where the graph attaches its nodes for them
+* a try built with `Expression.TryCatch`, whose catch blocks take their subscriptions the first time a fault selects them
+* a call to the get method of a property or an indexer, which is how an indexer written in C# arrives, read as the member or index access it stands for
+* object construction, object initializers and array initializers, including construction of a value the observer disposes of when nothing the constructor is given can change, made once and disposed once
+* an invocation of a literal lambda, as a formula or rule engine building expression trees at run time commonly emits, reduced to the body it would have evaluated when each parameter is read exactly once and, unless its argument is a constant or the argument, not inside a deferred operand or a try
+* method calls and operators resolved to a method, unless the observer disposes of what one returned and what it is made on or given can change
+* a property whose change notifications you have told the observer to ignore, when nothing it is read through can change, read once and kept
+
+What builds the graph instead: a kind of expression not in that list, such as a lambda passed as an argument or an array built from bounds; an invocation of a literal lambda whose parameter is read other than exactly once, or is read inside a deferred operand or a try when its argument could fault, because the graph evaluates every argument first; an indexer whose target can change; a member read on a value type which can notify; a call or operator whose return value the observer disposes of and whose target or arguments can change; a construction whose value the observer disposes of and whose arguments can change; a read of a property or an indexer you have registered for disposal, whatever it is read through, because the property can announce and the graph replaces and disposes of its value when it does; a read of an ignored property through something which can change; and an expression deferring more than 64 operands.
+
+To find out about a particular expression, ask:
+
+```csharp
+var analysis = new DirectSubscriptionAnalyzer(options).Analyze(expression.Body);
+// analysis.IsEligible says whether the shortcut handles it
+// analysis.Ineligibility says why not, such as DirectSubscriptionIneligibility.ValueRequiresDisposal
+// analysis.IneligibleExpression is the part responsible
+```
+
+Hand the analyzer the same options you hand the observer, since some of them decide what gets subscribed to at all. Set `UseDirectSubscription` to `false` if you would rather always have the graph; it is `true` by default.
+
 # Observable Queries
 This library provides re-implementations of LINQ operations, but instead of returning `IEnumerable<T>`s and simple values, these return `IObservableCollectionQuery<T>`s, `IObservableDictionaryQuery<TKey, TValue>`s, and `IObservableScalarQuery<T>`s.
 This is because, unlike traditional LINQ operations, these implementations continuously update their results until those results are disposed.
 What they hand back is a read-only view of the source: change the source, and the query brings itself up to date. Queries do not implement the mutating range collection and dictionary interfaces, because a query result is not somewhere you put things.
 
-But... what could cause those updates?
+A query updates when:
 
 * the source is enumerable, implements `INotifyCollectionChanged`, and raises a `CollectionChanged` event
 * the source is a dictionary, implements `Epiforge.Extensions.Collections.INotifyDictionaryChanged<TKey, TValue>`, and raises a `DictionaryChanged` event
 * the elements in the enumerable (or the values in the dictionary) implement `INotifyPropertyChanged` and raise a `PropertyChanged` event
 * a reference enclosed by a selector or a predicate passed to the method implements `INotifyCollectionChanged`, `Epiforge.Extensions.Collections.INotifyDictionaryChanged<TKey, TValue>`, or `INotifyPropertyChanged` and raises one of their events
 
-That last one might be a little surprising, but this is because all selectors and predicates passed to Observable Query methods become Observable Expressions (see above).
-This means that you will not be able to pass one that an `ExpressionObserver` cannot observe (e.g. a lambda expression that can't be converted to an expression tree or that contains nodes that are unsupported).
-But, in exchange for this, you get all kinds of notification plumbing that's just handled for you behind the scenes.
+That last one might be a little surprising, but it is because every selector and predicate passed to an Observable Query method becomes an observable expression (see above).
+This means that you cannot pass one that an `ExpressionObserver` cannot observe (for example, a lambda expression that cannot be converted to an expression tree or that contains nodes that are unsupported).
+In exchange, all of the notification plumbing is handled for you.
 
 Suppose, for example, you're working on an app that displays a list of notes and you want the notes to be shown in descending order of when they were last edited.
 
@@ -175,7 +186,7 @@ notesViewControl.ItemsSource = orderedNotes;
 
 From then on, as you add `Note`s to the `notes` observable collection, the `IObservableCollectionQuery<Note>` named `orderedNotes` will be kept ordered so that `notesViewControl` displays them in the preferred order.
 
-Since `IObservableCollectionQuery<T>`'s are automatically subscribing to events for you, you do need to call `Dispose` on them when you don't need them any more.
+Since queries subscribe to events for you, you need to call `Dispose` on them when you no longer need them.
 
 ```csharp
 void Page_Unload(object? sender, EventArgs e)
@@ -185,26 +196,7 @@ void Page_Unload(object? sender, EventArgs e)
 }
 ```
 
-Ahh, but what about exceptions?
-Well, Observable Expressions contain a `Fault` element in their `Evaluation` properties, but... you don't really see those Observable Expressions as an Observable Query caller, do ya?
-For that reason, Observable Queries all have `OperationFault` properties.
-You may subscribe to their `PropertyChanging` and `PropertyChanged` events to be notified when an Observable Expression or the overall Observable Query runs into a problem.
-If there is more than one fault in play, the value of `OperationFault` will be an `AggregateException`.
-
-Dictionary queries adopt the key comparer of the dictionary they observe, discovering it through `Epiforge.Extensions.Collections.Generic.IHashKeys<TKey>` or a `Dictionary<TKey, TValue>`'s own `Comparer`, so a query over a case-insensitive dictionary is itself case-insensitive.
-
-`ObserveGroupBy`, `ObserveToLookup`, and `ObserveDistinct` do not order their results the way LINQ does.
-Groupings are ordered by when they were created and the elements of a grouping by when they were added, rather than by where they occur in the source.
-This is deliberate: holding a grouping at the position of its key's first occurrence would mean moving that grouping every time an element was inserted ahead of it, announcing a change to something whose membership did not change, which is the opposite of what an Observable Query is for.
-Call `ObserveOrderBy` on the query, or on a grouping, when you want a defined order.
-
-Reach for `foreach` rather than the indexer, because the difference between them is larger than it looks and grows with the collection.
-An enumeration takes the query's lock once and then walks a list, while the indexer takes that lock again for every element you ask for; on a large collection it must also find each one in a tree, because a query keeps its elements' positions in one so that a change repairs only what it touched.
-A query does remember the position it handed out last and searches outward from there, so asking for positions in order, or near one another, costs a fraction of asking for them at random, and what remains is mostly the repeated locking rather than the search.
-Walking ten thousand elements by index instead of by enumerator measured between thirty and fifty times slower in order, and around two hundred times out of order; at a hundred elements it was about fifteen, and there the repeated locking is the whole of it.
-Where you do need elements by position more than once, copy the query's contents and index the copy.
-
-Since the `ExpressionObserver` has a number of options governing its behavior, you may optionally pass one you've made to the constructor of `CollectionObserver` to ensure those options are obeyed when Observable Expressions are created to enable your Observable Queries.
+Since the `ExpressionObserver` has a number of options governing its behavior, you may pass one you've made to the constructor of `CollectionObserver` to ensure those options are obeyed when observable expressions are created for your queries.
 
 ## How Observable Queries Work and When to Use Them
 It is worth being plain about what kind of thing this is, because "LINQ, but observable" undersells it and sets the wrong expectations.
@@ -218,11 +210,31 @@ Three things that might otherwise look like arbitrary restrictions fall straight
 
 What is not free is construction. Building the machine means building an observable expression for every element the query touches, and that is proportional to the size of the collection. So build a query once and hold onto it. Do not build one per frame, per request, or per keystroke. The bargain is that you pay up front and then stop paying to read.
 
-The same goes for the lambdas you hand it. The observer optimizes, analyzes and compiles a lambda once and remembers the result by the instance you gave it, not by what the lambda says, and a lambda written inline is a new instance every time that line runs. So when you build queries over many collections, a query per row or per entity, keep each selector and predicate in a `static readonly` field and pass the same one every time. Over 256 one-element collections, `ObserveWhere` given a held predicate took 117 μs, and given the same predicate written inline, 9,784 μs.
+The same goes for the lambdas you hand it. The observer optimizes, analyzes and compiles a lambda once and remembers the result by the instance you gave it, not by what the lambda says, and a lambda written inline is a new instance every time that line runs. So when you build queries over many collections, a query per row or per entity, keep each selector and predicate in a `static readonly` field and pass the same one every time. Over 256 one-element collections, `ObserveWhere` given a held predicate took 118 μs, and given the same predicate written inline, 14,229 μs, a figure which varied by about a third from one process to the next where the held one barely moved.
 
 Reading is also cheaper than being told. A query subscribes to the one it is built on only while something is subscribed to it, and a filtered query works out where a change landed, and describes it, only when something will receive that description. So subscribe when you need to be told what changed, and simply read the query when you only need its answer to be right.
 
 Which is also how to decide whether you want one. If you compute a result once and move on, plain LINQ is cheaper and simpler, and you should use it. If a result has to stay correct across a long run of small changes, such as a list someone is looking at, a running total, or a filter someone is typing into, that is what these are for.
+
+## When a Query Faults
+The observable expressions a query builds are not yours to see, so their faults reach you through the query instead: every Observable Query has an `OperationFault` property.
+Subscribe to its `PropertyChanging` and `PropertyChanged` events to be told when one of its observable expressions, or the query as a whole, runs into a problem.
+If there is more than one fault in play, the value of `OperationFault` is an `AggregateException`.
+
+## Keys and Order
+Dictionary queries adopt the key comparer of the dictionary they observe, discovering it through `Epiforge.Extensions.Collections.Generic.IHashKeys<TKey>` or a `Dictionary<TKey, TValue>`'s own `Comparer`, so a query over a case-insensitive dictionary is itself case-insensitive.
+
+`ObserveGroupBy`, `ObserveToLookup`, and `ObserveDistinct` do not order their results the way LINQ does.
+Groupings are ordered by when they were created and the elements of a grouping by when they were added, rather than by where they occur in the source.
+This is deliberate: holding a grouping at the position of its key's first occurrence would mean moving that grouping every time an element was inserted ahead of it, announcing a change to something whose membership did not change, which is the opposite of what an Observable Query is for.
+Call `ObserveOrderBy` on the query, or on a grouping, when you want a defined order.
+
+## Enumerate Rather Than Index
+Reach for `foreach` rather than the indexer, because the difference between them is larger than it looks and grows with the collection.
+An enumeration takes the query's lock once and then walks a list, while the indexer takes that lock again for every element you ask for; on a large collection it must also find each one in a tree, because a query keeps its elements' positions in one so that a change repairs only what it touched.
+A query does remember the position it handed out last and searches outward from there, so asking for positions in order, or near one another, costs a fraction of asking for them at random, and what remains is mostly the repeated locking rather than the search.
+Walking ten thousand elements by index instead of by enumerator measured 25x to 50x slower in order, and 120x to 150x out of order; at a hundred elements it was 10x to 15x, and there the repeated locking is the whole of it.
+Where you do need elements by position more than once, copy the query's contents and index the copy.
 
 ## Choosing Between Observable Queries and DynamicData
 [DynamicData](https://github.com/reactivemarbles/DynamicData) is the nearest thing to this in .NET, and it is a good library. Both keep a derived collection correct as your data changes — filter, sort, group, project, aggregate — and both update the result when an element's property changes rather than only when the collection does. Here is how to tell which one you want.
@@ -244,23 +256,23 @@ Which is also how to decide whether you want one. If you compute a result once a
 
 **Use this library if** you want a live view of a collection you already have, with the least new vocabulary, and you care about what an individual property change costs.
 
-### What It Costs
+## Measured Against DynamicData
 These are from the benchmarks in this repository, against DynamicData 9.4.33 at a thousand elements unless stated otherwise. Each propagation figure is per property change, above what the same changes cost with nothing observing them at all.
 
 | | This library | DynamicData |
 |---|---|---|
-| A property change that does not alter a filtered view | **0 B**, **7.8 ns** | 608 B, 199.1 ns |
-| An element changing group | **578 B**, **236.9 ns** | 1,891 B, 604.8 ns |
-| An element moving in a sorted view | **292 B**, 1,259.5 ns | 414 B, **984.4 ns** |
-| Building a filtered view | **973 KB**, **295 μs** | 4,119 KB, 2,267 μs |
-| What a live filtered view holds | **942 B** per element | 1,865 B per element |
+| A property change that does not alter a filtered view | **0 B**, **8.6 ns** | 608 B, 197.8 ns |
+| An element changing group | **592 B**, **240.8 ns** | 1,936 B, 619.2 ns |
+| An element moving in a sorted view | **292 B**, 1,287.6 ns | 414 B, **997.3 ns** |
+| Building a filtered view | **966 KB**, **297 μs** | 4,118 KB, 2,315 μs |
+| What a live filtered view holds | **935 B** per element | 1,865 B per element |
 
 The zero is exact rather than rounded: a property change that does not move an element in or out of a filtered view allocates nothing here, at a thousand, ten thousand and a hundred thousand elements alike. This library re-evaluates the predicate in place and stays silent when the answer has not moved; DynamicData's model is a stream of change sets, so a refresh has to materialize one. Neither is a defect. **One library pays per change and the other pays per change that matters.**
 
 **Two of those rows move with the size of the view, in opposite directions, and this is the part worth reading twice.**
 
-- **Sorting.** DynamicData's cost per move grows with the collection while this library's barely does, so the two cross at about **1,400** elements. Below that DynamicData is 1.28x faster; at four thousand this library is 1.72x faster and at ten thousand 2.98x.
-- **Grouping.** The reverse. DynamicData's cost per migration is flat while this library's grows, so the two cross at about **7,900** elements. Below that this library is 2.55x faster; at ten thousand DynamicData is 1.18x faster — though it holds about twice the memory to do it, 1,954 B per element against 1,032.
+- **Sorting.** DynamicData's cost per move grows with the collection while this library's barely does, so the two cross at about **1,500** elements. Below that DynamicData is 1.29x faster; at four thousand this library is 1.79x faster and at ten thousand 3.05x.
+- **Grouping.** The reverse. DynamicData's cost per migration is flat while this library's grows, so the two cross at about **8,000** elements. Below that this library is 2.61x faster; at ten thousand DynamicData is 1.19x faster — though it holds 1.92x the memory to do it, 1,954 B per element against 1,019.
 
 **The grouping crossover is a trade rather than an oversight, and knowing which side of it you want is more useful than the number.** A grouping here keeps its elements in the order they were added, so moving one out of its old group means finding it first, which is work proportional to the size of that group. DynamicData's groups are keyed rather than positional, so a removal is a dictionary operation and costs the same whatever the group holds. If you need the elements of a group in a stable order, that is what you are paying for. If you do not, DynamicData's shape is cheaper once groups get large. **A lookup built with `ObserveToLookup` is the same shape as a grouping here and behaves the same way.**
 
@@ -268,7 +280,7 @@ The zero is exact rather than rounded: a property change that does not move an e
 
 **Allocation does not cross.** At every size measured, this library allocates less for the same work: nothing at all for a filtered view, 0.31x DynamicData's for grouping, 0.71x for sorting.
 
-**The propagation advantage is largest at the sizes most applications use, and it narrows above them.** Per property change above the floor, this library costs 6.8 ns at a thousand elements, 9.2 ns at ten thousand and 55.0 ns at a hundred thousand, against 190.7, 212.5 and 406.8 ns — a lead of 27.9x, then 23.1x, then 7.4x. The allocation figure is unchanged across all three sizes; the time figure is not. A hundred thousand observations do not fit in cache, and a library which has driven its own per-change work to near zero has nothing left to hide a cache miss behind. The advantage shrinks from very large to large.
+**The propagation advantage is largest at the sizes most applications use, and it narrows above them.** Per property change above the floor, this library costs 8.2 ns at a thousand elements, 9.3 ns at ten thousand and 59.7 ns at a hundred thousand, against 200.8, 223.6 and 351.2 ns — a lead of 24.6x, then 24.0x, then 5.9x. The allocation figure is unchanged across all three sizes; the time figure is not. A hundred thousand observations do not fit in cache, and a library which has driven its own per-change work to near zero has nothing left to hide a cache miss behind. The advantage shrinks from very large to large.
 
 **Composition behaves.** Ordering or grouping a filtered view costs each library close to the sum of its parts rather than more, so a chain does not change which one to prefer — only the size of the view arriving at each stage does.
 
@@ -279,3 +291,4 @@ Two more things worth knowing before you weigh any of the above.
 **`ToObservableChangeSet()` over an existing `ObservableCollection<T>` costs DynamicData about 210x what its own `SourceCache` does** for the same property changes. That is the path you land on if you adopt it without changing where your data lives, and it is worth knowing about before you do.
 
 These comparisons were written by someone who does not use DynamicData, which is a real limitation on them. The harness is in this repository, the workloads are ordinary ones, and corrections are welcome.
+

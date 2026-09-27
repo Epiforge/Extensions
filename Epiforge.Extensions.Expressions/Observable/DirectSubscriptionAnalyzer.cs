@@ -28,6 +28,9 @@
 /// A short-circuiting operator and a conditional expression are admitted whatever their deferred operands reach, the subscriptions of each deferred operand being attached the first time an evaluation reaches that operand rather than when the observation is constructed, which is where the graph attaches the nodes of that operand and after which it never detaches them
 /// </remarks>
 /// <remarks>
+/// A try is admitted on the same terms, its body being evaluated at once and each catch block which does not rethrow being a deferred operand reached when a fault first selects it. The compiled evaluation catches what the graph's node for the try matches, because both see the fault the body raised, a held subexpression's fault included, and test it against the catch blocks in order; a try with a finally or a fault block, or a catch block with a variable or a filter, is refused, as the graph refuses it
+/// </remarks>
+/// <remarks>
 /// A subscription belongs to the nearest operand enclosing every use of the node which plans it, because the graph gives one node to an expression however many operands name it and attaches that node the first time any of them is evaluated; the contents of a constant or of the argument are the exception, the graph attaching those when the node is constructed whether or not its evaluation is deferred
 /// </remarks>
 /// <remarks>
@@ -558,6 +561,27 @@ public sealed class DirectSubscriptionAnalyzer
         return leftAnalysis.IsEligible ? AnalyzeDeferredOperand(binaryExpression.Right, planner) : leftAnalysis;
     }
 
+    DirectSubscriptionAnalysis AnalyzeTry(TryExpression tryExpression, Planner? planner)
+    {
+        if (!ExpressionObserver.IsObservable(tryExpression))
+            return new(tryExpression, DirectSubscriptionIneligibility.UnsupportedExpressionKind);
+        if (planner is null)
+            return new(tryExpression, DirectSubscriptionIneligibility.DeferredBranch);
+        var bodyAnalysis = AnalyzeNode(tryExpression.Body, planner);
+        if (!bodyAnalysis.IsEligible)
+            return bodyAnalysis;
+        var catchBlocks = tryExpression.Handlers;
+        for (int i = 0, ii = catchBlocks.Count; i < ii; ++i)
+        {
+            if (ExpressionObserver.IsRethrow(catchBlocks[i].Body))
+                continue;
+            var handlerAnalysis = AnalyzeDeferredOperand(catchBlocks[i].Body, planner);
+            if (!handlerAnalysis.IsEligible)
+                return handlerAnalysis;
+        }
+        return DirectSubscriptionAnalysis.Eligible;
+    }
+
     DirectSubscriptionAnalysis AnalyzeNode(Expression expression, Planner? planner) =>
         planner is not null && planner.Reached(expression) ? DirectSubscriptionAnalysis.Eligible : expression switch
         {
@@ -575,8 +599,10 @@ public sealed class DirectSubscriptionAnalyzer
             BinaryExpression binaryExpression when binaryExpression.Conversion is not null => new(binaryExpression, DirectSubscriptionIneligibility.UnsupportedExpressionKind),
             BinaryExpression binaryExpression => AnalyzeNode(binaryExpression.Left, planner) is { IsEligible: false } left ? left : AnalyzeNode(binaryExpression.Right, planner),
             ConditionalExpression conditionalExpression => AnalyzeConditional(conditionalExpression, planner),
+            TryExpression tryExpression => AnalyzeTry(tryExpression, planner),
             TypeBinaryExpression typeBinaryExpression when typeBinaryExpression.NodeType is not ExpressionType.TypeAs => AnalyzeNode(typeBinaryExpression.Expression, planner),
             UnaryExpression unaryExpression when unaryExpression.NodeType is ExpressionType.Quote => DirectSubscriptionAnalysis.Eligible,
+            UnaryExpression unaryExpression when ExpressionObserver.IsRethrow(unaryExpression) => new(unaryExpression, DirectSubscriptionIneligibility.UnsupportedExpressionKind),
             UnaryExpression unaryExpression when unaryExpression.Method is { } unaryOperator && !ExpressionObserverOptions.CannotBeDisposed(unaryOperator.ReturnType) && isMethodReturnValueDisposed(unaryOperator) => new(unaryExpression, DirectSubscriptionIneligibility.UserDefinedOperator),
             UnaryExpression unaryExpression => AnalyzeNode(unaryExpression.Operand, planner),
             _ => new(expression, DirectSubscriptionIneligibility.UnsupportedExpressionKind)

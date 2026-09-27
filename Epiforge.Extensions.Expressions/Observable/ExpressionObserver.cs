@@ -67,13 +67,41 @@ public class ExpressionObserver :
                 return newExpression.Constructor is null ? newExpression : newExpression.Members is null ? Expression.New(newExpression.Constructor, newArguments) : Expression.New(newExpression.Constructor, newArguments, newExpression.Members);
             case ParameterExpression parameterExpression:
                 return parameterTranslation[parameterExpression];
+            case TryExpression tryExpression:
+                ThrowIfUnobservable(tryExpression);
+                var catchBlocks = tryExpression.Handlers;
+                var replacedCatchBlocks = new CatchBlock[catchBlocks.Count];
+                for (int i = 0, ii = catchBlocks.Count; i < ii; ++i)
+                    replacedCatchBlocks[i] = catchBlocks[i] is var catchBlock && IsRethrow(catchBlock.Body) ? catchBlock : catchBlock.Update(null, null, ReplaceParameters(parameterTranslation, catchBlock.Body));
+                return tryExpression.Update(ReplaceParameters(parameterTranslation, tryExpression.Body), replacedCatchBlocks, null, null);
             case TypeBinaryExpression typeBinaryExpression:
                 return Expression.TypeIs(ReplaceParameters(parameterTranslation, typeBinaryExpression.Expression), typeBinaryExpression.TypeOperand);
+            case UnaryExpression { NodeType: ExpressionType.Throw, Operand: null }:
+                throw new NotSupportedException("A rethrow can be observed only as the whole body of a catch block");
             case UnaryExpression unaryExpression:
                 return Expression.MakeUnary(unaryExpression.NodeType, ReplaceParameters(parameterTranslation, unaryExpression.Operand), unaryExpression.Type, unaryExpression.Method);
             default:
                 throw new NotSupportedException($"Cannot replace parameters in {expression?.GetType().Name ?? "null expression"}");
         }
+    }
+
+    internal static bool IsRethrow(Expression expression) =>
+        expression is UnaryExpression { NodeType: ExpressionType.Throw, Operand: null };
+
+    internal static bool IsObservable(TryExpression tryExpression)
+    {
+        if (tryExpression.Finally is not null || tryExpression.Fault is not null)
+            return false;
+        foreach (var catchBlock in tryExpression.Handlers)
+            if (catchBlock.Variable is not null || catchBlock.Filter is not null)
+                return false;
+        return true;
+    }
+
+    static void ThrowIfUnobservable(TryExpression tryExpression)
+    {
+        if (!IsObservable(tryExpression))
+            throw new NotSupportedException("A try expression can be observed only when it has neither a finally nor a fault block and none of its catch blocks has a variable or a filter");
     }
 
     internal static Expression? ReplaceParametersWithoutOptimization(LambdaExpression lambdaExpression, params object?[] arguments)
@@ -138,6 +166,7 @@ public class ExpressionObserver :
     readonly Dictionary<MethodCallExpression, ObservableMethodCallExpression> cachedObservableMethodCallExpressions = new(ExpressionEqualityComparer.Default);
     readonly Dictionary<NewArrayExpression, ObservableNewArrayInitExpression> cachedObservableNewArrayInitExpressions = new(ExpressionEqualityComparer.Default);
     readonly Dictionary<NewExpression, ObservableNewExpression> cachedObservableNewExpressions = new(ExpressionEqualityComparer.Default);
+    readonly Dictionary<TryExpression, ObservableTryExpression> cachedObservableTryExpressions = new(ExpressionEqualityComparer.Default);
     readonly Dictionary<TypeBinaryExpression, ObservableTypeBinaryExpression> cachedObservableTypeBinaryExpressions = new(ExpressionEqualityComparer.Default);
     readonly Dictionary<UnaryExpression, ObservableUnaryExpression> cachedObservableUnaryExpressions = new(ExpressionEqualityComparer.Default);
 #if IS_NET_9_0_OR_GREATER
@@ -151,6 +180,7 @@ public class ExpressionObserver :
     readonly Lock cachedObservableMethodCallExpressionsAccess = new();
     readonly Lock cachedObservableNewArrayInitExpressionsAccess = new();
     readonly Lock cachedObservableNewExpressionsAccess = new();
+    readonly Lock cachedObservableTryExpressionsAccess = new();
     readonly Lock cachedObservableTypeBinaryExpressionsAccess = new();
     readonly Lock cachedObservableUnaryExpressionsAccess = new();
 #else
@@ -164,6 +194,7 @@ public class ExpressionObserver :
     readonly object cachedObservableMethodCallExpressionsAccess = new();
     readonly object cachedObservableNewArrayInitExpressionsAccess = new();
     readonly object cachedObservableNewExpressionsAccess = new();
+    readonly object cachedObservableTryExpressionsAccess = new();
     readonly object cachedObservableTypeBinaryExpressionsAccess = new();
     readonly object cachedObservableUnaryExpressionsAccess = new();
 #endif
@@ -203,6 +234,8 @@ public class ExpressionObserver :
                 count += cachedObservableNewArrayInitExpressions.Count;
             lock (cachedObservableNewExpressionsAccess)
                 count += cachedObservableNewExpressions.Count;
+            lock (cachedObservableTryExpressionsAccess)
+                count += cachedObservableTryExpressions.Count;
             lock (cachedObservableTypeBinaryExpressionsAccess)
                 count += cachedObservableTypeBinaryExpressions.Count;
             lock (cachedObservableUnaryExpressionsAccess)
@@ -462,6 +495,22 @@ public class ExpressionObserver :
         return false;
     }
 
+    internal bool ExpressionDisposed(ObservableTryExpression observableTryExpression)
+    {
+        lock (cachedObservableTryExpressionsAccess)
+        {
+            var remaining = --observableTryExpression.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException($"an observation of {observableTryExpression.Expression} was released more times than it was acquired");
+            if (remaining == 0)
+            {
+                cachedObservableTryExpressions.Remove(observableTryExpression.TryExpression);
+                return true;
+            }
+        }
+        return false;
+    }
+
     internal bool ExpressionDisposed(ObservableTypeBinaryExpression observableTypeBinaryExpression)
     {
         lock (cachedObservableTypeBinaryExpressionsAccess)
@@ -509,6 +558,7 @@ public class ExpressionObserver :
             MethodCallExpression methodCallExpression => GetObservableExpression(methodCallExpression, deferEvaluation),
             NewArrayExpression newArrayExpression when newArrayExpression.NodeType is ExpressionType.NewArrayInit => GetObservableExpression(newArrayExpression, deferEvaluation),
             NewExpression newExpression => GetObservableExpression(newExpression, deferEvaluation),
+            TryExpression tryExpression => GetObservableExpression(tryExpression, deferEvaluation),
             TypeBinaryExpression typeBinaryExpression when typeBinaryExpression.NodeType is not ExpressionType.TypeAs => GetObservableExpression(typeBinaryExpression, deferEvaluation),
             UnaryExpression unaryExpression when unaryExpression.NodeType is ExpressionType.Quote => GetObservableExpression(Expression.Constant(unaryExpression.Operand), deferEvaluation),
             UnaryExpression unaryExpression => GetObservableExpression(unaryExpression, deferEvaluation),
@@ -684,6 +734,21 @@ public class ExpressionObserver :
             }
             ++observableNewExpression.Observations;
             return observableNewExpression;
+        }
+    }
+
+    ObservableTryExpression GetObservableExpression(TryExpression tryExpression, bool deferEvaluation)
+    {
+        ThrowIfUnobservable(tryExpression);
+        lock (cachedObservableTryExpressionsAccess)
+        {
+            if (!cachedObservableTryExpressions.TryGetValue(tryExpression, out var observableTryExpression))
+            {
+                observableTryExpression = new ObservableTryExpression(this, tryExpression, deferEvaluation);
+                cachedObservableTryExpressions.Add(tryExpression, observableTryExpression);
+            }
+            ++observableTryExpression.Observations;
+            return observableTryExpression;
         }
     }
 

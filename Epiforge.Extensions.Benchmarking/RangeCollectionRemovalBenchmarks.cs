@@ -3,7 +3,8 @@ namespace Epiforge.Extensions.Benchmarking;
 using System.Collections.ObjectModel;
 
 [MemoryDiagnoser]
-[SimpleJob(launchCount: 3)]
+[IterationCount(40)]
+[ProcessCount(3)]
 public class RangeCollectionRemovalBenchmarks
 {
     int[] doomed = null!;

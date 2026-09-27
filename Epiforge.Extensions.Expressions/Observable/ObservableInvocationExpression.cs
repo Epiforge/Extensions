@@ -144,14 +144,15 @@ sealed class ObservableInvocationExpression(ExpressionObserver observer, Invocat
                 for (int i = 0, ii = invocationExpressionArguments.Count; i < ii; ++i)
                 {
                     var invocationExpressionArgument = invocationExpressionArguments[i];
-                    var observableArgument = observer.GetObservableExpression(invocationExpressionArgument, IsDeferringEvaluation);
-                    if (observableArgument.CanChange)
-                        subscriptions[i] = observableArgument.SubscribeDependent(this);
-                    observableArgumentsList.Add(observableArgument);
+                    observableArgumentsList.Add(observer.GetObservableExpression(invocationExpressionArgument, IsDeferringEvaluation));
                 }
                 observableArguments = [..observableArgumentsList];
             }
             CreateObservableExpression();
+            if (observableArgumentSubscriptions is { } argumentSubscriptions)
+                for (int i = 0, ii = observableArgumentsList.Count; i < ii; ++i)
+                    if (observableArgumentsList[i] is { CanChange: true } observableArgument)
+                        argumentSubscriptions[i] = observableArgument.SubscribeDependent(this);
         }
         catch (Exception ex)
         {

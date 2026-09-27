@@ -70,12 +70,12 @@ sealed class ObservableConditionalExpression(ExpressionObserver observer, Condit
         {
             var conditionalExpression = ConditionalExpression;
             test = observer.GetObservableExpression(conditionalExpression.Test, IsDeferringEvaluation);
+            ifTrue = observer.GetObservableExpression(conditionalExpression.IfTrue, true);
+            ifFalse = observer.GetObservableExpression(conditionalExpression.IfFalse, true);
             if (test.CanChange)
                 testSubscription = test.SubscribeDependent(this);
-            ifTrue = observer.GetObservableExpression(conditionalExpression.IfTrue, true);
             if (ifTrue.CanChange)
                 ifTrueSubscription = ifTrue.SubscribeDependent(this);
-            ifFalse = observer.GetObservableExpression(conditionalExpression.IfFalse, true);
             if (ifFalse.CanChange)
                 ifFalseSubscription = ifFalse.SubscribeDependent(this);
             EvaluateIfNotDeferred();

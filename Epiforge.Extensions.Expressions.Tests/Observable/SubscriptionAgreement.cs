@@ -277,6 +277,20 @@ public class SubscriptionAgreement
         AssertAgreement(subject => subject.Tag ?? subject.Rank.ToString(), new Recorded(new SubscriptionLog()));
 
     [TestMethod]
+    public void ATryOverTheArgumentWithItsBodyFaulted() =>
+        AssertAgreement(Handled(), new Recorded(new SubscriptionLog()) { Rank = 2, Score = 0 });
+
+    [TestMethod]
+    public void ATryOverTheArgumentWithItsBodyValued() =>
+        AssertAgreement(Handled(), new Recorded(new SubscriptionLog()) { Rank = 2, Score = 5 });
+
+    static Expression<Func<Recorded, int>> Handled()
+    {
+        var subject = Expression.Parameter(typeof(Recorded), "subject");
+        return Expression.Lambda<Func<Recorded, int>>(Expression.TryCatch(Expression.Divide(Expression.Constant(10), Expression.Property(subject, nameof(Recorded.Score))), Expression.Catch(typeof(Exception), Expression.Property(subject, nameof(Recorded.Rank)))), subject);
+    }
+
+    [TestMethod]
     public void MemberOfANonNotifyingValueOnTheArgument() =>
         AssertAgreement(subject => subject.Tag!.Length, new Recorded(new SubscriptionLog()) { Tag = "x" });
 

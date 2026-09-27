@@ -1,7 +1,8 @@
 namespace Epiforge.Extensions.Benchmarking;
 
 [MemoryDiagnoser]
-[SimpleJob(launchCount: 3)]
+[IterationCount(40)]
+[ProcessCount(3)]
 public class RangeCollectionPredicateRemovalBenchmarks
 {
     Func<int, bool> doomed = null!;

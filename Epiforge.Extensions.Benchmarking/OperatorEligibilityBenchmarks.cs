@@ -3,7 +3,6 @@ namespace Epiforge.Extensions.Benchmarking;
 using System.Linq.Expressions;
 
 [MemoryDiagnoser]
-[SimpleJob(launchCount: 3)]
 public class OperatorEligibilityBenchmarks
 {
     const int elementCount = 1000;

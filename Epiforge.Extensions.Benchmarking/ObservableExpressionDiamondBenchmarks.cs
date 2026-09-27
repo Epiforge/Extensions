@@ -1,7 +1,6 @@
 namespace Epiforge.Extensions.Benchmarking;
 
 [MemoryDiagnoser]
-[SimpleJob(launchCount: 3)]
 public class ObservableExpressionDiamondBenchmarks
 {
     sealed class Probe

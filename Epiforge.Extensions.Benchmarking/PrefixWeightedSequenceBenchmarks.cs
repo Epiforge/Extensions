@@ -3,7 +3,6 @@ namespace Epiforge.Extensions.Benchmarking;
 using Epiforge.Extensions.Collections.Generic;
 
 [MemoryDiagnoser]
-[SimpleJob(launchCount: 3)]
 public class PrefixWeightedSequenceBenchmarks
 {
     int middleIndex;
