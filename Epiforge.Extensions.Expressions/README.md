@@ -277,7 +277,7 @@ These are from the benchmarks in this repository, against DynamicData 9.4.33 at 
 | | This library | DynamicData |
 |---|---|---|
 | A property change that does not alter a filtered view | **0 B**, **13.6 ns** | 608 B, 195.3 ns |
-| An element changing group | **592 B**, **256.3 ns** | 1,936 B, 623.9 ns |
+| An element changing group | **592 B**, **250.8 ns** | 1,936 B, 624.5 ns |
 | An element moving in a sorted view | **292 B**, 1,286.0 ns | 414 B, **994.6 ns** |
 | Building a filtered view | **958 KB**, **308 μs** | 4,116 KB, 2,423 μs |
 | What a live filtered view holds | **927 B** per element | 1,865 B per element |
@@ -287,7 +287,7 @@ The zero is exact rather than rounded: a property change that does not move an e
 **Two of those rows move with the size of the view, in opposite directions, and this is the part worth reading twice.**
 
 - **Sorting.** DynamicData's cost per move grows with the collection while this library's barely does, so the two cross at about **1,500** elements. Below that DynamicData is 1.29x faster; at four thousand this library is 1.74x faster and at ten thousand 2.98x.
-- **Grouping.** The reverse. DynamicData's cost per migration is flat while this library's grows, so the two cross at about **7,100** elements. Below that this library is 2.43x faster; at ten thousand DynamicData is 1.33x faster — though it holds 1.93x the memory to do it, 1,954 B per element against 1,012.
+- **Grouping.** The reverse. DynamicData's cost per migration is flat while this library's grows, so the two cross at about **8,300** elements. Below that this library is 2.49x faster; at ten thousand DynamicData is 1.16x faster — though it holds 1.93x the memory to do it, 1,954 B per element against 1,012.
 
 **The grouping crossover is a trade rather than an oversight, and knowing which side of it you want is more useful than the number.** A grouping here keeps its elements in the order they were added, so moving one out of its old group means finding it first, which is work proportional to the size of that group. DynamicData's groups are keyed rather than positional, so a removal is a dictionary operation and costs the same whatever the group holds. If you need the elements of a group in a stable order, that is what you are paying for. If you do not, DynamicData's shape is cheaper once groups get large. **A lookup built with `ObserveToLookup` is the same shape as a grouping here and behaves the same way.**
 

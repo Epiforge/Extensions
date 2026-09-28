@@ -136,17 +136,14 @@ abstract class ObservableQuery :
     {
         internal OwnChangeHold(ObservableQuery query)
         {
-            var owner = query.ChangeLockOwner;
-            if (owner.IsChangeLockHeldByCurrentThread)
-                return;
-            owner.EnterChangeLock();
-            this.owner = owner;
+            query.EnterChangeLock();
+            this.query = query;
         }
 
-        readonly ObservableQuery? owner;
+        readonly ObservableQuery query;
 
         public void Dispose() =>
-            owner?.ExitChangeLock();
+            query.ExitChangeLock();
     }
 
     protected static readonly PropertyChangedEventArgs countPropertyChangedEventArgs = new(nameof(IReadOnlyList<>.Count));
@@ -191,7 +188,7 @@ abstract class ObservableQuery :
     public virtual int CachedObservableQueries { get; } = 0;
 
     /// <summary>
-    /// Gets the query whose lock this query changes under, which is another query only where that query alone ever changes this one
+    /// Gets the query whose lock this query changes under, which is another query only where that query alone ever changes this one and does so only while holding its own lock, so that such a query announces its changes without taking any
     /// </summary>
     private protected virtual ObservableQuery? ChangeLockHolder =>
         null;
@@ -251,20 +248,6 @@ abstract class ObservableQuery :
         }
     }
 
-    /// <summary>
-    /// Gets the query whose lock this query changes under, following each query which delegates its lock to another
-    /// </summary>
-    ObservableQuery ChangeLockOwner
-    {
-        get
-        {
-            var query = this;
-            while (query.ChangeLockHolder is { } holder && !ReferenceEquals(holder, query))
-                query = holder;
-            return query;
-        }
-    }
-
     NotificationDeferralState DeferralState
     {
         get
@@ -275,16 +258,6 @@ abstract class ObservableQuery :
             return Interlocked.CompareExchange(ref deferralState, state, null) ?? state;
         }
     }
-
-    /// <summary>
-    /// Gets whether the current thread holds this query's own lock, in which case holding it again would change nothing
-    /// </summary>
-    bool IsChangeLockHeldByCurrentThread =>
-#if IS_NET_9_0_OR_GREATER
-        Volatile.Read(ref changeAccess) is { } access && access.IsHeldByCurrentThread;
-#else
-        Volatile.Read(ref changeAccess) is { } access && Monitor.IsEntered(access);
-#endif
 
     void BeginNotificationDeferral()
     {

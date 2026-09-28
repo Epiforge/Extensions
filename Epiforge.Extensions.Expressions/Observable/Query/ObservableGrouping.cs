@@ -41,23 +41,14 @@ sealed class ObservableGrouping<TKey, TElement>(CollectionObserver collectionObs
     public override IEnumerator<TElement> GetEnumerator() =>
         groupQuery.GetEnumerator();
 
-    void IObservableQueryDependent.OnDependencyCollectionChanged(ObservableQuerySubscription subscription, NotifyCollectionChangedEventArgs e)
-    {
-        using var changeHold = HoldOwnChanges();
+    void IObservableQueryDependent.OnDependencyCollectionChanged(ObservableQuerySubscription subscription, NotifyCollectionChangedEventArgs e) =>
         OnCollectionChanged(e);
-    }
 
-    void IObservableQueryDependent.OnDependencyPropertyChanged(ObservableQuerySubscription subscription, PropertyChangedEventArgs e)
-    {
-        using var changeHold = HoldOwnChanges();
+    void IObservableQueryDependent.OnDependencyPropertyChanged(ObservableQuerySubscription subscription, PropertyChangedEventArgs e) =>
         OnPropertyChanged(e);
-    }
 
-    void IObservableQueryDependent.OnDependencyPropertyChanging(ObservableQuerySubscription subscription, PropertyChangingEventArgs e)
-    {
-        using var changeHold = HoldOwnChanges();
+    void IObservableQueryDependent.OnDependencyPropertyChanging(ObservableQuerySubscription subscription, PropertyChangingEventArgs e) =>
         OnPropertyChanging(e);
-    }
 
     internal void InternalDispose()
     {

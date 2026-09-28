@@ -23,6 +23,11 @@ sealed class ObservableCollectionQueryReadOnlyList<TElement>(CollectionObserver 
 
     void CollectionChangedNotifierCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
+        if (changeLockHolder is not null)
+        {
+            OnCollectionChanged(e);
+            return;
+        }
         using var changeHold = HoldOwnChanges();
         if (copy is null)
             OnCollectionChanged(e);
@@ -76,6 +81,11 @@ sealed class ObservableCollectionQueryReadOnlyList<TElement>(CollectionObserver 
     {
         if (e.PropertyName == nameof(IReadOnlyList<>.Count))
         {
+            if (changeLockHolder is not null)
+            {
+                OnPropertyChanged(e);
+                return;
+            }
             using var changeHold = HoldOwnChanges();
             OnPropertyChanged(e);
         }
@@ -85,6 +95,11 @@ sealed class ObservableCollectionQueryReadOnlyList<TElement>(CollectionObserver 
     {
         if (e.PropertyName == nameof(IReadOnlyList<>.Count))
         {
+            if (changeLockHolder is not null)
+            {
+                OnPropertyChanging(e);
+                return;
+            }
             using var changeHold = HoldOwnChanges();
             OnPropertyChanging(e);
         }
