@@ -21,6 +21,8 @@
         <PackageReference Include="BenchmarkDotNet" Version="0.15.8" />
         <PackageReference Include="DynamicData" Version="9.4.33" />
         <PackageReference Include="Linq.Expression.Optimizer" Version="1.0.29" />
+        <PackageReference Include="NMF-Expressions" Version="2.3.0" />
+        <PackageReference Include="ObservableComputations" Version="2.3.0" />
     </ItemGroup>
 
 </Project>

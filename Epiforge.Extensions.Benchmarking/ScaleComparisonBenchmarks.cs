@@ -2,6 +2,9 @@ namespace Epiforge.Extensions.Benchmarking;
 
 using DynamicData;
 using DynamicData.Binding;
+using NMF.Expressions;
+using NMF.Expressions.Linq;
+using ObservableComputations;
 using System.Collections.ObjectModel;
 using System.Reactive.Linq;
 
@@ -17,6 +20,9 @@ using System.Reactive.Linq;
 /// <remarks>
 /// Construction at a hundred thousand elements allocates hundreds of megabytes per operation in at least one of the arms. That is not a defect of the instrument; it is the answer to the question, and it is why the question is worth asking of a library whose per-element construction floor is known.
 /// </remarks>
+/// <remarks>
+/// NMF Expressions and ObservableComputations are measured as <c>DynamicDataComparisonBenchmarks</c> measures them, and their standing views are verified at every size before they are measured.
+/// </remarks>
 [MemoryDiagnoser]
 public class ScaleComparisonBenchmarks
 {
@@ -25,6 +31,9 @@ public class ScaleComparisonBenchmarks
     SourceCache<BenchmarkPerson, string> cache = null!;
     ReadOnlyObservableCollection<BenchmarkPerson> cacheResults = null!;
     IDisposable cacheSubscription = null!;
+    INotifyEnumerable<BenchmarkPerson> nmfWhere = null!;
+    OcConsumer observableComputationsConsumer = null!;
+    Filtering<BenchmarkPerson> observableComputationsFiltering = null!;
     CollectionObserver observer = null!;
     ObservableRangeCollection<BenchmarkPerson> source = null!;
     IObservableCollectionQuery<BenchmarkPerson> sourceQuery = null!;
@@ -40,7 +49,7 @@ public class ScaleComparisonBenchmarks
     }
 
     /// <summary>
-    /// What changing every element's rank costs before anything observes it, which is the floor the two arms below stand on and the only thing here which grows for a reason neither library controls
+    /// What changing every element's rank costs before anything observes it, which is the floor every arm below stands on and the only thing here which grows for a reason no library controls
     /// </summary>
     [Benchmark(Baseline = true)]
     public void ChangeEveryRankUnobserved() =>
@@ -52,6 +61,14 @@ public class ScaleComparisonBenchmarks
 
     [Benchmark]
     public void ChangeEveryRankWithExpressions() =>
+        ChangeEveryRank();
+
+    [Benchmark]
+    public void ChangeEveryRankWithNmf() =>
+        ChangeEveryRank();
+
+    [Benchmark]
+    public void ChangeEveryRankWithObservableComputations() =>
         ChangeEveryRank();
 
     [Benchmark]
@@ -75,6 +92,22 @@ public class ScaleComparisonBenchmarks
         query.Dispose();
     }
 
+    [Benchmark]
+    public void ConstructAndDisposeWithNmf()
+    {
+        var filtered = ((IEnumerable<BenchmarkPerson>)source).WithUpdates().Where(predicate);
+        filtered.Successors.SetDummy();
+        filtered.Dispose();
+    }
+
+    [Benchmark]
+    public void ConstructAndDisposeWithObservableComputations()
+    {
+        var consumer = new OcConsumer();
+        source.Filtering(predicate).For(consumer);
+        consumer.Dispose();
+    }
+
     [GlobalCleanup(Targets = [nameof(ChangeEveryRankWithDynamicDataCache), nameof(ConstructAndDisposeWithDynamicDataCache)])]
     public void CleanupCache()
     {
@@ -87,6 +120,31 @@ public class ScaleComparisonBenchmarks
     {
         where.Dispose();
         sourceQuery.Dispose();
+    }
+
+    [GlobalCleanup(Target = nameof(ChangeEveryRankWithNmf))]
+    public void CleanupStandingNmf() =>
+        nmfWhere.Dispose();
+
+    [GlobalCleanup(Target = nameof(ChangeEveryRankWithObservableComputations))]
+    public void CleanupStandingObservableComputations() =>
+        observableComputationsConsumer.Dispose();
+
+    /// <summary>
+    /// Takes an element out of the view by its rank and puts it back, so that a view which is not actually following its source is caught here rather than reported as a fast one
+    /// </summary>
+    void Probe(Func<IReadOnlyCollection<BenchmarkPerson>> view, string arm)
+    {
+        var subject = source[1];
+        var held = subject.Rank;
+        if (!view().Contains(subject))
+            throw new InvalidOperationException($"{arm} does not hold an element its predicate admits");
+        subject.Rank = -held;
+        if (view().Contains(subject))
+            throw new InvalidOperationException($"{arm} kept an element its predicate stopped admitting; this instrument would otherwise be reporting a view which does not do the work as though it did it quickly");
+        subject.Rank = held;
+        if (!view().Contains(subject))
+            throw new InvalidOperationException($"{arm} did not take back an element its predicate admits again");
     }
 
     void SetupCache()
@@ -106,6 +164,10 @@ public class ScaleComparisonBenchmarks
         SetupSource();
         observer = new CollectionObserver();
     }
+
+    [GlobalSetup(Targets = [nameof(ConstructAndDisposeWithNmf), nameof(ConstructAndDisposeWithObservableComputations)])]
+    public void SetupConstructPeers() =>
+        SetupSource();
 
     void SetupSource() =>
         source = BenchmarkPerson.CreateCollection(ElementCount);
@@ -129,6 +191,24 @@ public class ScaleComparisonBenchmarks
         observer = new CollectionObserver();
         sourceQuery = observer.ObserveReadOnlyList(source);
         where = sourceQuery.ObserveWhere(predicate);
+    }
+
+    [GlobalSetup(Target = nameof(ChangeEveryRankWithNmf))]
+    public void SetupStandingNmf()
+    {
+        SetupSource();
+        nmfWhere = ((IEnumerable<BenchmarkPerson>)source).WithUpdates().Where(predicate);
+        nmfWhere.Successors.SetDummy();
+        Probe(() => [.. nmfWhere], "NMF's filter");
+    }
+
+    [GlobalSetup(Target = nameof(ChangeEveryRankWithObservableComputations))]
+    public void SetupStandingObservableComputations()
+    {
+        SetupSource();
+        observableComputationsConsumer = new OcConsumer();
+        observableComputationsFiltering = source.Filtering(predicate).For(observableComputationsConsumer);
+        Probe(() => observableComputationsFiltering, "ObservableComputations' filter");
     }
 
     [GlobalSetup(Target = nameof(ChangeEveryRankUnobserved))]

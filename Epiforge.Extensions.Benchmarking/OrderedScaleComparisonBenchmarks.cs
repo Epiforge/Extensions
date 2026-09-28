@@ -2,6 +2,9 @@ namespace Epiforge.Extensions.Benchmarking;
 
 using DynamicData;
 using DynamicData.Binding;
+using NMF.Expressions;
+using NMF.Expressions.Linq;
+using ObservableComputations;
 using System.Collections.ObjectModel;
 using System.Reactive.Linq;
 
@@ -23,6 +26,9 @@ using System.Reactive.Linq;
 /// <remarks>
 /// This instrument uses <see cref="ParamsAttribute" /> where the convention here is not to, for the same reason <c>ScaleComparisonBenchmarks</c> does: the element count is the question rather than a dimension of it
 /// </remarks>
+/// <remarks>
+/// NMF Expressions and ObservableComputations are measured as <c>OrderedComparisonBenchmarks</c> measures them, and their standing views are verified at every size before they are measured
+/// </remarks>
 [MemoryDiagnoser]
 public class OrderedScaleComparisonBenchmarks
 {
@@ -37,11 +43,15 @@ public class OrderedScaleComparisonBenchmarks
 
     const int changeCount = 1000;
 
+    static readonly Expression<Func<BenchmarkPerson, int>> hoistedRank = person => person.Rank;
     static readonly Expression<Func<BenchmarkPerson, IComparable>> hoistedSelector = person => person.Rank;
 
     ReadOnlyObservableCollection<BenchmarkPerson> bound = null!;
     SourceCache<BenchmarkPerson, string> dynamicDataCache = null!;
     IDisposable dynamicDataSubscription = null!;
+    INotifyEnumerable<BenchmarkPerson> nmfOrderBy = null!;
+    OcConsumer observableComputationsConsumer = null!;
+    Ordering<BenchmarkPerson, int> observableComputationsOrdering = null!;
     CollectionObserver observer = null!;
     IObservableCollectionQuery<BenchmarkPerson> orderBy = null!;
     ObservableRangeCollection<BenchmarkPerson> source = null!;
@@ -58,7 +68,7 @@ public class OrderedScaleComparisonBenchmarks
     }
 
     /// <summary>
-    /// What a thousand rank changes cost before anything observes them, which is the floor both of the arms below stand on and which should itself be flat across the sizes
+    /// What a thousand rank changes cost before anything observes them, which is the floor every arm below stands on and which should itself be flat across the sizes
     /// </summary>
     [Benchmark(Baseline = true)]
     public void ChangeAThousandRanksUnobserved() =>
@@ -70,6 +80,14 @@ public class OrderedScaleComparisonBenchmarks
 
     [Benchmark]
     public void ChangeAThousandRanksWithExpressions() =>
+        ChangeAThousandRanks();
+
+    [Benchmark]
+    public void ChangeAThousandRanksWithNmf() =>
+        ChangeAThousandRanks();
+
+    [Benchmark]
+    public void ChangeAThousandRanksWithObservableComputations() =>
         ChangeAThousandRanks();
 
     /// <summary>
@@ -92,8 +110,22 @@ public class OrderedScaleComparisonBenchmarks
         return Read(bound);
     }
 
+    [Benchmark]
+    public long ChangeAThousandRanksThenReadWithNmf()
+    {
+        ChangeAThousandRanks();
+        return Read(nmfOrderBy);
+    }
+
+    [Benchmark]
+    public long ChangeAThousandRanksThenReadWithObservableComputations()
+    {
+        ChangeAThousandRanks();
+        return Read(observableComputationsOrdering);
+    }
+
     /// <summary>
-    /// Walks the source itself after the same changes, which is the floor the two arms above stand on and the cost of the walk alone
+    /// Walks the source itself after the same changes, which is the floor the arms above stand on and the cost of the walk alone
     /// </summary>
     [Benchmark]
     public long ChangeAThousandRanksThenReadUnobserved()
@@ -115,6 +147,14 @@ public class OrderedScaleComparisonBenchmarks
         orderBy.Dispose();
         sourceQuery.Dispose();
     }
+
+    [GlobalCleanup(Targets = [nameof(ChangeAThousandRanksWithNmf), nameof(ChangeAThousandRanksThenReadWithNmf)])]
+    public void CleanupNmf() =>
+        nmfOrderBy.Dispose();
+
+    [GlobalCleanup(Targets = [nameof(ChangeAThousandRanksWithObservableComputations), nameof(ChangeAThousandRanksThenReadWithObservableComputations)])]
+    public void CleanupObservableComputations() =>
+        observableComputationsConsumer.Dispose();
 
     static long Read(IEnumerable<BenchmarkPerson> view)
     {
@@ -168,6 +208,24 @@ public class OrderedScaleComparisonBenchmarks
         sourceQuery = observer.ObserveReadOnlyList(source);
         orderBy = sourceQuery.ObserveOrderBy(hoistedSelector);
         Probe(() => [.. orderBy], "this library's ordered query");
+    }
+
+    [GlobalSetup(Targets = [nameof(ChangeAThousandRanksWithNmf), nameof(ChangeAThousandRanksThenReadWithNmf)])]
+    public void SetupStandingNmf()
+    {
+        SetupSource();
+        nmfOrderBy = ((IEnumerable<BenchmarkPerson>)source).WithUpdates().OrderBy(hoistedRank);
+        nmfOrderBy.Successors.SetDummy();
+        Probe(() => [.. nmfOrderBy], "NMF's ordering");
+    }
+
+    [GlobalSetup(Targets = [nameof(ChangeAThousandRanksWithObservableComputations), nameof(ChangeAThousandRanksThenReadWithObservableComputations)])]
+    public void SetupStandingObservableComputations()
+    {
+        SetupSource();
+        observableComputationsConsumer = new OcConsumer();
+        observableComputationsOrdering = source.Ordering(hoistedRank).For(observableComputationsConsumer);
+        Probe(() => observableComputationsOrdering, "ObservableComputations' ordering");
     }
 
     [GlobalSetup(Targets = [nameof(ChangeAThousandRanksUnobserved), nameof(ChangeAThousandRanksThenReadUnobserved)])]

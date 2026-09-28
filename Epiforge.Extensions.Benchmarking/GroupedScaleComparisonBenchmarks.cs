@@ -2,6 +2,9 @@ namespace Epiforge.Extensions.Benchmarking;
 
 using DynamicData;
 using DynamicData.Binding;
+using NMF.Expressions;
+using NMF.Expressions.Linq;
+using ObservableComputations;
 using System.Reactive.Linq;
 
 /// <summary>
@@ -16,15 +19,23 @@ using System.Reactive.Linq;
 /// <remarks>
 /// The arms which read after changing exist because a cost which comes back suspiciously cheap may belong to a view deferring its work until somebody looks, which the counts a probe checks would not reveal if the read is what performs the migration
 /// </remarks>
+/// <remarks>
+/// NMF Expressions and ObservableComputations are measured as <c>GroupedComparisonBenchmarks</c> measures them, and their standing views are verified at every size before they are measured
+/// </remarks>
 [MemoryDiagnoser]
 public class GroupedScaleComparisonBenchmarks
 {
     const int changeCount = 1000;
     const int groupCount = 16;
 
+    static readonly Expression<Func<BenchmarkPerson, int>> hoistedKeySelector = person => person.Rank % groupCount;
+
     SourceCache<BenchmarkPerson, string> dynamicDataCache = null!;
     IObservableCache<IGroup<BenchmarkPerson, string, int>, int> dynamicDataGroups = null!;
     IObservableCollectionQuery<IObservableGrouping<int, BenchmarkPerson>> groupBy = null!;
+    INotifyEnumerable<INotifyGrouping<int, BenchmarkPerson>> nmfGroupBy = null!;
+    OcConsumer observableComputationsConsumer = null!;
+    Grouping<BenchmarkPerson, int> observableComputationsGrouping = null!;
     CollectionObserver observer = null!;
     ObservableRangeCollection<BenchmarkPerson> source = null!;
     IObservableCollectionQuery<BenchmarkPerson> sourceQuery = null!;
@@ -55,6 +66,14 @@ public class GroupedScaleComparisonBenchmarks
         ChangeAThousandRanks();
 
     [Benchmark]
+    public void ChangeAThousandRanksWithNmf() =>
+        ChangeAThousandRanks();
+
+    [Benchmark]
+    public void ChangeAThousandRanksWithObservableComputations() =>
+        ChangeAThousandRanks();
+
+    [Benchmark]
     public long ChangeAThousandRanksThenReadWithDynamicDataCache()
     {
         ChangeAThousandRanks();
@@ -66,6 +85,20 @@ public class GroupedScaleComparisonBenchmarks
     {
         ChangeAThousandRanks();
         return CountAcrossGroups(ExpressionsGroupCount);
+    }
+
+    [Benchmark]
+    public long ChangeAThousandRanksThenReadWithNmf()
+    {
+        ChangeAThousandRanks();
+        return CountAcrossGroups(NmfGroupCount);
+    }
+
+    [Benchmark]
+    public long ChangeAThousandRanksThenReadWithObservableComputations()
+    {
+        ChangeAThousandRanks();
+        return CountAcrossGroups(ObservableComputationsGroupCount);
     }
 
     [GlobalCleanup(Targets = [nameof(ChangeAThousandRanksWithDynamicDataCache), nameof(ChangeAThousandRanksThenReadWithDynamicDataCache)])]
@@ -82,6 +115,14 @@ public class GroupedScaleComparisonBenchmarks
         sourceQuery.Dispose();
     }
 
+    [GlobalCleanup(Targets = [nameof(ChangeAThousandRanksWithNmf), nameof(ChangeAThousandRanksThenReadWithNmf)])]
+    public void CleanupNmf() =>
+        nmfGroupBy.Dispose();
+
+    [GlobalCleanup(Targets = [nameof(ChangeAThousandRanksWithObservableComputations), nameof(ChangeAThousandRanksThenReadWithObservableComputations)])]
+    public void CleanupObservableComputations() =>
+        observableComputationsConsumer.Dispose();
+
     static long CountAcrossGroups(Func<int, int> countInGroup)
     {
         var total = 0L;
@@ -95,6 +136,18 @@ public class GroupedScaleComparisonBenchmarks
 
     int ExpressionsGroupCount(int key) =>
         groupBy.FirstOrDefault(grouping => grouping.Key == key) is { } found ? found.Count : 0;
+
+    IReadOnlyCollection<BenchmarkPerson> NmfGroup(int key) =>
+        Enumerable.FirstOrDefault(nmfGroupBy, grouping => grouping.Key == key) is { } found ? [.. found] : [];
+
+    IReadOnlyCollection<BenchmarkPerson> ObservableComputationsGroup(int key) =>
+        Enumerable.FirstOrDefault(observableComputationsGrouping, group => group.Key == key) is { } found ? found : [];
+
+    int NmfGroupCount(int key) =>
+        Enumerable.FirstOrDefault(nmfGroupBy, grouping => grouping.Key == key) is { } found ? Enumerable.Count(found) : 0;
+
+    int ObservableComputationsGroupCount(int key) =>
+        Enumerable.FirstOrDefault(observableComputationsGrouping, group => group.Key == key) is { } found ? found.Count : 0;
 
     /// <summary>
     /// Moves one element between groups and back again, so that an arrangement which is not actually regrouping is caught here rather than reported as a fast one
@@ -139,6 +192,24 @@ public class GroupedScaleComparisonBenchmarks
         sourceQuery = observer.ObserveReadOnlyList(source);
         groupBy = sourceQuery.ObserveGroupBy(person => person.Rank % groupCount);
         Probe(ExpressionsGroupCount, key => groupBy.FirstOrDefault(grouping => grouping.Key == key) is { } found ? [.. found] : [], "this library's grouped query");
+    }
+
+    [GlobalSetup(Targets = [nameof(ChangeAThousandRanksWithNmf), nameof(ChangeAThousandRanksThenReadWithNmf)])]
+    public void SetupNmf()
+    {
+        SetupSource();
+        nmfGroupBy = ((IEnumerable<BenchmarkPerson>)source).WithUpdates().GroupBy(hoistedKeySelector);
+        nmfGroupBy.Successors.SetDummy();
+        Probe(NmfGroupCount, NmfGroup, "NMF's grouping");
+    }
+
+    [GlobalSetup(Targets = [nameof(ChangeAThousandRanksWithObservableComputations), nameof(ChangeAThousandRanksThenReadWithObservableComputations)])]
+    public void SetupObservableComputations()
+    {
+        SetupSource();
+        observableComputationsConsumer = new OcConsumer();
+        observableComputationsGrouping = source.Grouping(hoistedKeySelector).For(observableComputationsConsumer);
+        Probe(ObservableComputationsGroupCount, ObservableComputationsGroup, "ObservableComputations' grouping");
     }
 
     void SetupSource()

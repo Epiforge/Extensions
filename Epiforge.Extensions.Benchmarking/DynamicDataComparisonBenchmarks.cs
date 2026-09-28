@@ -2,11 +2,14 @@ namespace Epiforge.Extensions.Benchmarking;
 
 using DynamicData;
 using DynamicData.Binding;
+using NMF.Expressions;
+using NMF.Expressions.Linq;
+using ObservableComputations;
 using System.Collections.ObjectModel;
 using System.Reactive.Linq;
 
 /// <summary>
-/// Compares a live filtered view of a collection built with this library against one built with DynamicData, on the two things such a view costs: standing it up, and propagating a change to every element through it
+/// Compares a live filtered view of a collection built with this library against ones built with DynamicData, NMF Expressions and ObservableComputations, on the two things such a view costs: standing it up, and propagating a change to every element through it
 /// </summary>
 /// <remarks>
 /// The two are asked for the same behavior and not for the same code. This library reads the dependency out of the predicate; DynamicData is told it by <c>AutoRefresh</c>, which is a difference in what the caller writes rather than in what the result does. Both bind their results into a collection which stays correct as ranks change, and the unobserved arm is what those changes cost before either of them sees anything.
@@ -16,6 +19,9 @@ using System.Reactive.Linq;
 /// </remarks>
 /// <remarks>
 /// Construction is measured twice for this library, because the two figures are honest about different callers. A predicate written once and reused is analyzed and compiled once, which is what the query layer itself does and what a caller who hoists their expression gets; a predicate written inline at every call builds a new expression tree every time and is analyzed and compiled every time. DynamicData's lambda is a delegate the compiler caches in a static field, so it has no equivalent of the second figure and none is invented for it.
+/// </remarks>
+/// <remarks>
+/// NMF Expressions and ObservableComputations are each measured in the form their documentation leads with, from the predicate written once. NMF's view is built over <c>WithUpdates</c> and given a dummy successor, because an NMF view with nothing attached to it does not follow its source; ObservableComputations' view is bound to an <c>OcConsumer</c>, whose disposal tears it down. Their standing views are each verified before they are measured, because a view which quietly failed to follow its source would otherwise be reported as a very fast one.
 /// </remarks>
 [MemoryDiagnoser]
 public class DynamicDataComparisonBenchmarks
@@ -30,6 +36,9 @@ public class DynamicDataComparisonBenchmarks
     IDisposable dynamicDataSubscription = null!;
     CollectionObserver observer = null!;
     ReadOnlyObservableCollection<BenchmarkPerson> dynamicDataResults = null!;
+    INotifyEnumerable<BenchmarkPerson> nmfWhere = null!;
+    OcConsumer observableComputationsConsumer = null!;
+    Filtering<BenchmarkPerson> observableComputationsFiltering = null!;
     ObservableRangeCollection<BenchmarkPerson> source = null!;
     IObservableCollectionQuery<BenchmarkPerson> sourceQuery = null!;
     IObservableCollectionQuery<BenchmarkPerson> where = null!;
@@ -41,7 +50,7 @@ public class DynamicDataComparisonBenchmarks
     }
 
     /// <summary>
-    /// What changing every element's rank costs before anything observes it, which is the floor both of the arms below stand on
+    /// What changing every element's rank costs before anything observes it, which is the floor every arm below stands on
     /// </summary>
     [Benchmark(Baseline = true)]
     public void ChangeEveryRankUnobserved() =>
@@ -57,6 +66,14 @@ public class DynamicDataComparisonBenchmarks
 
     [Benchmark]
     public void ChangeEveryRankWithExpressions() =>
+        ChangeEveryRank();
+
+    [Benchmark]
+    public void ChangeEveryRankWithNmf() =>
+        ChangeEveryRank();
+
+    [Benchmark]
+    public void ChangeEveryRankWithObservableComputations() =>
         ChangeEveryRank();
 
     [Benchmark]
@@ -107,6 +124,22 @@ public class DynamicDataComparisonBenchmarks
         query.Dispose();
     }
 
+    [Benchmark]
+    public void ConstructAndDisposeWithNmf()
+    {
+        var filtered = ((IEnumerable<BenchmarkPerson>)source).WithUpdates().Where(hoistedPredicate);
+        filtered.Successors.SetDummy();
+        filtered.Dispose();
+    }
+
+    [Benchmark]
+    public void ConstructAndDisposeWithObservableComputations()
+    {
+        var consumer = new OcConsumer();
+        source.Filtering(hoistedPredicate).For(consumer);
+        consumer.Dispose();
+    }
+
     [GlobalCleanup(Targets = [nameof(ChangeEveryRankWithDynamicDataCache), nameof(ConstructAndDisposeWithDynamicDataCache)])]
     public void CleanupDynamicDataCache()
     {
@@ -125,6 +158,31 @@ public class DynamicDataComparisonBenchmarks
         sourceQuery.Dispose();
     }
 
+    [GlobalCleanup(Target = nameof(ChangeEveryRankWithNmf))]
+    public void CleanupStandingNmf() =>
+        nmfWhere.Dispose();
+
+    [GlobalCleanup(Target = nameof(ChangeEveryRankWithObservableComputations))]
+    public void CleanupStandingObservableComputations() =>
+        observableComputationsConsumer.Dispose();
+
+    /// <summary>
+    /// Takes an element out of the view by its rank and puts it back, so that a view which is not actually following its source is caught here rather than reported as a fast one
+    /// </summary>
+    void Probe(Func<IReadOnlyCollection<BenchmarkPerson>> view, string arm)
+    {
+        var subject = source[1];
+        var held = subject.Rank;
+        if (!view().Contains(subject))
+            throw new InvalidOperationException($"{arm} does not hold an element its predicate admits");
+        subject.Rank = -held;
+        if (view().Contains(subject))
+            throw new InvalidOperationException($"{arm} kept an element its predicate stopped admitting; this instrument would otherwise be reporting a view which does not do the work as though it did it quickly");
+        subject.Rank = held;
+        if (!view().Contains(subject))
+            throw new InvalidOperationException($"{arm} did not take back an element its predicate admits again");
+    }
+
     void SetupCache()
     {
         SetupSource();
@@ -138,6 +196,10 @@ public class DynamicDataComparisonBenchmarks
 
     [GlobalSetup(Target = nameof(ConstructAndDisposeWithDynamicDataList))]
     public void SetupConstructDynamicDataList() =>
+        SetupSource();
+
+    [GlobalSetup(Targets = [nameof(ConstructAndDisposeWithNmf), nameof(ConstructAndDisposeWithObservableComputations)])]
+    public void SetupConstructPeers() =>
         SetupSource();
 
     [GlobalSetup(Targets = [nameof(ConstructAndDisposeWithExpressions), nameof(ConstructAndDisposeWithExpressionsFromAFreshPredicate)])]
@@ -181,6 +243,24 @@ public class DynamicDataComparisonBenchmarks
         observer = new CollectionObserver();
         sourceQuery = observer.ObserveReadOnlyList(source);
         where = sourceQuery.ObserveWhere(hoistedPredicate);
+    }
+
+    [GlobalSetup(Target = nameof(ChangeEveryRankWithNmf))]
+    public void SetupStandingNmf()
+    {
+        SetupSource();
+        nmfWhere = ((IEnumerable<BenchmarkPerson>)source).WithUpdates().Where(hoistedPredicate);
+        nmfWhere.Successors.SetDummy();
+        Probe(() => [.. nmfWhere], "NMF's filter");
+    }
+
+    [GlobalSetup(Target = nameof(ChangeEveryRankWithObservableComputations))]
+    public void SetupStandingObservableComputations()
+    {
+        SetupSource();
+        observableComputationsConsumer = new OcConsumer();
+        observableComputationsFiltering = source.Filtering(hoistedPredicate).For(observableComputationsConsumer);
+        Probe(() => observableComputationsFiltering, "ObservableComputations' filter");
     }
 
     [GlobalSetup(Target = nameof(ChangeEveryRankUnobserved))]

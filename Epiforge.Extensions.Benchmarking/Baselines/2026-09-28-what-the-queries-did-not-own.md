@@ -70,4 +70,4 @@ The after is `BenchmarkRun-20260928-131153`. The before for `OperatorConstructio
 
 ## What remains
 
-- **What 7.0.1 costs to build a query is not isolated.** The building arms, the flattening's inner change and its indexer all compare against 6.1.0, and 6.1.1 already made building the smallest observations up to 19% slower. Only a run of 7.0.0 would say how much of the 3% to 13% belongs to 7.0.1.
+- **What 7.0.1 costs to build a query** is taken up in `2026-09-28-the-waits-under-the-locks.md`, which separates it over an empty collection, where no expression is observed. The flattening's inner change and its indexer, and building over one element, still compare only with 6.1.0.

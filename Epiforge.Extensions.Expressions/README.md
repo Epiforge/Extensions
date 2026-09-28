@@ -225,7 +225,7 @@ Three things that might otherwise look like arbitrary restrictions fall straight
 
 What is not free is construction. Building the machine means building an observable expression for every element the query touches, and that is proportional to the size of the collection. So build a query once and hold onto it. Do not build one per frame, per request, or per keystroke. The bargain is that you pay up front and then stop paying to read.
 
-The same goes for the lambdas you hand it. The observer optimizes, analyzes and compiles a lambda once and remembers the result by the instance you gave it, not by what the lambda says, and a lambda written inline is a new instance every time that line runs. So when you build queries over many collections, a query per row or per entity, keep each selector and predicate in a `static readonly` field and pass the same one every time. Over 256 one-element collections, `ObserveWhere` given a held predicate took 128 μs, and given the same predicate written inline, 14,645 μs, a figure which varied by about a third from one process to the next where the held one barely moved.
+The same goes for the lambdas you hand it. The observer optimizes, analyzes and compiles a lambda once and remembers the result by the instance you gave it, not by what the lambda says, and a lambda written inline is a new instance every time that line runs. So when you build queries over many collections, a query per row or per entity, keep each selector and predicate in a `static readonly` field and pass the same one every time. Over 256 one-element collections, `ObserveWhere` given a held predicate took 135 μs, and given the same predicate written inline, 14,801 μs, a figure which varied by about a third from one process to the next where the held one barely moved.
 
 Reading is also cheaper than being told. A query subscribes to the one it is built on only while something is subscribed to it, and a filtered query works out where a change landed, and describes it, only when something will receive that description. So subscribe when you need to be told what changed, and simply read the query when you only need its answer to be right.
 
@@ -276,18 +276,18 @@ These are from the benchmarks in this repository, against DynamicData 9.4.33 at 
 
 | | This library | DynamicData |
 |---|---|---|
-| A property change that does not alter a filtered view | **0 B**, **13.6 ns** | 608 B, 195.3 ns |
-| An element changing group | **592 B**, **250.8 ns** | 1,936 B, 624.5 ns |
-| An element moving in a sorted view | **292 B**, 1,286.0 ns | 414 B, **994.6 ns** |
-| Building a filtered view | **958 KB**, **308 μs** | 4,116 KB, 2,423 μs |
+| A property change that does not alter a filtered view | **0 B**, **13.2 ns** | 608 B, 201.9 ns |
+| An element changing group | **592 B**, **254.4 ns** | 1,936 B, 630.6 ns |
+| An element moving in a sorted view | **292 B**, 1,280.6 ns | 414 B, **982.4 ns** |
+| Building a filtered view | **958 KB**, **318 μs** | 4,116 KB, 2,537 μs |
 | What a live filtered view holds | **927 B** per element | 1,865 B per element |
 
 The zero is exact rather than rounded: a property change that does not move an element in or out of a filtered view allocates nothing here, at a thousand, ten thousand and a hundred thousand elements alike. This library re-evaluates the predicate in place and stays silent when the answer has not moved; DynamicData's model is a stream of change sets, so a refresh has to materialize one. Neither is a defect. **One library pays per change and the other pays per change that matters.**
 
 **Two of those rows move with the size of the view, in opposite directions, and this is the part worth reading twice.**
 
-- **Sorting.** DynamicData's cost per move grows with the collection while this library's barely does, so the two cross at about **1,500** elements. Below that DynamicData is 1.29x faster; at four thousand this library is 1.74x faster and at ten thousand 2.98x.
-- **Grouping.** The reverse. DynamicData's cost per migration is flat while this library's grows, so the two cross at about **8,300** elements. Below that this library is 2.49x faster; at ten thousand DynamicData is 1.16x faster — though it holds 1.93x the memory to do it, 1,954 B per element against 1,012.
+- **Sorting.** DynamicData's cost per move grows with the collection while this library's barely does, so the two cross at about **1,500** elements. Below that DynamicData is 1.29x faster; at four thousand this library is 1.80x faster and at ten thousand 2.92x.
+- **Grouping.** The reverse. DynamicData's cost per migration is flat while this library's grows, so the two cross at about **8,400** elements. Below that this library is 2.54x faster; at ten thousand DynamicData is 1.15x faster — though it holds 1.93x the memory to do it, 1,954 B per element against 1,012.
 
 **The grouping crossover is a trade rather than an oversight, and knowing which side of it you want is more useful than the number.** A grouping here keeps its elements in the order they were added, so moving one out of its old group means finding it first, which is work proportional to the size of that group. DynamicData's groups are keyed rather than positional, so a removal is a dictionary operation and costs the same whatever the group holds. If you need the elements of a group in a stable order, that is what you are paying for. If you do not, DynamicData's shape is cheaper once groups get large. **A lookup built with `ObserveToLookup` is the same shape as a grouping here and behaves the same way.**
 
@@ -295,7 +295,7 @@ The zero is exact rather than rounded: a property change that does not move an e
 
 **Allocation does not cross.** At every size measured, this library allocates less for the same work: nothing at all for a filtered view, 0.31x DynamicData's for grouping, 0.71x for sorting.
 
-**The propagation advantage is largest at the sizes most applications use, and it narrows above them.** Per property change above the floor, this library costs 13.7 ns at a thousand elements, 15.9 ns at ten thousand and 66.2 ns at a hundred thousand, against 197.6, 218.9 and 338.7 ns — a lead of 14.4x, then 13.8x, then 5.1x. The allocation figure is unchanged across all three sizes; the time figure is not. A hundred thousand observations do not fit in cache, and a library which has driven its own per-change work to near zero has nothing left to hide a cache miss behind. The advantage shrinks from very large to large.
+**The propagation advantage is largest at the sizes most applications use, and it narrows above them.** Per property change above the floor, this library costs 13.9 ns at a thousand elements, 15.5 ns at ten thousand and 66.7 ns at a hundred thousand, against 212.1, 233.5 and 367.6 ns — a lead of 15.2x, then 15.1x, then 5.5x. The allocation figure is unchanged across all three sizes; the time figure is not. A hundred thousand observations do not fit in cache, and a library which has driven its own per-change work to near zero has nothing left to hide a cache miss behind. The advantage shrinks from very large to large.
 
 **Composition behaves.** Ordering or grouping a filtered view costs each library close to the sum of its parts rather than more, so a chain does not change which one to prefer — only the size of the view arriving at each stage does.
 
@@ -303,7 +303,7 @@ Two more things worth knowing before you weigh any of the above.
 
 **A live view is not free in either library.** One over ten thousand elements holds about 9 MB here and about 19 MB in DynamicData, against 960 KB for the elements themselves. Building a view is likewise proportional to the size of the collection in both. Build one and keep it; neither library rewards building views casually.
 
-**`ToObservableChangeSet()` over an existing `ObservableCollection<T>` costs DynamicData about 210x what its own `SourceCache` does** for the same property changes. That is the path you land on if you adopt it without changing where your data lives, and it is worth knowing about before you do.
+**`ToObservableChangeSet()` over an existing `ObservableCollection<T>` costs DynamicData about 160x what its own `SourceCache` does** for the same property changes. That is the path you land on if you adopt it without changing where your data lives, and it is worth knowing about before you do.
 
 These comparisons were written by someone who does not use DynamicData, which is a real limitation on them. The harness is in this repository, the workloads are ordinary ones, and corrections are welcome.
 
