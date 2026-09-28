@@ -56,6 +56,7 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
     PropertyChangedEventHandler? observableExpressionPropertyChangedHandler;
     readonly Dictionary<IObservableExpression<TElement, bool>, (List<PrefixWeightedSequenceNode<IObservableExpression<TElement, bool>>> Nodes, Exception? Fault)> observableExpressionStates = [];
     internal readonly Expression<Func<TElement, bool>> Predicate = predicate;
+    bool released;
     ObservableQuerySubscription? sourceSubscription;
 
     public override TElement this[int index]
@@ -91,15 +92,19 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
             var removedFromCache = source.QueryDisposed(this);
             if (removedFromCache)
             {
-                foreach (var (observableExpression, state) in observableExpressionStates)
+                lock (access)
                 {
-                    observableExpression.PropertyChanged -= ObservableExpressionPropertyChangedHandler;
-                    for (int i = 0, ii = state.Nodes.Count; i < ii; ++i)
-                        observableExpression.Dispose();
+                    released = true;
+                    foreach (var (observableExpression, state) in observableExpressionStates)
+                    {
+                        observableExpression.PropertyChanged -= ObservableExpressionPropertyChangedHandler;
+                        for (int i = 0, ii = state.Nodes.Count; i < ii; ++i)
+                            observableExpression.Dispose();
+                    }
+                    source.UnsubscribeDependent(sourceSubscription!);
+                    enumerationSnapshot = null;
+                    enumerationSnapshotShared = false;
                 }
-                source.UnsubscribeDependent(sourceSubscription!);
-                enumerationSnapshot = null;
-                enumerationSnapshotShared = false;
                 RemovedFromCache();
             }
             return removedFromCache;
@@ -167,6 +172,8 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
             return;
         lock (access)
         {
+            if (released)
+                return;
             if (!observableExpressionStates.TryGetValue(observableExpression, out var state))
                 return;
             var (newFault, newResult) = observableExpression.Evaluation;
@@ -272,6 +279,8 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
         using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
         lock (access)
         {
+            if (released)
+                return;
             cursorNode = null;
             FaultList? faultList = null;
             NotifyCollectionChangedEventArgs? eventArgs = null;

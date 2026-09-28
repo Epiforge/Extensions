@@ -12,6 +12,7 @@ sealed class ObservableDictionaryToCollectionQuery<TElement, TKey, TValue>(Colle
     readonly Dictionary<TKey, (IObservableExpression<KeyValuePair<TKey, TValue>, TElement> ObservableExpression, Exception? CommittedFault, TElement CommittedElement)> observableExpressions = new(source.KeyComparer);
     readonly Dictionary<TKey, int> positionsByKey = new(source.KeyComparer);
     internal readonly Expression<Func<KeyValuePair<TKey, TValue>, TElement>> Selector = selector;
+    bool released;
 
     public override TElement this[int index]
     {
@@ -45,14 +46,18 @@ sealed class ObservableDictionaryToCollectionQuery<TElement, TKey, TValue>(Colle
             var removedFromCache = source.QueryDisposed(this);
             if (removedFromCache)
             {
-                foreach (var (observableExpression, _, _) in observableExpressions.Values)
+                lock (access)
                 {
-                    observableExpression.PropertyChanged -= ObservableExpressionPropertyChangedHandler;
-                    observableExpression.Dispose();
+                    released = true;
+                    foreach (var (observableExpression, _, _) in observableExpressions.Values)
+                    {
+                        observableExpression.PropertyChanged -= ObservableExpressionPropertyChangedHandler;
+                        observableExpression.Dispose();
+                    }
+                    source.DictionaryChanged -= SourceDictionaryChanged;
+                    elements.CollectionChanged -= ElementsCollectionChanged;
+                    ((INotifyPropertyChanged)elements).PropertyChanged -= ElementsPropertyChanged;
                 }
-                source.DictionaryChanged -= SourceDictionaryChanged;
-                elements.CollectionChanged -= ElementsCollectionChanged;
-                ((INotifyPropertyChanged)elements).PropertyChanged -= ElementsPropertyChanged;
             }
             return removedFromCache;
         }
@@ -89,6 +94,8 @@ sealed class ObservableDictionaryToCollectionQuery<TElement, TKey, TValue>(Colle
             return;
         lock (access)
         {
+            if (released)
+                return;
             var key = observableExpression.Argument.Key;
             if (!observableExpressions.TryGetValue(key, out var committed) || !ReferenceEquals(committed.ObservableExpression, observableExpression))
                 return;
@@ -147,6 +154,8 @@ sealed class ObservableDictionaryToCollectionQuery<TElement, TKey, TValue>(Colle
         using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
         lock (access)
         {
+            if (released)
+                return;
             var expressionObserver = collectionObserver.ExpressionObserver;
             if (e.Action is NotifyDictionaryChangedAction.Reset)
             {

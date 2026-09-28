@@ -9,6 +9,7 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue>(CollectionObserver col
     IReadOnlyList<TKey>? keysSnapshot;
     PropertyChangedEventHandler? observableExpressionPropertyChangedHandler;
     readonly Dictionary<TKey, (IObservableExpression<KeyValuePair<TKey, TValue>, bool> ObservableExpression, Exception? CommittedFault, bool IsIncluded)> observableExpressions = new(source.KeyComparer);
+    bool released;
     readonly ObservableDictionary<TKey, TValue> result = new(source.KeyComparer);
     IReadOnlyList<TValue>? valuesSnapshot;
     internal readonly Expression<Func<KeyValuePair<TKey, TValue>, bool>> Predicate = predicate;
@@ -77,17 +78,21 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue>(CollectionObserver col
             var removedFromCache = source.QueryDisposed(this);
             if (removedFromCache)
             {
-                foreach (var (observableExpression, _, _) in observableExpressions.Values)
+                lock (access)
                 {
-                    observableExpression.PropertyChanged -= ObservableExpressionPropertyChangedHandler;
-                    observableExpression.Dispose();
+                    released = true;
+                    foreach (var (observableExpression, _, _) in observableExpressions.Values)
+                    {
+                        observableExpression.PropertyChanged -= ObservableExpressionPropertyChangedHandler;
+                        observableExpression.Dispose();
+                    }
+                    source.DictionaryChanged -= SourceDictionaryChanged;
+                    result.CollectionChanged -= ResultCollectionChanged;
+                    ((INotifyDictionaryChanged)result).DictionaryChanged -= ResultDictionaryChangedBoxed;
+                    result.DictionaryChanged -= ResultDictionaryChanged;
+                    result.PropertyChanging -= ResultPropertyChanging;
+                    result.PropertyChanged -= ResultPropertyChanged;
                 }
-                source.DictionaryChanged -= SourceDictionaryChanged;
-                result.CollectionChanged -= ResultCollectionChanged;
-                ((INotifyDictionaryChanged)result).DictionaryChanged -= ResultDictionaryChangedBoxed;
-                result.DictionaryChanged -= ResultDictionaryChanged;
-                result.PropertyChanging -= ResultPropertyChanging;
-                result.PropertyChanged -= ResultPropertyChanged;
                 RemovedFromCache();
             }
             return removedFromCache;
@@ -213,6 +218,8 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue>(CollectionObserver col
             return;
         lock (access)
         {
+            if (released)
+                return;
             var keyValuePair = observableExpression.Argument;
             var key = keyValuePair.Key;
             if (!observableExpressions.TryGetValue(key, out var committed) || !ReferenceEquals(committed.ObservableExpression, observableExpression))
@@ -234,6 +241,8 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue>(CollectionObserver col
         using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
         lock (access)
         {
+            if (released)
+                return;
             var expressionObserver = collectionObserver.ExpressionObserver;
             if (e.Action is NotifyDictionaryChangedAction.Reset)
             {

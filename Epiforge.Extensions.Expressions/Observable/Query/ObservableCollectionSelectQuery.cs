@@ -60,6 +60,7 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
     PropertyChangedEventHandler? observableExpressionPropertyChangedHandler;
     readonly Dictionary<IObservableExpression<TElement, TResult>, (Projection Projection, List<PrefixWeightedSequenceNode<Projection>> Nodes, Exception? Fault)> observableExpressionStates = [];
     readonly PrefixWeightedSequence<Projection> positions = new();
+    bool released;
     readonly EqualityComparer<TResult> resultComparer = EqualityComparer<TResult>.Default;
     internal readonly Expression<Func<TElement, TResult>> Selector = selector;
     ObservableQuerySubscription? sourceSubscription;
@@ -101,15 +102,19 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
             var removedFromCache = source.QueryDisposed(this);
             if (removedFromCache)
             {
-                foreach (var (observableExpression, state) in observableExpressionStates)
+                lock (access)
                 {
-                    observableExpression.PropertyChanged -= ObservableExpressionPropertyChangedHandler;
-                    for (int i = 0, ii = state.Nodes.Count; i < ii; ++i)
-                        observableExpression.Dispose();
+                    released = true;
+                    foreach (var (observableExpression, state) in observableExpressionStates)
+                    {
+                        observableExpression.PropertyChanged -= ObservableExpressionPropertyChangedHandler;
+                        for (int i = 0, ii = state.Nodes.Count; i < ii; ++i)
+                            observableExpression.Dispose();
+                    }
+                    source.UnsubscribeDependent(sourceSubscription!);
+                    enumerationSnapshot = null;
+                    enumerationSnapshotShared = false;
                 }
-                source.UnsubscribeDependent(sourceSubscription!);
-                enumerationSnapshot = null;
-                enumerationSnapshotShared = false;
                 RemovedFromCache();
             }
             return removedFromCache;
@@ -157,6 +162,8 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
             return;
         lock (access)
         {
+            if (released)
+                return;
             if (!observableExpressionStates.TryGetValue(observableExpression, out var state))
                 return;
             var (newFault, newResult) = observableExpression.Evaluation;
@@ -286,6 +293,8 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
         using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
         lock (access)
         {
+            if (released)
+                return;
             cursorNode = null;
             FaultList? faultList = null;
             NotifyCollectionChangedEventArgs? eventArgs = null;
