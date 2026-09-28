@@ -5,34 +5,35 @@ sealed class ObservableDictionaryUsingSynchronizationContextQuery<TKey, TValue>(
     where TKey : notnull
 {
     ObservableDictionary<TKey, TValue>? dictionary;
+    readonly Queue<(NotifyDictionaryChangedEventArgs<TKey, TValue> change, Dictionary<TKey, TValue>? reset)> pending = new();
     internal readonly SynchronizationContext SynchronizationContext = synchronizationContext;
 
     public override TValue this[TKey key] =>
-        SynchronizationContext.Send(() => dictionary![key]);
+        ReadOnContext(SynchronizationContext, () => dictionary![key]);
 
     internal override IEqualityComparer<TKey> KeyComparer =>
         source.KeyComparer;
 
     public override int Count =>
-        SynchronizationContext.Send(() => dictionary!.Count);
+        ReadOnContext(SynchronizationContext, () => dictionary!.Count);
 
     public override bool IsSynchronized =>
         true;
 
     public override IEnumerable<TKey> Keys =>
-        SynchronizationContext.Send(() => dictionary!.Keys.ToList().AsReadOnly());
+        ReadOnContext(SynchronizationContext, () => dictionary!.Keys.ToList().AsReadOnly());
 
     public override IEnumerable<TValue> Values =>
-        SynchronizationContext.Send(() => dictionary!.Values.ToList().AsReadOnly());
+        ReadOnContext(SynchronizationContext, () => dictionary!.Values.ToList().AsReadOnly());
 
     public override bool Contains(KeyValuePair<TKey, TValue> item) =>
-        SynchronizationContext.Send(() => dictionary!.Contains(item));
+        ReadOnContext(SynchronizationContext, () => dictionary!.Contains(item));
 
     public override bool ContainsKey(TKey key) =>
-        SynchronizationContext.Send(() => dictionary!.ContainsKey(key));
+        ReadOnContext(SynchronizationContext, () => dictionary!.ContainsKey(key));
 
     public override void CopyTo(KeyValuePair<TKey, TValue>[] array, int arrayIndex) =>
-        SynchronizationContext.Send(() => ((ICollection<KeyValuePair<TKey, TValue>>)dictionary!).CopyTo(array, arrayIndex));
+        ReadOnContext(SynchronizationContext, () => ((ICollection<KeyValuePair<TKey, TValue>>)dictionary!).CopyTo(array, arrayIndex));
 
     void DictionaryCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
         OnCollectionChanged(e);
@@ -67,10 +68,10 @@ sealed class ObservableDictionaryUsingSynchronizationContextQuery<TKey, TValue>(
     }
 
     public override IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator() =>
-        SynchronizationContext.Send(() => (IEnumerator<KeyValuePair<TKey, TValue>>)dictionary!.ToList().GetEnumerator());
+        ReadOnContext(SynchronizationContext, () => (IEnumerator<KeyValuePair<TKey, TValue>>)dictionary!.ToList().GetEnumerator());
 
     public override IReadOnlyList<KeyValuePair<TKey, TValue>> GetRange(IEnumerable<TKey> keys) =>
-        SynchronizationContext.Send(() => dictionary!.GetRange(keys));
+        ReadOnContext(SynchronizationContext, () => dictionary!.GetRange(keys));
 
     protected override void OnInitialization()
     {
@@ -88,10 +89,22 @@ sealed class ObservableDictionaryUsingSynchronizationContextQuery<TKey, TValue>(
         dictionary.PropertyChanged += DictionaryPropertyChanged;
     }
 
-    void SourceDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e) =>
-        SynchronizationContext.Send(() =>
+    /// <summary>
+    /// Applies, on the context's thread, every change of the source not yet applied, in the order the source announced them
+    /// </summary>
+    void ApplyPendingChanges()
+    {
+        using var changeHold = HoldOwnChanges();
+        while (true)
         {
-            using var changeHold = HoldOwnChanges();
+            NotifyDictionaryChangedEventArgs<TKey, TValue> e;
+            Dictionary<TKey, TValue>? reset;
+            lock (pending)
+            {
+                if (!pending.TryDequeue(out var next))
+                    return;
+                (e, reset) = next;
+            }
             switch (e.Action)
             {
                 case NotifyDictionaryChangedAction.Add:
@@ -104,19 +117,35 @@ sealed class ObservableDictionaryUsingSynchronizationContextQuery<TKey, TValue>(
                     dictionary!.ReplaceRange(e.OldItems.Select(oldKeyValuePair => oldKeyValuePair.Key), e.NewItems);
                     break;
                 case NotifyDictionaryChangedAction.Reset:
-                    dictionary!.Reset(source.ToDictionary(kv => kv.Key, kv => kv.Value));
+                    dictionary!.Reset(reset!);
                     break;
             }
-        });
+        }
+    }
+
+    void SourceDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e)
+    {
+        lock (pending)
+            pending.Enqueue((e, e.Action is NotifyDictionaryChangedAction.Reset ? source.ToDictionary(kv => kv.Key, kv => kv.Value) : null));
+        if (SynchronizationContext == SynchronizationContext.Current)
+            ApplyPendingChanges();
+        else
+            DeferUntilChangeLocksReleased(() => SynchronizationContext.Send(ApplyPendingChanges));
+    }
 
     void SourcePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(OperationFault))
-            SynchronizationContext.Send(() =>
-            {
-                using var changeHold = HoldOwnChanges();
-                OperationFault = source.OperationFault;
-            });
+        if (e.PropertyName != nameof(OperationFault))
+            return;
+        void applyOperationFault()
+        {
+            using var changeHold = HoldOwnChanges();
+            OperationFault = source.OperationFault;
+        }
+        if (SynchronizationContext == SynchronizationContext.Current)
+            applyOperationFault();
+        else
+            DeferUntilChangeLocksReleased(() => SynchronizationContext.Send(applyOperationFault));
     }
 
     public override string ToString() =>
@@ -125,7 +154,7 @@ sealed class ObservableDictionaryUsingSynchronizationContextQuery<TKey, TValue>(
     public override bool TryGetValue(TKey key, out TValue value)
     {
         bool success;
-        (success, value) = SynchronizationContext.Send(() => (dictionary!.TryGetValue(key, out var value), value));
+        (success, value) = ReadOnContext(SynchronizationContext, () => (dictionary!.TryGetValue(key, out var value), value));
         return success;
     }
 }

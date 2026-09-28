@@ -91,18 +91,22 @@ public class CollectionUsingSynchronizationCallbackEventually
                 source.Add(1);
                 async Task persistentConditionAsync(Expression<Func<bool>> condition)
                 {
+                    var holds = condition.Compile();
                     while (true)
                     {
                         try
                         {
                             await collectionObserver.ExpressionObserver.ConditionAsync(condition, conditionCancellation.Token).ConfigureAwait(false);
-                            break;
                         }
                         catch
                         {
                             conditionCancellation.Token.ThrowIfCancellationRequested();
                             continue;
                         }
+                        var heldUnderTheLock = false;
+                        synchronizationCallback(usingSynchronizationCallbackEventuallyQuery, context, () => heldUnderTheLock = holds(), false);
+                        if (heldUnderTheLock)
+                            break;
                     }
                 }
                 await persistentConditionAsync(() => usingSynchronizationCallbackEventuallyQuery.Count == 1);

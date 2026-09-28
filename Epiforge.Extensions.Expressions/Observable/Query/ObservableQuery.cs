@@ -148,7 +148,26 @@ abstract class ObservableQuery :
 
     protected static readonly PropertyChangedEventArgs countPropertyChangedEventArgs = new(nameof(IReadOnlyList<>.Count));
     protected static readonly PropertyChangingEventArgs countPropertyChangingEventArgs = new(nameof(IReadOnlyList<>.Count));
+
+    /// <summary>
+    /// Holds what this thread is to do once it holds no query's change lock, in the order it was asked
+    /// </summary>
+    [ThreadStatic]
+    static Queue<Action>? deferredUntilChangeLocksReleased;
+
+    /// <summary>
+    /// Counts the change locks this thread holds, each time it holds one
+    /// </summary>
+    [ThreadStatic]
+    static int heldChangeLocks;
+
     static long lastSequence;
+
+    /// <summary>
+    /// Is set while this thread does what it deferred until it held no change lock, so that a lock taken and released by one of those actions does not start them again out of order
+    /// </summary>
+    [ThreadStatic]
+    static bool runningDeferredUntilChangeLocksReleased;
 
     public ObservableQuery(CollectionObserver collectionObserver)
     {
@@ -227,6 +246,16 @@ abstract class ObservableQuery :
 #endif
         Volatile.Read(ref childrenAccess);
 
+    /// <summary>
+    /// Gets whether the calling thread holds this query's own change lock
+    /// </summary>
+    private protected bool HoldsOwnChanges =>
+#if IS_NET_9_0_OR_GREATER
+        Volatile.Read(ref changeAccess) is { } access && access.IsHeldByCurrentThread;
+#else
+        Volatile.Read(ref changeAccess) is { } access && Monitor.IsEntered(access);
+#endif
+
     private protected bool HasDependents =>
         Volatile.Read(ref firstDependent) is not null;
 
@@ -266,6 +295,7 @@ abstract class ObservableQuery :
 #else
         Monitor.Enter(ChangeAccess);
 #endif
+        ++heldChangeLocks;
         ++DeferralState.Depth;
     }
 
@@ -326,7 +356,54 @@ abstract class ObservableQuery :
 #else
             Monitor.Exit(changeAccess!);
 #endif
+            ChangeLockReleased();
         }
+    }
+
+    static void ChangeLockReleased()
+    {
+        if (--heldChangeLocks != 0 || runningDeferredUntilChangeLocksReleased || deferredUntilChangeLocksReleased is not { Count: > 0 } actions)
+            return;
+        runningDeferredUntilChangeLocksReleased = true;
+        try
+        {
+            while (actions.TryDequeue(out var action))
+                action();
+        }
+        finally
+        {
+            runningDeferredUntilChangeLocksReleased = false;
+        }
+    }
+
+    /// <summary>
+    /// Does the specified action once this thread holds no query's change lock, at once if it holds none now, so that an action which waits on another thread never waits there while holding a lock that thread may need to make a change
+    /// </summary>
+    private protected static void DeferUntilChangeLocksReleased(Action action)
+    {
+        if (heldChangeLocks == 0 && !runningDeferredUntilChangeLocksReleased)
+        {
+            action();
+            return;
+        }
+        (deferredUntilChangeLocksReleased ??= new()).Enqueue(action);
+    }
+
+    /// <summary>
+    /// Reads something kept on the specified context, on the calling thread where it holds this query's change lock or runs on the context, since nothing kept there can change while either is so, and on the context otherwise
+    /// </summary>
+    private protected T ReadOnContext<T>(SynchronizationContext synchronizationContext, Func<T> read) =>
+        HoldsOwnChanges || synchronizationContext == SynchronizationContext.Current ? read() : synchronizationContext.Send(read);
+
+    /// <summary>
+    /// Reads something kept on the specified context, on the calling thread where it holds this query's change lock or runs on the context, since nothing kept there can change while either is so, and on the context otherwise
+    /// </summary>
+    private protected void ReadOnContext(SynchronizationContext synchronizationContext, Action read)
+    {
+        if (HoldsOwnChanges || synchronizationContext == SynchronizationContext.Current)
+            read();
+        else
+            synchronizationContext.Send(read);
     }
 
     internal void EnterChangeLock()
@@ -341,6 +418,7 @@ abstract class ObservableQuery :
 #else
         Monitor.Enter(ChangeAccess);
 #endif
+        ++heldChangeLocks;
     }
 
     internal void ExitChangeLock()
@@ -355,6 +433,7 @@ abstract class ObservableQuery :
 #else
         Monitor.Exit(changeAccess!);
 #endif
+        ChangeLockReleased();
     }
 
     /// <summary>

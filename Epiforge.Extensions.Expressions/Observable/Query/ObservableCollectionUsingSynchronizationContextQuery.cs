@@ -4,13 +4,14 @@ sealed class ObservableCollectionUsingSynchronizationContextQuery<TElement>(Coll
     ObservableCollectionQuery<TElement>(collectionObserver)
 {
     ObservableRangeCollection<TElement>? elements;
+    readonly Queue<(NotifyCollectionChangedEventArgs change, List<TElement>? reset)> pending = new();
     internal readonly SynchronizationContext SynchronizationContext = synchronizationContext;
 
     public override TElement this[int index] =>
-        SynchronizationContext.Send(() => elements![index]);
+        ReadOnContext(SynchronizationContext, () => elements![index]);
 
     public override int Count =>
-        SynchronizationContext.Send(() => elements!.Count);
+        ReadOnContext(SynchronizationContext, () => elements!.Count);
 
     internal override bool HasIndexerPenalty =>
         true;
@@ -37,7 +38,7 @@ sealed class ObservableCollectionUsingSynchronizationContextQuery<TElement>(Coll
     }
 
     public override IEnumerator<TElement> GetEnumerator() =>
-        SynchronizationContext.Send(() => (IEnumerator<TElement>)elements!.ToList().GetEnumerator());
+        ReadOnContext(SynchronizationContext, () => (IEnumerator<TElement>)elements!.ToList().GetEnumerator());
 
     protected override void OnInitialization()
     {
@@ -56,11 +57,22 @@ sealed class ObservableCollectionUsingSynchronizationContextQuery<TElement>(Coll
     void ElementsPropertyChanged(object? sender, PropertyChangedEventArgs e) =>
         OnPropertyChanged(e);
 
-    void SourceCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    /// <summary>
+    /// Applies, on the context's thread, every change of the source not yet applied, in the order the source announced them
+    /// </summary>
+    void ApplyPendingChanges()
     {
-        void handleEventArgs()
+        using var changeHold = HoldOwnChanges();
+        while (true)
         {
-            using var changeHold = HoldOwnChanges();
+            NotifyCollectionChangedEventArgs e;
+            List<TElement>? reset;
+            lock (pending)
+            {
+                if (!pending.TryDequeue(out var next))
+                    return;
+                (e, reset) = next;
+            }
             switch (e.Action)
             {
                 case NotifyCollectionChangedAction.Add:
@@ -76,24 +88,35 @@ sealed class ObservableCollectionUsingSynchronizationContextQuery<TElement>(Coll
                     elements!.ReplaceRange(e.OldStartingIndex, e.OldItems!.Count, e.NewItems!.Cast<TElement>());
                     break;
                 case NotifyCollectionChangedAction.Reset:
-                    elements!.Reset(source);
+                    elements!.Reset(reset!);
                     break;
             }
         }
+    }
+
+    void SourceCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        lock (pending)
+            pending.Enqueue((e, e.Action is NotifyCollectionChangedAction.Reset ? [.. source] : null));
         if (SynchronizationContext == SynchronizationContext.Current)
-            handleEventArgs();
+            ApplyPendingChanges();
         else
-            SynchronizationContext.Send(handleEventArgs);
+            DeferUntilChangeLocksReleased(() => SynchronizationContext.Send(ApplyPendingChanges));
     }
 
     void SourcePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(OperationFault))
-            SynchronizationContext.Send(() =>
-            {
-                using var changeHold = HoldOwnChanges();
-                OperationFault = source.OperationFault;
-            });
+        if (e.PropertyName != nameof(OperationFault))
+            return;
+        void applyOperationFault()
+        {
+            using var changeHold = HoldOwnChanges();
+            OperationFault = source.OperationFault;
+        }
+        if (SynchronizationContext == SynchronizationContext.Current)
+            applyOperationFault();
+        else
+            DeferUntilChangeLocksReleased(() => SynchronizationContext.Send(applyOperationFault));
     }
 
     public override string ToString() =>

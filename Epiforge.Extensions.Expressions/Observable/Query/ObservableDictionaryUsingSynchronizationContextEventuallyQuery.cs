@@ -8,31 +8,31 @@ sealed class ObservableDictionaryUsingSynchronizationContextEventuallyQuery<TKey
     internal readonly SynchronizationContext SynchronizationContext = synchronizationContext;
 
     public override TValue this[TKey key] =>
-        SynchronizationContext.Send(() => dictionary![key]);
+        ReadOnContext(SynchronizationContext, () => dictionary![key]);
 
     internal override IEqualityComparer<TKey> KeyComparer =>
         source.KeyComparer;
 
     public override int Count =>
-        SynchronizationContext.Send(() => dictionary!.Count);
+        ReadOnContext(SynchronizationContext, () => dictionary!.Count);
 
     public override bool IsSynchronized =>
         true;
 
     public override IEnumerable<TKey> Keys =>
-        SynchronizationContext.Send(() => dictionary!.Keys.ToList().AsReadOnly());
+        ReadOnContext(SynchronizationContext, () => dictionary!.Keys.ToList().AsReadOnly());
 
     public override IEnumerable<TValue> Values =>
-        SynchronizationContext.Send(() => dictionary!.Values.ToList().AsReadOnly());
+        ReadOnContext(SynchronizationContext, () => dictionary!.Values.ToList().AsReadOnly());
 
     public override bool Contains(KeyValuePair<TKey, TValue> item) =>
-        SynchronizationContext.Send(() => dictionary!.Contains(item));
+        ReadOnContext(SynchronizationContext, () => dictionary!.Contains(item));
 
     public override bool ContainsKey(TKey key) =>
-        SynchronizationContext.Send(() => dictionary!.ContainsKey(key));
+        ReadOnContext(SynchronizationContext, () => dictionary!.ContainsKey(key));
 
     public override void CopyTo(KeyValuePair<TKey, TValue>[] array, int arrayIndex) =>
-        SynchronizationContext.Send(() => ((ICollection<KeyValuePair<TKey, TValue>>)dictionary!).CopyTo(array, arrayIndex));
+        ReadOnContext(SynchronizationContext, () => ((ICollection<KeyValuePair<TKey, TValue>>)dictionary!).CopyTo(array, arrayIndex));
 
     void DictionaryCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
         OnCollectionChanged(e);
@@ -67,10 +67,10 @@ sealed class ObservableDictionaryUsingSynchronizationContextEventuallyQuery<TKey
     }
 
     public override IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator() =>
-        SynchronizationContext.Send(() => (IEnumerator<KeyValuePair<TKey, TValue>>)dictionary!.ToList().GetEnumerator());
+        ReadOnContext(SynchronizationContext, () => (IEnumerator<KeyValuePair<TKey, TValue>>)dictionary!.ToList().GetEnumerator());
 
     public override IReadOnlyList<KeyValuePair<TKey, TValue>> GetRange(IEnumerable<TKey> keys) =>
-        SynchronizationContext.Send(() => dictionary!.GetRange(keys));
+        ReadOnContext(SynchronizationContext, () => dictionary!.GetRange(keys));
 
     protected override void OnInitialization()
     {
@@ -128,7 +128,7 @@ sealed class ObservableDictionaryUsingSynchronizationContextEventuallyQuery<TKey
     public override bool TryGetValue(TKey key, out TValue value)
     {
         bool success;
-        (success, value) = SynchronizationContext.Send(() => (dictionary!.TryGetValue(key, out var value), value));
+        (success, value) = ReadOnContext(SynchronizationContext, () => (dictionary!.TryGetValue(key, out var value), value));
         return success;
     }
 }

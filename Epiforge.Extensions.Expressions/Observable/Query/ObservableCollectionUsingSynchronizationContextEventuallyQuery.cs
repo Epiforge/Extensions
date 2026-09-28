@@ -7,10 +7,10 @@ sealed class ObservableCollectionUsingSynchronizationContextEventuallyQuery<TEle
     internal readonly SynchronizationContext SynchronizationContext = synchronizationContext;
 
     public override TElement this[int index] =>
-        SynchronizationContext.Send(() => elements![index]);
+        ReadOnContext(SynchronizationContext, () => elements![index]);
 
     public override int Count =>
-        SynchronizationContext.Send(() => elements!.Count);
+        ReadOnContext(SynchronizationContext, () => elements!.Count);
 
     internal override bool HasIndexerPenalty =>
         true;
@@ -37,7 +37,7 @@ sealed class ObservableCollectionUsingSynchronizationContextEventuallyQuery<TEle
     }
 
     public override IEnumerator<TElement> GetEnumerator() =>
-        SynchronizationContext.Send(() => (IEnumerator<TElement>)elements!.ToList().GetEnumerator());
+        ReadOnContext(SynchronizationContext, () => (IEnumerator<TElement>)elements!.ToList().GetEnumerator());
 
     protected override void OnInitialization()
     {

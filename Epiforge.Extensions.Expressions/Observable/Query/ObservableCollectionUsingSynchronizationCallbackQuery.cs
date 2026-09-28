@@ -4,6 +4,7 @@ sealed class ObservableCollectionUsingSynchronizationCallbackQuery<TElement>(Col
     ObservableCollectionQuery<TElement>(collectionObserver)
 {
     ObservableRangeCollection<TElement>? elements;
+    readonly Queue<(NotifyCollectionChangedEventArgs change, List<TElement>? reset)> pending = new();
     internal readonly object Context = context;
     internal readonly CollectionSynchronizationCallback SynchronizationCallback = synchronizationCallback;
 
@@ -51,10 +52,22 @@ sealed class ObservableCollectionUsingSynchronizationCallbackQuery<TElement>(Col
     void ElementsPropertyChanged(object? sender, PropertyChangedEventArgs e) =>
         OnPropertyChanged(e);
 
-    void SourceCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
-        SynchronizationCallback(this, Context, () =>
+    /// <summary>
+    /// Applies, within the callback, every change of the source not yet applied, in the order the source announced them
+    /// </summary>
+    void ApplyPendingChanges()
+    {
+        using var changeHold = HoldOwnChanges();
+        while (true)
         {
-            using var changeHold = HoldOwnChanges();
+            NotifyCollectionChangedEventArgs e;
+            List<TElement>? reset;
+            lock (pending)
+            {
+                if (!pending.TryDequeue(out var next))
+                    return;
+                (e, reset) = next;
+            }
             switch (e.Action)
             {
                 case NotifyCollectionChangedAction.Add:
@@ -70,19 +83,27 @@ sealed class ObservableCollectionUsingSynchronizationCallbackQuery<TElement>(Col
                     elements!.ReplaceRange(e.OldStartingIndex, e.OldItems!.Count, e.NewItems!.Cast<TElement>());
                     break;
                 case NotifyCollectionChangedAction.Reset:
-                    elements!.Reset(source);
+                    elements!.Reset(reset!);
                     break;
             }
-        }, true);
+        }
+    }
+
+    void SourceCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        lock (pending)
+            pending.Enqueue((e, e.Action is NotifyCollectionChangedAction.Reset ? [.. source] : null));
+        DeferUntilChangeLocksReleased(() => SynchronizationCallback(this, Context, ApplyPendingChanges, true));
+    }
 
     void SourcePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(OperationFault))
-            SynchronizationCallback(this, Context, () =>
+            DeferUntilChangeLocksReleased(() => SynchronizationCallback(this, Context, () =>
             {
                 using var changeHold = HoldOwnChanges();
                 OperationFault = source.OperationFault;
-            }, false);
+            }, false));
     }
 
     public override string ToString() =>
