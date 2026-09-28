@@ -11,6 +11,7 @@ sealed class ObservableCollectionUsingSynchronizationCallbackEventuallyQuery<TEl
     ObservableRangeCollection<TElement>? elements;
     readonly ConcurrentQueue<AsyncProducerConsumerQueue<NotifyCollectionChangedEventArgs>> pendingCollectionChangedEventsQueue = new();
     readonly ConcurrentQueue<CancellationTokenSource> resetCancellationTokenSources = new();
+    readonly ConcurrentQueue<List<TElement>> resetElementsQueue = new();
     internal readonly object Context = context;
     internal readonly CollectionSynchronizationCallback SynchronizationCallback = synchronizationCallback;
 
@@ -47,6 +48,7 @@ sealed class ObservableCollectionUsingSynchronizationCallbackEventuallyQuery<TEl
 
     protected override void OnInitialization()
     {
+        using var changeHold = HoldChangesOf(source);
         currentPendingCollectionChangedEvents = new();
         pendingCollectionChangedEventsQueue.Enqueue(currentPendingCollectionChangedEvents);
         currentResetCancellationTokenSource = new();
@@ -70,6 +72,7 @@ sealed class ObservableCollectionUsingSynchronizationCallbackEventuallyQuery<TEl
     {
         if (e.Action is NotifyCollectionChangedAction.Reset)
         {
+            resetElementsQueue.Enqueue(source.ToList());
             currentPendingCollectionChangedEvents = new();
             pendingCollectionChangedEventsQueue.Enqueue(currentPendingCollectionChangedEvents);
             var previousResetCancellationTokenSource = currentResetCancellationTokenSource;
@@ -84,7 +87,10 @@ sealed class ObservableCollectionUsingSynchronizationCallbackEventuallyQuery<TEl
     void SourcePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(OperationFault))
+        {
+            using var changeHold = HoldOwnChanges();
             OperationFault = source.OperationFault;
+        }
     }
 
     async Task SynchronizationAsync()
@@ -101,6 +107,7 @@ sealed class ObservableCollectionUsingSynchronizationCallbackEventuallyQuery<TEl
                         var e = await pendingCollectionChangeEvents.DequeueAsync(linkedCancellationTokenSource.Token).ConfigureAwait(false);
                         SynchronizationCallback(this, Context, () =>
                         {
+                            using var changeHold = HoldOwnChanges();
                             switch (e.Action)
                             {
                                 case NotifyCollectionChangedAction.Add:
@@ -123,7 +130,12 @@ sealed class ObservableCollectionUsingSynchronizationCallbackEventuallyQuery<TEl
                 {
                     if (disposedCancellationToken.IsCancellationRequested)
                         return;
-                    SynchronizationCallback(this, Context, () => elements!.Reset(source), true);
+                    resetElementsQueue.TryDequeue(out var resetElements);
+                    SynchronizationCallback(this, Context, () =>
+                    {
+                        using var changeHold = HoldOwnChanges();
+                        elements!.Reset(resetElements!);
+                    }, true);
                 }
             }
     }

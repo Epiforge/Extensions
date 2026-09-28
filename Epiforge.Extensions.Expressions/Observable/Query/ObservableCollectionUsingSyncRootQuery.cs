@@ -36,6 +36,7 @@ sealed class ObservableCollectionUsingSyncRootQuery<TElement>(CollectionObserver
 
     protected override void OnInitialization()
     {
+        using var changeHold = HoldChangesOf(source);
         elements = new(source);
         source.CollectionChanged += SourceCollectionChanged;
         source.PropertyChanged += SourcePropertyChanged;
@@ -54,6 +55,7 @@ sealed class ObservableCollectionUsingSyncRootQuery<TElement>(CollectionObserver
     {
         lock (SyncRoot!)
         {
+            using var changeHold = HoldOwnChanges();
             switch (e.Action)
             {
                 case NotifyCollectionChangedAction.Add:
@@ -79,7 +81,10 @@ sealed class ObservableCollectionUsingSyncRootQuery<TElement>(CollectionObserver
     {
         if (e.PropertyName == nameof(OperationFault))
             lock (SyncRoot!)
+            {
+                using var changeHold = HoldOwnChanges();
                 OperationFault = source.OperationFault;
+            }
     }
 
     public override string ToString() =>

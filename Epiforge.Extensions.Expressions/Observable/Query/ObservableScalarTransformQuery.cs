@@ -48,6 +48,7 @@ sealed class ObservableScalarTransformQuery<TResult, TTransform>(CollectionObser
     protected override void OnInitialization()
     {
         transformDelegate = ExpressionKeyStability.IsStable(Transform) ? compiledTransformCache.GetOrAdd(Transform, CompileTransform) : Transform.Compile();
+        using var changeHold = HoldChangesOf(sourceQuery);
         sourceQuery.PropertyChanged += SourceQueryPropertyChanged;
         sourceQuery.PropertyChanging += SourceQueryPropertyChanging;
         Evaluate();
@@ -55,12 +56,14 @@ sealed class ObservableScalarTransformQuery<TResult, TTransform>(CollectionObser
 
     void SourceQueryPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        using var changeHold = HoldOwnChanges();
         if (e.PropertyName == nameof(Evaluation))
             Evaluate();
     }
 
     void SourceQueryPropertyChanging(object? sender, PropertyChangingEventArgs e)
     {
+        using var changeHold = HoldOwnChanges();
         if (e.PropertyName == nameof(Evaluation))
             OnPropertyChanging(e);
     }

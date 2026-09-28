@@ -66,11 +66,15 @@ sealed class ObservableCollectionIndexQuery<TElement>(CollectionObserver collect
         }
     }
 
-    void ObservableCollectionQueryCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
+    void ObservableCollectionQueryCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        using var changeHold = HoldOwnChanges();
         Evaluate();
+    }
 
     protected override void OnInitialization()
     {
+        using var changeHold = HoldChangesOf(observableCollectionQuery);
         observableCollectionQuery.CollectionChanged += ObservableCollectionQueryCollectionChanged;
         Evaluate();
     }

@@ -572,7 +572,7 @@ public class ExpressionObserver :
             TypeBinaryExpression typeBinaryExpression when typeBinaryExpression.NodeType is not ExpressionType.TypeAs => GetObservableExpression(typeBinaryExpression, deferEvaluation),
             UnaryExpression unaryExpression when unaryExpression.NodeType is ExpressionType.Quote => GetObservableExpression(Expression.Constant(unaryExpression.Operand), deferEvaluation),
             UnaryExpression unaryExpression => GetObservableExpression(unaryExpression, deferEvaluation),
-            _ => throw new NotSupportedException($"expression type {expression.GetType().Name} is not supported")
+            _ => throw new NotSupportedException($"expression type {expression.NodeType} is not supported")
         };
         if (Volatile.Read(ref observableExpression.InitializationAccess) is { } initializationAccess)
             lock (initializationAccess)

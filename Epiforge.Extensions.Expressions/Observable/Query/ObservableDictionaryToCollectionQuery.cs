@@ -107,6 +107,7 @@ sealed class ObservableDictionaryToCollectionQuery<TElement, TKey, TValue>(Colle
 
     protected override void OnInitialization()
     {
+        using var changeHold = HoldChangesOf(source);
         var faultList = new FaultList();
         var expressionObserver = collectionObserver.ExpressionObserver;
         foreach (var keyValuePair in source)

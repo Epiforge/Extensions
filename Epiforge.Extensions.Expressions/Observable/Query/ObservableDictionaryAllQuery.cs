@@ -33,20 +33,23 @@ sealed class ObservableDictionaryAllQuery<TKey, TValue>(CollectionObserver colle
 
     void ObservableDictionaryQueryDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e)
     {
+        using var changeHold = HoldOwnChanges();
         observableDictionaryQueryCount = e.Action is NotifyDictionaryChangedAction.Reset ? observableDictionaryQuery.Count : observableDictionaryQueryCount + (e.NewItems?.Count ?? 0) - (e.OldItems?.Count ?? 0);
         Evaluate();
     }
 
     void ObservableDictionaryQueryPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        using var changeHold = HoldOwnChanges();
         if (e.PropertyName == nameof(ObservableDictionaryQuery<,>.OperationFault))
             Evaluate();
     }
 
     protected override void OnInitialization()
     {
-        observableDictionaryQueryCount = observableDictionaryQuery.Count;
         where = observableDictionaryQuery.ObserveWhere(Predicate);
+        using var changeHold = HoldChangesOf(observableDictionaryQuery, Unscoped(where));
+        observableDictionaryQueryCount = observableDictionaryQuery.Count;
         ((INotifyDictionaryChanged<TKey, TValue>)where).DictionaryChanged += WhereDictionaryChanged;
         observableDictionaryQuery.DictionaryChanged += ObservableDictionaryQueryDictionaryChanged;
         observableDictionaryQuery.PropertyChanged += ObservableDictionaryQueryPropertyChanged;
@@ -56,6 +59,9 @@ sealed class ObservableDictionaryAllQuery<TKey, TValue>(CollectionObserver colle
     public override string ToString() =>
         $"all {observableDictionaryQuery} matching {Predicate}";
 
-    void WhereDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e) =>
+    void WhereDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e)
+    {
+        using var changeHold = HoldOwnChanges();
         Evaluate();
+    }
 }

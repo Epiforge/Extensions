@@ -121,12 +121,14 @@ sealed class ObservableCollectionComparisonQuery<TResult>(CollectionObserver col
 
     void ObservableCollectionQueryPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        using var changeHold = HoldOwnChanges();
         if (e.PropertyName == nameof(ObservableCollectionQuery<>.OperationFault))
             Evaluate();
     }
 
     protected override void OnInitialization()
     {
+        using var changeHold = HoldChangesOf(observableCollectionQuery);
         Evaluate();
         observableCollectionQuery.CollectionChanged += ObservableCollectionQueryCollectionChanged;
         observableCollectionQuery.PropertyChanged += ObservableCollectionQueryPropertyChanged;

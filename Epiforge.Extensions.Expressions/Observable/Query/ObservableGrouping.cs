@@ -1,6 +1,6 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
-sealed class ObservableGrouping<TKey, TElement>(CollectionObserver collectionObserver, TKey key, ObservableCollectionQuery<TElement> groupQuery) :
+sealed class ObservableGrouping<TKey, TElement>(CollectionObserver collectionObserver, TKey key, ObservableCollectionQuery<TElement> groupQuery, ObservableQuery owner) :
     ObservableCollectionQuery<TElement>(collectionObserver),
     IObservableGrouping<TKey, TElement>,
     IObservableQueryDependent
@@ -14,7 +14,16 @@ sealed class ObservableGrouping<TKey, TElement>(CollectionObserver collectionObs
     public override int Count =>
         groupQuery.Count;
 
+    internal override bool ChangesThroughOthers =>
+        true;
+
     public TKey Key { get; } = key;
+
+    private protected override ObservableQuery? ChangeLockHolder =>
+        owner;
+
+    internal override void CollectChangeLocks(List<ObservableQuery> queries) =>
+        owner.CollectChangeLocks(queries);
 
     protected override bool Dispose(bool disposing)
     {
@@ -32,14 +41,23 @@ sealed class ObservableGrouping<TKey, TElement>(CollectionObserver collectionObs
     public override IEnumerator<TElement> GetEnumerator() =>
         groupQuery.GetEnumerator();
 
-    void IObservableQueryDependent.OnDependencyCollectionChanged(ObservableQuerySubscription subscription, NotifyCollectionChangedEventArgs e) =>
+    void IObservableQueryDependent.OnDependencyCollectionChanged(ObservableQuerySubscription subscription, NotifyCollectionChangedEventArgs e)
+    {
+        using var changeHold = HoldOwnChanges();
         OnCollectionChanged(e);
+    }
 
-    void IObservableQueryDependent.OnDependencyPropertyChanged(ObservableQuerySubscription subscription, PropertyChangedEventArgs e) =>
+    void IObservableQueryDependent.OnDependencyPropertyChanged(ObservableQuerySubscription subscription, PropertyChangedEventArgs e)
+    {
+        using var changeHold = HoldOwnChanges();
         OnPropertyChanged(e);
+    }
 
-    void IObservableQueryDependent.OnDependencyPropertyChanging(ObservableQuerySubscription subscription, PropertyChangingEventArgs e) =>
+    void IObservableQueryDependent.OnDependencyPropertyChanging(ObservableQuerySubscription subscription, PropertyChangingEventArgs e)
+    {
+        using var changeHold = HoldOwnChanges();
         OnPropertyChanging(e);
+    }
 
     internal void InternalDispose()
     {

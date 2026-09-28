@@ -33,6 +33,7 @@ sealed class ObservableCollectionRankQuery<TElement>(CollectionObserver collecti
 
     protected override void OnInitialization()
     {
+        using var changeHold = HoldChangesOf(orderByQuery);
         orderByQuery.CollectionChanged += OrderByQueryCollectionChanged;
         orderByQuery.KeysChanged += OrderByQueryKeysChanged;
         orderByQuery.PropertyChanged += OrderByQueryPropertyChanged;
@@ -41,15 +42,20 @@ sealed class ObservableCollectionRankQuery<TElement>(CollectionObserver collecti
 
     void OrderByQueryCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
+        using var changeHold = HoldOwnChanges();
         if (e.Action is not NotifyCollectionChangedAction.Move)
             Evaluate();
     }
 
-    void OrderByQueryKeysChanged(object? sender, EventArgs e) =>
+    void OrderByQueryKeysChanged(object? sender, EventArgs e)
+    {
+        using var changeHold = HoldOwnChanges();
         Evaluate();
+    }
 
     void OrderByQueryPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        using var changeHold = HoldOwnChanges();
         if (e.PropertyName == nameof(IObservableCollectionQuery<>.OperationFault))
             Evaluate();
     }

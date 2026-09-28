@@ -219,6 +219,7 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
 
     protected override void OnInitialization()
     {
+        using var changeHold = HoldChangesOf(source);
         foreach (var sourceKeyValuePair in source)
             ObserveSourceKeyValuePairWithAccess(sourceKeyValuePair, result);
         SetOperationFault();

@@ -209,6 +209,7 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
 
     protected override void OnInitialization()
     {
+        using var changeHold = HoldChangesOf(source);
         lock (access)
         {
             var faultList = new FaultList();

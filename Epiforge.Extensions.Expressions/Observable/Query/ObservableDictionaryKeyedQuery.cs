@@ -45,6 +45,7 @@ sealed class ObservableDictionaryKeyedQuery<TKey, TValue>(CollectionObserver col
 
     void ObservableDictionaryQueryDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e)
     {
+        using var changeHold = HoldOwnChanges();
         if (e.Action is NotifyDictionaryChangedAction.Reset)
         {
             if (KeyComparer is { } keyComparer)
@@ -82,12 +83,14 @@ sealed class ObservableDictionaryKeyedQuery<TKey, TValue>(CollectionObserver col
 
     void ObservableDictionaryQueryPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        using var changeHold = HoldOwnChanges();
         if (e.PropertyName == nameof(IObservableDictionaryQuery<,>.OperationFault))
             Evaluate();
     }
 
     protected override void OnInitialization()
     {
+        using var changeHold = HoldChangesOf(observableDictionaryQuery);
         if (KeyComparer is { } keyComparer)
         {
             sortedDictionary = new SortedDictionary<TKey, TValue>(keyComparer);

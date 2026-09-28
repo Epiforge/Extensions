@@ -41,6 +41,7 @@ sealed class ObservableCollectionUsingSynchronizationContextEventuallyQuery<TEle
 
     protected override void OnInitialization()
     {
+        using var changeHold = HoldChangesOf(source);
         elements = new(source);
         source.CollectionChanged += SourceCollectionChanged;
         source.PropertyChanged += SourcePropertyChanged;
@@ -55,9 +56,12 @@ sealed class ObservableCollectionUsingSynchronizationContextEventuallyQuery<TEle
     void ElementsPropertyChanged(object? sender, PropertyChangedEventArgs e) =>
         OnPropertyChanged(e);
 
-    void SourceCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
+    void SourceCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        var resetElements = e.Action is NotifyCollectionChangedAction.Reset ? source.ToList() : null;
         SynchronizationContext.Post(_ =>
         {
+            using var changeHold = HoldOwnChanges();
             switch (e.Action)
             {
                 case NotifyCollectionChangedAction.Add:
@@ -73,15 +77,20 @@ sealed class ObservableCollectionUsingSynchronizationContextEventuallyQuery<TEle
                     elements!.ReplaceRange(e.OldStartingIndex, e.OldItems!.Count, e.NewItems!.Cast<TElement>());
                     break;
                 case NotifyCollectionChangedAction.Reset:
-                    elements!.Reset(source);
+                    elements!.Reset(resetElements!);
                     break;
             }
         }, null);
+    }
 
     void SourcePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(OperationFault))
-            SynchronizationContext.Post(_ => OperationFault = source.OperationFault, null);
+            SynchronizationContext.Post(_ =>
+            {
+                using var changeHold = HoldOwnChanges();
+                OperationFault = source.OperationFault;
+            }, null);
     }
 
     public override string ToString() =>

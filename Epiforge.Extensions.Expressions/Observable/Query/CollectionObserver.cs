@@ -155,7 +155,7 @@ public class CollectionObserver :
         return listObservableCollection.AsScoped();
     }
 
-    internal ObservableCollectionQueryReadOnlyList<TElement> GetObservableCollectionQuery<TElement>(IReadOnlyList<TElement> readOnlyList)
+    internal ObservableCollectionQueryReadOnlyList<TElement> GetObservableCollectionQuery<TElement>(IReadOnlyList<TElement> readOnlyList, ObservableQuery? changeLockHolder = null)
     {
         ArgumentNullException.ThrowIfNull(readOnlyList);
         ObservableCollectionQueryReadOnlyList<TElement> readOnlyListObservableCollection;
@@ -163,7 +163,7 @@ public class CollectionObserver :
         {
             if (!cachedReadOnlyListObservableCollections.TryGetValue(readOnlyList, out var cachedReadOnlyListObservableCollection))
             {
-                readOnlyListObservableCollection = new ObservableCollectionQueryReadOnlyList<TElement>(this, readOnlyList);
+                readOnlyListObservableCollection = new ObservableCollectionQueryReadOnlyList<TElement>(this, readOnlyList, changeLockHolder);
                 cachedReadOnlyListObservableCollections.Add(readOnlyList, readOnlyListObservableCollection);
             }
             else

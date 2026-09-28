@@ -36,6 +36,7 @@ sealed class ObservableCollectionUsingSynchronizationCallbackQuery<TElement>(Col
 
     protected override void OnInitialization()
     {
+        using var changeHold = HoldChangesOf(source);
         elements = new(source);
         source.CollectionChanged += SourceCollectionChanged;
         source.PropertyChanged += SourcePropertyChanged;
@@ -53,6 +54,7 @@ sealed class ObservableCollectionUsingSynchronizationCallbackQuery<TElement>(Col
     void SourceCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
         SynchronizationCallback(this, Context, () =>
         {
+            using var changeHold = HoldOwnChanges();
             switch (e.Action)
             {
                 case NotifyCollectionChangedAction.Add:
@@ -76,7 +78,11 @@ sealed class ObservableCollectionUsingSynchronizationCallbackQuery<TElement>(Col
     void SourcePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(OperationFault))
-            SynchronizationCallback(this, Context, () => OperationFault = source.OperationFault, false);
+            SynchronizationCallback(this, Context, () =>
+            {
+                using var changeHold = HoldOwnChanges();
+                OperationFault = source.OperationFault;
+            }, false);
     }
 
     public override string ToString() =>

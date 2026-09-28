@@ -30,11 +30,20 @@ sealed class ObservableCollectionSliceQuery<TElement>(CollectionObserver collect
     public override int Count =>
         count;
 
+    internal override bool ChangesThroughOthers =>
+        true;
+
     internal override bool HasEnumerationPenalty =>
         source.HasEnumerationPenalty;
 
     internal override bool HasIndexerPenalty =>
         source.HasIndexerPenalty;
+
+    internal override void CollectChangeLocks(List<ObservableQuery> queries)
+    {
+        source.CollectChangeLocks(queries);
+        queries.Add(this);
+    }
 
     protected override bool Dispose(bool disposing)
     {
@@ -68,6 +77,7 @@ sealed class ObservableCollectionSliceQuery<TElement>(CollectionObserver collect
 
     protected override void OnInitialization()
     {
+        using var changeHold = HoldChangesOf(source);
         lock (access)
         {
             ResetCount();

@@ -27,12 +27,14 @@ sealed class ObservableDictionaryValueForQuery<TKey, TValue>(CollectionObserver 
 
     void ObservableDictionaryQueryDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e)
     {
+        using var changeHold = HoldOwnChanges();
         if (e.Action is NotifyDictionaryChangedAction.Reset || e.OldItems is { } oldItems && e.OldItems.Select(kv => kv.Key).Contains(Key) || e.NewItems is { } newItems && newItems.Select(kv => kv.Key).Contains(Key))
             Evaluate();
     }
 
     protected override void OnInitialization()
     {
+        using var changeHold = HoldChangesOf(observableDictionaryQuery);
         observableDictionaryQuery.DictionaryChanged += ObservableDictionaryQueryDictionaryChanged;
         Evaluate();
     }

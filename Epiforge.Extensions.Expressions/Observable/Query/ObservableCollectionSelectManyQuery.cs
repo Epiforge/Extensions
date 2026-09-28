@@ -128,9 +128,11 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
 
     protected override void OnInitialization()
     {
+        var projections = source.ObserveSelect(Selector);
+        using var changeHold = HoldChangesOf(((ScopedObservableCollectionQuery<IEnumerable<TResult>>)projections).query);
         lock (access)
         {
-            select = source.ObserveSelect(Selector);
+            select = projections;
             OperationFault = select.OperationFault;
             for (int i = 0, ii = select.Count; i < ii; ++i)
                 ObserveProjectionWithAccess(positions.Count, select[i]);
@@ -160,6 +162,7 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
     {
         if (e.PropertyName == nameof(OperationFault))
         {
+            using var changeHold = HoldOwnChanges();
             OperationFault = select!.OperationFault;
             OnPropertyChanged(e);
         }
@@ -168,7 +171,10 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
     void IObservableQueryDependent.OnDependencyPropertyChanging(ObservableQuerySubscription subscription, PropertyChangingEventArgs e)
     {
         if (e.PropertyName == nameof(OperationFault))
+        {
+            using var changeHold = HoldOwnChanges();
             OnPropertyChanging(e);
+        }
     }
 
     void SelectCollectionChanged(NotifyCollectionChangedEventArgs e)

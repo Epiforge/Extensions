@@ -3,13 +3,14 @@ namespace Epiforge.Extensions.Expressions.Observable.Query;
 sealed class ObservableCollectionQueryGenericEnumerable<TElement>(CollectionObserver collectionObserver, IEnumerable<TElement> enumerable) :
     ObservableCollectionQuery<TElement>(collectionObserver)
 {
+    List<TElement>? copy;
     internal readonly IEnumerable<TElement> Enumerable = enumerable;
 
     public override TElement this[int index] =>
-        Enumerable.ElementAt(index);
+        copy is { } kept ? kept[index] : Enumerable.ElementAt(index);
 
     public override int Count =>
-        Enumerable.Count();
+        copy?.Count ?? Enumerable.Count();
 
     internal override bool HasEnumerationPenalty =>
         false;
@@ -17,8 +18,11 @@ sealed class ObservableCollectionQueryGenericEnumerable<TElement>(CollectionObse
     internal override bool HasIndexerPenalty =>
         true;
 
-    void CollectionChangedNotifierCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
-        OnCollectionChanged(e);
+    void CollectionChangedNotifierCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        using var changeHold = HoldOwnChanges();
+        FollowChange(ref copy, e, Enumerable);
+    }
 
     protected override bool Dispose(bool disposing)
     {
@@ -36,12 +40,15 @@ sealed class ObservableCollectionQueryGenericEnumerable<TElement>(CollectionObse
     }
 
     public override IEnumerator<TElement> GetEnumerator() =>
-        Enumerable.GetEnumerator();
+        copy is { } kept ? kept.GetEnumerator() : Enumerable.GetEnumerator();
 
     protected override void OnInitialization()
     {
         if (Enumerable is INotifyCollectionChanged collectionChangedNotifier)
+        {
+            copy = [.. Enumerable];
             collectionChangedNotifier.CollectionChanged += CollectionChangedNotifierCollectionChanged;
+        }
     }
 
     public override string ToString() =>

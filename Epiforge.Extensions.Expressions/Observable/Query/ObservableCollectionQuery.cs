@@ -307,6 +307,62 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     public void CopyTo(TElement[] array, int arrayIndex) =>
         CopyTo((Array)array, arrayIndex);
 
+    /// <summary>
+    /// Brings this query's copy of an observed sequence up to date with a change the sequence announced and then announces it, reading the whole sequence again where the announcement does not say precisely what changed
+    /// </summary>
+    private protected void FollowChange(ref List<TElement>? copy, NotifyCollectionChangedEventArgs e, IEnumerable<TElement> sequence)
+    {
+        var kept = copy!;
+        var previousCount = kept.Count;
+        int count;
+        switch (e.Action)
+        {
+            case NotifyCollectionChangedAction.Add when e.NewItems is { } newItems && e.NewStartingIndex >= 0 && e.NewStartingIndex <= kept.Count:
+                count = previousCount + newItems.Count;
+                if (count != previousCount)
+                    OnPropertyChanging(countPropertyChangingEventArgs);
+                if (newItems.Count == 1)
+                    kept.Insert(e.NewStartingIndex, (TElement)newItems[0]!);
+                else
+                    kept.InsertRange(e.NewStartingIndex, newItems.Cast<TElement>().ToList());
+                break;
+            case NotifyCollectionChangedAction.Remove when e.OldItems is { } oldItems && e.OldStartingIndex >= 0 && e.OldStartingIndex + oldItems.Count <= kept.Count:
+                count = previousCount - oldItems.Count;
+                if (count != previousCount)
+                    OnPropertyChanging(countPropertyChangingEventArgs);
+                kept.RemoveRange(e.OldStartingIndex, oldItems.Count);
+                break;
+            case NotifyCollectionChangedAction.Replace when e.OldItems is { } replacedItems && e.NewItems is { } replacementItems && e.OldStartingIndex >= 0 && e.OldStartingIndex + replacedItems.Count <= kept.Count:
+                count = previousCount - replacedItems.Count + replacementItems.Count;
+                if (count != previousCount)
+                    OnPropertyChanging(countPropertyChangingEventArgs);
+                if (replacedItems.Count == 1 && count == previousCount)
+                    kept[e.OldStartingIndex] = (TElement)replacementItems[0]!;
+                else
+                {
+                    kept.RemoveRange(e.OldStartingIndex, replacedItems.Count);
+                    kept.InsertRange(e.OldStartingIndex, replacementItems.Cast<TElement>().ToList());
+                }
+                break;
+            case NotifyCollectionChangedAction.Move when e.OldItems is { } movedItems && e.OldStartingIndex >= 0 && e.NewStartingIndex >= 0 && e.OldStartingIndex + movedItems.Count <= kept.Count && e.NewStartingIndex + movedItems.Count <= kept.Count:
+                count = previousCount;
+                var moved = kept.GetRange(e.OldStartingIndex, movedItems.Count);
+                kept.RemoveRange(e.OldStartingIndex, movedItems.Count);
+                kept.InsertRange(e.NewStartingIndex, moved);
+                break;
+            default:
+                var reread = new List<TElement>(sequence);
+                count = reread.Count;
+                if (count != previousCount)
+                    OnPropertyChanging(countPropertyChangingEventArgs);
+                copy = reread;
+                break;
+        }
+        if (count != previousCount)
+            OnPropertyChanged(countPropertyChangedEventArgs);
+        OnCollectionChanged(e);
+    }
+
     public abstract IEnumerator<TElement> GetEnumerator();
 
     IEnumerator IEnumerable.GetEnumerator() =>

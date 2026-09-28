@@ -258,6 +258,8 @@ Two things stay yours. While changes arrive on several threads at once, an obser
 
 If nothing an observer's observations read changes while another thread builds, evaluates or disposes of one of them, as when all of it happens on a user interface thread, you can say so by setting `IsThreadSafe` to `false` in the options you hand the observer. It then evaluates without the interlocked operations the promises above cost: a raise against a thousand observations of one object costs 0.50x what it otherwise would, and a property change in a filtered view of a thousand 0.73x. It is `true` by default, and setting it where changes do cross threads gives those promises up: a change can be lost, an observation can be evaluated before it is built, and observations disposed of on several threads at once can leave parts of themselves cached.
 
+Queries keep the same promise once a `CollectionObserver` is observing what they are built over. When you ask a `CollectionObserver` to begin observing a sequence, whether an enumerable, a list or a dictionary, make sure nothing changes it until the call returns. From then on it can change on any thread, and a query built over it, or over another query, while it does misses none of those changes. So that what a query reads always matches what it has been told, observing a sequence which announces its changes keeps a copy of it, which costs a reference per element and, for a change far from the end of a long list, the time to move the rest of the copy: inserting and removing at the front of ten thousand elements costs 2.3 μs more, 1.6x what the list itself spends moving them. A list must announce its changes in the order it makes them, which one writer at a time ensures. A dictionary need not, because the observer reads each key a change names from the dictionary itself, so an `ObservableConcurrentDictionary<TKey, TValue>` can be changed by several threads at once. The sequences an `ObserveSelectMany` selector returns are read as they stand rather than observed this way, so this promise does not reach changes made to them on another thread.
+
 A query's results change on whichever thread evaluated the change, so reading them on another thread while they change is a race of yours rather than the query's: enumerating, indexing or copying one can throw or miss elements. To read a query on another thread, observe it through `ObserveUsingSyncRoot` and take the same lock while you read, or through `ObserveUsingSynchronizationContext` so that it changes on the thread which reads it.
 
 #### Fields Are Read Once
@@ -320,7 +322,9 @@ The shortcut handles an expression built from these:
 * method calls and operators resolved to a method, unless the observer disposes of what one returned and what it is made on or given can change
 * a property whose change notifications you have told the observer to ignore, when nothing it is read through can change, read once and kept
 
-What builds the graph instead: a kind of expression not in that list, such as a lambda passed as an argument or an array built from bounds; an invocation of a literal lambda whose parameter is read other than exactly once, or is read inside a deferred operand or a try when its argument could fault, because the graph evaluates every argument first; an indexer whose target can change; a member read on a value type which can notify; a call or operator whose return value the observer disposes of and whose target or arguments can change; a construction whose value the observer disposes of and whose arguments can change; a read of a property or an indexer you have registered for disposal, whatever it is read through, because the property can announce and the graph replaces and disposes of its value when it does; a read of an ignored property through something which can change; and an expression deferring more than 64 operands.
+What builds the graph instead: an invocation of a literal lambda whose parameter is read other than exactly once, or is read inside a deferred operand or a try when its argument could fault, because the graph evaluates every argument first; an indexer whose target can change; a member read on a value type which can notify; a call or operator whose return value the observer disposes of and whose target or arguments can change; a construction whose value the observer disposes of and whose arguments can change; a read of a property or an indexer you have registered for disposal, whatever it is read through, because the property can announce and the graph replaces and disposes of its value when it does; a read of an ignored property through something which can change; and an expression deferring more than 64 operands.
+
+Neither mechanism observes a lambda passed as an argument, such as the predicate handed to `Enumerable.Count`, or an array built from bounds, and asking to observe an expression containing either throws `NotSupportedException`.
 
 To find out about a particular expression, ask:
 
@@ -437,18 +441,18 @@ These are from the benchmarks in this repository, against DynamicData 9.4.33 at 
 
 | | This library | DynamicData |
 |---|---|---|
-| A property change that does not alter a filtered view | **0 B**, **13.7 ns** | 608 B, 206.2 ns |
-| An element changing group | **592 B**, **243.5 ns** | 1,936 B, 633.5 ns |
-| An element moving in a sorted view | **292 B**, 1,300.9 ns | 414 B, **998.8 ns** |
-| Building a filtered view | **950 KB**, **315 μs** | 4,120 KB, 2,419 μs |
-| What a live filtered view holds | **919 B** per element | 1,865 B per element |
+| A property change that does not alter a filtered view | **0 B**, **13.6 ns** | 608 B, 195.3 ns |
+| An element changing group | **592 B**, **256.3 ns** | 1,936 B, 623.9 ns |
+| An element moving in a sorted view | **292 B**, 1,286.0 ns | 414 B, **994.6 ns** |
+| Building a filtered view | **958 KB**, **308 μs** | 4,116 KB, 2,423 μs |
+| What a live filtered view holds | **927 B** per element | 1,865 B per element |
 
 The zero is exact rather than rounded: a property change that does not move an element in or out of a filtered view allocates nothing here, at a thousand, ten thousand and a hundred thousand elements alike. This library re-evaluates the predicate in place and stays silent when the answer has not moved; DynamicData's model is a stream of change sets, so a refresh has to materialize one. Neither is a defect. **One library pays per change and the other pays per change that matters.**
 
 **Two of those rows move with the size of the view, in opposite directions, and this is the part worth reading twice.**
 
-- **Sorting.** DynamicData's cost per move grows with the collection while this library's barely does, so the two cross at about **1,500** elements. Below that DynamicData is 1.30x faster; at four thousand this library is 1.79x faster and at ten thousand 2.97x.
-- **Grouping.** The reverse. DynamicData's cost per migration is flat while this library's grows, so the two cross at about **8,300** elements. Below that this library is 2.57x faster; at ten thousand DynamicData is 1.15x faster — though it holds 1.95x the memory to do it, 1,954 B per element against 1,003.
+- **Sorting.** DynamicData's cost per move grows with the collection while this library's barely does, so the two cross at about **1,500** elements. Below that DynamicData is 1.29x faster; at four thousand this library is 1.74x faster and at ten thousand 2.98x.
+- **Grouping.** The reverse. DynamicData's cost per migration is flat while this library's grows, so the two cross at about **7,100** elements. Below that this library is 2.43x faster; at ten thousand DynamicData is 1.33x faster — though it holds 1.93x the memory to do it, 1,954 B per element against 1,012.
 
 **The grouping crossover is a trade rather than an oversight, and knowing which side of it you want is more useful than the number.** A grouping here keeps its elements in the order they were added, so moving one out of its old group means finding it first, which is work proportional to the size of that group. DynamicData's groups are keyed rather than positional, so a removal is a dictionary operation and costs the same whatever the group holds. If you need the elements of a group in a stable order, that is what you are paying for. If you do not, DynamicData's shape is cheaper once groups get large. **A lookup built with `ObserveToLookup` is the same shape as a grouping here and behaves the same way.**
 
@@ -456,7 +460,7 @@ The zero is exact rather than rounded: a property change that does not move an e
 
 **Allocation does not cross.** At every size measured, this library allocates less for the same work: nothing at all for a filtered view, 0.31x DynamicData's for grouping, 0.71x for sorting.
 
-**The propagation advantage is largest at the sizes most applications use, and it narrows above them.** Per property change above the floor, this library costs 13.9 ns at a thousand elements, 15.9 ns at ten thousand and 65.0 ns at a hundred thousand, against 200.8, 224.5 and 331.0 ns — a lead of 14.4x, then 14.2x, then 5.1x. The allocation figure is unchanged across all three sizes; the time figure is not. A hundred thousand observations do not fit in cache, and a library which has driven its own per-change work to near zero has nothing left to hide a cache miss behind. The advantage shrinks from very large to large.
+**The propagation advantage is largest at the sizes most applications use, and it narrows above them.** Per property change above the floor, this library costs 13.7 ns at a thousand elements, 15.9 ns at ten thousand and 66.2 ns at a hundred thousand, against 197.6, 218.9 and 338.7 ns — a lead of 14.4x, then 13.8x, then 5.1x. The allocation figure is unchanged across all three sizes; the time figure is not. A hundred thousand observations do not fit in cache, and a library which has driven its own per-change work to near zero has nothing left to hide a cache miss behind. The advantage shrinks from very large to large.
 
 **Composition behaves.** Ordering or grouping a filtered view costs each library close to the sum of its parts rather than more, so a chain does not change which one to prefer — only the size of the view arriving at each stage does.
 

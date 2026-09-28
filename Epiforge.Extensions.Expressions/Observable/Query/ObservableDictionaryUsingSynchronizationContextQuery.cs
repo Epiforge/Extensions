@@ -74,6 +74,7 @@ sealed class ObservableDictionaryUsingSynchronizationContextQuery<TKey, TValue>(
 
     protected override void OnInitialization()
     {
+        using var changeHold = HoldChangesOf(source);
 #pragma warning disable IDE0028 // Simplify collection initialization
         dictionary = new();
 #pragma warning restore IDE0028 // Simplify collection initialization
@@ -90,6 +91,7 @@ sealed class ObservableDictionaryUsingSynchronizationContextQuery<TKey, TValue>(
     void SourceDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e) =>
         SynchronizationContext.Send(() =>
         {
+            using var changeHold = HoldOwnChanges();
             switch (e.Action)
             {
                 case NotifyDictionaryChangedAction.Add:
@@ -110,7 +112,11 @@ sealed class ObservableDictionaryUsingSynchronizationContextQuery<TKey, TValue>(
     void SourcePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(OperationFault))
-            SynchronizationContext.Send(() => OperationFault = source.OperationFault);
+            SynchronizationContext.Send(() =>
+            {
+                using var changeHold = HoldOwnChanges();
+                OperationFault = source.OperationFault;
+            });
     }
 
     public override string ToString() =>

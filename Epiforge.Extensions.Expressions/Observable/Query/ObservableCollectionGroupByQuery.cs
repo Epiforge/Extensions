@@ -61,7 +61,7 @@ sealed class ObservableCollectionGroupByQuery<TKey, TElement> :
         if (!collectionAndGroupingByKey.TryGetValue(key, out var collectionAndGrouping))
         {
             collection = collectionObserver.ExpressionObserver.Logger is { } logger ? new(logger) : new();
-            var grouping = new ObservableGrouping<TKey, TElement>(collectionObserver, key, collectionObserver.GetObservableCollectionQuery(collection));
+            var grouping = new ObservableGrouping<TKey, TElement>(collectionObserver, key, collectionObserver.GetObservableCollectionQuery(collection, this), this);
             grouping.Initialize();
             collectionAndGrouping = (collection, grouping);
             collectionAndGroupingByKey.Add(key, collectionAndGrouping);
@@ -113,11 +113,12 @@ sealed class ObservableCollectionGroupByQuery<TKey, TElement> :
     {
         groupings.CollectionChanged += GroupingsCollectionChanged;
         select = source.ObserveSelect(WrapSelector(KeySelector));
-        select.CollectionChanged += SelectCollectionChanged;
-        select.PropertyChanged += SelectPropertyChanged;
+        using var changeHold = HoldChangesOf(((ScopedObservableCollectionQuery<Tuple<TElement, TKey>>)select).query);
         lock (access)
             foreach (var (element, key) in select)
                 AddElement(element, key);
+        select.CollectionChanged += SelectCollectionChanged;
+        select.PropertyChanged += SelectPropertyChanged;
     }
 
     void RemoveElement(TElement element, TKey key)
@@ -178,7 +179,10 @@ sealed class ObservableCollectionGroupByQuery<TKey, TElement> :
     void SelectPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(IObservableCollectionQuery<>.OperationFault))
+        {
+            using var changeHold = HoldOwnChanges();
             OperationFault = select!.OperationFault;
+        }
     }
 
     public override string ToString() =>

@@ -40,18 +40,23 @@ sealed class ObservableDictionaryAnyQuery<TKey, TValue>(CollectionObserver colle
 
     void ObservableDictionaryQueryDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e)
     {
+        using var changeHold = HoldOwnChanges();
         observableDictionaryQueryCount = e.Action is NotifyDictionaryChangedAction.Reset ? observableDictionaryQuery.Count : observableDictionaryQueryCount + (e.NewItems?.Count ?? 0) - (e.OldItems?.Count ?? 0);
         Evaluate();
     }
 
     void ObservableDictionaryQueryPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        using var changeHold = HoldOwnChanges();
         if (e.PropertyName == nameof(ObservableDictionaryQuery<,>.OperationFault))
             Evaluate();
     }
 
     protected override void OnInitialization()
     {
+        if (Predicate is not null)
+            where = observableDictionaryQuery.ObserveWhere(Predicate);
+        using var changeHold = HoldChangesOf(where is null ? observableDictionaryQuery : Unscoped(where));
         if (Predicate is null)
         {
             observableDictionaryQueryCount = observableDictionaryQuery.Count;
@@ -60,8 +65,7 @@ sealed class ObservableDictionaryAnyQuery<TKey, TValue>(CollectionObserver colle
         }
         else
         {
-            where = observableDictionaryQuery.ObserveWhere(Predicate);
-            ((INotifyDictionaryChanged<TKey, TValue>)where).DictionaryChanged += WhereDictionaryChanged;
+            ((INotifyDictionaryChanged<TKey, TValue>)where!).DictionaryChanged += WhereDictionaryChanged;
             where.PropertyChanged += WherePropertyChanged;
         }
         Evaluate();
@@ -70,11 +74,15 @@ sealed class ObservableDictionaryAnyQuery<TKey, TValue>(CollectionObserver colle
     public override string ToString() =>
         Predicate is null ? $"any of {observableDictionaryQuery}" : $"any of {observableDictionaryQuery} matching {Predicate}";
 
-    void WhereDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e) =>
+    void WhereDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e)
+    {
+        using var changeHold = HoldOwnChanges();
         Evaluate();
+    }
 
     void WherePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        using var changeHold = HoldOwnChanges();
         if (e.PropertyName == nameof(IObservableDictionaryQuery<,>.OperationFault))
             Evaluate();
     }

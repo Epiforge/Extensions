@@ -24,11 +24,15 @@ sealed class ObservableDictionaryCountQuery<TKey, TValue>(CollectionObserver col
             Evaluation = (null, observableDictionaryQuery.Count);
     }
 
-    void ObservableDictionaryQueryDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e) =>
+    void ObservableDictionaryQueryDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e)
+    {
+        using var changeHold = HoldOwnChanges();
         Evaluate();
+    }
 
     protected override void OnInitialization()
     {
+        using var changeHold = HoldChangesOf(observableDictionaryQuery);
         observableDictionaryQuery.DictionaryChanged += ObservableDictionaryQueryDictionaryChanged;
         Evaluate();
     }

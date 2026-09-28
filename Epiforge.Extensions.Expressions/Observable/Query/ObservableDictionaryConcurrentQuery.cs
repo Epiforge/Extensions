@@ -67,11 +67,15 @@ sealed class ObservableDictionaryConcurrentQuery<TKey, TValue>(CollectionObserve
     void ObservableConcurrentDictionaryPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(OperationFault))
+        {
+            using var changeHold = HoldOwnChanges();
             OperationFault = source.OperationFault;
+        }
     }
 
     protected override void OnInitialization()
     {
+        using var changeHold = HoldChangesOf(source);
         observableConcurrentDictionary = new ObservableConcurrentDictionary<TKey, TValue>(source);
         OperationFault = source.OperationFault;
         source.DictionaryChanged += SourceDictionaryChanged;
@@ -83,6 +87,7 @@ sealed class ObservableDictionaryConcurrentQuery<TKey, TValue>(CollectionObserve
 
     void SourceDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e)
     {
+        using var changeHold = HoldOwnChanges();
         if (e.Action is NotifyDictionaryChangedAction.Reset)
             observableConcurrentDictionary!.Reset(source);
         else

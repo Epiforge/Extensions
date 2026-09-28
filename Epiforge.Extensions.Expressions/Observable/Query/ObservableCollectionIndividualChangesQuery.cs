@@ -59,6 +59,7 @@ sealed class ObservableCollectionIndividualChangesQuery<TElement> :
 
     protected override void OnInitialization()
     {
+        using var changeHold = HoldChangesOf(source);
         elements.Reset(source);
         elements.CollectionChanged += ElementsCollectionChanged;
         ((INotifyPropertyChanged)elements).PropertyChanged += ElementsPropertyChanged;

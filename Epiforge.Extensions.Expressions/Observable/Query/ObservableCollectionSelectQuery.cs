@@ -202,6 +202,7 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
 
     protected override void OnInitialization()
     {
+        using var changeHold = HoldChangesOf(source);
         lock (access)
         {
             var faultList = new FaultList();
@@ -265,13 +266,19 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
     void IObservableQueryDependent.OnDependencyPropertyChanged(ObservableQuerySubscription subscription, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(Count))
+        {
+            using var changeHold = HoldOwnChanges();
             OnPropertyChanged(e);
+        }
     }
 
     void IObservableQueryDependent.OnDependencyPropertyChanging(ObservableQuerySubscription subscription, PropertyChangingEventArgs e)
     {
         if (e.PropertyName == nameof(Count))
+        {
+            using var changeHold = HoldOwnChanges();
             OnPropertyChanging(e);
+        }
     }
 
     void SourceCollectionChanged(NotifyCollectionChangedEventArgs e)

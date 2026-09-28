@@ -39,18 +39,23 @@ sealed class ObservableCollectionAnyQuery<TElement>(CollectionObserver collectio
 
     void ObservableCollectionQueryCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
+        using var changeHold = HoldOwnChanges();
         observableCollectionQueryCount = e.Action is NotifyCollectionChangedAction.Reset ? observableCollectionQuery.Count : observableCollectionQueryCount + (e.NewItems?.Count ?? 0) - (e.OldItems?.Count ?? 0);
         Evaluate();
     }
 
     void ObservableCollectionQueryPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        using var changeHold = HoldOwnChanges();
         if (e.PropertyName == nameof(ObservableCollectionQuery<>.OperationFault))
             Evaluate();
     }
 
     protected override void OnInitialization()
     {
+        if (Predicate is not null)
+            where = observableCollectionQuery.ObserveWhere(Predicate);
+        using var changeHold = HoldChangesOf(where is null ? observableCollectionQuery : Unscoped(where));
         if (Predicate is null)
         {
             observableCollectionQueryCount = observableCollectionQuery.Count;
@@ -59,8 +64,7 @@ sealed class ObservableCollectionAnyQuery<TElement>(CollectionObserver collectio
         }
         else
         {
-            where = observableCollectionQuery.ObserveWhere(Predicate);
-            where.CollectionChanged += WhereCollectionChanged;
+            where!.CollectionChanged += WhereCollectionChanged;
             where.PropertyChanged += WherePropertyChanged;
         }
         Evaluate();
@@ -69,11 +73,15 @@ sealed class ObservableCollectionAnyQuery<TElement>(CollectionObserver collectio
     public override string ToString() =>
         Predicate is null ? $"any of {observableCollectionQuery}" : $"any of {observableCollectionQuery} matching {Predicate}";
 
-    void WhereCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
+    void WhereCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        using var changeHold = HoldOwnChanges();
         Evaluate();
+    }
 
     void WherePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        using var changeHold = HoldOwnChanges();
         if (e.PropertyName == nameof(IObservableCollectionQuery<>.OperationFault))
             Evaluate();
     }

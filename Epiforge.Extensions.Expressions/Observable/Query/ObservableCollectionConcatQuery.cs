@@ -32,8 +32,26 @@ sealed class ObservableCollectionConcatQuery<TElement>(CollectionObserver collec
     public override int Count =>
         count;
 
+    internal override bool ChangesThroughOthers =>
+        true;
+
     internal override bool HasIndexerPenalty =>
         true;
+
+    ObservableQuery? SecondQuery =>
+        Second switch
+        {
+            ObservableQuery query => query,
+            ScopedObservableCollectionQuery<TElement> scoped => scoped.query,
+            _ => null
+        };
+
+    internal override void CollectChangeLocks(List<ObservableQuery> queries)
+    {
+        first.CollectChangeLocks(queries);
+        SecondQuery?.CollectChangeLocks(queries);
+        queries.Add(this);
+    }
 
     protected override bool Dispose(bool disposing)
     {
@@ -76,6 +94,7 @@ sealed class ObservableCollectionConcatQuery<TElement>(CollectionObserver collec
 
     void IObservableQueryDependent.OnDependencyCollectionChanged(ObservableQuerySubscription subscription, NotifyCollectionChangedEventArgs e)
     {
+        using var changeHold = HoldOwnChanges();
         lock (access)
         {
             if (subscription == firstSubscription)
@@ -88,11 +107,15 @@ sealed class ObservableCollectionConcatQuery<TElement>(CollectionObserver collec
     void IObservableQueryDependent.OnDependencyPropertyChanged(ObservableQuerySubscription subscription, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(OperationFault))
+        {
+            using var changeHold = HoldOwnChanges();
             SetOperationFault();
+        }
     }
 
     protected override void OnInitialization()
     {
+        using var changeHold = HoldChangesOf(first, SecondQuery);
         lock (access)
         {
             firstCount = first.Count;
@@ -109,8 +132,11 @@ sealed class ObservableCollectionConcatQuery<TElement>(CollectionObserver collec
         }
     }
 
-    void SecondCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
+    void SecondCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        using var changeHold = HoldOwnChanges();
         SecondCollectionChanged(e);
+    }
 
     void SecondCollectionChanged(NotifyCollectionChangedEventArgs e)
     {
@@ -137,7 +163,10 @@ sealed class ObservableCollectionConcatQuery<TElement>(CollectionObserver collec
     void SecondPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(IObservableCollectionQuery<>.OperationFault))
+        {
+            using var changeHold = HoldOwnChanges();
             SetOperationFault();
+        }
     }
 
     void SetCount()

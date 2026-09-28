@@ -44,6 +44,7 @@ sealed class ObservableCollectionAverageQuery<TElement, TResult>(CollectionObser
         divide = GenericDivision<TResult, TResult, TResult>.Instance;
         subtract = GenericSubtraction<TResult, TResult, TResult>.Instance;
         select = observableCollectionQuery.ObserveSelect(Selector);
+        using var changeHold = HoldChangesOf(Unscoped(select));
         lock (access)
             Recompute();
         select.CollectionChanged += SelectCollectionChanged;

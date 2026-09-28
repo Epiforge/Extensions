@@ -40,17 +40,22 @@ sealed class ObservableCollectionAggregateQuery<TElement, TAccumulate, TResult>(
         }
     }
 
-    void ObservableCollectionQueryCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
+    void ObservableCollectionQueryCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        using var changeHold = HoldOwnChanges();
         Evaluate();
+    }
 
     void ObservableCollectionQueryPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        using var changeHold = HoldOwnChanges();
         if (e.PropertyName == nameof(ObservableCollectionQuery<>.OperationFault))
             Evaluate();
     }
 
     protected override void OnInitialization()
     {
+        using var changeHold = HoldChangesOf(observableCollectionQuery);
         observableCollectionQuery.CollectionChanged += ObservableCollectionQueryCollectionChanged;
         observableCollectionQuery.PropertyChanged += ObservableCollectionQueryPropertyChanged;
         Evaluate();

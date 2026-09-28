@@ -48,6 +48,7 @@ sealed class ObservableCollectionSumQuery<TElement, TResult>(CollectionObserver 
         add = GenericAddition<TResult, TResult, TResult>.Instance;
         subtract = GenericSubtraction<TResult, TResult, TResult>.Instance;
         select = observableCollectionQuery.ObserveSelect(Selector);
+        using var changeHold = HoldChangesOf(Unscoped(select));
         Evaluate();
         select.CollectionChanged += SelectCollectionChanged;
         select.PropertyChanged += SelectPropertyChanged;
@@ -55,6 +56,7 @@ sealed class ObservableCollectionSumQuery<TElement, TResult>(CollectionObserver 
 
     void SelectCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
+        using var changeHold = HoldOwnChanges();
         switch (e.Action)
         {
             case NotifyCollectionChangedAction.Add:
@@ -80,6 +82,7 @@ sealed class ObservableCollectionSumQuery<TElement, TResult>(CollectionObserver 
 
     void SelectPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        using var changeHold = HoldOwnChanges();
         if (e.PropertyName == nameof(IObservableCollectionQuery<>.OperationFault))
             Evaluate();
     }

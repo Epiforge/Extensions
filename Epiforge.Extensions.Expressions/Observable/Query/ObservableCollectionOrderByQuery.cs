@@ -202,9 +202,11 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
 
     protected override void OnInitialization()
     {
+        var selections = SelectorsAndDirections.Select(t => (selection: source.ObserveSelect(WrapSelector(t.keySelectorExpression)), t.isDescending)).ToList().AsReadOnly();
+        using var changeHold = HoldChangesOf([source, .. selections.Select(t => ((ScopedObservableCollectionQuery<Tuple<TElement, IComparable>>)t.selection).query)]);
         lock (access)
         {
-            selectionsAndDirections = SelectorsAndDirections.Select(t => (selection: source.ObserveSelect(WrapSelector(t.keySelectorExpression)), t.isDescending)).ToList().AsReadOnly();
+            selectionsAndDirections = selections;
             comparer = new(access, selectionsAndDirections);
             var ordered = new List<TElement>();
             RebuildPositionsWithAccess(source.OrderBy(element => element, comparer).ToList(), ordered);
@@ -394,7 +396,10 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
     void SelectionPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(IObservableCollectionQuery<>.OperationFault))
+        {
+            using var changeHold = HoldOwnChanges();
             SetOperationFault();
+        }
     }
 
     void SetOperationFault()

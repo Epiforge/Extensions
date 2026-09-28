@@ -33,6 +33,7 @@ sealed class ObservableCollectionAllQuery<TElement>(CollectionObserver collectio
     protected override void OnInitialization()
     {
         unmatched = observableCollectionQuery.ObserveWhere(negatedPredicates.GetValue(Predicate, static source => Expression.Lambda<Func<TElement, bool>>(Expression.Not(source.Body), source.Parameters)));
+        using var changeHold = HoldChangesOf(Unscoped(unmatched));
         unmatched.CollectionChanged += UnmatchedCollectionChanged;
         unmatched.PropertyChanged += UnmatchedPropertyChanged;
         Evaluate();
@@ -41,11 +42,15 @@ sealed class ObservableCollectionAllQuery<TElement>(CollectionObserver collectio
     public override string ToString() =>
         $"all {observableCollectionQuery} matching {Predicate}";
 
-    void UnmatchedCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
+    void UnmatchedCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        using var changeHold = HoldOwnChanges();
         Evaluate();
+    }
 
     void UnmatchedPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        using var changeHold = HoldOwnChanges();
         if (e.PropertyName == nameof(IObservableCollectionQuery<>.OperationFault))
             Evaluate();
     }

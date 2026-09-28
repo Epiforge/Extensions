@@ -11,6 +11,7 @@ sealed class ObservableCollectionUsingSyncRootEventuallyQuery<TElement>(Collecti
     ObservableRangeCollection<TElement>? elements;
     readonly ConcurrentQueue<AsyncProducerConsumerQueue<NotifyCollectionChangedEventArgs>> pendingCollectionChangedEventsQueue = new();
     readonly ConcurrentQueue<CancellationTokenSource> resetCancellationTokenSources = new();
+    readonly ConcurrentQueue<List<TElement>> resetElementsQueue = new();
 
     public override TElement this[int index] =>
         elements![index];
@@ -47,6 +48,7 @@ sealed class ObservableCollectionUsingSyncRootEventuallyQuery<TElement>(Collecti
 
     protected override void OnInitialization()
     {
+        using var changeHold = HoldChangesOf(source);
         currentPendingCollectionChangedEvents = new();
         pendingCollectionChangedEventsQueue.Enqueue(currentPendingCollectionChangedEvents);
         currentResetCancellationTokenSource = new();
@@ -70,6 +72,7 @@ sealed class ObservableCollectionUsingSyncRootEventuallyQuery<TElement>(Collecti
     {
         if (e.Action is NotifyCollectionChangedAction.Reset)
         {
+            resetElementsQueue.Enqueue(source.ToList());
             currentPendingCollectionChangedEvents = new();
             pendingCollectionChangedEventsQueue.Enqueue(currentPendingCollectionChangedEvents);
             var previousResetCancellationTokenSource = currentResetCancellationTokenSource;
@@ -84,7 +87,10 @@ sealed class ObservableCollectionUsingSyncRootEventuallyQuery<TElement>(Collecti
     void SourcePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(OperationFault))
+        {
+            using var changeHold = HoldOwnChanges();
             OperationFault = source.OperationFault;
+        }
     }
 
     async Task SynchronizationAsync()
@@ -101,6 +107,7 @@ sealed class ObservableCollectionUsingSyncRootEventuallyQuery<TElement>(Collecti
                         var e = await pendingCollectionChangeEvents.DequeueAsync(linkedCancellationTokenSource.Token).ConfigureAwait(false);
                         lock (SyncRoot!)
                         {
+                            using var changeHold = HoldOwnChanges();
                             switch (e.Action)
                             {
                                 case NotifyCollectionChangedAction.Add:
@@ -123,8 +130,12 @@ sealed class ObservableCollectionUsingSyncRootEventuallyQuery<TElement>(Collecti
                 {
                     if (disposedCancellationToken.IsCancellationRequested)
                         return;
+                    resetElementsQueue.TryDequeue(out var resetElements);
                     lock (SyncRoot!)
-                        elements!.Reset(source);
+                    {
+                        using var changeHold = HoldOwnChanges();
+                        elements!.Reset(resetElements!);
+                    }
                 }
             }
     }

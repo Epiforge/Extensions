@@ -74,6 +74,7 @@ sealed class ObservableDictionaryUsingSynchronizationContextEventuallyQuery<TKey
 
     protected override void OnInitialization()
     {
+        using var changeHold = HoldChangesOf(source);
 #pragma warning disable IDE0028 // Simplify collection initialization
         dictionary = new();
 #pragma warning restore IDE0028 // Simplify collection initialization
@@ -87,9 +88,12 @@ sealed class ObservableDictionaryUsingSynchronizationContextEventuallyQuery<TKey
         dictionary.PropertyChanged += DictionaryPropertyChanged;
     }
 
-    void SourceDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e) =>
+    void SourceDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e)
+    {
+        var resetKeyValuePairs = e.Action is NotifyDictionaryChangedAction.Reset ? source.ToDictionary(kv => kv.Key, kv => kv.Value) : null;
         SynchronizationContext.Post(_ =>
         {
+            using var changeHold = HoldOwnChanges();
             switch (e.Action)
             {
                 case NotifyDictionaryChangedAction.Add:
@@ -102,15 +106,20 @@ sealed class ObservableDictionaryUsingSynchronizationContextEventuallyQuery<TKey
                     dictionary!.ReplaceRange(e.OldItems.Select(oldKeyValuePair => oldKeyValuePair.Key), e.NewItems);
                     break;
                 case NotifyDictionaryChangedAction.Reset:
-                    dictionary!.Reset(source.ToDictionary(kv => kv.Key, kv => kv.Value));
+                    dictionary!.Reset(resetKeyValuePairs!);
                     break;
             }
         }, null);
+    }
 
     void SourcePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(OperationFault))
-            SynchronizationContext.Post(_ => OperationFault = source.OperationFault, null);
+            SynchronizationContext.Post(_ =>
+            {
+                using var changeHold = HoldOwnChanges();
+                OperationFault = source.OperationFault;
+            }, null);
     }
 
     public override string ToString() =>

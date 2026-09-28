@@ -186,6 +186,7 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>(Colle
     protected override void OnInitialization()
     {
         select = source.ObserveSelect(PairSelector(KeySelector, ValueSelector));
+        using var changeHold = HoldChangesOf(Unscoped(select));
         lock (access)
         {
             BuildClaimsWithAccess();
@@ -284,7 +285,10 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>(Colle
     void SelectPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(IObservableCollectionQuery<>.OperationFault))
+        {
+            using var changeHold = HoldOwnChanges();
             SetOperationFault();
+        }
     }
 
     void SetOperationFault()

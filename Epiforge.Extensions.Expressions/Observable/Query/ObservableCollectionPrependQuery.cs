@@ -13,8 +13,17 @@ sealed class ObservableCollectionPrependQuery<TElement>(CollectionObserver colle
     public override int Count =>
         sequenceCount + 1;
 
+    internal override bool ChangesThroughOthers =>
+        true;
+
     internal override bool HasIndexerPenalty =>
         sequence.HasIndexerPenalty;
+
+    internal override void CollectChangeLocks(List<ObservableQuery> queries)
+    {
+        sequence.CollectChangeLocks(queries);
+        queries.Add(this);
+    }
 
     protected override bool Dispose(bool disposing)
     {
@@ -37,6 +46,7 @@ sealed class ObservableCollectionPrependQuery<TElement>(CollectionObserver colle
 
     protected override void OnInitialization()
     {
+        using var changeHold = HoldChangesOf(sequence);
         sequenceCount = sequence.Count;
         sequence.CollectionChanged += SequenceCollectionChanged;
         sequence.PropertyChanged += SequencePropertyChanged;
@@ -51,6 +61,7 @@ sealed class ObservableCollectionPrependQuery<TElement>(CollectionObserver colle
 
     void SequenceCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
+        using var changeHold = HoldOwnChanges();
         if (e.Action == NotifyCollectionChangedAction.Reset)
             sequenceCount = sequence.Count;
         else
@@ -69,7 +80,10 @@ sealed class ObservableCollectionPrependQuery<TElement>(CollectionObserver colle
     void SequencePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(IObservableCollectionQuery<>.OperationFault))
+        {
+            using var changeHold = HoldOwnChanges();
             SetOperationFault();
+        }
     }
 
     public override string ToString() =>
