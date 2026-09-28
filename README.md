@@ -258,6 +258,8 @@ Two things stay yours. While changes arrive on several threads at once, an obser
 
 If nothing an observer's observations read changes while another thread builds, evaluates or disposes of one of them, as when all of it happens on a user interface thread, you can say so by setting `IsThreadSafe` to `false` in the options you hand the observer. It then evaluates without the interlocked operations the promises above cost: a raise against a thousand observations of one object costs 0.50x what it otherwise would, and a property change in a filtered view of a thousand 0.73x. It is `true` by default, and setting it where changes do cross threads gives those promises up: a change can be lost, an observation can be evaluated before it is built, and observations disposed of on several threads at once can leave parts of themselves cached.
 
+A query's results change on whichever thread evaluated the change, so reading them on another thread while they change is a race of yours rather than the query's: enumerating, indexing or copying one can throw or miss elements. To read a query on another thread, observe it through `ObserveUsingSyncRoot` and take the same lock while you read, or through `ObserveUsingSynchronizationContext` so that it changes on the thread which reads it.
+
 #### Fields Are Read Once
 Whatever a field held when an observation began is what that observation goes on using — a captured local, a field of your own class, and a static field alike. Assigning it afterward does not reach an observation that already exists. Static properties behave the same way, so `e => e.Hired < DateTime.Now` compares against the moment it was created for as long as it lives.
 
