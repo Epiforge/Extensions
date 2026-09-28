@@ -6,6 +6,7 @@ namespace Epiforge.Extensions.Benchmarking;
 /// <remarks>
 /// Each arm inserts an element into ten thousand and removes it again, at the front or at the end. The unobserved arms price the sequence's own work, which moves its elements the same way the copy's are moved; the observed arms add an observation of the sequence and its copy and nothing else; the filtered arms add a filtered view over that observation, whose own work also grows with the elements after the change. What the copy costs is the observed arms' difference between the front and the end, less the unobserved arms' difference
 /// </remarks>
+[AgainstReleasedExpressions("7.0.0")]
 [MemoryDiagnoser]
 public class ObservedSequenceCopyBenchmarks
 {

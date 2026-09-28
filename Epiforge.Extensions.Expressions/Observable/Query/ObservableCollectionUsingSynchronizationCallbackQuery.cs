@@ -3,6 +3,8 @@ namespace Epiforge.Extensions.Expressions.Observable.Query;
 sealed class ObservableCollectionUsingSynchronizationCallbackQuery<TElement>(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> source, object context, CollectionSynchronizationCallback synchronizationCallback) :
     ObservableCollectionQuery<TElement>(collectionObserver)
 {
+    Action? applyPendingChangesAction;
+    Action? applyPendingChangesInCallbackAction;
     ObservableRangeCollection<TElement>? elements;
     readonly Queue<(NotifyCollectionChangedEventArgs change, List<TElement>? reset)> pending = new();
     internal readonly object Context = context;
@@ -89,11 +91,23 @@ sealed class ObservableCollectionUsingSynchronizationCallbackQuery<TElement>(Col
         }
     }
 
+    /// <summary>
+    /// Yields the one delegate this query hands on for applying its pending changes, since a method group converts to a new delegate at each conversion and this one is handed on for every change of the source
+    /// </summary>
+    Action ApplyPendingChangesAction =>
+        applyPendingChangesAction ??= ApplyPendingChanges;
+
+    /// <summary>
+    /// Yields the one delegate this query defers for applying its pending changes within the callback, since a lambda capturing the query converts to a new delegate each time it is reached, which is once for every change of the source
+    /// </summary>
+    Action ApplyPendingChangesInCallbackAction =>
+        applyPendingChangesInCallbackAction ??= () => SynchronizationCallback(this, Context, ApplyPendingChangesAction, true);
+
     void SourceCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         lock (pending)
             pending.Enqueue((e, e.Action is NotifyCollectionChangedAction.Reset ? [.. source] : null));
-        DeferUntilChangeLocksReleased(() => SynchronizationCallback(this, Context, ApplyPendingChanges, true));
+        DeferUntilChangeLocksReleased(ApplyPendingChangesInCallbackAction);
     }
 
     void SourcePropertyChanged(object? sender, PropertyChangedEventArgs e)

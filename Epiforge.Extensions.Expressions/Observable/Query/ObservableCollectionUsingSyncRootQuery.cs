@@ -3,6 +3,7 @@ namespace Epiforge.Extensions.Expressions.Observable.Query;
 sealed class ObservableCollectionUsingSyncRootQuery<TElement>(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> source, object syncRoot) :
     ObservableCollectionQuery<TElement>(collectionObserver)
 {
+    Action? applyPendingChangesAction;
     ObservableRangeCollection<TElement>? elements;
     readonly Queue<(NotifyCollectionChangedEventArgs change, List<TElement>? reset)> pending = new();
 
@@ -92,11 +93,17 @@ sealed class ObservableCollectionUsingSyncRootQuery<TElement>(CollectionObserver
         }
     }
 
+    /// <summary>
+    /// Yields the one delegate this query hands on for applying its pending changes, since a method group converts to a new delegate at each conversion and this one is handed on for every change of the source
+    /// </summary>
+    Action ApplyPendingChangesAction =>
+        applyPendingChangesAction ??= ApplyPendingChanges;
+
     void SourceCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         lock (pending)
             pending.Enqueue((e, e.Action is NotifyCollectionChangedAction.Reset ? [.. source] : null));
-        DeferUntilChangeLocksReleased(ApplyPendingChanges);
+        DeferUntilChangeLocksReleased(ApplyPendingChangesAction);
     }
 
     void SourcePropertyChanged(object? sender, PropertyChangedEventArgs e)

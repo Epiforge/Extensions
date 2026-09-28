@@ -6,6 +6,7 @@ namespace Epiforge.Extensions.Benchmarking;
 /// <remarks>
 /// GS5 measured <c>ObserveCast</c> compiling afresh on every call, because the lambda it observes is built anew each time and the observer's caches match by reference. Each arm builds one query over each of 256 standing sources of one element, as GS5's traversal does over time slices, and then disposes all of them, under the optimizer GS5 configures. <see cref="WhereShared"/> and <see cref="WhereRebuilt"/> differ only by the caller rebuilding its predicate for every call, which prices one pass of the optimizer, the analysis and the compiler per source in the same run; the other arms are multiples of that difference or controls
 /// </remarks>
+[AgainstReleasedExpressions("7.0.0")]
 [MemoryDiagnoser]
 public class QueryLambdaReuseBenchmarks
 {

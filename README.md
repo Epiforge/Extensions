@@ -37,8 +37,8 @@ Supports `net6.0`, `net7.0`, `net8.0`, `net9.0`, and `net10.0`.
       - [When a Query Faults](#when-a-query-faults)
       - [Keys and Order](#keys-and-order)
       - [Enumerate Rather Than Index](#enumerate-rather-than-index)
-      - [Choosing Between Observable Queries and DynamicData](#choosing-between-observable-queries-and-dynamicdata)
-      - [Measured Against DynamicData](#measured-against-dynamicdata)
+      - [Choosing a Library](#choosing-a-library)
+      - [Measured Against Other Libraries](#measured-against-other-libraries)
   - [Platforms](#platforms)
     - [ Windows](#-windows)
 - [License](#license)
@@ -416,61 +416,86 @@ A query does remember the position it handed out last and searches outward from 
 Walking ten thousand elements by index instead of by enumerator measured 25x to 50x slower in order, and 120x to 150x out of order; at a hundred elements it was 10x to 15x, and there the repeated locking is the whole of it.
 Where you do need elements by position more than once, copy the query's contents and index the copy.
 
-#### Choosing Between Observable Queries and DynamicData
-[DynamicData](https://github.com/reactivemarbles/DynamicData) is the nearest thing to this in .NET, and it is a good library. Both keep a derived collection correct as your data changes — filter, sort, group, project, aggregate — and both update the result when an element's property changes rather than only when the collection does. Here is how to tell which one you want.
+#### Choosing a Library
+Three other .NET libraries keep a derived collection correct as your data changes: [DynamicData](https://github.com/reactivemarbles/DynamicData), [NMF Expressions](https://github.com/NMFCode/NMF) and [ObservableComputations](https://github.com/IgorBuchelnikov/ObservableComputations). All four filter, sort, group, project and aggregate, and all four update the result when an element's property changes rather than only when the collection does. They are all good at what they set out to do, and they set out to do different things. Everything this section says one of them does is asserted by a test in `Epiforge.Extensions.Comparisons.Tests`, which exercises all four the same way, so a statement here that stops being true fails a test; what each offers beyond that is taken from its own documentation and public API.
 
-**Start with what you already know.** If you know `INotifyPropertyChanged`, `ObservableCollection<T>` and LINQ, this library asks you to learn almost nothing else: you point it at the collection you already have, write `ObserveWhere(person => person.Rank > 0)`, and bind the result. If you already know Rx, or you use ReactiveUI, DynamicData will feel like home and this library will feel like an unfamiliar dialect — and it is probably already somewhere in your dependency graph. Most of the rest follows from that one answer.
+**Start with what you already know.** If you know `INotifyPropertyChanged`, `ObservableCollection<T>` and LINQ, this library, NMF Expressions and ObservableComputations all ask you to learn little else: each reads what to watch out of an expression you write over the collection you already have. This library wants you to observe the collection first, NMF Expressions wants you to call `WithUpdates()` on it and to give the result a successor before it follows anything, and ObservableComputations wants you to bind each computation to an `OcConsumer` whose disposal tears it down. If you already know Rx, or you use ReactiveUI, DynamicData will feel like home — and it is probably already somewhere in your dependency graph.
 
-| What you will actually run into | This library | DynamicData |
-|---|---|---|
-| Where your data lives | The `ObservableCollection<T>` you already have | A `SourceCache` or `SourceList`; adapting an existing collection is possible but much slower |
-| Saying which property to watch | Read out of your expression | You name it with `AutoRefresh` — forget it and your view goes quietly stale |
-| A property change that does not change the result | Costs nothing | Materializes a change set each time |
-| When your projection throws | A fault you can bind to; the query keeps working | Ends the subscription, as Rx does, unless you use `TransformSafe` |
-| Combining collections | `ObserveConcat`, chained | Also union, intersection, difference, and merging a changing set of sources |
-| Showing only what is on screen | A fixed slice that stays correct | Live paging and virtualization driven by a stream of requests |
-| Composing with anything else reactive | Not applicable | Everything in Rx composes with it |
-| An expression it cannot analyze | Falls back to a slower path, says so in your log, results unchanged | Not applicable |
+| What you will actually run into | This library | DynamicData | NMF Expressions | ObservableComputations |
+|---|---|---|---|---|
+| Where your data lives | The `ObservableCollection<T>` you already have | A `SourceCache` or `SourceList`; adapting an existing collection is possible but much slower | The collection you already have, through `WithUpdates()` | The collection you already have |
+| Saying which property to watch | Read out of your expression | You name it with `AutoRefresh` — forget it and your view goes quietly stale | Read out of your expression | Read out of your expression |
+| An element announcing that all its properties changed, without naming one | Followed | Followed only when told to refresh on any property | Ignored | Ignored |
+| A predicate or selector which throws while the view is built | The element is left out and the fault reported on the view; it returns once it stops throwing | The view ends | Building the view throws | Building the view throws |
+| A change which makes it throw | Your setter returns, the fault is reported on the view, and the view recovers | The view ends, and your setter throws if nothing handles its error; `TransformSafe` catches a projection's | Your setter throws; the view recovers | Your setter throws; the view afterward misses elements added to the collection |
+| A change on another thread while your handler is still handling the view's last change | Waits until your handler returns | Waits until your handler returns | Applied to the view underneath your handler | Returns at once, and is applied once your handler returns |
+| Values the view makes, when they are replaced or removed | Disposed of without being asked | Disposed of when asked, with `DisposeMany` | Not reliably disposed of | Disposed of when asked, with `CollectionDisposing` |
+| Combining collections | `ObserveConcat`, chained | Union, intersection, difference, and merging a changing set of sources | Concatenation, union, intersection, difference and joins | Concatenation, union, intersection, difference and zipping |
+| Showing only what is on screen | A fixed slice that stays correct | Live paging and virtualization driven by a stream of requests | The first elements of an ordering, with `TopX` | Paging |
+| Composing with anything else reactive | Through its change events | Everything in Rx composes with it | Through its change events | Through its change events |
+
+When a view observes a single value rather than a collection, three of them observe an expression and differ in what they announce:
+
+| An observed expression which | This library | NMF Expressions | ObservableComputations |
+|---|---|---|---|
+| reads one value twice, when that value changes | Announces the new result once | Announces a result the expression never had, then the new one | Announces the new result once |
+| does not change when what it reads does | Announces nothing | Announces nothing | Announces its unchanged result |
+| reads an element of a list by index | Follows the element there | Follows the element there | Does not follow it |
+| catches an exception with `try` and `catch` | Observes the try | Refuses it | Observes the try |
+| contains a query, such as a `Count` with a predicate | Refuses it; use a query such as `ObserveCount` instead | Follows it over a sequence given `WithUpdates()` | Follows its own operators, such as `Filtering(…).Count`, but not LINQ's |
 
 **Use DynamicData if** you are already in Rx; you need to combine several collections by set operations; you need live paging, virtualization, size limits or expiry; you need asynchronous projections; or you want the reassurance of a large and long-established user base.
 
-**Use this library if** you want a live view of a collection you already have, with the least new vocabulary, and you care about what an individual property change costs.
+**Use NMF Expressions if** your sorted views are large and change far more often than anyone reads them all, or if you need what it offers beyond the others: transactions which apply several changes as one, a parallel execution engine, expressions which can be written back through, and incremental functions you can reuse.
 
-#### Measured Against DynamicData
-These are from the benchmarks in this repository, against DynamicData 9.4.33 at a thousand elements unless stated otherwise. Each propagation figure is per property change, above what the same changes cost with nothing observing them at all.
+**Use ObservableComputations if** sorting and grouping views of up to a few thousand elements is where your time goes and the code your views run never throws; or if you want its dispatching of computations to other threads, pausing, paging or zipping.
 
-| | This library | DynamicData |
-|---|---|---|
-| A property change that does not alter a filtered view | **0 B**, **13.2 ns** | 608 B, 201.9 ns |
-| An element changing group | **592 B**, **254.4 ns** | 1,936 B, 630.6 ns |
-| An element moving in a sorted view | **292 B**, 1,280.6 ns | 414 B, **982.4 ns** |
-| Building a filtered view | **958 KB**, **318 μs** | 4,116 KB, 2,537 μs |
-| What a live filtered view holds | **927 B** per element | 1,865 B per element |
+**Use this library if** you want a live view of a collection you already have with the least new vocabulary; if the code your views run may throw and your application has to keep going; if changes come from more than one thread; or if you care most about what an individual property change costs a filtered view.
 
-The zero is exact rather than rounded: a property change that does not move an element in or out of a filtered view allocates nothing here, at a thousand, ten thousand and a hundred thousand elements alike. This library re-evaluates the predicate in place and stays silent when the answer has not moved; DynamicData's model is a stream of change sets, so a refresh has to materialize one. Neither is a defect. **One library pays per change and the other pays per change that matters.**
+#### Measured Against Other Libraries
+These are from the benchmarks in this repository, against DynamicData 9.4.33, NMF Expressions 2.3.0 and ObservableComputations 2.3.0, at a thousand elements unless stated otherwise, all on one machine. Each propagation figure is per property change, above what the same changes cost with nothing observing them at all. The best in each row is in bold.
 
-**Two of those rows move with the size of the view, in opposite directions, and this is the part worth reading twice.**
+| | This library | DynamicData | NMF Expressions | ObservableComputations |
+|---|---|---|---|---|
+| A property change that does not alter a filtered view | **0 B**, **13.2 ns** | 608 B, 201.9 ns | 129 B, 31.1 ns | **0 B**, 13.7 ns |
+| The same at a hundred thousand | **0 B**, **66.7 ns** | 608 B, 367.6 ns | 128 B, 370.1 ns | **0 B**, 97.3 ns |
+| Building a filtered view | **958 KB**, **318 μs** | 4,116 KB, 2,537 μs | 2,023 KB, 450 μs | 1,070 KB, 323 μs |
+| An element moving in a sorted view | 292 B, 1,280.6 ns | 414 B, 982.4 ns | 556 B, 372.5 ns | **72 B**, **283.6 ns** |
+| The same at ten thousand | 312 B, 3,198.4 ns | 432 B, 9,345.0 ns | 556 B, **372.4 ns** | **72 B**, 5,488.9 ns |
+| Building a sorted view | 1,761 KB, 722 μs | 3,935 KB, 2,647 μs | 1,857 KB, 436 μs | **1,094 KB**, **323 μs** |
+| An element changing group | 592 B, 254.4 ns | 1,936 B, 630.6 ns | 640 B, 178.6 ns | **154 B**, **125.7 ns** |
+| The same at ten thousand | 592 B, 767.6 ns | 1,936 B, 667.8 ns | 640 B, 610.1 ns | **153 B**, **306.8 ns** |
+| Building a grouped view | 1,165 KB, **387 μs** | 4,117 KB, 2,558 μs | 2,118 KB, 647 μs | **1,118 KB**, 392 μs |
+| What a live filtered view holds | **927 B** per element | 1,865 B per element | Not measured | Not measured |
+
+**Filtering is this library's, at every size.** A property change which does not move an element in or out of a filtered view allocates nothing here, at a thousand, ten thousand and a hundred thousand elements alike: the predicate is re-evaluated in place and the view stays silent when the answer has not moved. ObservableComputations comes within 8% of it up to ten thousand elements, also allocating nothing, and falls to 1.46x its time at a hundred thousand. DynamicData's model is a stream of change sets, so a refresh has to materialize one; neither is a defect. **One library pays per change and another pays per change that matters.**
+
+**Sorting has no leader.** ObservableComputations moves an element in a sorted view of a thousand in 0.22x this library's time, allocating 72 B, but its cost grows fastest with the view, to 1.72x this library's at ten thousand. NMF Expressions' cost does not grow at all, which makes it the fastest from a few thousand elements on, but it allocates 556 B a change and rebuilds its order whenever it is read: one walk of a sorted view of ten thousand allocates 371 KB there, against 78 KB here and nothing in either of the others. This library sits between them, and passes DynamicData between a thousand and four thousand elements.
+
+**Grouping is ObservableComputations'.** It moves an element between groups in 0.40x to 0.50x this library's time at every size measured, allocating a quarter to a third as much, and NMF Expressions in 0.70x to 0.79x. This library's cost grows with the size of a group, for the reason below, while DynamicData's does not, which is why DynamicData passes it near ten thousand elements.
+
+**Against DynamicData, two of those rows move with the size of the view, in opposite directions.**
 
 - **Sorting.** DynamicData's cost per move grows with the collection while this library's barely does, so the two cross at about **1,500** elements. Below that DynamicData is 1.29x faster; at four thousand this library is 1.80x faster and at ten thousand 2.92x.
 - **Grouping.** The reverse. DynamicData's cost per migration is flat while this library's grows, so the two cross at about **8,400** elements. Below that this library is 2.54x faster; at ten thousand DynamicData is 1.15x faster — though it holds 1.93x the memory to do it, 1,954 B per element against 1,012.
 
-**The grouping crossover is a trade rather than an oversight, and knowing which side of it you want is more useful than the number.** A grouping here keeps its elements in the order they were added, so moving one out of its old group means finding it first, which is work proportional to the size of that group. DynamicData's groups are keyed rather than positional, so a removal is a dictionary operation and costs the same whatever the group holds. If you need the elements of a group in a stable order, that is what you are paying for. If you do not, DynamicData's shape is cheaper once groups get large. **A lookup built with `ObserveToLookup` is the same shape as a grouping here and behaves the same way.**
+**The grouping cost is a trade rather than an oversight, and knowing which side of it you want is more useful than the number.** A grouping here keeps its elements in the order they were added, so moving one out of its old group means finding it first, which is work proportional to the size of that group. DynamicData's groups are keyed rather than positional, so a removal is a dictionary operation and costs the same whatever the group holds. If you need the elements of a group in a stable order, that is what you are paying for. If you do not, a keyed shape is cheaper once groups get large. **A lookup built with `ObserveToLookup` is the same shape as a grouping here and behaves the same way.**
 
-**What decides both is the size of the view the operator sees, not the size of your collection.** Filter ten thousand elements down to a thousand and then sort, and you are on the small-view side of the sorting crossover, where DynamicData wins; grouping that same thousand puts you well on this library's side of the grouping one.
+**What decides both is the size of the view the operator sees, not the size of your collection.** Filter ten thousand elements down to a thousand and then sort, and you are on the small-view side of every sorting comparison above; grouping that same thousand puts you well on this library's side of DynamicData's crossover.
 
-**Allocation does not cross.** At every size measured, this library allocates less for the same work: nothing at all for a filtered view, 0.31x DynamicData's for grouping, 0.71x for sorting.
+**Against DynamicData, allocation does not cross.** At every size measured, this library allocates less for the same work: nothing at all for a filtered view, 0.31x DynamicData's for grouping, 0.71x for sorting. ObservableComputations allocates less than this library for sorting and grouping.
 
-**The propagation advantage is largest at the sizes most applications use, and it narrows above them.** Per property change above the floor, this library costs 13.9 ns at a thousand elements, 15.5 ns at ten thousand and 66.7 ns at a hundred thousand, against 212.1, 233.5 and 367.6 ns — a lead of 15.2x, then 15.1x, then 5.5x. The allocation figure is unchanged across all three sizes; the time figure is not. A hundred thousand observations do not fit in cache, and a library which has driven its own per-change work to near zero has nothing left to hide a cache miss behind. The advantage shrinks from very large to large.
+**The propagation advantage is largest at the sizes most applications use, and it narrows above them.** Per property change above the floor, this library costs 13.9 ns at a thousand elements, 15.5 ns at ten thousand and 66.7 ns at a hundred thousand, against DynamicData's 212.1, 233.5 and 367.6 ns — a lead of 15.2x, then 15.1x, then 5.5x. The allocation figure is unchanged across all three sizes; the time figure is not. A hundred thousand observations do not fit in cache, and a library which has driven its own per-change work to near zero has nothing left to hide a cache miss behind. The advantage shrinks from very large to large.
 
-**Composition behaves.** Ordering or grouping a filtered view costs each library close to the sum of its parts rather than more, so a chain does not change which one to prefer — only the size of the view arriving at each stage does.
+**Composition behaves.** Ordering or grouping a filtered view costs this library and DynamicData close to the sum of its parts rather than more, so a chain does not change which one to prefer — only the size of the view arriving at each stage does.
 
 Two more things worth knowing before you weigh any of the above.
 
-**A live view is not free in either library.** One over ten thousand elements holds about 9 MB here and about 19 MB in DynamicData, against 960 KB for the elements themselves. Building a view is likewise proportional to the size of the collection in both. Build one and keep it; neither library rewards building views casually.
+**A live view is not free in any library.** One over ten thousand elements holds about 9 MB here and about 19 MB in DynamicData, against 960 KB for the elements themselves. Building a view is likewise proportional to the size of the collection in all four. Build one and keep it; none of them rewards building views casually.
 
 **`ToObservableChangeSet()` over an existing `ObservableCollection<T>` costs DynamicData about 160x what its own `SourceCache` does** for the same property changes. That is the path you land on if you adopt it without changing where your data lives, and it is worth knowing about before you do.
 
-These comparisons were written by someone who does not use DynamicData, which is a real limitation on them. The harness is in this repository, the workloads are ordinary ones, and corrections are welcome.
+These comparisons were written by someone who uses none of the other three, which is a real limitation on them. The harness and the tests are in this repository, the workloads are ordinary ones, and corrections are welcome.
 
 ---
 

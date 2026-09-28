@@ -1,5 +1,6 @@
 namespace Epiforge.Extensions.Benchmarking;
 
+[AgainstReleasedExpressions("7.0.0")]
 [MemoryDiagnoser]
 public class ObserveDictionaryWhereBenchmarks
 {

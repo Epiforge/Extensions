@@ -824,6 +824,23 @@ public class ExpressionObserver :
     }
 
     /// <summary>
+    /// Disposes of a value asynchronously and waits for its disposal to finish, on the calling thread when nothing the disposal might resume on belongs to that thread, and otherwise beginning the disposal on a thread-pool thread, since a disposal which resumes on the calling thread's context or scheduler could never finish while that thread waits for it
+    /// </summary>
+    internal static void DisposeAndWait(IAsyncDisposable asyncDisposable)
+    {
+        if (SynchronizationContext.Current is null && TaskScheduler.Current == TaskScheduler.Default)
+        {
+            var disposal = asyncDisposable.DisposeAsync();
+            if (disposal.IsCompletedSuccessfully)
+                disposal.GetAwaiter().GetResult();
+            else
+                disposal.AsTask().Wait();
+            return;
+        }
+        DisposeOnThreadPoolAndWait(asyncDisposable);
+    }
+
+    /// <summary>
     /// Disposes of a value by whichever disposal interface it implements and these options prefer, without asking whether it ought to be disposed of, which its caller has already decided
     /// </summary>
     internal void DisposeIfPossible(object? value)
@@ -833,13 +850,19 @@ public class ExpressionObserver :
         else if (value is IAsyncDisposable asyncDisposable)
         {
             if (BlockOnAsyncDisposal)
-                Task.Run(() => asyncDisposable.DisposeAsync().AsTask()).Wait();
+                DisposeAndWait(asyncDisposable);
             else
                 Task.Run(async () => await asyncDisposable.DisposeAsync().ConfigureAwait(false));
         }
         else if (value is IDisposable disposable)
             disposable.Dispose();
     }
+
+    /// <summary>
+    /// Begins disposing of a value asynchronously on a thread-pool thread and waits for its disposal to finish, kept apart from <see cref="DisposeAndWait(IAsyncDisposable)"/> because the lambda capturing the value would otherwise be allocated on every call to that method, including the ones which dispose where they are
+    /// </summary>
+    static void DisposeOnThreadPoolAndWait(IAsyncDisposable asyncDisposable) =>
+        Task.Run(() => asyncDisposable.DisposeAsync().AsTask()).Wait();
 
     /// <inheritdoc/>
     public bool IsIgnoredPropertyChangeNotification(PropertyInfo property)

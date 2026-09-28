@@ -2,6 +2,7 @@ namespace Epiforge.Extensions.Benchmarking;
 
 using Epiforge.Extensions.Collections.Specialized;
 
+[AgainstReleasedExpressions("7.0.0")]
 [MemoryDiagnoser]
 public class DictionaryPropagationBenchmarks
 {

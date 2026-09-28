@@ -164,7 +164,7 @@ abstract class ObservableExpression :
             else if (value is IAsyncDisposable asyncDisposable)
             {
                 if (observer.BlockOnAsyncDisposal)
-                    Task.Run(() => asyncDisposable.DisposeAsync().AsTask()).Wait();
+                    ExpressionObserver.DisposeAndWait(asyncDisposable);
                 else
                     Task.Run(async () => await asyncDisposable.DisposeAsync().ConfigureAwait(false));
             }

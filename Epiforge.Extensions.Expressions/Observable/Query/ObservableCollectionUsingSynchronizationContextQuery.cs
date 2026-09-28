@@ -3,7 +3,9 @@ namespace Epiforge.Extensions.Expressions.Observable.Query;
 sealed class ObservableCollectionUsingSynchronizationContextQuery<TElement>(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> source, SynchronizationContext synchronizationContext) :
     ObservableCollectionQuery<TElement>(collectionObserver)
 {
+    Action? applyPendingChangesAction;
     ObservableRangeCollection<TElement>? elements;
+    Action? sendPendingChangesAction;
     readonly Queue<(NotifyCollectionChangedEventArgs change, List<TElement>? reset)> pending = new();
     internal readonly SynchronizationContext SynchronizationContext = synchronizationContext;
 
@@ -94,6 +96,18 @@ sealed class ObservableCollectionUsingSynchronizationContextQuery<TElement>(Coll
         }
     }
 
+    /// <summary>
+    /// Yields the one delegate this query hands on for applying its pending changes, since a method group converts to a new delegate at each conversion and this one is handed on for every change of the source
+    /// </summary>
+    Action ApplyPendingChangesAction =>
+        applyPendingChangesAction ??= ApplyPendingChanges;
+
+    /// <summary>
+    /// Yields the one delegate this query defers for sending its pending changes to the context to be applied, since a lambda capturing the query converts to a new delegate each time it is reached, which is once for every change of the source
+    /// </summary>
+    Action SendPendingChangesAction =>
+        sendPendingChangesAction ??= () => SynchronizationContext.Send(ApplyPendingChangesAction);
+
     void SourceCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         lock (pending)
@@ -101,7 +115,7 @@ sealed class ObservableCollectionUsingSynchronizationContextQuery<TElement>(Coll
         if (SynchronizationContext == SynchronizationContext.Current)
             ApplyPendingChanges();
         else
-            DeferUntilChangeLocksReleased(() => SynchronizationContext.Send(ApplyPendingChanges));
+            DeferUntilChangeLocksReleased(SendPendingChangesAction);
     }
 
     void SourcePropertyChanged(object? sender, PropertyChangedEventArgs e)
