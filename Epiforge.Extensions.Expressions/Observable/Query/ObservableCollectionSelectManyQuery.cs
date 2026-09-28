@@ -5,6 +5,7 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
     IObservableQueryDependent
 {
     readonly object access = new();
+    Dictionary<IEnumerable<TResult>, List<TResult>>? copies;
     int count;
     readonly Dictionary<IEnumerable<TResult>, List<PrefixWeightedSequenceNode<IEnumerable<TResult>?>>> enumerableNodes = [];
     List<TResult>? enumerationSnapshot;
@@ -28,8 +29,10 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
                     return snapshot[index];
                 if (positions.NodeAtWeight(index) is not { } node || node.Item is not { } spanningEnumerable)
                     throw new IndexOutOfRangeException();
-                enumerable = spanningEnumerable;
                 offset = index - positions.PrefixWeightBefore(node);
+                if (copies is not null && copies.TryGetValue(spanningEnumerable, out var copy))
+                    return copy[offset];
+                enumerable = spanningEnumerable;
             }
             return enumerable.ElementAt(offset);
         }
@@ -48,10 +51,11 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
             return;
         lock (access)
         {
-            if (!enumerableNodes.TryGetValue(enumerable, out var nodes))
+            if (!enumerableNodes.TryGetValue(enumerable, out var nodes) || copies is null || !copies.TryGetValue(enumerable, out var copy))
                 return;
             enumerationSnapshot = null;
-            var newWeight = enumerable.Count();
+            copies[enumerable] = copy = FollowInnerChange(copy, e, enumerable);
+            var newWeight = copy.Count;
             if (e.Action is NotifyCollectionChangedAction.Reset)
             {
                 for (int i = 0, ii = nodes.Count; i < ii; ++i)
@@ -75,6 +79,12 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
         }
     }
 
+    /// <summary>
+    /// Gets what this query has been told the specified sequence holds, which is its copy of it where the sequence announces its changes
+    /// </summary>
+    IEnumerable<TResult> ContentsWithAccess(IEnumerable<TResult> enumerable) =>
+        copies is not null && copies.TryGetValue(enumerable, out var copy) ? copy : enumerable;
+
     protected override bool Dispose(bool disposing)
     {
         if (disposing)
@@ -95,6 +105,36 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
         return true;
     }
 
+    /// <summary>
+    /// Applies an announced change to a copy of the sequence which announced it, reading the sequence again only when the change cannot be applied to the copy
+    /// </summary>
+    static List<TResult> FollowInnerChange(List<TResult> copy, NotifyCollectionChangedEventArgs e, IEnumerable<TResult> enumerable)
+    {
+        switch (e.Action)
+        {
+            case NotifyCollectionChangedAction.Add when e.NewItems is { } newItems && e.NewStartingIndex >= 0 && e.NewStartingIndex <= copy.Count:
+                if (newItems.Count == 1)
+                    copy.Insert(e.NewStartingIndex, (TResult)newItems[0]!);
+                else
+                    copy.InsertRange(e.NewStartingIndex, newItems.Cast<TResult>());
+                return copy;
+            case NotifyCollectionChangedAction.Remove when e.OldItems is { } oldItems && e.OldStartingIndex >= 0 && e.OldStartingIndex + oldItems.Count <= copy.Count:
+                copy.RemoveRange(e.OldStartingIndex, oldItems.Count);
+                return copy;
+            case NotifyCollectionChangedAction.Replace when e.OldItems is { } replacedItems && e.NewItems is { } replacementItems && e.OldStartingIndex >= 0 && e.OldStartingIndex + replacedItems.Count <= copy.Count:
+                copy.RemoveRange(e.OldStartingIndex, replacedItems.Count);
+                copy.InsertRange(e.OldStartingIndex, replacementItems.Cast<TResult>());
+                return copy;
+            case NotifyCollectionChangedAction.Move when e.OldItems is { } movedItems && e.OldStartingIndex >= 0 && e.NewStartingIndex >= 0 && e.OldStartingIndex + movedItems.Count <= copy.Count && e.NewStartingIndex + movedItems.Count <= copy.Count:
+                var moved = copy.GetRange(e.OldStartingIndex, movedItems.Count);
+                copy.RemoveRange(e.OldStartingIndex, movedItems.Count);
+                copy.InsertRange(e.NewStartingIndex, moved);
+                return copy;
+            default:
+                return [.. enumerable];
+        }
+    }
+
     public override IEnumerator<TResult> GetEnumerator()
     {
         lock (access)
@@ -104,7 +144,7 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
                 var results = new List<TResult>(count);
                 for (var node = positions.FirstNode; node is not null; node = positions.Next(node))
                     if (node.Item is { } enumerable)
-                        results.AddRange(enumerable);
+                        results.AddRange(ContentsWithAccess(enumerable));
                 enumerationSnapshot = results;
             }
             return enumerationSnapshot.GetEnumerator();
@@ -113,17 +153,22 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
 
     void ObserveProjectionWithAccess(int index, IEnumerable<TResult>? enumerable)
     {
-        var node = positions.Insert(index, enumerable, enumerable?.Count() ?? 0);
         if (enumerable is null)
-            return;
-        if (enumerableNodes.TryGetValue(enumerable, out var nodes))
-            nodes.Add(node);
-        else
         {
-            enumerableNodes.Add(enumerable, [node]);
-            if (enumerable is INotifyCollectionChanged collectionChangedNotifier)
-                collectionChangedNotifier.CollectionChanged += CollectionChangedNotifierCollectionChanged;
+            positions.Insert(index, enumerable, 0);
+            return;
         }
+        if (enumerableNodes.TryGetValue(enumerable, out var nodes))
+            nodes.Add(positions.Insert(index, enumerable, ContentsWithAccess(enumerable).Count()));
+        else if (enumerable is INotifyCollectionChanged collectionChangedNotifier)
+        {
+            List<TResult> copy = [.. enumerable];
+            (copies ??= []).Add(enumerable, copy);
+            enumerableNodes.Add(enumerable, [positions.Insert(index, enumerable, copy.Count)]);
+            collectionChangedNotifier.CollectionChanged += CollectionChangedNotifierCollectionChanged;
+        }
+        else
+            enumerableNodes.Add(enumerable, [positions.Insert(index, enumerable, enumerable.Count())]);
     }
 
     protected override void OnInitialization()
@@ -149,6 +194,7 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
         if (nodes.Count == 0)
         {
             enumerableNodes.Remove(enumerable);
+            copies?.Remove(enumerable);
             if (enumerable is INotifyCollectionChanged collectionChangedNotifier)
                 collectionChangedNotifier.CollectionChanged -= CollectionChangedNotifierCollectionChanged;
         }
@@ -195,7 +241,7 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
                         {
                             var node = positions.RemoveAt(e.OldStartingIndex);
                             if (node.Item is { } oldEnumerable)
-                                oldItems.AddRange(oldEnumerable);
+                                oldItems.AddRange(ContentsWithAccess(oldEnumerable));
                             ReleaseProjectionWithAccess(node);
                         }
                     var newItems = new List<TResult>();
@@ -205,7 +251,7 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
                             var newEnumerable = e.NewItems[i] as IEnumerable<TResult>;
                             ObserveProjectionWithAccess(e.NewStartingIndex + i, newEnumerable);
                             if (newEnumerable is not null)
-                                newItems.AddRange(newEnumerable);
+                                newItems.AddRange(ContentsWithAccess(newEnumerable));
                         }
                     if (oldItems.Count > 0)
                     {
@@ -229,7 +275,7 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
                         for (var i = 0; i < e.OldItems.Count && movedNode is not null; ++i)
                         {
                             if (movedNode.Item is { } movedEnumerable)
-                                movedItems.AddRange(movedEnumerable);
+                                movedItems.AddRange(ContentsWithAccess(movedEnumerable));
                             movedNode = positions.Next(movedNode);
                         }
                         positions.MoveRange(e.OldStartingIndex, e.NewStartingIndex, e.OldItems.Count);
@@ -243,6 +289,7 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
                         if (enumerable is INotifyCollectionChanged collectionChangedNotifier)
                             collectionChangedNotifier.CollectionChanged -= CollectionChangedNotifierCollectionChanged;
                     enumerableNodes.Clear();
+                    copies?.Clear();
                     positions.Clear();
                     for (int i = 0, ii = select!.Count; i < ii; ++i)
                         ObserveProjectionWithAccess(positions.Count, select[i]);

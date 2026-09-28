@@ -108,6 +108,4 @@ Eight bytes an element is the copy's reference. Every five-cycle row still ends 
 
 ## What remains
 
-- **A query's last release can race a change on another thread.** `ObservableCollectionSelectQuery.Dispose` and `ObservableCollectionWhereQuery.Dispose` can enumerate state a concurrent change handler is modifying and throw `InvalidOperationException`. This is older than 7.0.1 and has no test yet.
-- The sequences an `ObserveSelectMany` selector returns are read as they stand, and the readme says so.
-- A second operand of `ObserveConcat` implemented outside this library cannot be locked.
+Nothing of what this change left open. A query's last release racing a change on another thread, the sequences an `ObserveSelectMany` selector returns being read as they stand, and a second operand of `ObserveConcat` implemented outside this library are closed in `2026-09-28-what-the-queries-did-not-own.md`.

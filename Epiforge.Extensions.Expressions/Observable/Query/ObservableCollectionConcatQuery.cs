@@ -12,6 +12,7 @@ sealed class ObservableCollectionConcatQuery<TElement>(CollectionObserver collec
     int count;
     int firstCount;
     ObservableQuerySubscription? firstSubscription;
+    ObservableCollectionQueryReadOnlyList<TElement>? observedSecond;
     int secondCount;
     ObservableQuerySubscription? secondSubscription;
 
@@ -25,7 +26,7 @@ sealed class ObservableCollectionConcatQuery<TElement>(CollectionObserver collec
             int offset;
             lock (access)
                 offset = firstCount;
-            return index >= offset ? Second[index - offset] : first[index];
+            return index >= offset ? SecondContents[index - offset] : first[index];
         }
     }
 
@@ -38,12 +39,18 @@ sealed class ObservableCollectionConcatQuery<TElement>(CollectionObserver collec
     internal override bool HasIndexerPenalty =>
         true;
 
+    /// <summary>
+    /// Gets what this query reads of its second operand, which is its observation of that operand where the operand is not a query of this library
+    /// </summary>
+    IReadOnlyList<TElement> SecondContents =>
+        (IReadOnlyList<TElement>?)observedSecond ?? Second;
+
     ObservableQuery? SecondQuery =>
         Second switch
         {
             ObservableQuery query => query,
             ScopedObservableCollectionQuery<TElement> scoped => scoped.query,
-            _ => null
+            _ => observedSecond
         };
 
     internal override void CollectChangeLocks(List<ObservableQuery> queries)
@@ -61,13 +68,14 @@ sealed class ObservableCollectionConcatQuery<TElement>(CollectionObserver collec
             if (removedFromCache)
             {
                 first.UnsubscribeDependent(firstSubscription!);
-                if (secondSubscription is { } subscription)
-                    ((ObservableQuery)Second).UnsubscribeDependent(subscription);
-                else
+                if (observedSecond is { } observed)
                 {
-                    Second.CollectionChanged -= SecondCollectionChanged;
+                    observed.UnsubscribeDependent(secondSubscription!);
                     Second.PropertyChanged -= SecondPropertyChanged;
+                    observed.Dispose();
                 }
+                else
+                    ((ObservableQuery)Second).UnsubscribeDependent(secondSubscription!);
                 RemovedFromCache();
             }
             return removedFromCache;
@@ -90,7 +98,7 @@ sealed class ObservableCollectionConcatQuery<TElement>(CollectionObserver collec
     }
 
     public override IEnumerator<TElement> GetEnumerator() =>
-        first.Concat(Second).GetEnumerator();
+        first.Concat(SecondContents).GetEnumerator();
 
     void IObservableQueryDependent.OnDependencyCollectionChanged(ObservableQuerySubscription subscription, NotifyCollectionChangedEventArgs e)
     {
@@ -115,27 +123,19 @@ sealed class ObservableCollectionConcatQuery<TElement>(CollectionObserver collec
 
     protected override void OnInitialization()
     {
+        if (Second is not ObservableQuery)
+            observedSecond = collectionObserver.GetObservableCollectionQuery(Second);
         using var changeHold = HoldChangesOf(first, SecondQuery);
         lock (access)
         {
             firstCount = first.Count;
-            secondCount = Second.Count;
+            secondCount = SecondContents.Count;
             count = firstCount + secondCount;
             firstSubscription = first.SubscribeDependent(this);
-            if (Second is ObservableQuery secondQuery)
-                secondSubscription = secondQuery.SubscribeDependent(this);
-            else
-            {
-                Second.CollectionChanged += SecondCollectionChanged;
+            secondSubscription = SecondQuery!.SubscribeDependent(this);
+            if (observedSecond is not null)
                 Second.PropertyChanged += SecondPropertyChanged;
-            }
         }
-    }
-
-    void SecondCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
-    {
-        using var changeHold = HoldOwnChanges();
-        SecondCollectionChanged(e);
     }
 
     void SecondCollectionChanged(NotifyCollectionChangedEventArgs e)
@@ -143,7 +143,7 @@ sealed class ObservableCollectionConcatQuery<TElement>(CollectionObserver collec
         lock (access)
         {
             if (e.Action is NotifyCollectionChangedAction.Reset)
-                secondCount = Second.Count;
+                secondCount = SecondContents.Count;
             else
                 secondCount += (e.NewItems?.Count ?? 0) - (e.OldItems?.Count ?? 0);
             if (e.Action is not NotifyCollectionChangedAction.Move)
