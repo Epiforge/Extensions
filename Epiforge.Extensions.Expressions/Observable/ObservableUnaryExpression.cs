@@ -34,17 +34,20 @@ sealed class ObservableUnaryExpression(ExpressionObserver observer, UnaryExpress
     {
         var removedFromCache = observer.ExpressionDisposed(this);
         if (removedFromCache)
-        {
-            if (operand is not null)
-            {
-                if (operandSubscription is { } operandDependency)
-                    operand.UnsubscribeDependent(operandDependency);
-                operand.Dispose();
-                DisposeValueIfNecessaryAndPossible();
-            }
-            RemovedFromCache();
-        }
+            Retire();
         return removedFromCache;
+    }
+
+    private protected override void TearDown()
+    {
+        if (operand is not null)
+        {
+            if (operandSubscription is { } operandDependency)
+                operand.UnsubscribeDependent(operandDependency);
+            operand.Release();
+            DisposeValueIfNecessaryAndPossible();
+        }
+        RemovedFromCache();
     }
 
     protected override void Evaluate()
@@ -55,19 +58,19 @@ sealed class ObservableUnaryExpression(ExpressionObserver observer, UnaryExpress
             if (operandFault is not null)
             {
                 Evaluation = (operandFault, defaultResult);
-                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, operandFault, "{UnaryExpression} operand faulted: {Fault}", UnaryExpression, operandFault);
+                observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, operandFault, "{UnaryExpression} operand faulted: {Fault}", UnaryExpression, operandFault);
             }
             else
             {
                 var value = @delegate?.Invoke(operandResult);
                 Evaluation = (null, value);
-                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{UnaryExpression} evaluated: {Value}", UnaryExpression, value);
+                observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{UnaryExpression} evaluated: {Value}", UnaryExpression, value);
             }
         }
         catch (Exception ex)
         {
             Evaluation = (ex, defaultResult);
-            observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, ex, "{UnaryExpression} faulted: {Fault}", UnaryExpression, ex);
+            observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, ex, "{UnaryExpression} faulted: {Fault}", UnaryExpression, ex);
         }
     }
 
@@ -92,7 +95,7 @@ sealed class ObservableUnaryExpression(ExpressionObserver observer, UnaryExpress
             {
                 if (operandSubscription is { } operandDependency)
                     operand.UnsubscribeDependent(operandDependency);
-                operand.Dispose();
+                operand.Release();
             }
             ExceptionDispatchInfo.Capture(ex).Throw();
         }

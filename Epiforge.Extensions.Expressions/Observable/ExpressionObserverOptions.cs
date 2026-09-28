@@ -54,6 +54,14 @@ public class ExpressionObserverOptions
     public bool DisposeStaticMethodReturnValues { get; set; } = true;
 
     /// <summary>
+    /// Gets/sets whether observations may be built, changed and disposed of on more than one thread at a time; the default is <c>true</c>
+    /// </summary>
+    /// <remarks>
+    /// Set this to <c>false</c> only when nothing an observer's observations read changes while another thread builds, evaluates or disposes of one of them, as when all of it happens on a user interface thread; the observer then evaluates without the interlocked operations which otherwise make it safe, and a change raised on another thread at the same time may be lost or evaluated against an observation half built, and observations disposed of on several threads at once may leave parts of themselves cached
+    /// </remarks>
+    public bool IsThreadSafe { get; set; } = true;
+
+    /// <summary>
     /// Gets/sets the <see cref="ILogger"/> instance to which trace information will be written; the default is <c>null</c>
     /// </summary>
     public ILogger? Logger { get; set; }

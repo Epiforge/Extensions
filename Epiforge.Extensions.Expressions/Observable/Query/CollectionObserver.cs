@@ -20,7 +20,13 @@ public class CollectionObserver :
     {
         ArgumentNullException.ThrowIfNull(expressionObserver);
         ExpressionObserver = expressionObserver;
+        TraceLogger = expressionObserver is ExpressionObserver observer ? observer.TraceLogger : expressionObserver.Logger is { } logger ? new GuardedLogger(logger) : null;
     }
+
+    /// <summary>
+    /// Gets the logger the queries' own traces are written through, which is the expression observer's logger made unable to throw
+    /// </summary>
+    internal readonly ILogger? TraceLogger;
 
     readonly Dictionary<IEnumerable, ObservableQuery> cachedEnumerableObservableCollections = new(ReferenceEqualityComparer.Instance);
     readonly Dictionary<IEnumerable, ObservableQuery> cachedGenericEnumerableObservableCollections = new(ReferenceEqualityComparer.Instance);

@@ -28,19 +28,22 @@ sealed class ObservableNewExpression(ExpressionObserver observer, NewExpression 
     {
         var removedFromCache = observer.ExpressionDisposed(this);
         if (removedFromCache)
-        {
-            DisposeValueIfNecessaryAndPossible();
-            if (arguments is not null)
-                for (int i = 0, ii = arguments.Count; i < ii; ++i)
-                {
-                    var argument = arguments[i];
-                    if (argumentSubscriptions?[i] is { } argumentDependency)
-                        argument.UnsubscribeDependent(argumentDependency);
-                    argument.Dispose();
-                }
-            RemovedFromCache();
-        }
+            Retire();
         return removedFromCache;
+    }
+
+    private protected override void TearDown()
+    {
+        DisposeValueIfNecessaryAndPossible();
+        if (arguments is not null)
+            for (int i = 0, ii = arguments.Count; i < ii; ++i)
+            {
+                var argument = arguments[i];
+                if (argumentSubscriptions?[i] is { } argumentDependency)
+                    argument.UnsubscribeDependent(argumentDependency);
+                argument.Release();
+            }
+        RemovedFromCache();
     }
 
     protected override void Evaluate()
@@ -50,19 +53,19 @@ sealed class ObservableNewExpression(ExpressionObserver observer, NewExpression 
             if (arguments is { } faultedArguments && FirstFault(faultedArguments) is { } argumentFault)
             {
                 Evaluation = (argumentFault, defaultResult);
-                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, argumentFault, "{NewExpression} argument faulted: {Fault}", NewExpression, argumentFault);
+                observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, argumentFault, "{NewExpression} argument faulted: {Fault}", NewExpression, argumentFault);
             }
             else
             {
                 var value = Construct();
                 Evaluation = (null, value);
-                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{NewExpression} evaluated: {Value}", NewExpression, value);
+                observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{NewExpression} evaluated: {Value}", NewExpression, value);
             }
         }
         catch (Exception ex)
         {
             Evaluation = (ex, defaultResult);
-            observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, ex, "{NewExpression} faulted: {Fault}", NewExpression, ex);
+            observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, ex, "{NewExpression} faulted: {Fault}", NewExpression, ex);
         }
     }
 
@@ -102,7 +105,7 @@ sealed class ObservableNewExpression(ExpressionObserver observer, NewExpression 
                 var argument = argumentsList[i];
                 if (argumentSubscriptions?[i] is { } argumentDependency)
                     argument.UnsubscribeDependent(argumentDependency);
-                argument.Dispose();
+                argument.Release();
             }
             ExceptionDispatchInfo.Capture(ex).Throw();
         }

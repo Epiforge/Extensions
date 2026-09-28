@@ -18,25 +18,28 @@ sealed class ObservableMethodCallExpression(ExpressionObserver observer, MethodC
     {
         var removedFromCache = observer.ExpressionDisposed(this);
         if (removedFromCache)
-        {
-            DisposeValueIfNecessaryAndPossible();
-            if (@object is not null)
-            {
-                if (objectSubscription is { } objectDependency)
-                    @object.UnsubscribeDependent(objectDependency);
-                @object.Dispose();
-            }
-            if (arguments is not null)
-                for (int i = 0, ii = arguments.Count; i < ii; ++i)
-                {
-                    var argument = arguments[i];
-                    if (argumentSubscriptions?[i] is { } argumentDependency)
-                        argument.UnsubscribeDependent(argumentDependency);
-                    argument.Dispose();
-                }
-            RemovedFromCache();
-        }
+            Retire();
         return removedFromCache;
+    }
+
+    private protected override void TearDown()
+    {
+        DisposeValueIfNecessaryAndPossible();
+        if (@object is not null)
+        {
+            if (objectSubscription is { } objectDependency)
+                @object.UnsubscribeDependent(objectDependency);
+            @object.Release();
+        }
+        if (arguments is not null)
+            for (int i = 0, ii = arguments.Count; i < ii; ++i)
+            {
+                var argument = arguments[i];
+                if (argumentSubscriptions?[i] is { } argumentDependency)
+                    argument.UnsubscribeDependent(argumentDependency);
+                argument.Release();
+            }
+        RemovedFromCache();
     }
 
     protected override void Evaluate()
@@ -47,30 +50,30 @@ sealed class ObservableMethodCallExpression(ExpressionObserver observer, MethodC
             if (objectFault is not null)
             {
                 Evaluation = (objectFault, defaultResult);
-                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, objectFault, "{MethodCallExpression} object faulted: {Fault}", MethodCallExpression, objectFault);
+                observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, objectFault, "{MethodCallExpression} object faulted: {Fault}", MethodCallExpression, objectFault);
             }
             else if (arguments is { } faultedArguments && FirstFault(faultedArguments) is { } argumentFault)
             {
                 Evaluation = (argumentFault, defaultResult);
-                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, argumentFault, "{MethodCallExpression} argument faulted: {Fault}", MethodCallExpression, argumentFault);
+                observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, argumentFault, "{MethodCallExpression} argument faulted: {Fault}", MethodCallExpression, argumentFault);
             }
             else if (method is { IsStatic: false } && objectResult is null)
             {
                 var nullReference = new NullReferenceException();
                 Evaluation = (nullReference, defaultResult);
-                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, nullReference, "{MethodCallExpression} object was null: {Fault}", MethodCallExpression, nullReference);
+                observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, nullReference, "{MethodCallExpression} object was null: {Fault}", MethodCallExpression, nullReference);
             }
             else
             {
                 var value = methodInvoker is { } invoker ? Invoke(invoker, objectResult, arguments) : null;
                 Evaluation = (null, value);
-                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{MethodCallExpression} evaluated: {Value}", MethodCallExpression, value);
+                observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{MethodCallExpression} evaluated: {Value}", MethodCallExpression, value);
             }
         }
         catch (Exception ex)
         {
             Evaluation = (ex, defaultResult);
-            observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, ex, "{MethodCallExpression} faulted: {Fault}", MethodCallExpression, ex);
+            observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, ex, "{MethodCallExpression} faulted: {Fault}", MethodCallExpression, ex);
         }
     }
 
@@ -111,14 +114,14 @@ sealed class ObservableMethodCallExpression(ExpressionObserver observer, MethodC
             {
                 if (objectSubscription is { } objectDependency)
                     @object.UnsubscribeDependent(objectDependency);
-                @object.Dispose();
+                @object.Release();
             }
             for (int i = 0, ii = argumentsList.Count; i < ii; ++i)
             {
                 var argument = argumentsList[i];
                 if (argumentSubscriptions?[i] is { } argumentDependency)
                     argument.UnsubscribeDependent(argumentDependency);
-                argument.Dispose();
+                argument.Release();
             }
             ExceptionDispatchInfo.Capture(ex).Throw();
         }

@@ -18,7 +18,7 @@ sealed class ObservableTryExpression(ExpressionObserver observer, TryExpression 
         {
             if (bodySubscription is { } bodyDependency)
                 body.UnsubscribeDependent(bodyDependency);
-            body.Dispose();
+            body.Release();
         }
         if (handlers is not null)
             for (int i = 0, ii = handlers.Length; i < ii; ++i)
@@ -26,7 +26,7 @@ sealed class ObservableTryExpression(ExpressionObserver observer, TryExpression 
                 {
                     if (handlerSubscriptions?[i] is { } handlerDependency)
                         handler.UnsubscribeDependent(handlerDependency);
-                    handler.Dispose();
+                    handler.Release();
                 }
     }
 
@@ -34,11 +34,14 @@ sealed class ObservableTryExpression(ExpressionObserver observer, TryExpression 
     {
         var removedFromCache = observer.ExpressionDisposed(this);
         if (removedFromCache)
-        {
-            DisposeOperands();
-            RemovedFromCache();
-        }
+            Retire();
         return removedFromCache;
+    }
+
+    private protected override void TearDown()
+    {
+        DisposeOperands();
+        RemovedFromCache();
     }
 
     protected override void Evaluate()
@@ -47,7 +50,7 @@ sealed class ObservableTryExpression(ExpressionObserver observer, TryExpression 
         if (bodyFault is null)
         {
             Evaluation = (null, bodyResult);
-            observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{TryExpression} evaluated: {Value}", TryExpression, bodyResult);
+            observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{TryExpression} evaluated: {Value}", TryExpression, bodyResult);
             return;
         }
         var catchBlocks = TryExpression.Handlers;
@@ -58,13 +61,13 @@ sealed class ObservableTryExpression(ExpressionObserver observer, TryExpression 
                 if (handlers![i] is { } handler)
                 {
                     Evaluation = handler.Evaluation;
-                    observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{TryExpression} body faulted and was handled: {Fault}", TryExpression, bodyFault);
+                    observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{TryExpression} body faulted and was handled: {Fault}", TryExpression, bodyFault);
                     return;
                 }
                 break;
             }
         Evaluation = (bodyFault, defaultResult);
-        observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, bodyFault, "{TryExpression} body faulted: {Fault}", TryExpression, bodyFault);
+        observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, bodyFault, "{TryExpression} body faulted: {Fault}", TryExpression, bodyFault);
     }
 
     protected override void OnInitialization()

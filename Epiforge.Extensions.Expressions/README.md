@@ -84,6 +84,15 @@ using (var expr = observer.Observe(e => e.Name.Length, elizabeth))
 
 Observable expressions also try to dispose of disposable objects they create in the course of their evaluation, when and where it makes sense. Use the `ExpressionObserverOptions` class for more direct control over this behavior.
 
+## Changes From Other Threads
+A source can change on any thread, including while an observation of it is being built or evaluated on another. No change is lost: once the changes stop, every observation settles on what its expression gives over its sources as they then stand. You can dispose of an observation on any thread, too, even while another thread is evaluating it.
+
+An observation is evaluated on the thread which raised the change, unless another thread is evaluating it at that moment, in which case that thread evaluates it again before it finishes and the thread which raised the change carries on without waiting. So the `PropertyChanged` which follows a change can arrive on a different thread from the change, and a setter can return before an observation reflects it.
+
+Two things stay yours. While changes arrive on several threads at once, an observation can briefly report a value computed from reads taken at different moments, as any code reading shared state without a lock would, and it settles once they stop. And the observer reads your sources on whichever thread is evaluating, so a source must be safe to read while another thread changes it. `ObservableCollection<T>` is not: read in the middle of a change, it can throw, the observation reports that fault until the change's notification has it read again, and a `ConditionAsync` waiting on it completes with the fault.
+
+If nothing an observer's observations read changes while another thread builds, evaluates or disposes of one of them, as when all of it happens on a user interface thread, you can say so by setting `IsThreadSafe` to `false` in the options you hand the observer. It then evaluates without the interlocked operations the promises above cost: a raise against a thousand observations of one object costs 0.50x what it otherwise would, and a property change in a filtered view of a thousand 0.73x. It is `true` by default, and setting it where changes do cross threads gives those promises up: a change can be lost, an observation can be evaluated before it is built, and observations disposed of on several threads at once can leave parts of themselves cached.
+
 ## Fields Are Read Once
 Whatever a field held when an observation began is what that observation goes on using — a captured local, a field of your own class, and a static field alike. Assigning it afterward does not reach an observation that already exists. Static properties behave the same way, so `e => e.Hired < DateTime.Now` compares against the moment it was created for as long as it lives.
 
@@ -206,7 +215,7 @@ A LINQ query is a description of a computation you run. Run it again and it does
 Three things that might otherwise look like arbitrary restrictions fall straight out of that:
 1. Your selectors and predicates have to be expression trees rather than delegates because the machine has to read them to find out what they depend on. A delegate is opaque; there is nothing in it to subscribe to.
 2. You have to dispose of a query because it is holding subscriptions to everything it depends on, and those subscriptions are the entire reason the answer stays right.
-3. Faults reach you through `OperationFault` instead of being thrown, because the evaluation that failed happened later, on whatever thread raised the change. By then there is no call of yours left on the stack to throw out of.
+3. Faults reach you through `OperationFault` instead of being thrown, because the evaluation that failed happened later, on whichever thread evaluated the change. By then there is no call of yours left on the stack to throw out of.
 
 What is not free is construction. Building the machine means building an observable expression for every element the query touches, and that is proportional to the size of the collection. So build a query once and hold onto it. Do not build one per frame, per request, or per keystroke. The bargain is that you pay up front and then stop paying to read.
 
@@ -261,18 +270,18 @@ These are from the benchmarks in this repository, against DynamicData 9.4.33 at 
 
 | | This library | DynamicData |
 |---|---|---|
-| A property change that does not alter a filtered view | **0 B**, **8.6 ns** | 608 B, 197.8 ns |
-| An element changing group | **592 B**, **240.8 ns** | 1,936 B, 619.2 ns |
-| An element moving in a sorted view | **292 B**, 1,287.6 ns | 414 B, **997.3 ns** |
-| Building a filtered view | **966 KB**, **297 μs** | 4,118 KB, 2,315 μs |
-| What a live filtered view holds | **935 B** per element | 1,865 B per element |
+| A property change that does not alter a filtered view | **0 B**, **13.7 ns** | 608 B, 206.2 ns |
+| An element changing group | **592 B**, **243.5 ns** | 1,936 B, 633.5 ns |
+| An element moving in a sorted view | **292 B**, 1,300.9 ns | 414 B, **998.8 ns** |
+| Building a filtered view | **950 KB**, **315 μs** | 4,120 KB, 2,419 μs |
+| What a live filtered view holds | **919 B** per element | 1,865 B per element |
 
 The zero is exact rather than rounded: a property change that does not move an element in or out of a filtered view allocates nothing here, at a thousand, ten thousand and a hundred thousand elements alike. This library re-evaluates the predicate in place and stays silent when the answer has not moved; DynamicData's model is a stream of change sets, so a refresh has to materialize one. Neither is a defect. **One library pays per change and the other pays per change that matters.**
 
 **Two of those rows move with the size of the view, in opposite directions, and this is the part worth reading twice.**
 
-- **Sorting.** DynamicData's cost per move grows with the collection while this library's barely does, so the two cross at about **1,500** elements. Below that DynamicData is 1.29x faster; at four thousand this library is 1.79x faster and at ten thousand 3.05x.
-- **Grouping.** The reverse. DynamicData's cost per migration is flat while this library's grows, so the two cross at about **8,000** elements. Below that this library is 2.61x faster; at ten thousand DynamicData is 1.19x faster — though it holds 1.92x the memory to do it, 1,954 B per element against 1,019.
+- **Sorting.** DynamicData's cost per move grows with the collection while this library's barely does, so the two cross at about **1,500** elements. Below that DynamicData is 1.30x faster; at four thousand this library is 1.79x faster and at ten thousand 2.97x.
+- **Grouping.** The reverse. DynamicData's cost per migration is flat while this library's grows, so the two cross at about **8,300** elements. Below that this library is 2.57x faster; at ten thousand DynamicData is 1.15x faster — though it holds 1.95x the memory to do it, 1,954 B per element against 1,003.
 
 **The grouping crossover is a trade rather than an oversight, and knowing which side of it you want is more useful than the number.** A grouping here keeps its elements in the order they were added, so moving one out of its old group means finding it first, which is work proportional to the size of that group. DynamicData's groups are keyed rather than positional, so a removal is a dictionary operation and costs the same whatever the group holds. If you need the elements of a group in a stable order, that is what you are paying for. If you do not, DynamicData's shape is cheaper once groups get large. **A lookup built with `ObserveToLookup` is the same shape as a grouping here and behaves the same way.**
 
@@ -280,7 +289,7 @@ The zero is exact rather than rounded: a property change that does not move an e
 
 **Allocation does not cross.** At every size measured, this library allocates less for the same work: nothing at all for a filtered view, 0.31x DynamicData's for grouping, 0.71x for sorting.
 
-**The propagation advantage is largest at the sizes most applications use, and it narrows above them.** Per property change above the floor, this library costs 8.2 ns at a thousand elements, 9.3 ns at ten thousand and 59.7 ns at a hundred thousand, against 200.8, 223.6 and 351.2 ns — a lead of 24.6x, then 24.0x, then 5.9x. The allocation figure is unchanged across all three sizes; the time figure is not. A hundred thousand observations do not fit in cache, and a library which has driven its own per-change work to near zero has nothing left to hide a cache miss behind. The advantage shrinks from very large to large.
+**The propagation advantage is largest at the sizes most applications use, and it narrows above them.** Per property change above the floor, this library costs 13.9 ns at a thousand elements, 15.9 ns at ten thousand and 65.0 ns at a hundred thousand, against 200.8, 224.5 and 331.0 ns — a lead of 14.4x, then 14.2x, then 5.1x. The allocation figure is unchanged across all three sizes; the time figure is not. A hundred thousand observations do not fit in cache, and a library which has driven its own per-change work to near zero has nothing left to hide a cache miss behind. The advantage shrinks from very large to large.
 
 **Composition behaves.** Ordering or grouping a filtered view costs each library close to the sum of its parts rather than more, so a chain does not change which one to prefer — only the size of the view arriving at each stage does.
 

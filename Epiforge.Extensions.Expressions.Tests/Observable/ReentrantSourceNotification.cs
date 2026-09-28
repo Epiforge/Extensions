@@ -4,7 +4,7 @@
 /// How often each mechanism reads a property whose getter announces a change while it is being read
 /// </summary>
 /// <remarks>
-/// An observation is re-entered by a dependency announcing to it, which it now declines, and by a source announcing to it, which it does not: <c>DirectObservableExpression.OnSourceChanged</c> and <c>ObservableMemberExpression.ObservableExpressionValuePropertyChanged</c> both call <c>Evaluate</c> without the guard. A source can only announce during an evaluation if something the evaluation reads announces while being read, which is what the subject here does.
+/// An observation is re-entered by a dependency announcing to it, which it declines, and by a source announcing to it, which it does not: <c>DirectObservableExpression.OnSourceChanged</c> and <c>ObservableMemberExpression.ObservableExpressionValuePropertyChanged</c> both ask to be evaluated again once the evaluation in progress has finished, so the evaluation they ask for runs after it rather than inside it. A source can only announce during an evaluation if something the evaluation reads announces while being read, which is what the subject here does.
 /// The subject announces on its first few reads only, so that whatever the mechanisms do the recursion ends. That bound is not a convenience: an unbounded form of this subject cannot be run at all, because a stack overflow cannot be caught and would take the test host with it. These rows record what happens today so that closing the gap has to flip an assertion rather than quietly make one vacuous
 /// </remarks>
 [TestClass]

@@ -3,6 +3,18 @@
 abstract class ObservableExpression :
     PlainSyncDisposable
 {
+    sealed class FaultedEvaluation(Exception fault)
+    {
+        internal readonly Exception Fault = fault;
+    }
+
+    const int evaluationRequested = 1;
+    const int flags = evaluationRequested | initializing | retired | tearDownPending;
+    const int initializing = 2;
+    const int ownerShift = 4;
+    const int retired = 4;
+    const int tearDownPending = 8;
+
     internal static readonly PropertyChangedEventArgs EvaluationPropertyChangedEventArgs = new(nameof(Evaluation));
     internal static readonly PropertyChangingEventArgs EvaluationPropertyChangingEventArgs = new(nameof(Evaluation));
 
@@ -73,11 +85,14 @@ abstract class ObservableExpression :
         defaultResult = DefaultResult(type);
         resultEqualityComparer = FastEqualityComparer.Get(type);
         deferringEvaluation = deferEvaluation ? 1 : 0;
-        evaluation = (null, defaultResult);
+        evaluation = defaultResult;
     }
 
     protected readonly object? defaultResult;
     int deferringEvaluation;
+    /// <summary>
+    /// The thread evaluating or building this node, shifted clear of four flags: that an evaluation was asked for while it did, that it is building rather than evaluating, that the node's last observation has been released, and that the thread evaluating is to tear the node down when it lets go
+    /// </summary>
     int evaluating;
     Expression? expression;
 #if IS_NET_9_0_OR_GREATER
@@ -87,7 +102,10 @@ abstract class ObservableExpression :
 #endif
     ObservableExpressionSubscription? firstDependent;
     ObservableExpressionSubscription? lastDependent;
-    (Exception? Fault, object? Result) evaluation;
+    /// <summary>
+    /// What the node evaluated to, held as one reference so that a thread reading it while another writes it reads one evaluation or the other and never a fault from one with a result from the other: the result itself, or the fault wrapped
+    /// </summary>
+    object? evaluation;
     protected readonly ExpressionObserver observer;
     readonly FastEqualityComparer resultEqualityComparer;
 
@@ -114,22 +132,28 @@ abstract class ObservableExpression :
         get
         {
             EvaluateIfDeferred();
-            return evaluation;
+            return CurrentEvaluation;
         }
         protected set
         {
-            if (!ReferenceEquals(evaluation.Fault, value.Fault) || !resultEqualityComparer.Equals(evaluation.Result, value.Result))
+            var (currentFault, currentResult) = CurrentEvaluation;
+            if (!ReferenceEquals(currentFault, value.Fault) || !resultEqualityComparer.Equals(currentResult, value.Result))
             {
-                var previousValue = evaluation.Result;
-                evaluation = value;
+                Volatile.Write(ref evaluation, value.Fault is { } fault ? new FaultedEvaluation(fault) : value.Result);
                 NotifyDependentsChanged();
-                DisposeIfNecessaryAndPossible(previousValue);
+                DisposeIfNecessaryAndPossible(currentResult);
             }
         }
     }
 
     protected bool IsDeferringEvaluation =>
         Volatile.Read(ref deferringEvaluation) != 0;
+
+    /// <summary>
+    /// Gets whether this thread is evaluating or building this node, in which case what it is doing will read whatever is announcing to it
+    /// </summary>
+    private protected bool IsEvaluatingOnThisThread =>
+        (Volatile.Read(ref evaluating) & ~flags) == Environment.CurrentManagedThreadId << ownerShift;
 
     void DisposeIfNecessaryAndPossible(object? value)
     {
@@ -150,7 +174,7 @@ abstract class ObservableExpression :
     }
 
     protected void DisposeValueIfNecessaryAndPossible() =>
-        DisposeIfNecessaryAndPossible(evaluation.Result);
+        DisposeIfNecessaryAndPossible(CurrentEvaluation.Result);
 
     protected virtual void Evaluate()
     {
@@ -159,43 +183,184 @@ abstract class ObservableExpression :
     internal void EvaluateIfDeferred()
     {
         if (Volatile.Read(ref deferringEvaluation) != 0 && Interlocked.Exchange(ref deferringEvaluation, 0) != 0)
-            EvaluateOnce();
+            EvaluateAsOwner();
     }
 
     protected void EvaluateIfNotDeferred()
     {
         if (Volatile.Read(ref deferringEvaluation) == 0)
-            EvaluateOnce();
+            EvaluateAsOwner();
     }
 
     /// <summary>
-    /// Evaluates unless this observation is already evaluating, which is what a dependency announcing to it does while it is reading that very dependency
+    /// Evaluates unless this observation is already evaluating or being built, declining when that is on this thread and leaving it to evaluate once more when that is on another
     /// </summary>
     /// <remarks>
     /// Reading a deferred observation's evaluation both resolves it and announces that its value changed, and the thing which read it is often a dependent part way through its own evaluation, on the line which reads it. Left alone, that announcement re-enters the dependent's evaluation, which completes against the now resolved dependency, after which the outer evaluation carries on and does the same work a second time. Both produce the same value, which is why nothing has reported it, and for a node producing something the observer disposes of it makes and discards one more of them than the expression requires.
-    /// An evaluation in progress has not yet finished reading what it depends on, so it will read what the announcement was telling it. That is what makes this safe rather than a dropped notification, and it is also the limit of it: a node which reads one dependency into a local and then reads another whose resolution changes the first would compute against the local it took. No node here does that in a way which can be reached, every dependency being read through the evaluation property rather than held across the reading of another, but that is an argument from the shape of ten evaluations rather than a guarantee, and the differential fuzz is what stands behind it.
+    /// An evaluation in progress on this thread has not yet finished reading what it depends on, so it will read what the announcement was telling it, which is what makes declining safe rather than a dropped notification; a source announcing during the evaluation which reads it is the exception, and asks to be read again instead. An evaluation in progress on another thread may already have read what changed, so a request from elsewhere is never declined: the thread evaluating evaluates again once it has finished, and before it lets go, so the last evaluation always begins after the last change it was told of. A node being built is treated the same way, so that nothing evaluates a node another thread has not finished building
     /// </remarks>
-    private protected void EvaluateOnce()
+    private protected void EvaluateOnce() =>
+        EvaluateOnce(false);
+
+    private protected void EvaluateOnce(bool rerunOnReentry)
     {
-        if (Interlocked.CompareExchange(ref evaluating, 1, 0) != 0)
-            return;
+        var owner = Environment.CurrentManagedThreadId << ownerShift;
+        while (true)
+        {
+            var state = Volatile.Read(ref evaluating);
+            if (state == 0)
+            {
+                if (ExchangeState(owner, 0))
+                    break;
+                continue;
+            }
+            if ((state & retired) != 0 || (state & ~flags) == owner && !rerunOnReentry)
+                return;
+            if ((state & evaluationRequested) != 0 || ExchangeState(state | evaluationRequested, state))
+                return;
+        }
+        EvaluateAndRelinquish(owner);
+    }
+
+    /// <summary>
+    /// Replaces the evaluation state with the specified value if it is the specified comparand, interlocked unless the observer's observations are confined to one thread at a time
+    /// </summary>
+    bool ExchangeState(int value, int comparand)
+    {
+        if (observer.IsThreadSafe)
+            return Interlocked.CompareExchange(ref evaluating, value, comparand) == comparand;
+        if (evaluating != comparand)
+            return false;
+        evaluating = value;
+        return true;
+    }
+
+    void EvaluateAndRelinquish(int owner)
+    {
         try
         {
             Evaluate();
         }
-        finally
+        catch
         {
-            Volatile.Write(ref evaluating, 0);
+            Abandon();
+            throw;
+        }
+        Relinquish(owner);
+    }
+
+    /// <summary>
+    /// Lets go of evaluating because an evaluation threw, keeping the node retired if it was and tearing it down if that was left to this thread
+    /// </summary>
+    void Abandon()
+    {
+        var state = Volatile.Read(ref evaluating);
+        while (!ExchangeState(state & (retired | tearDownPending), state))
+            state = Volatile.Read(ref evaluating);
+        if ((state & tearDownPending) != 0)
+        {
+            Volatile.Write(ref evaluating, retired);
+            TearDown();
         }
     }
+
+    /// <summary>
+    /// Evaluates for the node itself rather than for something announcing to it, which while the node is being built on this thread means evaluating now
+    /// </summary>
+    void EvaluateAsOwner()
+    {
+        if ((Volatile.Read(ref evaluating) & ~evaluationRequested) == (Environment.CurrentManagedThreadId << ownerShift | initializing))
+            Evaluate();
+        else
+            EvaluateOnce();
+    }
+
+    /// <summary>
+    /// Lets go of evaluating, first evaluating again for as long as something asked for an evaluation while this thread held it
+    /// </summary>
+    void Relinquish(int owner)
+    {
+        while (true)
+        {
+            var state = Volatile.Read(ref evaluating);
+            if ((state & retired) != 0)
+            {
+                if (!ExchangeState(retired, state))
+                    continue;
+                if ((state & tearDownPending) != 0)
+                    TearDown();
+                return;
+            }
+            if ((state & evaluationRequested) == 0)
+            {
+                if (ExchangeState(0, state))
+                    return;
+                continue;
+            }
+            if (!ExchangeState(owner, state))
+                continue;
+            try
+            {
+                Evaluate();
+            }
+            catch
+            {
+                Abandon();
+                throw;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Tears the node down now that its last observation has been released, unless another thread is evaluating it, in which case that thread tears it down when it lets go, so that nothing the evaluation attaches to or makes outlives the node and nothing is disposed of twice
+    /// </summary>
+    /// <remarks>
+    /// Waiting for the other thread instead would be simpler, and would deadlock wherever that thread's evaluation, or something it notifies, waits on the thread releasing, as a handler marshalling to a user interface thread which is disposing of an observation does
+    /// </remarks>
+    private protected void Retire()
+    {
+        var owner = Environment.CurrentManagedThreadId << ownerShift;
+        while (true)
+        {
+            var state = Volatile.Read(ref evaluating);
+            if (state == 0 || (state & ~flags) == owner)
+            {
+                if (!ExchangeState(state | retired, state))
+                    continue;
+                TearDown();
+                return;
+            }
+            if (ExchangeState(state | retired | tearDownPending, state))
+                return;
+        }
+    }
+
+    /// <summary>
+    /// Releases what the node attached to, observes and made, once and on whichever thread <see cref="Retire"/> leaves it to
+    /// </summary>
+    private protected abstract void TearDown();
 
     protected virtual bool GetShouldValueBeDisposed() =>
         false;
 
+    /// <summary>
+    /// Builds the node while holding its evaluation, so that an announcement reaching it before it is built asks for an evaluation once it is rather than evaluating what is not yet there
+    /// </summary>
     internal void Initialize()
     {
-        OnInitialization();
-        observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionInitialized, "Initialized observation of {Expression}", Expression);
+        var owner = Environment.CurrentManagedThreadId << ownerShift;
+        Volatile.Write(ref evaluating, owner | initializing);
+        try
+        {
+            OnInitialization();
+        }
+        catch
+        {
+            Abandon();
+            throw;
+        }
+        observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionInitialized, "Initialized observation of {Expression}", Expression);
+        Relinquish(owner);
     }
 
     private protected void NotifyDependentsChanged()
@@ -223,13 +388,19 @@ abstract class ObservableExpression :
     }
 
     internal (Exception? Fault, object? Result) CurrentEvaluation =>
-        evaluation;
+        Decode(Volatile.Read(ref evaluation));
+
+    internal object? CurrentState =>
+        Volatile.Read(ref evaluation);
+
+    internal (Exception? Fault, object? Result) Decode(object? state) =>
+        state is FaultedEvaluation faulted ? (faulted.Fault, defaultResult) : (null, state);
 
     protected abstract void OnInitialization();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     protected void RemovedFromCache() =>
-        observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionDisposed, "Disposed observation of {Expression}", Expression);
+        observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionDisposed, "Disposed observation of {Expression}", Expression);
 
     internal ObservableExpressionSubscription SubscribeDependent(IObservableExpressionDependent dependent)
     {
@@ -257,8 +428,22 @@ abstract class ObservableExpression :
             result = null;
             return false;
         }
-        result = evaluation.Result;
+        result = CurrentEvaluation.Result;
         return true;
+    }
+
+    /// <summary>
+    /// Releases one observation of this node, one release at a time, since the disposal a release ends in ignores a call made while another is under way, and a release ignored is an observation never released
+    /// </summary>
+    internal virtual void Release()
+    {
+        if (!observer.IsThreadSafe)
+        {
+            Dispose();
+            return;
+        }
+        lock (dependentsAccess)
+            Dispose();
     }
 
     internal void UnsubscribeDependent(ObservableExpressionSubscription subscription)
@@ -291,6 +476,11 @@ abstract class ScopedObservableExpression :
     static bool FaultEquals(Exception? x, Exception? y) =>
         ReferenceEquals(x, y) || x is not null && y is not null && x.GetType() == y.GetType() && x.Message == y.Message;
 
+    /// <summary>
+    /// Stands in for an evaluation not yet read, so that whichever of construction and a first announcement reads the node's evaluation last is the one kept, since construction subscribes before it reads and an announcement can arrive in between on another thread
+    /// </summary>
+    static readonly object unread = new();
+
     protected ScopedObservableExpression(ExpressionObserver observer, Expression? expression, ObservableExpression observableExpression, IReadOnlyList<object?>? arguments)
     {
         ArgumentNullException.ThrowIfNull(observer);
@@ -299,9 +489,12 @@ abstract class ScopedObservableExpression :
         this.observer = observer;
         this.expression = expression;
         this.observableExpression = observableExpression;
-        evaluation = observableExpression.CurrentEvaluation;
         if (this.observableExpression.CanChange)
             subscription = this.observableExpression.SubscribeDependent(this);
+        if (!observer.IsThreadSafe)
+            evaluationState = observableExpression.CurrentState;
+        else
+            Interlocked.CompareExchange(ref evaluationState, observableExpression.CurrentState, unread);
     }
 
     private protected readonly ObservableExpression observableExpression;
@@ -309,10 +502,13 @@ abstract class ScopedObservableExpression :
     IReadOnlyList<object?>? arguments;
     int disposed;
     Expression? expression;
-    private protected (Exception? Fault, object? Result) evaluation;
+    object? evaluationState = unread;
     bool notificationForced;
     bool notificationPending;
     readonly ObservableExpressionSubscription? subscription;
+
+    private protected (Exception? Fault, object? Result) evaluation =>
+        observableExpression.Decode(Volatile.Read(ref evaluationState));
 
     internal Expression Expression =>
         expression ??= observableExpression.Expression;
@@ -356,7 +552,7 @@ abstract class ScopedObservableExpression :
         Disposing?.Invoke(this, e);
         if (subscription is { } dependency)
             observableExpression.UnsubscribeDependent(dependency);
-        observableExpression.Dispose();
+        observableExpression.Release();
         Disposed?.Invoke(this, e);
     }
 
@@ -389,12 +585,16 @@ abstract class ScopedObservableExpression :
 
     void RaiseIfEvaluationChanged()
     {
-        var current = observableExpression.CurrentEvaluation;
-        if (!notificationForced && FaultEquals(evaluation.Fault, current.Fault) && ResultEquals(evaluation.Result, current.Result))
+        var currentState = observableExpression.CurrentState;
+        if (ReferenceEquals(Volatile.Read(ref evaluationState), unread) && ReferenceEquals(Interlocked.CompareExchange(ref evaluationState, currentState, unread), unread))
+            return;
+        var current = observableExpression.Decode(currentState);
+        var previous = evaluation;
+        if (!notificationForced && FaultEquals(previous.Fault, current.Fault) && ResultEquals(previous.Result, current.Result))
             return;
         notificationForced = false;
         PropertyChanging?.Invoke(this, ObservableExpression.EvaluationPropertyChangingEventArgs);
-        evaluation = current;
+        Volatile.Write(ref evaluationState, currentState);
         PropertyChanged?.Invoke(this, ObservableExpression.EvaluationPropertyChangedEventArgs);
     }
 

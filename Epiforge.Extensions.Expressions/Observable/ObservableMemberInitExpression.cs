@@ -15,25 +15,28 @@ sealed class ObservableMemberInitExpression(ExpressionObserver observer, MemberI
     {
         var removedFromCache = observer.ExpressionDisposed(this);
         if (removedFromCache)
-        {
-            DisposeValueIfNecessaryAndPossible();
-            if (newObservableExpression is not null)
-            {
-                if (newObservableExpressionSubscription is { } newObservableExpressionDependency)
-                    newObservableExpression.UnsubscribeDependent(newObservableExpressionDependency);
-                newObservableExpression.Dispose();
-            }
-            if (memberAssignments is { } disposingMemberAssignments)
-                for (int i = 0, ii = disposingMemberAssignments.Length; i < ii; ++i)
-                {
-                    var memberAssignment = disposingMemberAssignments[i];
-                    if (memberAssignment.Subscription is { } memberAssignmentDependency)
-                        memberAssignment.Expression.UnsubscribeDependent(memberAssignmentDependency);
-                    memberAssignment.Expression.Dispose();
-                }
-            RemovedFromCache();
-        }
+            Retire();
         return removedFromCache;
+    }
+
+    private protected override void TearDown()
+    {
+        DisposeValueIfNecessaryAndPossible();
+        if (newObservableExpression is not null)
+        {
+            if (newObservableExpressionSubscription is { } newObservableExpressionDependency)
+                newObservableExpression.UnsubscribeDependent(newObservableExpressionDependency);
+            newObservableExpression.Release();
+        }
+        if (memberAssignments is { } disposingMemberAssignments)
+            for (int i = 0, ii = disposingMemberAssignments.Length; i < ii; ++i)
+            {
+                var memberAssignment = disposingMemberAssignments[i];
+                if (memberAssignment.Subscription is { } memberAssignmentDependency)
+                    memberAssignment.Expression.UnsubscribeDependent(memberAssignmentDependency);
+                memberAssignment.Expression.Release();
+            }
+        RemovedFromCache();
     }
 
     protected override void Evaluate()
@@ -44,12 +47,12 @@ sealed class ObservableMemberInitExpression(ExpressionObserver observer, MemberI
             if (newObservableExpressionFault is not null)
             {
                 Evaluation = (newObservableExpressionFault, defaultResult);
-                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, newObservableExpressionFault, "{MemberInitExpression} new faulted: {Fault}", MemberInitExpression, newObservableExpressionFault);
+                observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, newObservableExpressionFault, "{MemberInitExpression} new faulted: {Fault}", MemberInitExpression, newObservableExpressionFault);
             }
             else if (FirstMemberAssignmentFault() is { } memberAssignmentObservableExpressionFault)
             {
                 Evaluation = (memberAssignmentObservableExpressionFault, defaultResult);
-                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, memberAssignmentObservableExpressionFault, "{MemberInitExpression} member assignment faulted: {Fault}", MemberInitExpression, memberAssignmentObservableExpressionFault);
+                observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, memberAssignmentObservableExpressionFault, "{MemberInitExpression} member assignment faulted: {Fault}", MemberInitExpression, memberAssignmentObservableExpressionFault);
             }
             else
             {
@@ -66,13 +69,13 @@ sealed class ObservableMemberInitExpression(ExpressionObserver observer, MemberI
                             throw new NotSupportedException("Cannot handle member that is not a field or property");
                     }
                 Evaluation = (null, value);
-                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{MemberInitExpression} evaluated: {Value}", MemberInitExpression, value);
+                observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{MemberInitExpression} evaluated: {Value}", MemberInitExpression, value);
             }
         }
         catch (Exception ex)
         {
             Evaluation = (ex, defaultResult);
-            observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, ex, "{MemberInitExpression} faulted: {Fault}", MemberInitExpression, ex);
+            observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, ex, "{MemberInitExpression} faulted: {Fault}", MemberInitExpression, ex);
         }
     }
 
@@ -126,14 +129,14 @@ sealed class ObservableMemberInitExpression(ExpressionObserver observer, MemberI
             {
                 if (newObservableExpressionSubscription is { } newObservableExpressionDependency)
                     newObservableExpression.UnsubscribeDependent(newObservableExpressionDependency);
-                newObservableExpression.Dispose();
+                newObservableExpression.Release();
             }
             for (int i = 0, ii = memberAssignments.Count; i < ii; ++i)
             {
                 var memberAssignment = memberAssignments[i];
                 if (memberAssignment.Subscription is { } memberAssignmentDependency)
                     memberAssignment.Expression.UnsubscribeDependent(memberAssignmentDependency);
-                memberAssignment.Expression.Dispose();
+                memberAssignment.Expression.Release();
             }
             ExceptionDispatchInfo.Capture(ex).Throw();
         }

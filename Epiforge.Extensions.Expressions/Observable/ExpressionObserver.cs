@@ -137,6 +137,7 @@ public class ExpressionObserver :
         ConstantExpressionsListenForDictionaryChanged = options.ConstantExpressionsListenForDictionaryChanged;
         DisposeConstructedObjects = options.DisposeConstructedObjects;
         DisposeStaticMethodReturnValues = options.DisposeStaticMethodReturnValues;
+        IsThreadSafe = options.IsThreadSafe;
         MemberExpressionsListenToGeneratedTypesFieldValuesForCollectionChanged = options.MemberExpressionsListenToGeneratedTypesFieldValuesForCollectionChanged;
         MemberExpressionsListenToGeneratedTypesFieldValuesForDictionaryChanged = options.MemberExpressionsListenToGeneratedTypesFieldValuesForDictionaryChanged;
         Optimizer = Memoizing(options.Optimizer);
@@ -146,6 +147,7 @@ public class ExpressionObserver :
         disposeMethodReturnValues = [..options.DisposeMethodReturnValues.Keys];
         ignoredPropertyChangeNotifications = [..options.IgnoredPropertyChangeNotifications.Keys];
         Logger = options.Logger;
+        TraceLogger = options.Logger is { } logger ? new GuardedLogger(logger) : null;
     }
 
     readonly ConditionalWeakTable<LambdaExpression, DirectEvaluator> compiledLambdas = [];
@@ -257,7 +259,15 @@ public class ExpressionObserver :
     public bool DisposeStaticMethodReturnValues { get; }
 
     /// <inheritdoc/>
+    public bool IsThreadSafe { get; }
+
+    /// <inheritdoc/>
     public ILogger? Logger { get; }
+
+    /// <summary>
+    /// Gets the logger the observer's own traces are written through, which is <see cref="Logger"/> made unable to throw, so that whether a trace could be written never changes what an observation evaluates to
+    /// </summary>
+    internal ILogger? TraceLogger { get; }
 
     /// <inheritdoc/>
     public bool MemberExpressionsListenToGeneratedTypesFieldValuesForCollectionChanged { get; }
@@ -580,7 +590,7 @@ public class ExpressionObserver :
                 catch (Exception ex)
                 {
                     observableExpression.InitializationException = ex;
-                    observableExpression.Dispose();
+                    observableExpression.Release();
                     ExceptionDispatchInfo.Capture(ex).Throw();
                 }
                 Volatile.Write(ref observableExpression.InitializationAccess, null);
@@ -904,7 +914,7 @@ public class ExpressionObserver :
         if (!plan.IsEligible)
         {
             evaluator = DirectEvaluator.Ineligible;
-            Logger?.LogDebug(EventIds.Epiforge_Extensions_Expressions_ExpressionNotEligibleForDirectSubscription, "{Expression} is not eligible to be observed by subscribing directly to its change sources and will be observed by a graph of observable expressions instead; {IneligibleExpression} is {Ineligibility}", observed, plan.Analysis.IneligibleExpression, plan.Analysis.Ineligibility);
+            TraceLogger?.LogDebug(EventIds.Epiforge_Extensions_Expressions_ExpressionNotEligibleForDirectSubscription, "{Expression} is not eligible to be observed by subscribing directly to its change sources and will be observed by a graph of observable expressions instead; {IneligibleExpression} is {Ineligibility}", observed, plan.Analysis.IneligibleExpression, plan.Analysis.Ineligibility);
         }
         else
         {

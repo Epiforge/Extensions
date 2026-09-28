@@ -36,6 +36,11 @@ public interface IExpressionObserver
     bool DisposeStaticMethodReturnValues { get; }
 
     /// <summary>
+    /// Gets whether observations may be built, changed and disposed of on more than one thread at a time; the default is <c>true</c>
+    /// </summary>
+    bool IsThreadSafe { get; }
+
+    /// <summary>
     /// Gets the <see cref="ILogger"/> instance to which trace information will be written
     /// </summary>
     ILogger? Logger { get; }

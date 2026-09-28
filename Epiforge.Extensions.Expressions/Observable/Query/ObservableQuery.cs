@@ -44,7 +44,7 @@ abstract class ObservableQuery :
     public ObservableQuery(CollectionObserver collectionObserver)
     {
         this.collectionObserver = collectionObserver;
-        Logger = collectionObserver.ExpressionObserver.Logger;
+        Logger = collectionObserver.TraceLogger;
     }
 
 #if IS_NET_9_0_OR_GREATER
@@ -183,7 +183,7 @@ abstract class ObservableQuery :
                 return;
             OnInitialization();
             isInitialized = true;
-            collectionObserver.ExpressionObserver.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_QueryInitialized, "Initialized observation of {Query}", this);
+            collectionObserver.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_QueryInitialized, "Initialized observation of {Query}", this);
         }
     }
 
@@ -274,7 +274,7 @@ abstract class ObservableQuery :
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     protected void RemovedFromCache() =>
-        collectionObserver.ExpressionObserver.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_QueryDisposed, "Disposed observation of {Query}", this);
+        collectionObserver.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_QueryDisposed, "Disposed observation of {Query}", this);
 
     /// <summary>
     /// Subscribes a query derived from this one to its notifications, which it will receive before any handler subscribed to this query's events

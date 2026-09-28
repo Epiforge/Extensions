@@ -52,15 +52,26 @@ abstract class DirectObservableExpression(ExpressionObserver observer, Type type
     internal override bool CanChange =>
         attachments.Length > 0;
 
+    /// <summary>
+    /// Releases the observation without serializing, since an observation made directly belongs to one consumer and is never shared, so no other release can meet this one
+    /// </summary>
+    internal override void Release() =>
+        Dispose();
+
     protected override bool DisposeCore()
     {
         if (Interlocked.Exchange(ref released, 1) != 0)
             return false;
+        Retire();
+        return true;
+    }
+
+    private protected override void TearDown()
+    {
         var attached = attachments;
         for (var i = 0; i < attached.Length; ++i)
             observer.DirectSubscriptions.Detach(attached[i]);
         RemovedFromCache();
-        return true;
     }
 
     /// <summary>
@@ -143,7 +154,7 @@ abstract class DirectObservableExpression(ExpressionObserver observer, Type type
 
     internal void OnSourceChanged(bool forcesNotification)
     {
-        Evaluate();
+        EvaluateOnce(true);
         if (forcesNotification)
             NotifyDependentsOfValueContentsChanged();
     }
@@ -182,15 +193,13 @@ class DirectObservableExpression<TArgument, TResult> :
     /// <summary>
     /// Disposes of what every held slot the observer disposes of resolved to, which is once each because a held value is resolved once and never replaced
     /// </summary>
-    protected override bool DisposeCore()
+    private protected override void TearDown()
     {
-        if (!base.DisposeCore())
-            return false;
+        base.TearDown();
         var disposed = evaluator.DisposedHeldSlots;
         for (var i = 0; i < disposed.Length; ++i)
             if (held[disposed[i]] is { } value && !ReferenceEquals(value, Unresolved) && value is not DirectSlotFault)
                 observer.DisposeIfPossible(value);
-        return true;
     }
 
     private protected override Expression Materialize() =>
@@ -206,12 +215,12 @@ class DirectObservableExpression<TArgument, TResult> :
             var value = evaluate(argument, values, noDeferredGroups, noLinks, held);
             if (!IsCurrentResult(value))
                 Evaluation = (null, Box(value));
-            observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{Expression} evaluated directly: {Value}", Expression, value);
+            observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{Expression} evaluated directly: {Value}", Expression, value);
         }
         catch (Exception ex)
         {
             Evaluation = (ex, defaultResult);
-            observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, ex, "{Expression} faulted: {Fault}", Expression, ex);
+            observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, ex, "{Expression} faulted: {Fault}", Expression, ex);
         }
     }
 
@@ -307,7 +316,7 @@ class DeferringDirectObservableExpression<TArgument, TResult> :
                     continue;
                 if (!IsCurrentResult(value))
                     Evaluation = (null, Box(value));
-                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{Expression} evaluated directly: {Value}", Expression, value);
+                observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{Expression} evaluated directly: {Value}", Expression, value);
                 return;
             }
             catch (Exception ex)
@@ -318,7 +327,7 @@ class DeferringDirectObservableExpression<TArgument, TResult> :
                 if (again)
                     continue;
                 Evaluation = (ex, defaultResult);
-                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, ex, "{Expression} faulted: {Fault}", Expression, ex);
+                observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, ex, "{Expression} faulted: {Fault}", Expression, ex);
                 return;
             }
         }
@@ -382,13 +391,11 @@ sealed class LinkingDirectObservableExpression<TArgument, TResult> :
         return moved;
     }
 
-    protected override bool DisposeCore()
+    private protected override void TearDown()
     {
-        if (!base.DisposeCore())
-            return false;
+        base.TearDown();
         for (var s = 0; s < linkAttachments.Length; ++s)
             if (Interlocked.Exchange(ref linkAttachments[s], null) is { } attachment)
                 observer.DirectSubscriptions.Detach(attachment);
-        return true;
     }
 }

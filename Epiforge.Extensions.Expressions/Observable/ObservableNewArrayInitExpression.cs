@@ -14,18 +14,21 @@ sealed class ObservableNewArrayInitExpression(ExpressionObserver observer, NewAr
     {
         var removedFromCache = observer.ExpressionDisposed(this);
         if (removedFromCache)
-        {
-            if (initializers is not null)
-                for (int i = 0, ii = initializers.Count; i < ii; ++i)
-                {
-                    var initializer = initializers[i];
-                    if (initializerSubscriptions?[i] is { } initializerDependency)
-                        initializer.UnsubscribeDependent(initializerDependency);
-                    initializer.Dispose();
-                }
-            RemovedFromCache();
-        }
+            Retire();
         return removedFromCache;
+    }
+
+    private protected override void TearDown()
+    {
+        if (initializers is not null)
+            for (int i = 0, ii = initializers.Count; i < ii; ++i)
+            {
+                var initializer = initializers[i];
+                if (initializerSubscriptions?[i] is { } initializerDependency)
+                    initializer.UnsubscribeDependent(initializerDependency);
+                initializer.Release();
+            }
+        RemovedFromCache();
     }
 
     protected override void Evaluate()
@@ -33,7 +36,7 @@ sealed class ObservableNewArrayInitExpression(ExpressionObserver observer, NewAr
         if (initializers is { } faultedInitializers && FirstFault(faultedInitializers) is { } initializerFault)
         {
             Evaluation = (initializerFault, defaultResult);
-            observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, initializerFault, "{NewArrayExpression} initializer faulted: {Fault}", NewArrayExpression, initializerFault);
+            observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, initializerFault, "{NewArrayExpression} initializer faulted: {Fault}", NewArrayExpression, initializerFault);
         }
         else
         {
@@ -41,12 +44,12 @@ sealed class ObservableNewArrayInitExpression(ExpressionObserver observer, NewAr
             for (int i = 0, ii = initializers?.Count ?? 0; i < ii; ++i)
                 array.SetValue(initializers?[i].Evaluation.Result, i);
             Evaluation = (null, array);
-            observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{NewArrayExpression} evaluated: {Value}", NewArrayExpression, array);
+            observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{NewArrayExpression} evaluated: {Value}", NewArrayExpression, array);
         }
     }
 
     void IObservableExpressionDependent.OnDependencyEvaluationChanged(ObservableExpression dependency) =>
-        Evaluate();
+        EvaluateOnce();
 
     protected override void OnInitialization()
     {
@@ -75,7 +78,7 @@ sealed class ObservableNewArrayInitExpression(ExpressionObserver observer, NewAr
                 var initializer = initializersList[i];
                 if (initializerSubscriptions?[i] is { } initializerDependency)
                     initializer.UnsubscribeDependent(initializerDependency);
-                initializer.Dispose();
+                initializer.Release();
             }
             ExceptionDispatchInfo.Capture(ex).Throw();
         }   

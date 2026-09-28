@@ -43,7 +43,7 @@ sealed class ObservableCoalesceExpression(ExpressionObserver observer, BinaryExp
             if (leftFault is not null)
             {
                 Evaluation = (leftFault, defaultResult);
-                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, leftFault, "{BinaryExpression} left-hand operand faulted: {Fault}", BinaryExpression, leftFault);
+                observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, leftFault, "{BinaryExpression} left-hand operand faulted: {Fault}", BinaryExpression, leftFault);
             }
             else
             {
@@ -51,7 +51,7 @@ sealed class ObservableCoalesceExpression(ExpressionObserver observer, BinaryExp
                 {
                     var value = conversionDelegate is null ? leftResult : conversionDelegate(leftResult);
                     Evaluation = (null, value);
-                    observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{BinaryExpression} evaluated: {Value}", BinaryExpression, value);
+                    observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{BinaryExpression} evaluated: {Value}", BinaryExpression, value);
                 }
                 else
                 {
@@ -59,12 +59,12 @@ sealed class ObservableCoalesceExpression(ExpressionObserver observer, BinaryExp
                     if (rightFault is not null)
                     {
                         Evaluation = (rightFault, defaultResult);
-                        observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, rightFault, "{BinaryExpression} right-hand operand faulted: {Fault}", BinaryExpression, rightFault);
+                        observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, rightFault, "{BinaryExpression} right-hand operand faulted: {Fault}", BinaryExpression, rightFault);
                     }
                     else
                     {
                         Evaluation = (null, rightResult);
-                        observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{BinaryExpression} evaluated: {Value}", BinaryExpression, rightResult);
+                        observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{BinaryExpression} evaluated: {Value}", BinaryExpression, rightResult);
                     }
                 }
             }
@@ -72,7 +72,7 @@ sealed class ObservableCoalesceExpression(ExpressionObserver observer, BinaryExp
         catch (Exception ex)
         {
             Evaluation = (ex, defaultResult);
-            observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, ex, "{BinaryExpression} faulted: {Fault}", BinaryExpression, ex);
+            observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, ex, "{BinaryExpression} faulted: {Fault}", BinaryExpression, ex);
         }
     }
 

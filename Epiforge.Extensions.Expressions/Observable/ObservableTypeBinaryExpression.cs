@@ -30,16 +30,19 @@ sealed class ObservableTypeBinaryExpression(ExpressionObserver observer, TypeBin
     {
         var removedFromCache = observer.ExpressionDisposed(this);
         if (removedFromCache)
-        {
-            if (expression is not null)
-            {
-                if (expressionSubscription is { } expressionDependency)
-                    expression.UnsubscribeDependent(expressionDependency);
-                expression.Dispose();
-            }
-            RemovedFromCache();
-        }
+            Retire();
         return removedFromCache;
+    }
+
+    private protected override void TearDown()
+    {
+        if (expression is not null)
+        {
+            if (expressionSubscription is { } expressionDependency)
+                expression.UnsubscribeDependent(expressionDependency);
+            expression.Release();
+        }
+        RemovedFromCache();
     }
 
     protected override void Evaluate()
@@ -48,18 +51,18 @@ sealed class ObservableTypeBinaryExpression(ExpressionObserver observer, TypeBin
         if (expressionFault is not null)
         {
             Evaluation = (expressionFault, defaultResult);
-            observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, expressionFault, "{TypeBinaryExpression} expression faulted: {Fault}", TypeBinaryExpression, expressionFault);
+            observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, expressionFault, "{TypeBinaryExpression} expression faulted: {Fault}", TypeBinaryExpression, expressionFault);
         }
         else
         {
             var value = @delegate?.Invoke(expressionValue);
             Evaluation = (null, value);
-            observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{TypeBinaryExpression} evaluated: {Value}", TypeBinaryExpression, value);
+            observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{TypeBinaryExpression} evaluated: {Value}", TypeBinaryExpression, value);
         }
     }
 
     void IObservableExpressionDependent.OnDependencyEvaluationChanged(ObservableExpression dependency) =>
-        Evaluate();
+        EvaluateOnce();
 
     protected override void OnInitialization()
     {
@@ -78,7 +81,7 @@ sealed class ObservableTypeBinaryExpression(ExpressionObserver observer, TypeBin
             {
                 if (expressionSubscription is { } expressionDependency)
                     expression.UnsubscribeDependent(expressionDependency);
-                expression.Dispose();
+                expression.Release();
             }
             ExceptionDispatchInfo.Capture(ex).Throw();
         }

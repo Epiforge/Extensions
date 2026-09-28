@@ -38,23 +38,26 @@ class ObservableBinaryExpression(ExpressionObserver observer, BinaryExpression b
     {
         var removedFromCache = observer.ExpressionDisposed(this);
         if (removedFromCache)
-        {
-            DisposeValueIfNecessaryAndPossible();
-            if (left is not null)
-            {
-                if (leftSubscription is { } leftDependency)
-                    left.UnsubscribeDependent(leftDependency);
-                left.Dispose();
-            }
-            if (right is not null)
-            {
-                if (rightSubscription is { } rightDependency)
-                    right.UnsubscribeDependent(rightDependency);
-                right.Dispose();
-            }
-            RemovedFromCache();
-        }
+            Retire();
         return removedFromCache;
+    }
+
+    private protected override void TearDown()
+    {
+        DisposeValueIfNecessaryAndPossible();
+        if (left is not null)
+        {
+            if (leftSubscription is { } leftDependency)
+                left.UnsubscribeDependent(leftDependency);
+            left.Release();
+        }
+        if (right is not null)
+        {
+            if (rightSubscription is { } rightDependency)
+                right.UnsubscribeDependent(rightDependency);
+            right.Release();
+        }
+        RemovedFromCache();
     }
 
     protected override void Evaluate()
@@ -65,7 +68,7 @@ class ObservableBinaryExpression(ExpressionObserver observer, BinaryExpression b
             if (leftFault is not null)
             {
                 Evaluation = (leftFault, defaultResult);
-                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, leftFault, "{BinaryExpression} left-hand operand faulted: {Fault}", BinaryExpression, leftFault);
+                observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, leftFault, "{BinaryExpression} left-hand operand faulted: {Fault}", BinaryExpression, leftFault);
             }
             else
             {
@@ -73,20 +76,20 @@ class ObservableBinaryExpression(ExpressionObserver observer, BinaryExpression b
                 if (rightFault is not null)
                 {
                     Evaluation = (rightFault, defaultResult);
-                    observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, rightFault, "{BinaryExpression} right-hand operand faulted: {Fault}", BinaryExpression, rightFault);
+                    observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, rightFault, "{BinaryExpression} right-hand operand faulted: {Fault}", BinaryExpression, rightFault);
                 }
                 else
                 {
                     var value = @delegate?.Invoke(leftResult, rightResult);
                     Evaluation = (null, value);
-                    observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{BinaryExpression} evaluated: {Value}", BinaryExpression, value);
+                    observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{BinaryExpression} evaluated: {Value}", BinaryExpression, value);
                 }
             }
         }
         catch (Exception ex)
         {
             Evaluation = (ex, defaultResult);
-            observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, ex, "{BinaryExpression} faulted: {Fault}", BinaryExpression, ex);
+            observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, ex, "{BinaryExpression} faulted: {Fault}", BinaryExpression, ex);
         }
     }
 
@@ -124,13 +127,13 @@ class ObservableBinaryExpression(ExpressionObserver observer, BinaryExpression b
             {
                 if (leftSubscription is { } leftDependency)
                     left.UnsubscribeDependent(leftDependency);
-                left.Dispose();
+                left.Release();
             }
             if (right is not null)
             {
                 if (rightSubscription is { } rightDependency)
                     right.UnsubscribeDependent(rightDependency);
-                right.Dispose();
+                right.Release();
             }
             ExceptionDispatchInfo.Capture(ex).Throw();
         }

@@ -26,26 +26,29 @@ sealed class ObservableIndexExpression(ExpressionObserver observer, IndexExpress
     {
         var removedFromCache = observer.ExpressionDisposed(this);
         if (removedFromCache)
-        {
-            DisposeValueIfNecessaryAndPossible();
-            UnsubscribeFromObjectValueNotifications();
-            if (@object is not null)
-            {
-                if (objectSubscription is { } objectDependency)
-                    @object.UnsubscribeDependent(objectDependency);
-                @object.Dispose();
-            }
-            if (arguments is { } nonNullArguments)
-                for (int i = 0, ii = nonNullArguments.Count; i < ii; ++i)
-                {
-                    var argument = nonNullArguments[i];
-                    if (argumentSubscriptions?[i] is { } argumentDependency)
-                        argument.UnsubscribeDependent(argumentDependency);
-                    argument.Dispose();
-                }
-            RemovedFromCache();
-        }
+            Retire();
         return removedFromCache;
+    }
+
+    private protected override void TearDown()
+    {
+        DisposeValueIfNecessaryAndPossible();
+        UnsubscribeFromObjectValueNotifications();
+        if (@object is not null)
+        {
+            if (objectSubscription is { } objectDependency)
+                @object.UnsubscribeDependent(objectDependency);
+            @object.Release();
+        }
+        if (arguments is { } nonNullArguments)
+            for (int i = 0, ii = nonNullArguments.Count; i < ii; ++i)
+            {
+                var argument = nonNullArguments[i];
+                if (argumentSubscriptions?[i] is { } argumentDependency)
+                    argument.UnsubscribeDependent(argumentDependency);
+                argument.Release();
+            }
+        RemovedFromCache();
     }
 
     protected override void Evaluate()
@@ -56,12 +59,12 @@ sealed class ObservableIndexExpression(ExpressionObserver observer, IndexExpress
             if (objectFault is not null)
             {
                 Evaluation = (objectFault, defaultResult);
-                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, objectFault, "{IndexExpression} object expression faulted: {Fault}", IndexExpression, objectFault);
+                observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, objectFault, "{IndexExpression} object expression faulted: {Fault}", IndexExpression, objectFault);
             }
             else if (arguments is { } faultedArguments && FirstFault(faultedArguments) is { } argumentFault)
             {
                 Evaluation = (argumentFault, defaultResult);
-                observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, argumentFault, "{IndexExpression} argument expression faulted: {Fault}", IndexExpression, argumentFault);
+                observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, argumentFault, "{IndexExpression} argument expression faulted: {Fault}", IndexExpression, argumentFault);
             }
             else
             {
@@ -75,20 +78,20 @@ sealed class ObservableIndexExpression(ExpressionObserver observer, IndexExpress
                 {
                     var nullReference = new NullReferenceException();
                     Evaluation = (nullReference, defaultResult);
-                    observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, nullReference, "{IndexExpression} object was null: {Fault}", IndexExpression, nullReference);
+                    observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, nullReference, "{IndexExpression} object was null: {Fault}", IndexExpression, nullReference);
                 }
                 else
                 {
                     var value = getMethodInvoker is { } invoker ? Invoke(invoker, this.objectResult, arguments) : null;
                     Evaluation = (null, value);
-                    observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{IndexExpression} evaluated: {Value}", IndexExpression, value);
+                    observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{IndexExpression} evaluated: {Value}", IndexExpression, value);
                 }
             }
         }
         catch (Exception ex)
         {
             Evaluation = (ex, defaultResult);
-            observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, ex, "{IndexExpression} faulted: {Fault}", IndexExpression, ex);
+            observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, ex, "{IndexExpression} faulted: {Fault}", IndexExpression, ex);
         }
     }
 
@@ -107,20 +110,20 @@ sealed class ObservableIndexExpression(ExpressionObserver observer, IndexExpress
             case NotifyCollectionChangedAction.Add:
                 {
                     if (e.NewStartingIndex >= 0 && (e.NewItems?.Count ?? 0) > 0 && arguments?.Count == 1 && arguments?[0].Evaluation.Result is int index && e.NewStartingIndex <= index)
-                        Evaluate();
+                        EvaluateOnce(true);
                 }
                 break;
             case NotifyCollectionChangedAction.Move:
                 {
                     var movingCount = Math.Max(e.OldItems?.Count ?? 0, e.NewItems?.Count ?? 0);
                     if (e.OldStartingIndex >= 0 && e.NewStartingIndex >= 0 && movingCount > 0 && arguments?.Count == 1 && arguments?[0].Evaluation.Result is int index && (index >= e.OldStartingIndex && index < e.OldStartingIndex + movingCount || index >= e.NewStartingIndex && index < e.NewStartingIndex + movingCount))
-                        Evaluate();
+                        EvaluateOnce(true);
                 }
                 break;
             case NotifyCollectionChangedAction.Remove:
                 {
                     if (e.OldStartingIndex >= 0 && (e.OldItems?.Count ?? 0) > 0 && arguments?.Count == 1 && arguments?[0].Evaluation.Result is int index && e.OldStartingIndex <= index)
-                        Evaluate();
+                        EvaluateOnce(true);
                 }
                 break;
             case NotifyCollectionChangedAction.Replace:
@@ -130,12 +133,12 @@ sealed class ObservableIndexExpression(ExpressionObserver observer, IndexExpress
                         var oldCount = e.OldItems?.Count ?? 0;
                         var newCount = e.NewItems?.Count ?? 0;
                         if (oldCount != newCount && (e.OldStartingIndex >= 0 || e.NewStartingIndex >= 0) && index >= Math.Min(Math.Max(e.OldStartingIndex, 0), Math.Max(e.NewStartingIndex, 0)) || e.OldStartingIndex >= 0 && index >= e.OldStartingIndex && index < e.OldStartingIndex + oldCount || e.NewStartingIndex >= 0 && index >= e.NewStartingIndex && index < e.NewStartingIndex + newCount)
-                            Evaluate();
+                            EvaluateOnce(true);
                     }
                 }
                 break;
             case NotifyCollectionChangedAction.Reset:
-                Evaluate();
+                EvaluateOnce(true);
                 break;
         }
     }
@@ -144,21 +147,21 @@ sealed class ObservableIndexExpression(ExpressionObserver observer, IndexExpress
     {
         var e = (NotifyDictionaryChangedEventArgs<object?, object?>)eventArgs;
         if (e.Action == NotifyDictionaryChangedAction.Reset)
-            Evaluate();
+            EvaluateOnce(true);
         else if (arguments is { Count: 1 } indexArguments && indexArguments[0].Evaluation.Result is { } key)
         {
             var newItems = e.NewItems;
             for (int i = 0, ii = newItems.Count; i < ii; ++i)
                 if (key.Equals(newItems[i].Key))
                 {
-                    Evaluate();
+                    EvaluateOnce(true);
                     return;
                 }
             var oldItems = e.OldItems;
             for (int i = 0, ii = oldItems.Count; i < ii; ++i)
                 if (key.Equals(oldItems[i].Key))
                 {
-                    Evaluate();
+                    EvaluateOnce(true);
                     return;
                 }
         }
@@ -168,7 +171,7 @@ sealed class ObservableIndexExpression(ExpressionObserver observer, IndexExpress
     {
         var e = (PropertyChangedEventArgs)eventArgs;
         if (e.PropertyName == indexer?.Name || e.PropertyName == conventionalIndexerName)
-            Evaluate();
+            EvaluateOnce(true);
     }
 
     protected override void OnInitialization()
@@ -205,14 +208,14 @@ sealed class ObservableIndexExpression(ExpressionObserver observer, IndexExpress
             {
                 if (objectSubscription is { } objectDependency)
                     @object.UnsubscribeDependent(objectDependency);
-                @object.Dispose();
+                @object.Release();
             }
             for (int i = 0, ii = argumentsList.Count; i < ii; ++i)
             {
                 var argument = argumentsList[i];
                 if (argumentSubscriptions?[i] is { } argumentDependency)
                     argument.UnsubscribeDependent(argumentDependency);
-                argument.Dispose();
+                argument.Release();
             }
             ExceptionDispatchInfo.Capture(ex).Throw();
         }

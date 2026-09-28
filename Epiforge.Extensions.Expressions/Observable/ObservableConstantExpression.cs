@@ -14,15 +14,18 @@ sealed class ObservableConstantExpression(ExpressionObserver observer, ConstantE
     {
         var removedFromCache = observer.ExpressionDisposed(this);
         if (removedFromCache)
-        {
-            var value = Evaluation.Result;
-            if (observer.ConstantExpressionsListenForDictionaryChanged && value is INotifyDictionaryChanged dictionaryChanged)
-                dictionaryChanged.DictionaryChanged -= ValueChanged;
-            else if (observer.ConstantExpressionsListenForCollectionChanged && value is INotifyCollectionChanged collectionChanged)
-                collectionChanged.CollectionChanged -= ValueChanged;
-            RemovedFromCache();
-        }
+            Retire();
         return removedFromCache;
+    }
+
+    private protected override void TearDown()
+    {
+        var value = Evaluation.Result;
+        if (observer.ConstantExpressionsListenForDictionaryChanged && value is INotifyDictionaryChanged dictionaryChanged)
+            dictionaryChanged.DictionaryChanged -= ValueChanged;
+        else if (observer.ConstantExpressionsListenForCollectionChanged && value is INotifyCollectionChanged collectionChanged)
+            collectionChanged.CollectionChanged -= ValueChanged;
+        RemovedFromCache();
     }
 
     protected override void OnInitialization()

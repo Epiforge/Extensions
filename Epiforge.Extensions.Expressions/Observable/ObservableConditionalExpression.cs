@@ -20,28 +20,31 @@ sealed class ObservableConditionalExpression(ExpressionObserver observer, Condit
     {
         var removedFromCache = observer.ExpressionDisposed(this);
         if (removedFromCache)
-        {
-            if (test is not null)
-            {
-                if (testSubscription is { } testDependency)
-                    test.UnsubscribeDependent(testDependency);
-                test.Dispose();
-            }
-            if (ifTrue is not null)
-            {
-                if (ifTrueSubscription is { } ifTrueDependency)
-                    ifTrue.UnsubscribeDependent(ifTrueDependency);
-                ifTrue.Dispose();
-            }
-            if (ifFalse is not null)
-            {
-                if (ifFalseSubscription is { } ifFalseDependency)
-                    ifFalse.UnsubscribeDependent(ifFalseDependency);
-                ifFalse.Dispose();
-            }
-            RemovedFromCache();
-        }
+            Retire();
         return removedFromCache;
+    }
+
+    private protected override void TearDown()
+    {
+        if (test is not null)
+        {
+            if (testSubscription is { } testDependency)
+                test.UnsubscribeDependent(testDependency);
+            test.Release();
+        }
+        if (ifTrue is not null)
+        {
+            if (ifTrueSubscription is { } ifTrueDependency)
+                ifTrue.UnsubscribeDependent(ifTrueDependency);
+            ifTrue.Release();
+        }
+        if (ifFalse is not null)
+        {
+            if (ifFalseSubscription is { } ifFalseDependency)
+                ifFalse.UnsubscribeDependent(ifFalseDependency);
+            ifFalse.Release();
+        }
+        RemovedFromCache();
     }
 
     protected override void Evaluate()
@@ -50,17 +53,17 @@ sealed class ObservableConditionalExpression(ExpressionObserver observer, Condit
         if (testFault is not null)
         {
             Evaluation = (testFault, defaultResult);
-            observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, testFault, "{ConditionalExpression} test faulted: {Fault}", ConditionalExpression, testFault);
+            observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, testFault, "{ConditionalExpression} test faulted: {Fault}", ConditionalExpression, testFault);
         }
         else if (testResult is bool testBool)
         {
             Evaluation = testBool ? ifTrue!.Evaluation : ifFalse!.Evaluation;
-            observer.Logger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{ConditionalExpression} test: {TestResult}", ConditionalExpression, testBool);
+            observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{ConditionalExpression} test: {TestResult}", ConditionalExpression, testBool);
         }
         else
         {
             Evaluation = (new InvalidCastException(), defaultResult);
-            observer.Logger?.LogWarning(EventIds.Epiforge_Extensions_Expressions_ConditionalExpressionTestInvalidType, "{ConditionalExpression} test is of type {TestResultType} when a boolean is required", ConditionalExpression, testResult?.GetType());
+            observer.TraceLogger?.LogWarning(EventIds.Epiforge_Extensions_Expressions_ConditionalExpressionTestInvalidType, "{ConditionalExpression} test is of type {TestResultType} when a boolean is required", ConditionalExpression, testResult?.GetType());
         }
     }
 
@@ -86,19 +89,19 @@ sealed class ObservableConditionalExpression(ExpressionObserver observer, Condit
             {
                 if (testSubscription is { } testDependency)
                     test.UnsubscribeDependent(testDependency);
-                test.Dispose();
+                test.Release();
             }
             if (ifTrue is not null)
             {
                 if (ifTrueSubscription is { } ifTrueDependency)
                     ifTrue.UnsubscribeDependent(ifTrueDependency);
-                ifTrue.Dispose();
+                ifTrue.Release();
             }
             if (ifFalse is not null)
             {
                 if (ifFalseSubscription is { } ifFalseDependency)
                     ifFalse.UnsubscribeDependent(ifFalseDependency);
-                ifFalse.Dispose();
+                ifFalse.Release();
             }
             ExceptionDispatchInfo.Capture(ex).Throw();
         }
