@@ -53,6 +53,7 @@ sealed class ObservableCollectionSliceQuery<TElement>(CollectionObserver collect
             if (removedFromCache)
             {
                 source.CollectionChanged -= SourceCollectionChanged;
+                source.PropertyChanged -= SourcePropertyChanged;
                 RemovedFromCache();
             }
             return removedFromCache;
@@ -81,7 +82,9 @@ sealed class ObservableCollectionSliceQuery<TElement>(CollectionObserver collect
         lock (access)
         {
             ResetCount();
+            InheritOperationFault(source.OperationFault);
             source.CollectionChanged += SourceCollectionChanged;
+            source.PropertyChanged += SourcePropertyChanged;
         }
     }
 
@@ -90,6 +93,16 @@ sealed class ObservableCollectionSliceQuery<TElement>(CollectionObserver collect
         sourceCount = source.Count;
         var (_, length) = GetOffsetAndLength();
         SetBackedProperty(ref count, in length, countPropertyChangingEventArgs, countPropertyChangedEventArgs);
+    }
+
+    void SourcePropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(OperationFault))
+        {
+            using var changeHold = HoldOwnChanges();
+            lock (access)
+                InheritOperationFault(source.OperationFault);
+        }
     }
 
     void SourceCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)

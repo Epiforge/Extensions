@@ -15,6 +15,7 @@ sealed class ObservableDictionaryValueForQuery<TKey, TValue>(CollectionObserver 
             if (removedFromCache)
             {
                 observableDictionaryQuery.DictionaryChanged -= ObservableDictionaryQueryDictionaryChanged;
+                observableDictionaryQuery.PropertyChanged -= ObservableDictionaryQueryPropertyChanged;
                 RemovedFromCache();
             }
             return removedFromCache;
@@ -23,7 +24,7 @@ sealed class ObservableDictionaryValueForQuery<TKey, TValue>(CollectionObserver 
     }
 
     void Evaluate() =>
-        Evaluation = observableDictionaryQuery.TryGetValue(Key, out var value) ? (null, value) : NotFoundIsDefault ? (null, default!) : (ExceptionHelper.KeyNotFound, default!);
+        Evaluation = observableDictionaryQuery.OperationFault is { } fault ? (fault, default!) : observableDictionaryQuery.TryGetValue(Key, out var value) ? (null, value) : NotFoundIsDefault ? (null, default!) : (ExceptionHelper.KeyNotFound, default!);
 
     void ObservableDictionaryQueryDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e)
     {
@@ -32,10 +33,20 @@ sealed class ObservableDictionaryValueForQuery<TKey, TValue>(CollectionObserver 
             Evaluate();
     }
 
+    void ObservableDictionaryQueryPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(IObservableDictionaryQuery<,>.OperationFault))
+        {
+            using var changeHold = HoldOwnChanges();
+            Evaluate();
+        }
+    }
+
     protected override void OnInitialization()
     {
         using var changeHold = HoldChangesOf(observableDictionaryQuery);
         observableDictionaryQuery.DictionaryChanged += ObservableDictionaryQueryDictionaryChanged;
+        observableDictionaryQuery.PropertyChanged += ObservableDictionaryQueryPropertyChanged;
         Evaluate();
     }
 

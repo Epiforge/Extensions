@@ -172,7 +172,9 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     Dictionary<Expression, ObservableQuery>? cachedSelectManyQueries;
     Dictionary<Expression<Func<TElement, bool>>, ObservableCollectionWhereQuery<TElement>>? cachedWhereQueries;
     ChildQueryCaches? childQueryCaches;
+    Exception? inheritedOperationFault;
     Exception? operationFault;
+    Exception? ownOperationFault;
 
     public abstract TElement this[int index] { get; }
 
@@ -252,7 +254,46 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     public virtual Exception? OperationFault
     {
         get => operationFault;
-        protected set => SetBackedProperty(ref operationFault, in value, operationFaultPropertyChangingEventArgs, operationFaultPropertyChangedEventArgs);
+        protected set
+        {
+            if (ReferenceEquals(ownOperationFault, value))
+                return;
+            ownOperationFault = value;
+            PublishOperationFault();
+        }
+    }
+
+    /// <summary>
+    /// The fault of this query's own evaluations, without the fault of the query it is built over which <see cref="OperationFault" /> also reports
+    /// </summary>
+    private protected Exception? OwnOperationFault =>
+        ownOperationFault;
+
+    /// <summary>
+    /// Takes on the fault of the query this one is built over, so that a view reports a fault arising anywhere beneath it
+    /// </summary>
+    private protected void InheritOperationFault(Exception? fault)
+    {
+        if (ReferenceEquals(inheritedOperationFault, fault))
+            return;
+        inheritedOperationFault = fault;
+        PublishOperationFault();
+    }
+
+    void PublishOperationFault()
+    {
+        Exception? fault;
+        if (inheritedOperationFault is null)
+            fault = ownOperationFault;
+        else if (ownOperationFault is null)
+            fault = inheritedOperationFault;
+        else
+        {
+            var faultList = new FaultList(inheritedOperationFault);
+            faultList.Add(ownOperationFault);
+            fault = faultList.Fault;
+        }
+        SetBackedProperty(ref operationFault, in fault, operationFaultPropertyChangingEventArgs, operationFaultPropertyChangedEventArgs);
     }
 
     public virtual object SyncRoot =>
@@ -1005,7 +1046,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
             var caches = childQueryCaches ??= new();
             if (!(caches.OrderByQueries ??= new(CachedOrderByQueryEqualityComparer.Default)).TryGetValue(key, out orderByQuery!))
             {
-                orderByQuery = new ObservableCollectionOrderByQuery<TElement>(collectionObserver, this, selectorsAndDirections);
+                orderByQuery = new ObservableCollectionOrderByQuery<TElement>(collectionObserver, this, key);
                 caches.OrderByQueries.Add(key, orderByQuery);
             }
             ++orderByQuery.Observations;

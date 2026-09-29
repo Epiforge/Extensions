@@ -44,6 +44,7 @@ sealed class ObservableCollectionIndividualChangesQuery<TElement> :
                 elements.CollectionChanged -= ElementsCollectionChanged;
                 ((INotifyPropertyChanged)elements).PropertyChanged -= ElementsPropertyChanged;
                 source.CollectionChanged -= SourceCollectionChanged;
+                source.PropertyChanged -= SourcePropertyChanged;
                 RemovedFromCache();
             }
             return removedFromCache;
@@ -63,7 +64,9 @@ sealed class ObservableCollectionIndividualChangesQuery<TElement> :
         elements.Reset(source);
         elements.CollectionChanged += ElementsCollectionChanged;
         ((INotifyPropertyChanged)elements).PropertyChanged += ElementsPropertyChanged;
+        InheritOperationFault(source.OperationFault);
         source.CollectionChanged += SourceCollectionChanged;
+        source.PropertyChanged += SourcePropertyChanged;
     }
 
     void ElementsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -74,6 +77,16 @@ sealed class ObservableCollectionIndividualChangesQuery<TElement> :
 
     void ElementsPropertyChanged(object? sender, PropertyChangedEventArgs e) =>
         OnPropertyChanged(e);
+
+    void SourcePropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(OperationFault))
+        {
+            using var changeHold = HoldOwnChanges();
+            lock (access)
+                InheritOperationFault(source.OperationFault);
+        }
+    }
 
     [SuppressMessage("Maintainability", "CA1502: Avoid excessive complexity")]
     void SourceCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)

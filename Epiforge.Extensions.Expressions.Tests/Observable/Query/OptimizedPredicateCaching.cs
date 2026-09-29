@@ -4,7 +4,7 @@ namespace Epiforge.Extensions.Expressions.Tests.Observable.Query;
 /// Covers operators whose predicate the optimizer rewrites, which must leave their source's cache as they found it once disposed, and must yield a query which follows its source when observed again
 /// </summary>
 /// <remarks>
-/// A query cached under one key and removed under another stays cached after its last observation is disposed, and the next identical observation is handed the disposed query back. Every predicate here is one the optimizer rewrites, which each test checks first so that it cannot pass by the optimizer leaving its predicate alone. The collection operators are the controls: they cache and remove under the same key
+/// A query cached under one key and removed under another stays cached after its last observation is disposed, and the next identical observation is handed the disposed query back. Every predicate and key here is one the optimizer rewrites, which each test checks first so that it cannot pass by the optimizer leaving it alone. The collection operators other than ordering are the controls: they cache and remove under the same key
 /// </remarks>
 [TestClass]
 public class OptimizedPredicateCaching
@@ -13,6 +13,7 @@ public class OptimizedPredicateCaching
     static readonly Expression<Func<string, int, bool>> alwaysForValue = (key, value) => true | value > 0;
     static readonly Expression<Func<int, bool>> never = n => false & n > 0;
     static readonly Expression<Func<string, int, bool>> neverForValue = (key, value) => false & value > 0;
+    static readonly Expression<Func<int, IComparable>> ownKey = n => false & n > 0 ? 0 : n;
 
     static void AssertRewritten(Expression predicate) =>
         Assert.AreNotEqual(predicate.ToString(), ExpressionOptimizer.tryVisit(predicate).ToString(), $"the optimizer left {predicate} alone, so this test cannot say anything");
@@ -67,6 +68,32 @@ public class OptimizedPredicateCaching
         Assert.IsTrue(any.Evaluation.Result);
         source.Clear();
         Assert.IsFalse(any.Evaluation.Result, "an observation made after an identical one was disposed did not follow its source");
+    }
+
+    [TestMethod]
+    public void CollectionOrderByLeavesNothingCachedOnceDisposed()
+    {
+        AssertRewritten(ownKey);
+        var source = new ObservableRangeCollection<int>([2, 1]);
+        var collectionObserver = CollectionObserverHelpers.Create();
+        using var sourceQuery = collectionObserver.ObserveReadOnlyList(source);
+        using (var ordering = sourceQuery.ObserveOrderBy(ownKey))
+            CollectionAssert.AreEqual(new[] { 1, 2 }, ordering.ToArray());
+        Assert.AreEqual(0, sourceQuery.CachedObservableQueries);
+    }
+
+    [TestMethod]
+    public void CollectionOrderByObservedAgainFollowsItsSource()
+    {
+        AssertRewritten(ownKey);
+        var source = new ObservableRangeCollection<int>([2, 1]);
+        var collectionObserver = CollectionObserverHelpers.Create();
+        using var sourceQuery = collectionObserver.ObserveReadOnlyList(source);
+        sourceQuery.ObserveOrderBy(ownKey).Dispose();
+        using var ordering = sourceQuery.ObserveOrderBy(ownKey);
+        CollectionAssert.AreEqual(new[] { 1, 2 }, ordering.ToArray());
+        source.Add(0);
+        CollectionAssert.AreEqual(new[] { 0, 1, 2 }, ordering.ToArray(), "an observation made after an identical one was disposed did not follow its source");
     }
 
     [TestMethod]

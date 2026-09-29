@@ -1,22 +1,19 @@
 namespace Epiforge.Extensions.Expressions.Observable.Query;
 
+/// <summary>
+/// Orders the elements of a source by keys it observes for each distinct element directly, leaving an element out while any of its keys faults
+/// </summary>
 sealed class ObservableCollectionOrderByQuery<TElement> :
-    ObservableCollectionQuery<TElement>
+    ObservableCollectionQuery<TElement>,
+    IObservableQueryDependent
 {
-    static readonly ConditionalWeakTable<Expression<Func<TElement, IComparable>>, Expression<Func<TElement, Tuple<TElement, IComparable>>>> cachedWrappedSelectors = [];
-    static readonly ConcurrentDictionary<Expression<Func<TElement, IComparable>>, Expression<Func<TElement, Tuple<TElement, IComparable>>>> cachedWrappedStableSelectors = new(ExpressionEqualityComparer.Default);
-
-    static Expression<Func<TElement, Tuple<TElement, IComparable>>> CachedWrappedSelectorsValueFactory(Expression<Func<TElement, IComparable>> selector)
-    {
-        var parameter = Expression.Parameter(typeof(TElement), "element");
-        return Expression.Lambda<Func<TElement, Tuple<TElement, IComparable>>>(Expression.New(typeof(Tuple<TElement, IComparable>).GetConstructor([typeof(TElement), typeof(IComparable)])!, parameter, LambdaInvocationRewriter.Apply(selector, parameter) ?? Expression.Invoke(selector, parameter)), parameter);
-    }
+    static readonly ConcurrentDictionary<Expression<Func<TElement, IComparable>>, Expression<Func<TElement, IComparable>>> stableKeySelectors = new(ExpressionEqualityComparer.Default);
 
     /// <summary>
-    /// Yields the lambda pairing an element with its key, shared among selectors equal in structure where every constant they hold compares by value, so that a caller writing a selector which captures nothing where it is used still shares one compilation, and otherwise kept for as long as the selector is, so that a selector holding a closure is never retained by this cache
+    /// Yields one instance for every key selector equal in structure where every constant it holds compares by value, so that a caller writing a selector which captures nothing where it is used still shares one compilation, since the observer's caches of optimized and compiled lambdas match by reference; a selector holding a closure is used as it is and never retained
     /// </summary>
-    static Expression<Func<TElement, Tuple<TElement, IComparable>>> WrapSelector(Expression<Func<TElement, IComparable>> selector) =>
-        ExpressionKeyStability.IsStable(selector) ? cachedWrappedStableSelectors.GetOrAdd(selector, CachedWrappedSelectorsValueFactory) : cachedWrappedSelectors.GetValue(selector, CachedWrappedSelectorsValueFactory);
+    static Expression<Func<TElement, IComparable>> SharedKeySelector(Expression<Func<TElement, IComparable>> keySelector) =>
+        ExpressionKeyStability.IsStable(keySelector) ? stableKeySelectors.GetOrAdd(keySelector, keySelector) : keySelector;
 
     public ObservableCollectionOrderByQuery(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> source, IReadOnlyList<(Expression<Func<TElement, IComparable>> keySelectorExpression, bool isDescending)> selectorsAndDirections) :
         base(collectionObserver)
@@ -24,24 +21,31 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
         access = new();
         this.source = source;
         results = Logger is null ? new() : new(Logger);
-        nodesByElement = [];
+        entries = [];
         positions = new();
         SelectorsAndDirections = selectorsAndDirections;
+        keySelectors = [..selectorsAndDirections.Select(selectorAndDirection => SharedKeySelector(selectorAndDirection.keySelectorExpression))];
+        comparer = new([..selectorsAndDirections.Select(selectorAndDirection => selectorAndDirection.isDescending)]);
     }
 
     const int farthestGallopingStep = 8;
 
     readonly object access;
     NullableKeyDictionary<TElement, ObservableCollectionRankQuery<TElement>>? cachedRankQueries;
-    [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
-    ObservableCollectionOrderingComparer<TElement>? comparer;
+    readonly ObservableCollectionOrderingComparer<TElement> comparer;
     List<TElement>? enumerationSnapshot;
-    readonly NullableKeyDictionary<TElement, PrefixWeightedSequenceNode<TElement>> nodesByElement;
-    readonly PrefixWeightedSequence<TElement> positions;
+    readonly NullableKeyDictionary<TElement, ObservableCollectionOrderingComparer<TElement>.Entry> entries;
+    readonly FaultList faults = new();
+    bool faultsChanged;
+    PropertyChangedEventHandler? keyEvaluationChangedHandler;
+    readonly Expression<Func<TElement, IComparable>>[] keySelectors;
+    readonly PrefixWeightedSequence<ObservableCollectionOrderingComparer<TElement>.Entry> positions;
+    bool released;
     readonly ObservableRangeCollection<TElement> results;
     readonly List<TElement> singleOccurrence = [default!];
-    IReadOnlyList<(IObservableCollectionQuery<Tuple<TElement, IComparable>> selection, bool isDescending)>? selectionsAndDirections;
     readonly ObservableCollectionQuery<TElement> source;
+    ObservableQuerySubscription? sourceSubscription;
+    int withheldOccurrences;
 
     internal readonly IReadOnlyList<(Expression<Func<TElement, IComparable>> keySelectorExpression, bool isDescending)> SelectorsAndDirections;
 
@@ -75,6 +79,12 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
     }
 
     /// <summary>
+    /// Yields the one handler this query attaches to every key it observes, since a method group converts to a new delegate at each conversion
+    /// </summary>
+    PropertyChangedEventHandler KeyEvaluationChangedHandler =>
+        keyEvaluationChangedHandler ??= KeyEvaluationChanged;
+
+    /// <summary>
     /// Occurs when the key of an element in the ordering changes, whether or not the element moves
     /// </summary>
     internal event EventHandler? KeysChanged;
@@ -87,14 +97,12 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
             if (removedFromCache)
                 lock (access)
                 {
-                    foreach (var (selection, isDescending) in selectionsAndDirections!)
-                        selection.CollectionChanged -= SelectionCollectionChanged;
-                    source.CollectionChanged -= SourceCollectionChanged;
+                    released = true;
+                    if (sourceSubscription is not null)
+                        source.UnsubscribeDependent(sourceSubscription);
                     ((INotifyPropertyChanged)results).PropertyChanged -= ResultsPropertyChanged;
                     results.CollectionChanged -= ResultsCollectionChanged;
-                    comparer!.Dispose();
-                    foreach (var (selection, _) in selectionsAndDirections)
-                        selection.Dispose();
+                    ReleaseEntriesWithAccess();
                     RemovedFromCache();
                 }
             return removedFromCache;
@@ -108,7 +116,7 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
     /// <remarks>
     /// The search which uses this probes positions which converge on one another, so each node is found from the one before it rather than from the root of the sequence. <c>NodeAtFrom</c> decides for itself whether the finger is nearer than the root and descends from the root when it is not, so this cannot reach a different node than a descent would
     /// </remarks>
-    TElement ElementAtExcludingWithAccess(int index, int excludedIndex, ref PrefixWeightedSequenceNode<TElement> finger, ref int fingerIndex)
+    ObservableCollectionOrderingComparer<TElement>.Entry EntryAtExcludingWithAccess(int index, int excludedIndex, ref PrefixWeightedSequenceNode<ObservableCollectionOrderingComparer<TElement>.Entry> finger, ref int fingerIndex)
     {
         var positionIndex = index < excludedIndex ? index : index + 1;
         var node = positions.NodeAtFrom(finger, fingerIndex, positionIndex);
@@ -123,12 +131,11 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
     /// <remarks>
     /// A key change usually moves an element a few places, which this settles in a few comparisons, where a search by halves over everything on the side it moves to takes the logarithm of the order's size however near it lands; a move across the order costs at most four comparisons more than that search
     /// </remarks>
-    int FindDestinationWithAccess(TElement element, PrefixWeightedSequenceNode<TElement> node, int currentIndex)
+    int FindDestinationWithAccess(ObservableCollectionOrderingComparer<TElement>.Entry entry, PrefixWeightedSequenceNode<ObservableCollectionOrderingComparer<TElement>.Entry> node, int currentIndex)
     {
-        var elementComparables = comparer!.ComparablesOf(element);
         var finger = node;
         var fingerIndex = currentIndex;
-        if (currentIndex > 0 && comparer!.CompareWithComparablesOf(element, ref elementComparables, ElementAtExcludingWithAccess(currentIndex - 1, currentIndex, ref finger, ref fingerIndex)) < 0)
+        if (currentIndex > 0 && comparer.Compare(entry, EntryAtExcludingWithAccess(currentIndex - 1, currentIndex, ref finger, ref fingerIndex)) < 0)
         {
             var low = 0;
             var high = currentIndex - 1;
@@ -137,7 +144,7 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
                 var probe = high - step;
                 if (probe < 0)
                     break;
-                if (comparer!.CompareWithComparablesOf(element, ref elementComparables, ElementAtExcludingWithAccess(probe, currentIndex, ref finger, ref fingerIndex)) >= 0)
+                if (comparer.Compare(entry, EntryAtExcludingWithAccess(probe, currentIndex, ref finger, ref fingerIndex)) >= 0)
                 {
                     low = probe + 1;
                     break;
@@ -147,7 +154,7 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
             while (low < high)
             {
                 var middle = low + (high - low) / 2;
-                if (comparer!.CompareWithComparablesOf(element, ref elementComparables, ElementAtExcludingWithAccess(middle, currentIndex, ref finger, ref fingerIndex)) < 0)
+                if (comparer.Compare(entry, EntryAtExcludingWithAccess(middle, currentIndex, ref finger, ref fingerIndex)) < 0)
                     high = middle;
                 else
                     low = middle + 1;
@@ -155,7 +162,7 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
             return low;
         }
         var reducedCount = positions.Count - 1;
-        if (currentIndex < reducedCount && comparer!.CompareWithComparablesOf(element, ref elementComparables, ElementAtExcludingWithAccess(currentIndex, currentIndex, ref finger, ref fingerIndex)) > 0)
+        if (currentIndex < reducedCount && comparer.Compare(entry, EntryAtExcludingWithAccess(currentIndex, currentIndex, ref finger, ref fingerIndex)) > 0)
         {
             var low = currentIndex + 1;
             var high = reducedCount;
@@ -164,7 +171,7 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
                 var probe = low - 1 + step;
                 if (probe >= reducedCount)
                     break;
-                if (comparer!.CompareWithComparablesOf(element, ref elementComparables, ElementAtExcludingWithAccess(probe, currentIndex, ref finger, ref fingerIndex)) <= 0)
+                if (comparer.Compare(entry, EntryAtExcludingWithAccess(probe, currentIndex, ref finger, ref fingerIndex)) <= 0)
                 {
                     high = probe;
                     break;
@@ -174,7 +181,7 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
             while (low < high)
             {
                 var middle = low + (high - low) / 2;
-                if (comparer!.CompareWithComparablesOf(element, ref elementComparables, ElementAtExcludingWithAccess(middle, currentIndex, ref finger, ref fingerIndex)) <= 0)
+                if (comparer.Compare(entry, EntryAtExcludingWithAccess(middle, currentIndex, ref finger, ref fingerIndex)) <= 0)
                     high = middle;
                 else
                     low = middle + 1;
@@ -184,12 +191,11 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
         return currentIndex;
     }
 
-    int FindInsertionIndexWithAccess(TElement element)
+    int FindInsertionIndexWithAccess(ObservableCollectionOrderingComparer<TElement>.Entry entry)
     {
-        var elementComparables = comparer!.ComparablesOf(element);
         var low = 0;
         var high = positions.Count;
-        PrefixWeightedSequenceNode<TElement>? finger = null;
+        PrefixWeightedSequenceNode<ObservableCollectionOrderingComparer<TElement>.Entry>? finger = null;
         var fingerIndex = 0;
         while (low < high)
         {
@@ -197,7 +203,7 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
             var node = finger is null ? positions.NodeAt(middle) : positions.NodeAtFrom(finger, fingerIndex, middle);
             finger = node;
             fingerIndex = middle;
-            if (comparer!.CompareWithComparablesOf(element, ref elementComparables, node.Item) < 0)
+            if (comparer.Compare(entry, node.Item) < 0)
                 high = middle;
             else
                 low = middle + 1;
@@ -211,6 +217,163 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
         {
             enumerationSnapshot ??= results.ToList();
             return enumerationSnapshot.GetEnumerator();
+        }
+    }
+
+    /// <summary>
+    /// Places the specified number of occurrences of an element, which finds it a place in the order where it has none yet and holds them back where one of its keys faults
+    /// </summary>
+    /// <param name="element">The element to place</param>
+    /// <param name="count">The number of occurrences of it to place</param>
+    /// <param name="occurrences">The occurrences to place, which is <c>null</c> for a single one, in which case the buffer this keeps for the purpose stands in for them</param>
+    /// <remarks>
+    /// The buffer is safe to reuse because every caller holds the query's lock and <see cref="ObservableRangeCollection{T}.InsertRange(int, IEnumerable{T})" /> copies what it is given before it announces anything
+    /// </remarks>
+    void InsertElementOccurrencesWithAccess(TElement element, int count, IEnumerable<TElement>? occurrences)
+    {
+        if (occurrences is null)
+        {
+            singleOccurrence[0] = element;
+            occurrences = singleOccurrence;
+        }
+        if (entries.TryGetValue(element, out var entry))
+        {
+            entry.Occurrences += count;
+            if (entry.Node is { } node)
+            {
+                results.InsertRange(positions.PrefixWeightBefore(node), occurrences);
+                positions.SetWeight(node, node.Weight + count);
+            }
+            else
+                withheldOccurrences += count;
+        }
+        else
+        {
+            entry = ObserveElementWithAccess(element);
+            entry.Occurrences = count;
+            if (entry.FaultedKeys == 0)
+                PlaceWithAccess(entry, occurrences);
+            else
+                withheldOccurrences += count;
+        }
+        singleOccurrence[0] = default!;
+    }
+
+    void KeyEvaluationChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (sender is not IObservableExpression<TElement, IComparable> observation || e.PropertyName != nameof(IObservableExpression<,>.Evaluation))
+            return;
+        var keyChanged = false;
+        using (var notificationDeferral = DeferNotificationsUntilMutationCompletes())
+            lock (access)
+                if (!released)
+                {
+                    keyChanged = KeyEvaluationChangedWithAccess(observation);
+                    TakeFaultWithAccess();
+                }
+        if (keyChanged)
+            KeysChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// Takes up a new evaluation of one key of an element, which moves the element where it stays in the order, takes it out where the key began faulting and puts it back where the last of its keys stopped
+    /// </summary>
+    /// <returns><c>true</c> if the key changed; otherwise, <c>false</c></returns>
+    bool KeyEvaluationChangedWithAccess(IObservableExpression<TElement, IComparable> observation)
+    {
+        if (!entries.TryGetValue(observation.Argument, out var entry))
+            return false;
+        var keys = entry.Keys;
+        var keyIndex = 0;
+        while (keyIndex < keys.Length && !ReferenceEquals(keys[keyIndex].Observation, observation))
+            ++keyIndex;
+        if (keyIndex == keys.Length)
+            return false;
+        ref var key = ref keys[keyIndex];
+        var (fault, comparable) = observation.Evaluation;
+        var oldFault = key.Fault;
+        if (ReferenceEquals(oldFault, fault) && (fault is not null || Equals(key.Comparable, comparable)))
+            return false;
+        key.Fault = fault;
+        key.Comparable = fault is null ? comparable : null;
+        if (!ReferenceEquals(oldFault, fault))
+        {
+            entry.FaultedKeys += (fault is null ? 0 : 1) - (oldFault is null ? 0 : 1);
+            RecordFaultsWithAccess(entry);
+        }
+        if (entry.Node is { } node)
+        {
+            if (entry.FaultedKeys > 0)
+            {
+                results.RemoveRange(positions.PrefixWeightBefore(node), node.Weight);
+                positions.RemoveAt(positions.IndexOf(node));
+                entry.Node = null;
+                withheldOccurrences += entry.Occurrences;
+            }
+            else
+                RepositionWithAccess(entry, node);
+        }
+        else if (entry.FaultedKeys == 0)
+        {
+            withheldOccurrences -= entry.Occurrences;
+            PlaceWithAccess(entry, Enumerable.Repeat(entry.Element, entry.Occurrences));
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Observes the keys of an element, subscribing to each before reading any and reading them only once the element is recorded, so that a change made on another thread in between is taken up once the lock is released rather than lost
+    /// </summary>
+    ObservableCollectionOrderingComparer<TElement>.Entry ObserveElementWithAccess(TElement element)
+    {
+        var entry = new ObservableCollectionOrderingComparer<TElement>.Entry(element, SelectorsAndDirections.Count);
+        var keys = entry.Keys;
+        for (var i = 0; i < keys.Length; ++i)
+        {
+            var observation = collectionObserver.ExpressionObserver.ObserveWithoutOptimization(keySelectors[i], element);
+            observation.PropertyChanged += KeyEvaluationChangedHandler;
+            keys[i].Observation = observation;
+        }
+        entries.Add(element, entry);
+        for (var i = 0; i < keys.Length; ++i)
+        {
+            ref var key = ref keys[i];
+            (key.Fault, key.Comparable) = key.Observation.Evaluation;
+            if (key.Fault is { } fault)
+            {
+                key.Comparable = null;
+                ++entry.FaultedKeys;
+                faults.Add(new EvaluationFaultException(element, fault));
+                faultsChanged = true;
+            }
+        }
+        return entry;
+    }
+
+    /// <summary>
+    /// Observes the keys of every element of the source, in the order the source first holds each, counting the occurrences of each
+    /// </summary>
+    List<ObservableCollectionOrderingComparer<TElement>.Entry> ObserveSourceWithAccess()
+    {
+        var firstOccurrences = new List<ObservableCollectionOrderingComparer<TElement>.Entry>();
+        if (!source.HasIndexerPenalty)
+            for (int i = 0, ii = source.Count; i < ii; ++i)
+                ObserveOccurrenceWithAccess(source[i], firstOccurrences);
+        else
+            foreach (var element in source)
+                ObserveOccurrenceWithAccess(element, firstOccurrences);
+        return firstOccurrences;
+    }
+
+    void ObserveOccurrenceWithAccess(TElement element, List<ObservableCollectionOrderingComparer<TElement>.Entry> firstOccurrences)
+    {
+        if (entries.TryGetValue(element, out var entry))
+            ++entry.Occurrences;
+        else
+        {
+            entry = ObserveElementWithAccess(element);
+            entry.Occurrences = 1;
+            firstOccurrences.Add(entry);
         }
     }
 
@@ -232,27 +395,114 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
         return rankQuery.AsScoped();
     }
 
-    protected override void OnInitialization()
+    void IObservableQueryDependent.OnDependencyCollectionChanged(ObservableQuerySubscription subscription, NotifyCollectionChangedEventArgs e)
     {
-        var selections = SelectorsAndDirections.Select(t => (selection: source.ObserveSelect(WrapSelector(t.keySelectorExpression)), t.isDescending)).ToList().AsReadOnly();
-        using var changeHold = HoldChangesOf([source, .. selections.Select(t => ((ScopedObservableCollectionQuery<Tuple<TElement, IComparable>>)t.selection).query)]);
+        using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
         lock (access)
         {
-            selectionsAndDirections = selections;
-            comparer = new(access, selectionsAndDirections);
+            if (released)
+                return;
+            if (e.Action is NotifyCollectionChangedAction.Reset)
+            {
+                ReleaseEntriesWithAccess();
+                var ordered = new List<TElement>();
+                PlaceAllWithAccess(ObserveSourceWithAccess(), ordered);
+                results.Reset(ordered);
+            }
+            else if (e.Action is not NotifyCollectionChangedAction.Move)
+            {
+                if (e.OldItems is { } oldItems && oldItems.Count > 0)
+                {
+                    if (oldItems.Count == results.Count + withheldOccurrences)
+                    {
+                        ReleaseEntriesWithAccess();
+                        results.Clear();
+                    }
+                    else if (oldItems.Count == 1)
+                        RemoveElementOccurrencesWithAccess((TElement)oldItems[0]!, 1);
+                    else
+                        foreach (var elements in oldItems.Cast<TElement>().GroupBy(element => element))
+                            RemoveElementOccurrencesWithAccess(elements.Key, elements.Count());
+                }
+                if (e.NewItems is { } newItems && newItems.Count > 0)
+                {
+                    if (results.Count == 0)
+                    {
+                        var firstOccurrences = new List<ObservableCollectionOrderingComparer<TElement>.Entry>();
+                        for (int i = 0, ii = newItems.Count; i < ii; ++i)
+                            ObserveOccurrenceWithAccess((TElement)newItems[i]!, firstOccurrences);
+                        var ordered = new List<TElement>();
+                        PlaceAllWithAccess(firstOccurrences, ordered);
+                        if (ordered.Count > 0)
+                            results.Reset(ordered);
+                    }
+                    else if (newItems.Count == 1)
+                        InsertElementOccurrencesWithAccess((TElement)newItems[0]!, 1, null);
+                    else
+                        foreach (var elements in newItems.Cast<TElement>().GroupBy(element => element))
+                            InsertElementOccurrencesWithAccess(elements.Key, elements.Count(), elements);
+                }
+            }
+            TakeFaultWithAccess();
+        }
+    }
+
+    void IObservableQueryDependent.OnDependencyPropertyChanged(ObservableQuerySubscription subscription, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(OperationFault))
+        {
+            using var changeHold = HoldOwnChanges();
+            lock (access)
+                if (!released)
+                    InheritOperationFault(source.OperationFault);
+        }
+    }
+
+    protected override void OnInitialization()
+    {
+        using var changeHold = HoldChangesOf(source);
+        lock (access)
+        {
             var ordered = new List<TElement>();
-            RebuildPositionsWithAccess(source.OrderBy(element => element, comparer).ToList(), ordered);
+            PlaceAllWithAccess(ObserveSourceWithAccess(), ordered);
             results.Reset(ordered);
             results.CollectionChanged += ResultsCollectionChanged;
             ((INotifyPropertyChanged)results).PropertyChanged += ResultsPropertyChanged;
-            source.CollectionChanged += SourceCollectionChanged;
-            foreach (var (selection, isDescending) in selectionsAndDirections)
-            {
-                selection.CollectionChanged += SelectionCollectionChanged;
-                selection.PropertyChanged += SelectionPropertyChanged;
-            }
-            SetOperationFault();
+            TakeFaultWithAccess();
+            InheritOperationFault(source.OperationFault);
+            sourceSubscription = source.SubscribeDependent(this);
         }
+    }
+
+    /// <summary>
+    /// Places elements newly observed into an order holding none, sorting those whose keys are all known and holding back those with a key which faults, and lists the whole order
+    /// </summary>
+    /// <remarks>
+    /// The sort is stable, so elements whose keys tie stand in the order the source first holds them, as they would had they been placed one at a time. Occurrences held back are counted afresh, since elements held back before these arrived may have gained occurrences among them
+    /// </remarks>
+    void PlaceAllWithAccess(List<ObservableCollectionOrderingComparer<TElement>.Entry> firstOccurrences, List<TElement> intoOrder)
+    {
+        var placeable = new List<ObservableCollectionOrderingComparer<TElement>.Entry>(firstOccurrences.Count);
+        foreach (var entry in firstOccurrences)
+            if (entry.FaultedKeys == 0)
+                placeable.Add(entry);
+        foreach (var entry in placeable.OrderBy(entry => entry, comparer))
+            entry.Node = positions.Insert(positions.Count, entry, entry.Occurrences);
+        withheldOccurrences = 0;
+        foreach (var (_, entry) in entries)
+            if (entry.Node is null)
+                withheldOccurrences += entry.Occurrences;
+        intoOrder.Clear();
+        for (var node = positions.FirstNode; node is not null; node = positions.Next(node))
+            for (int i = 0, ii = node.Weight; i < ii; ++i)
+                intoOrder.Add(node.Item.Element);
+    }
+
+    void PlaceWithAccess(ObservableCollectionOrderingComparer<TElement>.Entry entry, IEnumerable<TElement> occurrences)
+    {
+        var index = FindInsertionIndexWithAccess(entry);
+        entry.Node = positions.Insert(index, entry, entry.Occurrences);
+        results.InsertRange(positions.PrefixWeightBefore(index), occurrences);
     }
 
     internal bool QueryDisposed(ObservableCollectionRankQuery<TElement> rankQuery)
@@ -283,10 +533,9 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
         {
             if (OperationFault is { } fault)
                 return (fault, default);
-            if (!nodesByElement.ContainsKey(element))
+            if (!entries.TryGetValue(element, out var entry) || entry.Node is null)
                 return (ExceptionHelper.SequenceContainsNoMatchingElement, default);
-            var elementComparables = comparer!.ComparablesOf(element);
-            PrefixWeightedSequenceNode<TElement>? finger = null;
+            PrefixWeightedSequenceNode<ObservableCollectionOrderingComparer<TElement>.Entry>? finger = null;
             var fingerIndex = 0;
             var low = 0;
             var high = positions.Count;
@@ -296,7 +545,7 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
                 var node = finger is null ? positions.NodeAt(middle) : positions.NodeAtFrom(finger, fingerIndex, middle);
                 finger = node;
                 fingerIndex = middle;
-                if (comparer!.CompareWithComparablesOf(element, ref elementComparables, node.Item) > 0)
+                if (comparer.Compare(entry, node.Item) > 0)
                     low = middle + 1;
                 else
                     high = middle;
@@ -309,7 +558,7 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
                 var node = finger is null ? positions.NodeAt(middle) : positions.NodeAtFrom(finger, fingerIndex, middle);
                 finger = node;
                 fingerIndex = middle;
-                if (comparer!.CompareWithComparablesOf(element, ref elementComparables, node.Item) >= 0)
+                if (comparer.Compare(entry, node.Item) >= 0)
                     low = middle + 1;
                 else
                     high = middle;
@@ -319,83 +568,82 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
         }
     }
 
-    void RebuildPositionsWithAccess(IReadOnlyList<TElement> fromSort, List<TElement> intoOrder)
+    /// <summary>
+    /// Records the faults of an element's keys afresh, which is how one of them changing is recorded
+    /// </summary>
+    void RecordFaultsWithAccess(ObservableCollectionOrderingComparer<TElement>.Entry entry)
     {
-        positions.Clear();
-        nodesByElement.Clear();
-        for (int i = 0, ii = fromSort.Count; i < ii; ++i)
-        {
-            var element = fromSort[i];
-            if (nodesByElement.TryGetValue(element, out var node))
-                positions.SetWeight(node, node.Weight + 1);
-            else
-                nodesByElement.Add(element, positions.Insert(positions.Count, element, 1));
-        }
-        nodesByElement.TrimExcess();
-        intoOrder.Clear();
-        for (var node = positions.FirstNode; node is not null; node = positions.Next(node))
-            for (int i = 0, ii = node.Weight; i < ii; ++i)
-                intoOrder.Add(node.Item);
+        faults.RemoveKey(entry.Element, EqualityComparer<TElement>.Default);
+        foreach (var key in entry.Keys)
+            if (key.Fault is { } fault)
+                faults.Add(new EvaluationFaultException(entry.Element, fault));
+        faultsChanged = true;
     }
 
-    void RepositionElementWithAccess(TElement element)
+    void ReleaseEntriesWithAccess()
     {
-        if (!nodesByElement.TryGetValue(element, out var node))
+        foreach (var entry in entries.Values)
+            foreach (var key in entry.Keys)
+            {
+                key.Observation.PropertyChanged -= KeyEvaluationChangedHandler;
+                key.Observation.Dispose();
+            }
+        entries.Clear();
+        positions.Clear();
+        withheldOccurrences = 0;
+        faults.Clear();
+        faultsChanged = true;
+    }
+
+    void ReleaseEntryWithAccess(ObservableCollectionOrderingComparer<TElement>.Entry entry)
+    {
+        entries.Remove(entry.Element);
+        foreach (var key in entry.Keys)
+        {
+            key.Observation.PropertyChanged -= KeyEvaluationChangedHandler;
+            key.Observation.Dispose();
+        }
+        if (entry.FaultedKeys > 0)
+        {
+            faults.RemoveKey(entry.Element, EqualityComparer<TElement>.Default);
+            faultsChanged = true;
+        }
+    }
+
+    /// <summary>
+    /// Forgets the specified number of occurrences of an element, which takes it out of the order and stops observing its keys where none remain
+    /// </summary>
+    void RemoveElementOccurrencesWithAccess(TElement element, int removedCount)
+    {
+        if (!entries.TryGetValue(element, out var entry))
             return;
+        if (entry.Node is { } node)
+        {
+            results.RemoveRange(positions.PrefixWeightBefore(node), removedCount);
+            if (removedCount < node.Weight)
+                positions.SetWeight(node, node.Weight - removedCount);
+            else
+            {
+                positions.RemoveAt(positions.IndexOf(node));
+                entry.Node = null;
+            }
+        }
+        else
+            withheldOccurrences -= removedCount;
+        entry.Occurrences -= removedCount;
+        if (entry.Occurrences <= 0)
+            ReleaseEntryWithAccess(entry);
+    }
+
+    void RepositionWithAccess(ObservableCollectionOrderingComparer<TElement>.Entry entry, PrefixWeightedSequenceNode<ObservableCollectionOrderingComparer<TElement>.Entry> node)
+    {
         var currentIndex = positions.IndexOf(node);
-        var destinationIndex = FindDestinationWithAccess(element, node, currentIndex);
+        var destinationIndex = FindDestinationWithAccess(entry, node, currentIndex);
         if (destinationIndex == currentIndex)
             return;
         var startingIndex = positions.PrefixWeightBefore(currentIndex);
         positions.Move(node, destinationIndex);
         results.MoveRange(startingIndex, positions.PrefixWeightBefore(node), node.Weight);
-    }
-
-    /// <summary>
-    /// Places the specified number of occurrences of an element, which finds it a place in the order where it has none yet
-    /// </summary>
-    /// <param name="element">The element to place</param>
-    /// <param name="count">The number of occurrences of it to place</param>
-    /// <param name="occurrences">The occurrences to place, which is <c>null</c> for a single one, in which case the buffer this keeps for the purpose stands in for them</param>
-    /// <remarks>
-    /// The buffer is safe to reuse because every caller holds the query's lock and <see cref="ObservableRangeCollection{T}.InsertRange(int, IEnumerable{T})" /> copies what it is given before it announces anything
-    /// </remarks>
-    void InsertElementOccurrencesWithAccess(TElement element, int count, IEnumerable<TElement>? occurrences)
-    {
-        if (occurrences is null)
-        {
-            singleOccurrence[0] = element;
-            occurrences = singleOccurrence;
-        }
-        if (nodesByElement.TryGetValue(element, out var node))
-        {
-            results.InsertRange(positions.PrefixWeightBefore(node), occurrences);
-            positions.SetWeight(node, node.Weight + count);
-        }
-        else
-        {
-            var index = FindInsertionIndexWithAccess(element);
-            nodesByElement.Add(element, positions.Insert(index, element, count));
-            results.InsertRange(positions.PrefixWeightBefore(index), occurrences);
-        }
-        singleOccurrence[0] = default!;
-    }
-
-    /// <summary>
-    /// Forgets the specified number of occurrences of an element, which takes it out of the order where none remain
-    /// </summary>
-    void RemoveElementOccurrencesWithAccess(TElement element, int removedCount)
-    {
-        if (!nodesByElement.TryGetValue(element, out var node))
-            return;
-        results.RemoveRange(positions.PrefixWeightBefore(node), removedCount);
-        if (removedCount < node.Weight)
-            positions.SetWeight(node, node.Weight - removedCount);
-        else
-        {
-            positions.RemoveAt(positions.IndexOf(node));
-            nodesByElement.Remove(element);
-        }
     }
 
     void ResultsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -407,89 +655,12 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
     void ResultsPropertyChanged(object? sender, PropertyChangedEventArgs e) =>
         OnPropertyChanged(e);
 
-    /// <remarks>
-    /// The payload is walked by index rather than through a query over it, because a key change carries a single item and the query allocates two iterators and their enumerators to deliver it
-    /// </remarks>
-    /// <remarks>
-    /// A key change is reported after the notifications of any move it caused have been raised and the lock released, so that what hears of it reads an ordering already settled
-    /// </remarks>
-    void SelectionCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    void TakeFaultWithAccess()
     {
-        using (var notificationDeferral = DeferNotificationsUntilMutationCompletes())
-            lock (access)
-                if (e.NewItems is { } newItems)
-                    for (int i = 0, ii = newItems.Count; i < ii; ++i)
-                        if (newItems[i] is Tuple<TElement, IComparable> keyedElement)
-                            RepositionElementWithAccess(keyedElement.Item1);
-        if (e.Action is NotifyCollectionChangedAction.Replace)
-            KeysChanged?.Invoke(this, EventArgs.Empty);
-    }
-
-    void SelectionPropertyChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName == nameof(IObservableCollectionQuery<>.OperationFault))
-        {
-            using var changeHold = HoldOwnChanges();
-            SetOperationFault();
-        }
-    }
-
-    void SetOperationFault()
-    {
-        lock (access)
-        {
-            var faultList = new FaultList();
-            foreach (var (selection, _) in selectionsAndDirections!)
-                faultList.Check(selection);
-            OperationFault = faultList.Fault;
-        }
-    }
-
-    void SourceCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
-    {
-        using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
-        lock (access)
-        {
-            if (e.Action is NotifyCollectionChangedAction.Reset)
-            {
-                var ordered = new List<TElement>();
-                RebuildPositionsWithAccess(source.OrderBy(element => element, comparer).ToList(), ordered);
-                results.Reset(ordered);
-                SetOperationFault();
-            }
-            else if (e.Action is not NotifyCollectionChangedAction.Move)
-            {
-                if (e.OldItems is { } oldItems && oldItems.Count > 0)
-                {
-                    if (oldItems.Count == results.Count)
-                    {
-                        positions.Clear();
-                        nodesByElement.Clear();
-                        nodesByElement.TrimExcess();
-                        results.Clear();
-                    }
-                    else if (oldItems.Count == 1)
-                        RemoveElementOccurrencesWithAccess((TElement)oldItems[0]!, 1);
-                    else
-                        foreach (var elements in oldItems.Cast<TElement>().GroupBy(element => element))
-                            RemoveElementOccurrencesWithAccess(elements.Key, elements.Count());
-                }
-                if (e.NewItems is { } newItems && newItems.Count > 0)
-                {
-                    if (results.Count == 0)
-                    {
-                        var ordered = new List<TElement>();
-                        RebuildPositionsWithAccess(newItems.Cast<TElement>().OrderBy(element => element, comparer).ToList(), ordered);
-                        results.Reset(ordered);
-                    }
-                    else if (newItems.Count == 1)
-                        InsertElementOccurrencesWithAccess((TElement)newItems[0]!, 1, null);
-                    else
-                        foreach (var elements in newItems.Cast<TElement>().GroupBy(element => element))
-                            InsertElementOccurrencesWithAccess(elements.Key, elements.Count(), elements);
-                }
-            }
-        }
+        if (!faultsChanged)
+            return;
+        faultsChanged = false;
+        OperationFault = faults.Fault;
     }
 
     public override string ToString() =>

@@ -41,7 +41,7 @@ class FaultList
         var exceptionGroups = faultList.exceptions.ToLookup(exception => exception is EvaluationFaultException);
         var evaluationFaults = exceptionGroups[true].Cast<EvaluationFaultException>().ToList();
         if (removeExisting)
-            evaluationFaults.RemoveAll(elementFault => elementFault.Element is TElement faultElement && elementComparer.Equals(faultElement, element));
+            evaluationFaults.RemoveAll(elementFault => IsFaultOf(elementFault, element, elementComparer));
         if (addNew)
             evaluationFaults.Add(new EvaluationFaultException(element, newFault!));
         faultList.Clear();
@@ -61,7 +61,7 @@ class FaultList
         var exceptionGroups = faultList.exceptions.ToLookup(exception => exception is EvaluationFaultException);
         var evaluationFaults = exceptionGroups[true].Cast<EvaluationFaultException>().ToList();
         if (removeExisting)
-            evaluationFaults.RemoveAll(elementFault => elementFault.Element is TKey faultKey && keyComparer.Equals(faultKey, key));
+            evaluationFaults.RemoveAll(elementFault => IsFaultOf(elementFault, key, keyComparer));
         if (addNew)
             evaluationFaults.Add(new EvaluationFaultException(key, newFault!));
         faultList.Clear();
@@ -69,6 +69,12 @@ class FaultList
         faultList.AddRange(evaluationFaults);
         return faultList.Fault;
     }
+
+    /// <summary>
+    /// Determines whether a fault is the one recorded for an element, which for a null element is one recorded for null, since null matches no type pattern
+    /// </summary>
+    static bool IsFaultOf<TElement>(EvaluationFaultException elementFault, TElement element, IEqualityComparer<TElement> elementComparer) =>
+        elementFault.Element is TElement faultElement ? elementComparer.Equals(faultElement, element) : elementFault.Element is null && element is null;
 
     public FaultList()
     {
@@ -162,7 +168,7 @@ class FaultList
     public bool RemoveElementOccurrence<TElement>(TElement element, IEqualityComparer<TElement> elementComparer)
     {
         for (int i = 0, ii = exceptions.Count; i < ii; ++i)
-            if (exceptions[i] is EvaluationFaultException elementFault && elementFault.Element is TElement faultElement && elementComparer.Equals(faultElement, element))
+            if (exceptions[i] is EvaluationFaultException elementFault && IsFaultOf(elementFault, element, elementComparer))
             {
                 exceptions.RemoveAt(i);
                 return true;
@@ -171,5 +177,5 @@ class FaultList
     }
 
     public int RemoveKey<TKey>(TKey key, IEqualityComparer<TKey> keyComparer) =>
-        exceptions.RemoveAll(exception => exception is EvaluationFaultException elementFault && elementFault.Element is TKey faultKey && keyComparer.Equals(faultKey, key));
+        exceptions.RemoveAll(exception => exception is EvaluationFaultException elementFault && IsFaultOf(elementFault, key, keyComparer));
 }

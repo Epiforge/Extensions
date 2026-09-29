@@ -41,7 +41,7 @@ sealed class ObservableDictionaryConcurrentQuery<TKey, TValue>(CollectionObserve
                 observableConcurrentDictionary!.CollectionChanged -= ObservableConcurrentDictionaryCollectionChanged;
                 observableConcurrentDictionary.DictionaryChanged -= ObservableConcurrentDictionaryDictionaryChanged;
                 ((INotifyDictionaryChanged)observableConcurrentDictionary).DictionaryChanged -= ObservableDictionaryConcurrentQueryDictionaryChangedBoxed;
-                observableConcurrentDictionary.PropertyChanged -= ObservableConcurrentDictionaryPropertyChanged;
+                source.PropertyChanged -= SourcePropertyChanged;
                 RemovedFromCache();
             }
             return removedFromCache;
@@ -64,7 +64,7 @@ sealed class ObservableDictionaryConcurrentQuery<TKey, TValue>(CollectionObserve
     void ObservableDictionaryConcurrentQueryDictionaryChangedBoxed(object? sender, NotifyDictionaryChangedEventArgs<object?, object?> e) =>
         OnDictionaryChangedBoxed(e);
 
-    void ObservableConcurrentDictionaryPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    void SourcePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(OperationFault))
         {
@@ -82,7 +82,7 @@ sealed class ObservableDictionaryConcurrentQuery<TKey, TValue>(CollectionObserve
         observableConcurrentDictionary.CollectionChanged += ObservableConcurrentDictionaryCollectionChanged;
         ((INotifyDictionaryChanged)observableConcurrentDictionary).DictionaryChanged += ObservableDictionaryConcurrentQueryDictionaryChangedBoxed;
         observableConcurrentDictionary.DictionaryChanged += ObservableConcurrentDictionaryDictionaryChanged;
-        observableConcurrentDictionary.PropertyChanged += ObservableConcurrentDictionaryPropertyChanged;
+        source.PropertyChanged += SourcePropertyChanged;
     }
 
     void SourceDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e)

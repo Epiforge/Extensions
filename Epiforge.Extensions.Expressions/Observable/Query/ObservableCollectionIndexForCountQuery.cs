@@ -13,6 +13,7 @@ sealed class ObservableCollectionIndexForCountQuery<TElement>(CollectionObserver
             if (removedFromCache)
             {
                 observableCollectionQuery.CollectionChanged -= ObservableCollectionQueryCollectionChanged;
+                observableCollectionQuery.PropertyChanged -= ObservableCollectionQueryPropertyChanged;
                 RemovedFromCache();
             }
             return removedFromCache;
@@ -54,10 +55,20 @@ sealed class ObservableCollectionIndexForCountQuery<TElement>(CollectionObserver
         Evaluate();
     }
 
+    void ObservableCollectionQueryPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(IObservableCollectionQuery<>.OperationFault))
+        {
+            using var changeHold = HoldOwnChanges();
+            Evaluate();
+        }
+    }
+
     protected override void OnInitialization()
     {
         using var changeHold = HoldChangesOf(observableCollectionQuery);
         observableCollectionQuery.CollectionChanged += ObservableCollectionQueryCollectionChanged;
+        observableCollectionQuery.PropertyChanged += ObservableCollectionQueryPropertyChanged;
         Evaluate();
     }
 

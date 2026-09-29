@@ -177,7 +177,7 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
             if (!observableExpressionStates.TryGetValue(observableExpression, out var state))
                 return;
             var (newFault, newResult) = observableExpression.Evaluation;
-            if (FaultList.ExchangeElementFault(OperationFault, observableExpression.Argument, elementComparer, state.Fault, newFault, out var newOperationFault))
+            if (FaultList.ExchangeElementFault(OwnOperationFault, observableExpression.Argument, elementComparer, state.Fault, newFault, out var newOperationFault))
             {
                 observableExpressionStates[observableExpression] = (state.Nodes, newFault);
                 OperationFault = newOperationFault;
@@ -197,22 +197,25 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
         }
     }
 
+    /// <summary>
+    /// Observes an element, subscribing to the first observation of it before reading it, so that a change made on another thread in between is taken up once the lock is released rather than lost
+    /// </summary>
     void ObserveElementWithAccess(TElement element, FaultList faultList, ref int runningCount)
     {
         var observableExpression = collectionObserver.ExpressionObserver.ObserveWithoutOptimization(Predicate, element);
+        ref var state = ref CollectionsMarshal.GetValueRefOrNullRef(observableExpressionStates, observableExpression);
+        var isObserved = !Unsafe.IsNullRef(ref state);
+        if (!isObserved)
+            observableExpression.PropertyChanged += ObservableExpressionPropertyChangedHandler;
         var (fault, result) = observableExpression.Evaluation;
         var node = memberships.Insert(memberships.Count, observableExpression, result ? 1 : 0);
         faultList.Check(observableExpression);
         if (result)
             ++runningCount;
-        ref var state = ref CollectionsMarshal.GetValueRefOrNullRef(observableExpressionStates, observableExpression);
-        if (!Unsafe.IsNullRef(ref state))
+        if (isObserved)
             state.Nodes.Add(node);
         else
-        {
             observableExpressionStates.Add(observableExpression, (new(node), fault));
-            observableExpression.PropertyChanged += ObservableExpressionPropertyChangedHandler;
-        }
     }
 
     protected override void OnInitialization()
@@ -230,6 +233,7 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
                     ObserveElementWithAccess(element, faultList, ref runningCount);
             count = runningCount;
             OperationFault = faultList.Fault;
+            InheritOperationFault(source.OperationFault);
             sourceSubscription = source.SubscribeDependent(this);
         }
     }
@@ -275,6 +279,17 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
     void IObservableQueryDependent.OnDependencyCollectionChanged(ObservableQuerySubscription subscription, NotifyCollectionChangedEventArgs e) =>
         SourceCollectionChanged(e);
 
+    void IObservableQueryDependent.OnDependencyPropertyChanged(ObservableQuerySubscription subscription, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(OperationFault))
+        {
+            using var changeHold = HoldOwnChanges();
+            lock (access)
+                if (!released)
+                    InheritOperationFault(source.OperationFault);
+        }
+    }
+
     void SourceCollectionChanged(NotifyCollectionChangedEventArgs e)
     {
         using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
@@ -302,7 +317,7 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
                             ReleaseMembershipWithAccess(node);
                             if (fault is not null)
                             {
-                                faultList ??= new FaultList(OperationFault);
+                                faultList ??= new FaultList(OwnOperationFault);
                                 faultList.RemoveElementOccurrence(observableExpression.Argument, elementComparer);
                             }
                             if (node.Weight == 1)
@@ -315,19 +330,19 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
                         {
                             var element = (TElement)e.NewItems[i]!;
                             var observableExpression = collectionObserver.ExpressionObserver.ObserveWithoutOptimization(Predicate, element);
+                            ref var state = ref CollectionsMarshal.GetValueRefOrNullRef(observableExpressionStates, observableExpression);
+                            var isObserved = !Unsafe.IsNullRef(ref state);
+                            if (!isObserved)
+                                observableExpression.PropertyChanged += ObservableExpressionPropertyChangedHandler;
                             var (fault, result) = observableExpression.Evaluation;
                             var node = memberships.Insert(e.NewStartingIndex + i, observableExpression, result ? 1 : 0);
-                            ref var state = ref CollectionsMarshal.GetValueRefOrNullRef(observableExpressionStates, observableExpression);
-                            if (!Unsafe.IsNullRef(ref state))
+                            if (isObserved)
                                 state.Nodes.Add(node);
                             else
-                            {
                                 observableExpressionStates.Add(observableExpression, (new(node), fault));
-                                observableExpression.PropertyChanged += ObservableExpressionPropertyChangedHandler;
-                            }
                             if (fault is not null)
                             {
-                                faultList ??= new FaultList(OperationFault);
+                                faultList ??= new FaultList(OwnOperationFault);
                                 faultList.Check(observableExpression);
                             }
                             if (result)

@@ -10,7 +10,10 @@ sealed class ObservableDictionaryCountQuery<TKey, TValue>(CollectionObserver col
         {
             var removedFromCache = observableDictionaryQuery.QueryDisposed(this);
             if (removedFromCache)
+            {
                 observableDictionaryQuery.DictionaryChanged -= ObservableDictionaryQueryDictionaryChanged;
+                observableDictionaryQuery.PropertyChanged -= ObservableDictionaryQueryPropertyChanged;
+            }
             return removedFromCache;
         }
         return true;
@@ -30,10 +33,20 @@ sealed class ObservableDictionaryCountQuery<TKey, TValue>(CollectionObserver col
         Evaluate();
     }
 
+    void ObservableDictionaryQueryPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(IObservableDictionaryQuery<,>.OperationFault))
+        {
+            using var changeHold = HoldOwnChanges();
+            Evaluate();
+        }
+    }
+
     protected override void OnInitialization()
     {
         using var changeHold = HoldChangesOf(observableDictionaryQuery);
         observableDictionaryQuery.DictionaryChanged += ObservableDictionaryQueryDictionaryChanged;
+        observableDictionaryQuery.PropertyChanged += ObservableDictionaryQueryPropertyChanged;
         Evaluate();
     }
 

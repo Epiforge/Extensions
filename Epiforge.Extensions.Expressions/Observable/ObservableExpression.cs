@@ -548,7 +548,7 @@ abstract class ScopedObservableExpression :
     public event EventHandler? Disposing;
 
     internal void ClearPendingNotification() =>
-        notificationPending = false;
+        Volatile.Write(ref notificationPending, false);
 
     public void Dispose()
     {
@@ -577,31 +577,87 @@ abstract class ScopedObservableExpression :
         RaiseIfEvaluationChanged();
     }
 
+    /// <summary>
+    /// Announces an evaluation, a write which is a full fence where observations are shared between threads so that the node read after it is read no earlier than the write
+    /// </summary>
+    void Announce(object? state, bool isFenced)
+    {
+        notificationForced = false;
+        PropertyChanging?.Invoke(this, ObservableExpression.EvaluationPropertyChangingEventArgs);
+        if (isFenced)
+            Interlocked.Exchange(ref evaluationState, state);
+        else
+            Volatile.Write(ref evaluationState, state);
+        PropertyChanged?.Invoke(this, ObservableExpression.EvaluationPropertyChangedEventArgs);
+    }
+
+    /// <summary>
+    /// Defers this observation's notification to the end of the propagation on this thread, unless one is already pending
+    /// </summary>
+    /// <remarks>
+    /// A pending notification may be another thread's, which may already have read the node without this thread's change, so where observations are shared between threads one seen pending is looked at again behind a full fence, as the thread raising it reads the node again behind one of its own before it finishes, and one of the two must then see the other
+    /// </remarks>
     bool Enlisted()
     {
         if (!PropagationScope.IsPropagating)
             return false;
-        if (!notificationPending)
+        if (Volatile.Read(ref notificationPending))
         {
-            notificationPending = true;
-            PropagationScope.Enlist(this);
+            if (!observer.IsThreadSafe)
+                return true;
+            Interlocked.MemoryBarrier();
+            if (Volatile.Read(ref notificationPending))
+                return true;
         }
+        Volatile.Write(ref notificationPending, true);
+        PropagationScope.Enlist(this);
         return true;
     }
 
+    bool IsAnnounceable(object? announcedState, object? currentState)
+    {
+        if (notificationForced)
+            return true;
+        var (announcedFault, announcedResult) = observableExpression.Decode(announcedState);
+        var (currentFault, currentResult) = observableExpression.Decode(currentState);
+        return !FaultEquals(announcedFault, currentFault) || !ResultEquals(announcedResult, currentResult);
+    }
+
+    /// <summary>
+    /// Announces the node's evaluation if it differs from the one last announced
+    /// </summary>
+    /// <remarks>
+    /// Where observations are shared between threads, two threads can announce at once having read the node at different moments, and the one writing last may write the older evaluation. So after announcing, or finding nothing to announce, a thread reads the node again behind a full fence and goes around again if it has moved, which leaves the last to write holding what the node holds
+    /// </remarks>
     void RaiseIfEvaluationChanged()
     {
         var currentState = observableExpression.CurrentState;
-        if (ReferenceEquals(Volatile.Read(ref evaluationState), unread) && ReferenceEquals(Interlocked.CompareExchange(ref evaluationState, currentState, unread), unread))
+        if (!observer.IsThreadSafe)
+        {
+            var announcedState = evaluationState;
+            if (ReferenceEquals(announcedState, unread))
+                evaluationState = currentState;
+            else if (IsAnnounceable(announcedState, currentState))
+                Announce(currentState, false);
             return;
-        var current = observableExpression.Decode(currentState);
-        var previous = evaluation;
-        if (!notificationForced && FaultEquals(previous.Fault, current.Fault) && ResultEquals(previous.Result, current.Result))
-            return;
-        notificationForced = false;
-        PropertyChanging?.Invoke(this, ObservableExpression.EvaluationPropertyChangingEventArgs);
-        Volatile.Write(ref evaluationState, currentState);
-        PropertyChanged?.Invoke(this, ObservableExpression.EvaluationPropertyChangedEventArgs);
+        }
+        while (true)
+        {
+            var announcedState = Volatile.Read(ref evaluationState);
+            if (ReferenceEquals(announcedState, unread))
+            {
+                if (!ReferenceEquals(Interlocked.CompareExchange(ref evaluationState, currentState, unread), unread))
+                    continue;
+            }
+            else if (IsAnnounceable(announcedState, currentState))
+                Announce(currentState, true);
+            else
+                Interlocked.MemoryBarrier();
+            var latestState = observableExpression.CurrentState;
+            if (ReferenceEquals(latestState, currentState))
+                return;
+            currentState = latestState;
+        }
     }
 
     private protected virtual IReadOnlyList<object?> MakeArguments() =>

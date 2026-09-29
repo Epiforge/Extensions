@@ -167,7 +167,7 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
             if (!observableExpressionStates.TryGetValue(observableExpression, out var state))
                 return;
             var (newFault, newResult) = observableExpression.Evaluation;
-            if (FaultList.ExchangeElementFault(OperationFault, observableExpression.Argument, elementComparer, state.Fault, newFault, out var newOperationFault))
+            if (FaultList.ExchangeElementFault(OwnOperationFault, observableExpression.Argument, elementComparer, state.Fault, newFault, out var newOperationFault))
             {
                 observableExpressionStates[observableExpression] = (state.Projection, state.Nodes, newFault);
                 OperationFault = newOperationFault;
@@ -191,20 +191,25 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
         }
     }
 
+    /// <summary>
+    /// Observes an element, subscribing to the first observation of it before reading it, so that a change made on another thread in between is taken up once the lock is released rather than lost
+    /// </summary>
     void ObserveElementWithAccess(TElement element, int index, FaultList faultList)
     {
         var observableExpression = collectionObserver.ExpressionObserver.ObserveWithoutOptimization(Selector, element);
+        ref var state = ref CollectionsMarshal.GetValueRefOrNullRef(observableExpressionStates, observableExpression);
+        var isObserved = !Unsafe.IsNullRef(ref state);
+        if (!isObserved)
+            observableExpression.PropertyChanged += ObservableExpressionPropertyChangedHandler;
         var (fault, result) = observableExpression.Evaluation;
         if (fault is not null)
             faultList.Add(new EvaluationFaultException(element, fault));
-        ref var state = ref CollectionsMarshal.GetValueRefOrNullRef(observableExpressionStates, observableExpression);
-        if (!Unsafe.IsNullRef(ref state))
+        if (isObserved)
             state.Nodes.Add(positions.Insert(index, state.Projection, 1));
         else
         {
             var projection = new Projection(observableExpression, result);
             observableExpressionStates.Add(observableExpression, (projection, new(positions.Insert(index, projection, 1)), fault));
-            observableExpression.PropertyChanged += ObservableExpressionPropertyChangedHandler;
         }
     }
 
@@ -221,6 +226,7 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
                 foreach (var element in source)
                     ObserveElementWithAccess(element, positions.Count, faultList);
             OperationFault = faultList.Fault;
+            InheritOperationFault(source.OperationFault);
             sourceSubscription = source.SubscribeDependent(this);
         }
     }
@@ -278,6 +284,13 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
             using var changeHold = HoldOwnChanges();
             OnPropertyChanged(e);
         }
+        else if (e.PropertyName == nameof(OperationFault))
+        {
+            using var changeHold = HoldOwnChanges();
+            lock (access)
+                if (!released)
+                    InheritOperationFault(source.OperationFault);
+        }
     }
 
     void IObservableQueryDependent.OnDependencyPropertyChanging(ObservableQuerySubscription subscription, PropertyChangingEventArgs e)
@@ -322,7 +335,7 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
                             ReleaseProjectionWithAccess(node);
                             if (fault is not null)
                             {
-                                faultList ??= new FaultList(OperationFault);
+                                faultList ??= new FaultList(OwnOperationFault);
                                 faultList.RemoveElementOccurrence(argument, elementComparer);
                             }
                         }
@@ -330,7 +343,7 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
                     var newItems = new List<TResult>();
                     if (e.NewItems is not null && e.NewStartingIndex >= 0)
                     {
-                        faultList ??= new FaultList(OperationFault);
+                        faultList ??= new FaultList(OwnOperationFault);
                         for (var i = 0; i < e.NewItems.Count; ++i)
                         {
                             ObserveElementWithAccess((TElement)e.NewItems[i]!, e.NewStartingIndex + i, faultList);

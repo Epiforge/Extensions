@@ -152,7 +152,9 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
 #else
     readonly object changeAccess = new();
 #endif
+    Exception? inheritedOperationFault;
     Exception? operationFault;
+    Exception? ownOperationFault;
 
     public abstract TValue this[TKey key] { get; }
 
@@ -207,7 +209,46 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     public virtual Exception? OperationFault
     {
         get => operationFault;
-        protected set => SetBackedProperty(ref operationFault, in value, operationFaultPropertyChangingEventArgs, operationFaultPropertyChangedEventArgs);
+        protected set
+        {
+            if (ReferenceEquals(ownOperationFault, value))
+                return;
+            ownOperationFault = value;
+            PublishOperationFault();
+        }
+    }
+
+    /// <summary>
+    /// The fault of this query's own evaluations, without the fault of the query it is built over which <see cref="OperationFault" /> also reports
+    /// </summary>
+    private protected Exception? OwnOperationFault =>
+        ownOperationFault;
+
+    /// <summary>
+    /// Takes on the fault of the query this one is built over, so that a view reports a fault arising anywhere beneath it
+    /// </summary>
+    private protected void InheritOperationFault(Exception? fault)
+    {
+        if (ReferenceEquals(inheritedOperationFault, fault))
+            return;
+        inheritedOperationFault = fault;
+        PublishOperationFault();
+    }
+
+    void PublishOperationFault()
+    {
+        Exception? fault;
+        if (inheritedOperationFault is null)
+            fault = ownOperationFault;
+        else if (ownOperationFault is null)
+            fault = inheritedOperationFault;
+        else
+        {
+            var faultList = new FaultList(inheritedOperationFault);
+            faultList.Add(ownOperationFault);
+            fault = faultList.Fault;
+        }
+        SetBackedProperty(ref operationFault, in fault, operationFaultPropertyChangingEventArgs, operationFaultPropertyChangedEventArgs);
     }
 
     internal IObservableDictionaryQuery<TKey, TValue> AsScoped() =>

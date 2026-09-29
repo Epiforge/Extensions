@@ -21,6 +21,11 @@ static class Program
             await ConcurrencyStressReport.RunAsync(args.Length > 1 ? int.Parse(args[1], CultureInfo.InvariantCulture) : 200000).ConfigureAwait(false);
             return;
         }
+        if (args.Length > 0 && args[0] == "--soak")
+        {
+            await KeyedViewSoakReport.RunAsync(args.Length > 1 ? int.Parse(args[1], CultureInfo.InvariantCulture) : 20000).ConfigureAwait(false);
+            return;
+        }
         BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args, configuration);
     }
 }

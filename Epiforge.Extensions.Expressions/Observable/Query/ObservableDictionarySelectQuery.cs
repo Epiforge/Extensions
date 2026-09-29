@@ -112,6 +112,7 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
                         observableExpression.Dispose();
                     }
                     source.DictionaryChanged -= SourceDictionaryChanged;
+                    source.PropertyChanged -= SourcePropertyChanged;
                     result.CollectionChanged -= ResultCollectionChanged;
                     ((INotifyDictionaryChanged)result).DictionaryChanged -= ResultDictionaryChangedBoxed;
                     result.DictionaryChanged -= ResultDictionaryChanged;
@@ -185,10 +186,10 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
     void ObserveSourceKeyValuePairWithAccess(KeyValuePair<TSourceKey, TSourceValue> sourceKeyValuePair, ObservableDictionary<TKey, TValue> into)
     {
         var observableExpression = collectionObserver.ExpressionObserver.ObserveWithoutOptimization(KeyValuePairSelector, sourceKeyValuePair);
+        observableExpression.PropertyChanged += ObservableExpressionPropertyChangedHandler;
         var (fault, projection) = observableExpression.Evaluation;
         if (fault is null)
             ApplyProjectionWithAccess(sourceKeyValuePair.Key, projection, into);
-        observableExpression.PropertyChanged += ObservableExpressionPropertyChangedHandler;
         observableExpressions.Add(sourceKeyValuePair.Key, (observableExpression, fault, projection));
     }
 
@@ -227,10 +228,14 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
     protected override void OnInitialization()
     {
         using var changeHold = HoldChangesOf(source);
-        foreach (var sourceKeyValuePair in source)
-            ObserveSourceKeyValuePairWithAccess(sourceKeyValuePair, result);
-        SetOperationFault();
-        source.DictionaryChanged += SourceDictionaryChanged;
+        lock (access)
+        {
+            foreach (var sourceKeyValuePair in source)
+                ObserveSourceKeyValuePairWithAccess(sourceKeyValuePair, result);
+            SetOperationFault();
+            source.DictionaryChanged += SourceDictionaryChanged;
+            source.PropertyChanged += SourcePropertyChanged;
+        }
     }
 
     void DiscardSnapshots()
@@ -292,6 +297,16 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
         foreach (var (observableExpression, _, _) in observableExpressions.Values)
             faultList.Check(observableExpression);
         OperationFault = faultList.Fault;
+    }
+
+    void SourcePropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(OperationFault))
+        {
+            using var changeHold = HoldOwnChanges();
+            lock (access)
+                SetOperationFault();
+        }
     }
 
     void SourceDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TSourceKey, TSourceValue> e)

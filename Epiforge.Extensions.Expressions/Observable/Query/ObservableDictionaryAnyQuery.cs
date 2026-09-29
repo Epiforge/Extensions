@@ -36,7 +36,7 @@ sealed class ObservableDictionaryAnyQuery<TKey, TValue>(CollectionObserver colle
     }
 
     void Evaluate() =>
-        Evaluation = where?.OperationFault is { } whereFault ? (whereFault, default) : where is null ? (null, observableDictionaryQueryCount > 0) : observableDictionaryQuery.OperationFault is { } observableDictionaryQueryFault ? (observableDictionaryQueryFault, default) : (null, where.Count > 0);
+        Evaluation = where is null ? observableDictionaryQuery.OperationFault is { } observableDictionaryQueryFault ? (observableDictionaryQueryFault, default) : (null, observableDictionaryQueryCount > 0) : where.OperationFault is { } whereFault ? (whereFault, default) : (null, where.Count > 0);
 
     void ObservableDictionaryQueryDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e)
     {

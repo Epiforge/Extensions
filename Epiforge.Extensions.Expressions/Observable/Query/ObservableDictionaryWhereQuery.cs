@@ -87,6 +87,7 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue>(CollectionObserver col
                         observableExpression.Dispose();
                     }
                     source.DictionaryChanged -= SourceDictionaryChanged;
+                    source.PropertyChanged -= SourcePropertyChanged;
                     result.CollectionChanged -= ResultCollectionChanged;
                     ((INotifyDictionaryChanged)result).DictionaryChanged -= ResultDictionaryChangedBoxed;
                     result.DictionaryChanged -= ResultDictionaryChanged;
@@ -147,22 +148,27 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue>(CollectionObserver col
     protected override void OnInitialization()
     {
         using var changeHold = HoldChangesOf(source);
-        var faultList = new FaultList();
-        var expressionObserver = collectionObserver.ExpressionObserver;
-        foreach (var keyValuePair in source)
+        lock (access)
         {
-            var observableExpression = expressionObserver.ObserveWithoutOptimization(Predicate, keyValuePair);
-            var (fault, predicateResult) = observableExpression.Evaluation;
-            var isIncluded = fault is null && predicateResult;
-            if (!faultList.Check(observableExpression) && isIncluded)
-                AddToResultWithAccess(keyValuePair.Key, keyValuePair.Value);
-            observableExpression.PropertyChanged += ObservableExpressionPropertyChangedHandler;
-            observableExpressions.Add(keyValuePair.Key, (observableExpression, fault, isIncluded));
+            var faultList = new FaultList();
+            var expressionObserver = collectionObserver.ExpressionObserver;
+            foreach (var keyValuePair in source)
+            {
+                var observableExpression = expressionObserver.ObserveWithoutOptimization(Predicate, keyValuePair);
+                observableExpression.PropertyChanged += ObservableExpressionPropertyChangedHandler;
+                var (fault, predicateResult) = observableExpression.Evaluation;
+                var isIncluded = fault is null && predicateResult;
+                if (!faultList.Check(observableExpression) && isIncluded)
+                    AddToResultWithAccess(keyValuePair.Key, keyValuePair.Value);
+                observableExpressions.Add(keyValuePair.Key, (observableExpression, fault, isIncluded));
+            }
+            OperationFault = faultList.Fault;
+            InheritOperationFault(source.OperationFault);
+            source.DictionaryChanged += SourceDictionaryChanged;
+            source.PropertyChanged += SourcePropertyChanged;
+            result.PropertyChanging += ResultPropertyChanging;
+            result.PropertyChanged += ResultPropertyChanged;
         }
-        OperationFault = faultList.Fault;
-        source.DictionaryChanged += SourceDictionaryChanged;
-        result.PropertyChanging += ResultPropertyChanging;
-        result.PropertyChanged += ResultPropertyChanged;
     }
 
     void AddToResultWithAccess(TKey key, TValue value)
@@ -231,8 +237,18 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue>(CollectionObserver col
             else if (committed.IsIncluded && !isIncluded)
                 RemoveFromResultWithAccess(key);
             observableExpressions[key] = (observableExpression, newFault, isIncluded);
-            if (FaultList.ExchangeKeyFault(OperationFault, key, source.KeyComparer, committed.CommittedFault, newFault, out var newOperationFault))
+            if (FaultList.ExchangeKeyFault(OwnOperationFault, key, source.KeyComparer, committed.CommittedFault, newFault, out var newOperationFault))
                 OperationFault = newOperationFault;
+        }
+    }
+
+    void SourcePropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(OperationFault))
+        {
+            using var changeHold = HoldOwnChanges();
+            lock (access)
+                InheritOperationFault(source.OperationFault);
         }
     }
 
@@ -257,11 +273,11 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue>(CollectionObserver col
                 foreach (var keyValuePair in source)
                 {
                     var observableExpression = expressionObserver.ObserveWithoutOptimization(Predicate, keyValuePair);
+                    observableExpression.PropertyChanged += ObservableExpressionPropertyChangedHandler;
                     var (fault, predicateResult) = observableExpression.Evaluation;
                     var isIncluded = fault is null && predicateResult;
                     if (!faultList.Check(observableExpression) && isIncluded)
                         newResult.Add(keyValuePair.Key, keyValuePair.Value);
-                    observableExpression.PropertyChanged += ObservableExpressionPropertyChangedHandler;
                     observableExpressions.Add(keyValuePair.Key, (observableExpression, fault, isIncluded));
                 }
                 ResetResultWithAccess(newResult);
@@ -277,7 +293,7 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue>(CollectionObserver col
                         continue;
                     if (committed.CommittedFault is not null)
                     {
-                        faultList ??= new FaultList(OperationFault);
+                        faultList ??= new FaultList(OwnOperationFault);
                         faultList.RemoveKey(key, source.KeyComparer);
                     }
                     else if (committed.IsIncluded)
@@ -290,16 +306,16 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue>(CollectionObserver col
                 {
                     var key = keyValuePair.Key;
                     var observableExpression = expressionObserver.ObserveWithoutOptimization(Predicate, keyValuePair);
+                    observableExpression.PropertyChanged += ObservableExpressionPropertyChangedHandler;
                     var (fault, predicateResult) = observableExpression.Evaluation;
                     var isIncluded = fault is null && predicateResult;
                     if (fault is not null)
                     {
-                        faultList ??= new FaultList(OperationFault);
+                        faultList ??= new FaultList(OwnOperationFault);
                         faultList.Check(observableExpression);
                     }
                     else if (isIncluded)
                         AddToResultWithAccess(key, keyValuePair.Value);
-                    observableExpression.PropertyChanged += ObservableExpressionPropertyChangedHandler;
                     observableExpressions.Add(key, (observableExpression, fault, isIncluded));
                 }
                 if (faultList is not null)

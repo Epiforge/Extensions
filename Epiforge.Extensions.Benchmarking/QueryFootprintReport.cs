@@ -263,6 +263,31 @@ static class QueryFootprintReport
         return new(allocated, retained, afterDispose);
     }
 
+    /// <summary>
+    /// Builds and drops the grouped view five times over five separate collections under a single baseline, which reads its release as <see cref="MeasureExpressionsFilterOverFiveCycles(int)" /> reads the filtered view's
+    /// </summary>
+    static ComparisonReading MeasureExpressionsGroupingOverFiveCycles(int elementCount)
+    {
+        var baseline = Settle();
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        for (var cycle = 0; cycle < 5; ++cycle)
+            BuildAndDropAGroupedView(elementCount);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+        var retained = Settle() - baseline;
+        var afterDispose = Settle() - baseline;
+        return new(allocated, retained, afterDispose);
+    }
+
+    static void BuildAndDropAGroupedView(int elementCount)
+    {
+        var observer = new CollectionObserver();
+        var source = BenchmarkPerson.CreateCollection(elementCount);
+        var sourceQuery = observer.ObserveReadOnlyList(source);
+        var groupBy = sourceQuery.ObserveGroupBy(person => person.Rank % 16);
+        groupBy.Dispose();
+        sourceQuery.Dispose();
+    }
+
     static ComparisonReading MeasureDynamicDataCacheGrouping(int elementCount)
     {
         var source = BenchmarkPerson.CreateCollection(elementCount);
@@ -369,6 +394,54 @@ static class QueryFootprintReport
     }
 
     /// <summary>
+    /// Measures what a live dictionary built from the collection with <c>ObserveToDictionary</c> retains, mapping each element's name to its rank
+    /// </summary>
+    static ComparisonReading MeasureExpressionsDictionary(int elementCount)
+    {
+        var observer = new CollectionObserver();
+        var source = BenchmarkPerson.CreateCollection(elementCount);
+        var baseline = Settle();
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var sourceQuery = observer.ObserveReadOnlyList(source);
+        var dictionary = sourceQuery.ObserveToDictionary(person => person.Name, person => person.Rank);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+        var retained = Settle() - baseline;
+        dictionary.Dispose();
+        sourceQuery.Dispose();
+        dictionary = null;
+        sourceQuery = null;
+        observer = null;
+        var afterDispose = Settle() - baseline;
+        GC.KeepAlive(source);
+        return new(allocated, retained, afterDispose);
+    }
+
+    /// <summary>
+    /// Builds and drops the dictionary five times over five separate collections under a single baseline, which reads its release as <see cref="MeasureExpressionsFilterOverFiveCycles(int)" /> reads the filtered view's
+    /// </summary>
+    static ComparisonReading MeasureExpressionsDictionaryOverFiveCycles(int elementCount)
+    {
+        var baseline = Settle();
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        for (var cycle = 0; cycle < 5; ++cycle)
+            BuildAndDropADictionary(elementCount);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+        var retained = Settle() - baseline;
+        var afterDispose = Settle() - baseline;
+        return new(allocated, retained, afterDispose);
+    }
+
+    static void BuildAndDropADictionary(int elementCount)
+    {
+        var observer = new CollectionObserver();
+        var source = BenchmarkPerson.CreateCollection(elementCount);
+        var sourceQuery = observer.ObserveReadOnlyList(source);
+        var dictionary = sourceQuery.ObserveToDictionary(person => person.Name, person => person.Rank);
+        dictionary.Dispose();
+        sourceQuery.Dispose();
+    }
+
+    /// <summary>
     /// Measures what observing a dictionary retains with nothing built over the observation, which since 7.0.1 is the copy the observation keeps so that what is read of it always matches what it has announced
     /// </summary>
     static ComparisonReading MeasureExpressionsDictionaryObservationAlone(int elementCount)
@@ -428,6 +501,31 @@ static class QueryFootprintReport
         var afterDispose = Settle() - baseline;
         GC.KeepAlive(source);
         return new(allocated, retained, afterDispose);
+    }
+
+    /// <summary>
+    /// Builds and drops the sorted view five times over five separate collections under a single baseline, which reads its release as <see cref="MeasureExpressionsFilterOverFiveCycles(int)" /> reads the filtered view's
+    /// </summary>
+    static ComparisonReading MeasureExpressionsOrderingOverFiveCycles(int elementCount)
+    {
+        var baseline = Settle();
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        for (var cycle = 0; cycle < 5; ++cycle)
+            BuildAndDropASortedView(elementCount);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+        var retained = Settle() - baseline;
+        var afterDispose = Settle() - baseline;
+        return new(allocated, retained, afterDispose);
+    }
+
+    static void BuildAndDropASortedView(int elementCount)
+    {
+        var observer = new CollectionObserver();
+        var source = BenchmarkPerson.CreateCollection(elementCount);
+        var sourceQuery = observer.ObserveReadOnlyList(source);
+        var orderBy = sourceQuery.ObserveOrderBy(person => person.Rank);
+        orderBy.Dispose();
+        sourceQuery.Dispose();
     }
 
     /// <summary>
@@ -543,7 +641,7 @@ static class QueryFootprintReport
         report.AppendLine();
         report.AppendLine("**The `five cycles` rows are the ones which measure release, because their cycle bodies are separate methods which have returned before anything is measured.** Each builds and drops the whole arrangement five times under one baseline. Compare each against its own `five cycles` counterpart and never against an inline row; a figure which grows with the number of cycles is memory lost on every query a process builds. `five cycles then one over ten elements` ends on a tiny graph, so a residue which is really the most recently built graph would collapse there.");
         report.AppendLine();
-        report.AppendLine("**The rows after DynamicData's grouped view** are NMF Expressions and ObservableComputations, each in the form its documentation leads with, filtering, sorting and grouping the same collection, and a `five cycles` row for each so that release can be read the same way; a sorted view of each of the four libraries; and this library's observation of a collection and of a dictionary with nothing built over them, which is the copy each keeps. Nothing reads any view before it is measured.");
+        report.AppendLine("**The rows after DynamicData's grouped view** are NMF Expressions and ObservableComputations, each in the form its documentation leads with, filtering, sorting and grouping the same collection, and a `five cycles` row for each so that release can be read the same way; a sorted view of each of the four libraries; this library's grouped and sorted views built and dropped five times, which read their release as the filtered view's `five cycles` row reads its; a dictionary built with `ObserveToDictionary`, standing and over five cycles, which no other library is measured building here; and this library's observation of a collection and of a dictionary with nothing built over them, which is the copy each keeps. Nothing reads any view before it is measured.");
         report.AppendLine();
         report.AppendLine("`nothing built` takes the baseline and then does nothing at all, so all three of its columns must read zero; anything else means this instrument cannot measure retention and no other figure in either table may be quoted.");
         report.AppendLine();
@@ -564,6 +662,7 @@ static class QueryFootprintReport
                 ("DynamicData cache, the view over it", MeasureDynamicDataCacheFilter),
                 ("DynamicData list, the view over the collection", MeasureDynamicDataListFilter),
                 ("Expressions, a grouped view", MeasureExpressionsGrouping),
+                ("Expressions, a grouped view, five build-and-drop cycles", MeasureExpressionsGroupingOverFiveCycles),
                 ("DynamicData cache, a grouped view over it", MeasureDynamicDataCacheGrouping),
                 ("NMF Expressions, the view over the collection", MeasureNmfFilter),
                 ("NMF Expressions, five build-and-drop cycles", MeasureNmfFilterOverFiveCycles),
@@ -572,9 +671,12 @@ static class QueryFootprintReport
                 ("ObservableComputations, five build-and-drop cycles", MeasureObservableComputationsFilterOverFiveCycles),
                 ("ObservableComputations, a grouped view", MeasureObservableComputationsGrouping),
                 ("Expressions, a sorted view", MeasureExpressionsOrdering),
+                ("Expressions, a sorted view, five build-and-drop cycles", MeasureExpressionsOrderingOverFiveCycles),
                 ("DynamicData cache, a sorted view over it", MeasureDynamicDataCacheOrdering),
                 ("NMF Expressions, a sorted view", MeasureNmfOrdering),
                 ("ObservableComputations, a sorted view", MeasureObservableComputationsOrdering),
+                ("Expressions, a dictionary", MeasureExpressionsDictionary),
+                ("Expressions, a dictionary, five build-and-drop cycles", MeasureExpressionsDictionaryOverFiveCycles),
                 ("Expressions, observing the collection alone", MeasureExpressionsObservationAlone),
                 ("Expressions, observing a dictionary alone", MeasureExpressionsDictionaryObservationAlone)
             })
