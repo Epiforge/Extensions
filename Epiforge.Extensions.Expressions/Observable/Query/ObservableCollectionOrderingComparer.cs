@@ -6,7 +6,7 @@ namespace Epiforge.Extensions.Expressions.Observable.Query;
 /// <remarks>
 /// A missing key sorts ahead of any other in ascending order and after any other in descending order, as the default comparer places null, and two missing keys tie, leaving the elements to the keys after them
 /// </remarks>
-sealed class ObservableCollectionOrderingComparer<TElement>(IReadOnlyList<bool> directions) :
+sealed class ObservableCollectionOrderingComparer<TElement>(bool[] directions) :
     IComparer<ObservableCollectionOrderingComparer<TElement>.Entry>
 {
     /// <summary>
@@ -52,7 +52,7 @@ sealed class ObservableCollectionOrderingComparer<TElement>(IReadOnlyList<bool> 
 
     public int Compare(Entry? x, Entry? y)
     {
-        for (int i = 0, ii = directions.Count; i < ii; ++i)
+        for (var i = 0; i < directions.Length; ++i)
         {
             var isDescending = directions[i];
             var xComparable = x!.KeyAt(i).Comparable;

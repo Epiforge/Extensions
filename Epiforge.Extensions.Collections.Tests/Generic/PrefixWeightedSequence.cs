@@ -341,6 +341,43 @@ public class PrefixWeightedSequence
     }
 
     [TestMethod]
+    public void CountingWhileATestHoldsAgreesWithAListOfTheSameContent()
+    {
+        var random = new Random(4242);
+        for (var trial = 0; trial < 200; ++trial)
+        {
+            var sequence = new PrefixWeightedSequence<int>();
+            var reference = new List<int>();
+            var size = random.Next(200);
+            for (var i = 0; i < size; ++i)
+            {
+                var value = random.Next(50);
+                var index = reference.BinarySearch(value);
+                if (index < 0)
+                    index = ~index;
+                reference.Insert(index, value);
+                sequence.Insert(index, value, random.Next(3));
+            }
+            for (var threshold = -1; threshold <= 51; ++threshold)
+            {
+                Assert.AreEqual(reference.Count(item => item < threshold), sequence.CountWhile(static (bound, item) => item < bound, threshold), $"trial {trial}: fewer than {threshold}");
+                Assert.AreEqual(reference.Count(item => item <= threshold), sequence.CountWhile(static (bound, item) => item <= bound, threshold), $"trial {trial}: at most {threshold}");
+            }
+        }
+    }
+
+    [TestMethod]
+    public void CountingWhileValidatesItsArguments()
+    {
+        var sequence = new PrefixWeightedSequence<int>();
+        Assert.AreEqual(0, sequence.CountWhile(static (_, _) => true, 0));
+        sequence.Insert(0, 42, 1);
+        Assert.ThrowsException<ArgumentNullException>(() => _ = sequence.CountWhile<int>(null!, 0));
+        Assert.AreEqual(1, sequence.CountWhile(static (_, _) => true, 0));
+        Assert.AreEqual(0, sequence.CountWhile(static (_, _) => false, 0));
+    }
+
+    [TestMethod]
     public void FingerSearchValidatesItsArguments()
     {
         var sequence = new PrefixWeightedSequence<int>();

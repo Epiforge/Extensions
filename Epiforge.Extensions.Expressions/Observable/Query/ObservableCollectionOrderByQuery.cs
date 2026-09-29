@@ -7,6 +7,11 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
     ObservableCollectionQuery<TElement>,
     IObservableQueryDependent
 {
+    /// <summary>
+    /// Tells whether an element stands before where an element with a changed or new key belongs: one whose key it follows, or one whose key it equals where the element is new or moving earlier, since such an element goes after those whose keys equal its own and one moving later goes before them; the element itself stands before its destination only where it is moving later
+    /// </summary>
+    static readonly Func<(ObservableCollectionOrderingComparer<TElement> Comparer, ObservableCollectionOrderingComparer<TElement>.Entry Entry, bool IsMovingLater), ObservableCollectionOrderingComparer<TElement>.Entry, bool> precedesDestination = static (state, other) =>
+        ReferenceEquals(other, state.Entry) ? state.IsMovingLater : state.IsMovingLater ? state.Comparer.Compare(state.Entry, other) > 0 : state.Comparer.Compare(state.Entry, other) >= 0;
     static readonly ConcurrentDictionary<Expression<Func<TElement, IComparable>>, Expression<Func<TElement, IComparable>>> stableKeySelectors = new(ExpressionEqualityComparer.Default);
 
     /// <summary>
@@ -126,10 +131,10 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
     }
 
     /// <summary>
-    /// Finds where an element whose key changed belongs, counting as though it were not in the order, by comparing it with its neighbors and then with elements one, two, four and eight places further on, before searching by halves whatever the last comparison left
+    /// Finds where an element whose key changed belongs, counting as though it were not in the order, by comparing it with its neighbors and then with elements one, two, four and eight places further on, before searching by halves whatever the last comparison left, or descending the order once where the element belongs further on than that
     /// </summary>
     /// <remarks>
-    /// A key change usually moves an element a few places, which this settles in a few comparisons, where a search by halves over everything on the side it moves to takes the logarithm of the order's size however near it lands; a move across the order costs at most four comparisons more than that search
+    /// A key change usually moves an element a few places, which this settles in a few comparisons near the element; a move further than that costs one comparison at each level of the order, where a search by halves would walk the order to find each element it compares
     /// </remarks>
     int FindDestinationWithAccess(ObservableCollectionOrderingComparer<TElement>.Entry entry, PrefixWeightedSequenceNode<ObservableCollectionOrderingComparer<TElement>.Entry> node, int currentIndex)
     {
@@ -139,18 +144,25 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
         {
             var low = 0;
             var high = currentIndex - 1;
+            var isBracketed = false;
             for (var step = 1; step <= farthestGallopingStep; step <<= 1)
             {
                 var probe = high - step;
                 if (probe < 0)
+                {
+                    isBracketed = true;
                     break;
+                }
                 if (comparer.Compare(entry, EntryAtExcludingWithAccess(probe, currentIndex, ref finger, ref fingerIndex)) >= 0)
                 {
                     low = probe + 1;
+                    isBracketed = true;
                     break;
                 }
                 high = probe;
             }
+            if (!isBracketed)
+                return positions.CountWhile(precedesDestination, (comparer, entry, false));
             while (low < high)
             {
                 var middle = low + (high - low) / 2;
@@ -166,18 +178,25 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
         {
             var low = currentIndex + 1;
             var high = reducedCount;
+            var isBracketed = false;
             for (var step = 1; step <= farthestGallopingStep; step <<= 1)
             {
                 var probe = low - 1 + step;
                 if (probe >= reducedCount)
+                {
+                    isBracketed = true;
                     break;
+                }
                 if (comparer.Compare(entry, EntryAtExcludingWithAccess(probe, currentIndex, ref finger, ref fingerIndex)) <= 0)
                 {
                     high = probe;
+                    isBracketed = true;
                     break;
                 }
                 low = probe + 1;
             }
+            if (!isBracketed)
+                return positions.CountWhile(precedesDestination, (comparer, entry, true)) - 1;
             while (low < high)
             {
                 var middle = low + (high - low) / 2;
@@ -191,25 +210,11 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
         return currentIndex;
     }
 
-    int FindInsertionIndexWithAccess(ObservableCollectionOrderingComparer<TElement>.Entry entry)
-    {
-        var low = 0;
-        var high = positions.Count;
-        PrefixWeightedSequenceNode<ObservableCollectionOrderingComparer<TElement>.Entry>? finger = null;
-        var fingerIndex = 0;
-        while (low < high)
-        {
-            var middle = low + (high - low) / 2;
-            var node = finger is null ? positions.NodeAt(middle) : positions.NodeAtFrom(finger, fingerIndex, middle);
-            finger = node;
-            fingerIndex = middle;
-            if (comparer.Compare(entry, node.Item) < 0)
-                high = middle;
-            else
-                low = middle + 1;
-        }
-        return low;
-    }
+    /// <summary>
+    /// Finds where a new element belongs, after any whose keys equal its own, by descending the order once
+    /// </summary>
+    int FindInsertionIndexWithAccess(ObservableCollectionOrderingComparer<TElement>.Entry entry) =>
+        positions.CountWhile(precedesDestination, (comparer, entry, false));
 
     public override IEnumerator<TElement> GetEnumerator()
     {

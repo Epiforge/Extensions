@@ -131,6 +131,32 @@ public sealed class PrefixWeightedSequence<T>
         root = null;
 
     /// <summary>
+    /// Counts the items at the start of the sequence for which the specified test holds, which is the position at which it first does not
+    /// </summary>
+    /// <typeparam name="TState">The type of the state passed to <paramref name="test"/></typeparam>
+    /// <param name="test">The test, given <paramref name="state"/> and an item</param>
+    /// <param name="state">The state to pass to <paramref name="test"/>, which lets a caller pass a static delegate rather than allocating a closure</param>
+    /// <returns>The number of items at the start of the sequence for which <paramref name="test"/> holds</returns>
+    /// <remarks>This descends the sequence once, testing one item at each level, rather than looking items up by position, and so it requires that the test hold for every item before any item for which it does not; for a test which does not, the count is unspecified</remarks>
+    public int CountWhile<TState>(Func<TState, T, bool> test, TState state)
+    {
+        ArgumentNullException.ThrowIfNull(test);
+        var count = 0;
+        var current = root;
+        while (current is not null)
+        {
+            if (test(state, current.Item))
+            {
+                count += CountOf(current.Left) + 1;
+                current = current.Right;
+            }
+            else
+                current = current.Left;
+        }
+        return count;
+    }
+
+    /// <summary>
     /// Gets the position of the specified node within the sequence
     /// </summary>
     /// <param name="node">A node belonging to this sequence</param>
