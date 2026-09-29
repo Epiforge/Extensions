@@ -1,11 +1,11 @@
 namespace Epiforge.Extensions.Benchmarking;
 
 /// <summary>
-/// Changes a collection on one thread while three others change the keys and values of its elements, many rounds at a time, and then checks a grouping, a lookup, an ordering by two keys, a dictionary and a rank over it against what LINQ makes of the collection as it was left
+/// Changes a collection on one thread while three others change the keys and values of its elements, many rounds at a time, and then checks a grouping, a lookup, an ordering by two keys, a dictionary, a rank and chains of queries over it against what LINQ makes of the collection as it was left
 /// </summary>
 /// <remarks>
 /// The grouping, the lookup, the ordering and the dictionary observe each element's key themselves and hear the collection's changes before its own handlers do, so a change to the collection and a change to a key meet under their locks rather than under one query's beneath them. Nothing here can force the interleaving which would lose one of them, so it runs enough of them for a loss to be seen, and a zero is an absence of evidence rather than a proof.
-/// A key is twelve divided by three less than the rank, so a rank of three makes it throw, and a view must leave that element out and report the fault while the rank stays there. The ordering's second key is the name, descending, and the dictionary maps each key to the name of the element earliest in the collection which claims it. Every view is disposed of at the end of its round, after which the observer must hold nothing cached. Progress is written every ten seconds, and a minute without a round finishing is called out, since a stuck round would be a finding rather than a slow one
+/// A key is twelve divided by three less than the rank, so a rank of three makes it throw, and a view must leave that element out and report the fault while the rank stays there. The ordering's second key is the name, descending, and the dictionary maps each key to the name of the element earliest in the collection which claims it. The chains filter the collection to even ranks and then group it or project each name, and filter the dictionary to names other than a and then turn it into a collection of each key with its name, so that a query's own changes, not only the collection's, meet key changes under the locks of the query above it. Every view is disposed of at the end of its round, after which the observer must hold nothing cached. Progress is written every ten seconds, and a minute without a round finishing is called out, since a stuck round would be a finding rather than a slow one
 /// </remarks>
 static class KeyedViewSoakReport
 {
@@ -14,6 +14,9 @@ static class KeyedViewSoakReport
     const int poolSize = 64;
 
     static readonly string[] names = ["a", "b", "c", "d"];
+    static readonly Expression<Func<BenchmarkPerson, bool>> evenRank = person => person.Rank % 2 == 0;
+    static readonly Expression<Func<int, string, string>> keyedName = (key, name) => $"{key}{name}";
+    static readonly Expression<Func<int, string, bool>> keptName = (key, name) => name != "a";
     static readonly Expression<Func<BenchmarkPerson, int>> key = person => 12 / (person.Rank - 3);
     static readonly Expression<Func<BenchmarkPerson, IComparable>> comparableKey = person => 12 / (person.Rank - 3);
     static readonly Expression<Func<BenchmarkPerson, IComparable>> comparableName = person => person.Name;
@@ -23,6 +26,40 @@ static class KeyedViewSoakReport
 
     static bool Evaluates(BenchmarkPerson person) =>
         person.Rank != 3;
+
+    static IEnumerable<(string View, string Detail)> CheckChains(IReadOnlyList<BenchmarkPerson> source, IObservableCollectionQuery<IObservableGrouping<int, BenchmarkPerson>> evenGrouping, IObservableCollectionQuery<string> evenNames, IObservableDictionaryQuery<int, string> keptDictionary, IObservableCollectionQuery<string> keptKeyedNames)
+    {
+        var even = source.Where(person => person.Rank % 2 == 0).ToList();
+        var expectedGroups = Groups(even.GroupBy(KeyOf).Select(group => (group.Key, (IEnumerable<BenchmarkPerson>)group)));
+        var actualGroups = Groups(evenGrouping.Select(group => (group.Key, (IEnumerable<BenchmarkPerson>)group)));
+        if (actualGroups != expectedGroups)
+            yield return ("grouping of a filter", $"held {actualGroups} where the collection groups as {expectedGroups}");
+        if (evenGrouping.OperationFault is not null)
+            yield return ("grouping of a filter", "reported a fault");
+        var expectedNames = string.Join(",", even.Select(person => person.Name));
+        var actualNames = string.Join(",", evenNames);
+        if (actualNames != expectedNames)
+            yield return ("projection of a filter", $"held {actualNames} where the collection projects {expectedNames}");
+        var anyFault = source.Any(person => !Evaluates(person));
+        var expectedDictionary = new Dictionary<int, string>();
+        var duplicated = false;
+        foreach (var person in source.Where(Evaluates))
+            if (!expectedDictionary.TryAdd(KeyOf(person), person.Name))
+                duplicated = true;
+        var expectedKept = expectedDictionary.Where(entry => entry.Value != "a").ToList();
+        var expectedMapping = string.Join(" ", expectedKept.OrderBy(entry => entry.Key).Select(entry => $"{entry.Key}={entry.Value}"));
+        var actualMapping = string.Join(" ", keptDictionary.OrderBy(entry => entry.Key).Select(entry => $"{entry.Key}={entry.Value}"));
+        if (actualMapping != expectedMapping)
+            yield return ("filter of a dictionary", $"mapped {actualMapping} where the collection maps {expectedMapping}");
+        if (keptDictionary.OperationFault is not null != (anyFault || duplicated))
+            yield return ("filter of a dictionary", anyFault || duplicated ? "reported no fault" : "reported a fault");
+        var expectedKeyedNames = string.Join(",", expectedKept.Select(entry => $"{entry.Key}{entry.Value}").Order(StringComparer.Ordinal));
+        var actualKeyedNames = string.Join(",", keptKeyedNames.Order(StringComparer.Ordinal));
+        if (actualKeyedNames != expectedKeyedNames)
+            yield return ("collection of a filtered dictionary", $"held {actualKeyedNames} where the collection makes {expectedKeyedNames}");
+        if (keptKeyedNames.OperationFault is not null != (anyFault || duplicated))
+            yield return ("collection of a filtered dictionary", anyFault || duplicated ? "reported no fault" : "reported a fault");
+    }
 
     static int KeyOf(BenchmarkPerson person) =>
         12 / (person.Rank - 3);
@@ -201,8 +238,18 @@ static class KeyedViewSoakReport
                 views.Add(dictionary);
                 var rank = sourceQuery.ObserveRank(pool[0], (comparableKey, false), (comparableName, true));
                 views.Add(rank);
+                var evenPeople = sourceQuery.ObserveWhere(evenRank);
+                views.Add(evenPeople);
+                var evenGrouping = evenPeople.ObserveGroupBy(key);
+                views.Add(evenGrouping);
+                var evenNames = evenPeople.ObserveSelect(name);
+                views.Add(evenNames);
+                var keptDictionary = dictionary.ObserveWhere(keptName);
+                views.Add(keptDictionary);
+                var keptKeyedNames = keptDictionary.ObserveToCollection(keyedName);
+                views.Add(keptKeyedNames);
                 Churn(random, source, pool, faults);
-                foreach (var (view, detail) in Check(source, grouping, lookup, ordering, dictionary, rank, pool[0]))
+                foreach (var (view, detail) in Check(source, grouping, lookup, ordering, dictionary, rank, pool[0]).Concat(CheckChains(source, evenGrouping, evenNames, keptDictionary, keptKeyedNames)))
                 {
                     mismatches.AddOrUpdate(view, 1, (_, count) => count + 1);
                     Interlocked.CompareExchange(ref firstMismatch, $"round {round:N0}, the {view} {detail}", null);
