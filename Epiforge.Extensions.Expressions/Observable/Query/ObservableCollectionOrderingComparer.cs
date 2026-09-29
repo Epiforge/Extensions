@@ -12,13 +12,35 @@ sealed class ObservableCollectionOrderingComparer<TElement>(IReadOnlyList<bool> 
     /// <summary>
     /// The keys an ordering keeps for one distinct element, the observations yielding them and where the element stands
     /// </summary>
-    internal sealed class Entry(TElement element, int keyCount)
+    /// <remarks>
+    /// The first key is held in the entry itself, and only an ordering by more than one key makes entries with an array of the keys after it, since most orderings have one key and an array of one costs a header and a reference beside the key it holds
+    /// </remarks>
+    internal class Entry(TElement element)
     {
         internal readonly TElement Element = element;
         internal int FaultedKeys;
-        internal readonly Key[] Keys = new Key[keyCount];
+        internal Key FirstKey;
         internal PrefixWeightedSequenceNode<Entry>? Node;
         internal int Occurrences;
+
+        internal static Entry Create(TElement element, int keyCount) =>
+            keyCount > 1 ? new EntryWithLaterKeys(element, keyCount - 1) : new Entry(element);
+
+        internal ref Key KeyAt(int index)
+        {
+            if (index == 0)
+                return ref FirstKey;
+            return ref ((EntryWithLaterKeys)this).LaterKeys[index - 1];
+        }
+    }
+
+    /// <summary>
+    /// An entry of an ordering by more than one key, holding the keys after the first
+    /// </summary>
+    internal sealed class EntryWithLaterKeys(TElement element, int laterKeyCount) :
+        Entry(element)
+    {
+        internal readonly Key[] LaterKeys = new Key[laterKeyCount];
     }
 
     internal struct Key
@@ -30,13 +52,11 @@ sealed class ObservableCollectionOrderingComparer<TElement>(IReadOnlyList<bool> 
 
     public int Compare(Entry? x, Entry? y)
     {
-        var xKeys = x!.Keys;
-        var yKeys = y!.Keys;
         for (int i = 0, ii = directions.Count; i < ii; ++i)
         {
             var isDescending = directions[i];
-            var xComparable = xKeys[i].Comparable;
-            var yComparable = yKeys[i].Comparable;
+            var xComparable = x!.KeyAt(i).Comparable;
+            var yComparable = y!.KeyAt(i).Comparable;
             if (xComparable is null)
             {
                 if (yComparable is null)

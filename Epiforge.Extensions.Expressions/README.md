@@ -283,7 +283,7 @@ When a view observes a single value rather than a collection, three of them obse
 
 **Use NMF Expressions if** your sorted views are large and change far more often than anyone reads them all, or if you need what it offers beyond the others: transactions which apply several changes as one, a parallel execution engine, expressions which can be written back through, and incremental functions you can reuse.
 
-**Use ObservableComputations if** sorting views of about a thousand elements is where your time goes and the code your views run never throws; if memory is what you are short of and your views sort, since its sorted views hold the least of the four; or if you want its dispatching of computations to other threads, pausing, paging or zipping.
+**Use ObservableComputations if** sorting views of about a thousand elements is where your time goes and the code your views run never throws; or if you want its dispatching of computations to other threads, pausing, paging or zipping.
 
 **Use this library if** you want a live view of a collection you already have with the least new vocabulary; if the code your views run may throw and your application has to keep going; if changes come from more than one thread; or if you care most about what a filtered or grouped view costs, whether for an individual property change or for each element it holds.
 
@@ -299,13 +299,13 @@ These are from the benchmarks in this repository, against DynamicData 9.4.33, NM
 | Building a filtered view | **856 KB**, **306 μs** | 4,120 KB, 2,513 μs | 2,023 KB, 456 μs | 1,071 KB, 314 μs |
 | An element moving in a sorted view | 87 B, 338.3 ns | 414 B, 999.2 ns | 556 B, 340.5 ns | **72 B**, **277.8 ns** |
 | The same at ten thousand | 96 B, 450.4 ns | 432 B, 9,231.5 ns | 556 B, **363.8 ns** | **72 B**, 5,498.4 ns |
-| Building a sorted view | **1,031 KB**, 358 μs | 3,936 KB, 2,337 μs | 1,857 KB, 412 μs | 1,094 KB, **339 μs** |
+| Building a sorted view | **999 KB**, 346 μs | 3,938 KB, 2,347 μs | 1,857 KB, 402 μs | 1,094 KB, **317 μs** |
 | An element changing group | 168 B, **128.9 ns** | 1,936 B, 633.2 ns | 640 B, 174.5 ns | **154 B**, 131.4 ns |
 | The same at ten thousand | 168 B, **204.6 ns** | 1,936 B, 648.7 ns | 640 B, 607.5 ns | **153 B**, 308.3 ns |
 | The same at 65,536 | 168 B, **233.1 ns** | 1,936 B, 755.7 ns | 640 B, 11,073.5 ns | **153 B**, 1,297.0 ns |
 | Building a grouped view | **942 KB**, **265 μs** | 4,119 KB, 2,392 μs | 2,118 KB, 519 μs | 1,118 KB, 366 μs |
 | What a live filtered view holds, per element | **823 B** | 1,865 B | 1,281 B | 886 B |
-| What a live sorted view holds, per element | 937 B | 1,922 B | 1,193 B | **898 B** |
+| What a live sorted view holds, per element | 905 B | 1,922 B | 1,193 B | **898 B** |
 | What a live grouped view holds, per element | **831 B** | 2,002 B | 1,298 B | 860 B |
 
 **Filtering is this library's, at every size.** A property change which does not move an element in or out of a filtered view allocates nothing here, at a thousand, ten thousand and a hundred thousand elements alike: the predicate is re-evaluated in place and the view stays silent when the answer has not moved. ObservableComputations comes within 8% of it up to ten thousand elements, also allocating nothing, and falls to 1.46x its time at a hundred thousand. When the change does move the element in or out of the view, this library still leads, at 108.8 ns and 72 B a change with something handling the view's events and 76.5 ns and nothing without. ObservableComputations allocates only 84 B for it but takes 573.5 ns at a thousand elements and 6,753.2 ns at ten thousand, 11.78x the time for ten times the elements; NMF Expressions takes 146.3 ns and 592 B, and DynamicData 306.7 ns and 704 B. DynamicData's model is a stream of change sets, so a refresh has to materialize one; neither is a defect. **One library pays per change and another pays per change that matters.**
@@ -331,7 +331,7 @@ These are from the benchmarks in this repository, against DynamicData 9.4.33, NM
 
 Two more things worth knowing before you weigh any of the above.
 
-**A live view is not free in any library.** A filtered view over ten thousand elements holds 8.1 MB here, 9.0 MB in ObservableComputations, 12.7 MB in NMF Expressions and 18.6 MB in DynamicData, against 960 KB for the elements themselves. This library's filtered and grouped views hold the least of the four, 823 B per element filtering a thousand and 831 B grouping them against ObservableComputations' 886 B and 860 B, and ObservableComputations' sorted views hold the least, 898 B per element sorting a thousand against this library's 937 B. DynamicData's sorted and grouped figures are above its cache, which holds another 55 B per element. Building a view is likewise proportional to the size of the collection in all four. Build one and keep it; none of them rewards building views casually.
+**A live view is not free in any library.** A filtered view over ten thousand elements holds 8.1 MB here, 9.0 MB in ObservableComputations, 12.7 MB in NMF Expressions and 18.6 MB in DynamicData, against 960 KB for the elements themselves. This library's filtered and grouped views hold the least of the four, 823 B per element filtering a thousand and 831 B grouping them against ObservableComputations' 886 B and 860 B, and ObservableComputations' sorted views hold the least at a thousand elements, 898 B per element against this library's 905 B, while at four thousand and ten thousand this library's hold less, 842 B and 894 B against its 894 B and 903 B. DynamicData's sorted and grouped figures are above its cache, which holds another 55 B per element. Building a view is likewise proportional to the size of the collection in all four. Build one and keep it; none of them rewards building views casually.
 
 **`ToObservableChangeSet()` over an existing `ObservableCollection<T>` costs DynamicData about 160x what its own `SourceCache` does** for the same property changes. That is the path you land on if you adopt it without changing where your data lives, and it is worth knowing about before you do.
 

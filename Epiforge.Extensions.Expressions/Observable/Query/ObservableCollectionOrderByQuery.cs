@@ -283,13 +283,13 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
     {
         if (!entries.TryGetValue(observation.Argument, out var entry))
             return false;
-        var keys = entry.Keys;
+        var keyCount = keySelectors.Length;
         var keyIndex = 0;
-        while (keyIndex < keys.Length && !ReferenceEquals(keys[keyIndex].Observation, observation))
+        while (keyIndex < keyCount && !ReferenceEquals(entry.KeyAt(keyIndex).Observation, observation))
             ++keyIndex;
-        if (keyIndex == keys.Length)
+        if (keyIndex == keyCount)
             return false;
-        ref var key = ref keys[keyIndex];
+        ref var key = ref entry.KeyAt(keyIndex);
         var (fault, comparable) = observation.Evaluation;
         var oldFault = key.Fault;
         if (ReferenceEquals(oldFault, fault) && (fault is not null || Equals(key.Comparable, comparable)))
@@ -326,18 +326,18 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
     /// </summary>
     ObservableCollectionOrderingComparer<TElement>.Entry ObserveElementWithAccess(TElement element)
     {
-        var entry = new ObservableCollectionOrderingComparer<TElement>.Entry(element, SelectorsAndDirections.Count);
-        var keys = entry.Keys;
-        for (var i = 0; i < keys.Length; ++i)
+        var keyCount = keySelectors.Length;
+        var entry = ObservableCollectionOrderingComparer<TElement>.Entry.Create(element, keyCount);
+        for (var i = 0; i < keyCount; ++i)
         {
             var observation = collectionObserver.ExpressionObserver.ObserveWithoutOptimization(keySelectors[i], element);
             observation.PropertyChanged += KeyEvaluationChangedHandler;
-            keys[i].Observation = observation;
+            entry.KeyAt(i).Observation = observation;
         }
         entries.Add(element, entry);
-        for (var i = 0; i < keys.Length; ++i)
+        for (var i = 0; i < keyCount; ++i)
         {
-            ref var key = ref keys[i];
+            ref var key = ref entry.KeyAt(i);
             (key.Fault, key.Comparable) = key.Observation.Evaluation;
             if (key.Fault is { } fault)
             {
@@ -574,8 +574,8 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
     void RecordFaultsWithAccess(ObservableCollectionOrderingComparer<TElement>.Entry entry)
     {
         faults.RemoveKey(entry.Element, EqualityComparer<TElement>.Default);
-        foreach (var key in entry.Keys)
-            if (key.Fault is { } fault)
+        for (int i = 0, ii = keySelectors.Length; i < ii; ++i)
+            if (entry.KeyAt(i).Fault is { } fault)
                 faults.Add(new EvaluationFaultException(entry.Element, fault));
         faultsChanged = true;
     }
@@ -583,10 +583,11 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
     void ReleaseEntriesWithAccess()
     {
         foreach (var entry in entries.Values)
-            foreach (var key in entry.Keys)
+            for (int i = 0, ii = keySelectors.Length; i < ii; ++i)
             {
-                key.Observation.PropertyChanged -= KeyEvaluationChangedHandler;
-                key.Observation.Dispose();
+                var observation = entry.KeyAt(i).Observation;
+                observation.PropertyChanged -= KeyEvaluationChangedHandler;
+                observation.Dispose();
             }
         entries.Clear();
         positions.Clear();
@@ -598,10 +599,11 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
     void ReleaseEntryWithAccess(ObservableCollectionOrderingComparer<TElement>.Entry entry)
     {
         entries.Remove(entry.Element);
-        foreach (var key in entry.Keys)
+        for (int i = 0, ii = keySelectors.Length; i < ii; ++i)
         {
-            key.Observation.PropertyChanged -= KeyEvaluationChangedHandler;
-            key.Observation.Dispose();
+            var observation = entry.KeyAt(i).Observation;
+            observation.PropertyChanged -= KeyEvaluationChangedHandler;
+            observation.Dispose();
         }
         if (entry.FaultedKeys > 0)
         {
