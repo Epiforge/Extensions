@@ -47,7 +47,7 @@ sealed class ObservableCollectionQueryList(CollectionObserver collectionObserver
     }
 
     public override IEnumerator<object?> GetEnumerator() =>
-        copy is { } kept ? kept.GetEnumerator() : List.Cast<object?>().GetEnumerator();
+        copy is { } kept ? ((IEnumerable<object?>)kept).GetEnumerator() : List.Cast<object?>().GetEnumerator();
 
     protected override void OnInitialization()
     {

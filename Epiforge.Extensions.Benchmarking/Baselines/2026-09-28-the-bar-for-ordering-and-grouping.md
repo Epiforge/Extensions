@@ -81,5 +81,5 @@ An element changing group, of sixteen:
 
 - **The bar for sorting and grouping is ObservableComputations, and above a few thousand elements NMF's for sorting, not DynamicData.** This library sorts a thousand elements at 4.5x to 4.7x ObservableComputations' time and groups them at 2x, and the gap in allocation is wider. Nothing here says how; reading `Ordering` and `Grouping` in ObservableComputations and `OrderBy` in NMF comes before any change to this library's.
 - **These classes measure the ordinary path and nothing else.** None of them raises a fault, changes the collection from another thread, raises a notification naming no property, or reads by index, so they say nothing about what any library does then, or what doing it costs.
-- **Nothing here measures what a live view of either peer holds.** The footprint figures in the readmes are this library's and DynamicData's only.
-- The readmes compare this library with DynamicData alone.
+- **Nothing here measures what a live view of either peer holds.** The footprint figures in the readmes are this library's and DynamicData's only. Taken up in `2026-09-28-the-release-beside-it.md`: ObservableComputations holds the least of the four in every shape.
+- The readmes compare this library with DynamicData alone. Since then they compare all four; see `2026-09-28-the-release-beside-it.md`.

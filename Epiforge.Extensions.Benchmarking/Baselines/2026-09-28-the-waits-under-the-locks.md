@@ -176,6 +176,6 @@ Both readmes' comparison with DynamicData now quotes this run: 13.2 ns against 2
 
 ## What remains
 
-- **What a synchronized query costs to apply a change**, before or after this round. An instrument would need a context which runs what it is sent at once, so that the arms price the queue and the deferral rather than a thread switch.
-- **What holding locks while building costs, decomposed.** 7.0.1 builds over an empty collection 1.07x to 1.23x slower across three runs; the locks a slice takes and the price of each are uncounted.
-- **The one-element building rows, the flattening and the lambda arms** still compare only with 6.1.0, and a 7.0.0 run is the only thing that would separate 6.1.1's share.
+- **What a synchronized query costs to apply a change**, before or after this round. An instrument would need a context which runs what it is sent at once, so that the arms price the queue and the deferral rather than a thread switch. Taken up in `2026-09-28-the-release-beside-it.md`: 1.9x to 2.3x 7.0.0's time, allocating less.
+- **What holding locks while building costs, decomposed.** 7.0.1 builds over an empty collection 1.07x to 1.23x slower across three runs; the locks a slice takes and the price of each are uncounted. Taken up in `2026-09-28-the-release-beside-it.md`, which prices each lock beyond the first at 23 to 27 ns a build.
+- **The one-element building rows, the flattening and the lambda arms** still compare only with 6.1.0, and a 7.0.0 run is the only thing that would separate 6.1.1's share. Taken up in `2026-09-28-the-release-beside-it.md`, against 7.0.0 in the same run.

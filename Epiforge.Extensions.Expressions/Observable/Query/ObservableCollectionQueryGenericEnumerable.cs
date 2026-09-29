@@ -40,7 +40,7 @@ sealed class ObservableCollectionQueryGenericEnumerable<TElement>(CollectionObse
     }
 
     public override IEnumerator<TElement> GetEnumerator() =>
-        copy is { } kept ? kept.GetEnumerator() : Enumerable.GetEnumerator();
+        copy is { } kept ? ((IEnumerable<TElement>)kept).GetEnumerator() : Enumerable.GetEnumerator();
 
     protected override void OnInitialization()
     {

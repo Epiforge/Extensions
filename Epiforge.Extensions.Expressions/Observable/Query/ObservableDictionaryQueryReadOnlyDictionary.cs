@@ -81,6 +81,8 @@ sealed class ObservableDictionaryQueryReadOnlyDictionary<TKey, TValue>(Collectio
             Reconcile();
             return;
         }
+        if (Follow(e))
+            return;
         var keys = new List<TKey>(e.OldItems.Count + e.NewItems.Count);
         foreach (var keyValuePair in e.OldItems)
             keys.Add(keyValuePair.Key);
@@ -130,8 +132,54 @@ sealed class ObservableDictionaryQueryReadOnlyDictionary<TKey, TValue>(Collectio
         return true;
     }
 
+    /// <summary>
+    /// Applies a change naming one key to the copy and announces it as the dictionary did, provided the dictionary and the copy agree that it is the change still outstanding for that key, which they do whenever notifications arrive in the order of the changes they describe
+    /// </summary>
+    /// <returns><c>true</c> if the change was applied; otherwise, <c>false</c>, and the key must be reconciled instead</returns>
+    bool Follow(NotifyDictionaryChangedEventArgs<TKey, TValue> e)
+    {
+        using var changeHold = HoldOwnChanges();
+        var kept = copy!;
+        switch (e.Action)
+        {
+            case NotifyDictionaryChangedAction.Add when e.NewItems.Count is 1 && e.OldItems.Count is 0:
+                {
+                    var (key, value) = e.NewItems[0];
+                    if (kept.ContainsKey(key) || !ReadOnlyDictionary.TryGetValue(key, out var present) || !IsSame(present, value))
+                        return false;
+                    OnPropertyChanging(countPropertyChangingEventArgs);
+                    kept.Add(key, value);
+                    OnPropertyChanged(countPropertyChangedEventArgs);
+                    break;
+                }
+            case NotifyDictionaryChangedAction.Remove when e.OldItems.Count is 1 && e.NewItems.Count is 0:
+                {
+                    var (key, value) = e.OldItems[0];
+                    if (ReadOnlyDictionary.ContainsKey(key) || !kept.TryGetValue(key, out var keptValue) || !IsSame(keptValue, value))
+                        return false;
+                    OnPropertyChanging(countPropertyChangingEventArgs);
+                    kept.Remove(key);
+                    OnPropertyChanged(countPropertyChangedEventArgs);
+                    break;
+                }
+            case NotifyDictionaryChangedAction.Replace when e.NewItems.Count is 1 && e.OldItems.Count is 1:
+                {
+                    var (key, value) = e.NewItems[0];
+                    var (oldKey, oldValue) = e.OldItems[0];
+                    if (!KeyComparer.Equals(key, oldKey) || IsSame(value, oldValue) || !ReadOnlyDictionary.TryGetValue(key, out var present) || !IsSame(present, value) || !kept.TryGetValue(key, out var keptValue) || !IsSame(keptValue, oldValue))
+                        return false;
+                    kept[key] = value;
+                    break;
+                }
+            default:
+                return false;
+        }
+        OnChanged(e);
+        return true;
+    }
+
     public override IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator() =>
-        copy is { } kept ? kept.GetEnumerator() : ReadOnlyDictionary.GetEnumerator();
+        copy is { } kept ? ((IEnumerable<KeyValuePair<TKey, TValue>>)kept).GetEnumerator() : ReadOnlyDictionary.GetEnumerator();
 
     public override IReadOnlyList<KeyValuePair<TKey, TValue>> GetRange(IEnumerable<TKey> keys)
     {
@@ -148,6 +196,9 @@ sealed class ObservableDictionaryQueryReadOnlyDictionary<TKey, TValue>(Collectio
         else
             throw new NotSupportedException();
     }
+
+    static bool IsSame(TValue value, TValue otherValue) =>
+        isValueType ? EqualityComparer<TValue>.Default.Equals(value, otherValue) : ReferenceEquals(value, otherValue);
 
     protected override void OnInitialization()
     {
@@ -210,7 +261,7 @@ sealed class ObservableDictionaryQueryReadOnlyDictionary<TKey, TValue>(Collectio
             var wasPresent = kept.TryGetValue(key, out var keptValue);
             if (isPresent && !wasPresent)
                 (added ??= []).Add(new(key, value!));
-            else if (isPresent && !(isValueType ? EqualityComparer<TValue>.Default.Equals(value, keptValue) : ReferenceEquals(value, keptValue)))
+            else if (isPresent && !IsSame(value!, keptValue!))
             {
                 (replacements ??= []).Add(new(key, value!));
                 (replaced ??= []).Add(new(key, keptValue!));

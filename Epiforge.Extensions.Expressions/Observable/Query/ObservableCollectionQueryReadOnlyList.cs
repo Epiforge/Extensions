@@ -36,7 +36,7 @@ sealed class ObservableCollectionQueryReadOnlyList<TElement>(CollectionObserver 
     }
 
     public override IEnumerator<TElement> GetEnumerator() =>
-        copy is { } kept ? kept.GetEnumerator() : ReadOnlyList.GetEnumerator();
+        copy is { } kept ? ((IEnumerable<TElement>)kept).GetEnumerator() : ReadOnlyList.GetEnumerator();
 
     protected override bool Dispose(bool disposing)
     {
