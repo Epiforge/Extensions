@@ -1,2 +1,0 @@
-`PrefixWeightedSequence<T>.Move` moves a node to a new position by taking it out where it stands and reinserting it where it belongs, touching two paths through the sequence where moving a range of one by position touches six.
-`ObservableRangeCollection<T>.MoveRange` moving one element shifts only the elements between its two places, where it shifted everything after each of them, and announces the move with a single-element list rather than a `List<T>`, 72 bytes of event arguments rather than 160.
