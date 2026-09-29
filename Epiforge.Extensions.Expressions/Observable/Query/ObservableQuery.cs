@@ -247,6 +247,12 @@ abstract class ObservableQuery :
         Volatile.Read(ref childrenAccess);
 
     /// <summary>
+    /// Gets whether this thread holds exactly one change lock, which is how things stand while a query announces a change to one built directly over it, and not while a handler of one query's announcement is changing another
+    /// </summary>
+    private protected static bool HoldsOneChangeLock =>
+        heldChangeLocks == 1;
+
+    /// <summary>
     /// Gets whether the calling thread holds this query's own change lock
     /// </summary>
     private protected bool HoldsOwnChanges =>

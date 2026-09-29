@@ -29,6 +29,7 @@ using System.Reactive.Linq;
 /// <remarks>
 /// NMF Expressions and ObservableComputations are measured as <c>OrderedComparisonBenchmarks</c> measures them, and their standing views are verified at every size before they are measured
 /// </remarks>
+[AgainstReleasedExpressions("7.0.1")]
 [MemoryDiagnoser]
 public class OrderedScaleComparisonBenchmarks
 {

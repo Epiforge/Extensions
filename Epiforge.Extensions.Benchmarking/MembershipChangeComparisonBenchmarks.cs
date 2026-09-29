@@ -14,6 +14,7 @@ using System.Reactive.Linq;
 /// <remarks>
 /// Every element's rank is negated once per operation, so every element leaves the view on one operation and returns on the next. The other comparison classes change ranks without moving anything, which is the cheaper case for every library; this one prices the case in which the view itself changes and says so. This library's view raises no event when nothing handles its events, while the others' views are collections which raise theirs regardless, so this library is measured both without a handler and with one which does nothing. DynamicData is measured on its cache, the shape its operators are built around. Every standing view is verified before it is measured
 /// </remarks>
+[AgainstReleasedExpressions("7.0.1")]
 [MemoryDiagnoser]
 public class MembershipChangeComparisonBenchmarks
 {

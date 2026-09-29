@@ -75,8 +75,11 @@ abstract class ObservableExpression :
     }
 
     protected ObservableExpression(ExpressionObserver observer, Expression expression, bool deferEvaluation) :
-        this(observer, Validated(expression).Type, deferEvaluation) =>
+        this(observer, Validated(expression).Type, deferEvaluation)
+    {
         this.expression = expression;
+        InitializationAccess = new();
+    }
 
     private protected ObservableExpression(ExpressionObserver observer, Type type, bool deferEvaluation)
     {
@@ -109,10 +112,13 @@ abstract class ObservableExpression :
     protected readonly ExpressionObserver observer;
     readonly FastEqualityComparer resultEqualityComparer;
 
+    /// <summary>
+    /// Serializes the building of a node the observer caches, which another thread can be handed before it is built, and is released once it is; a direct observation is built by the thread which makes it before any other can reach it, so it has none
+    /// </summary>
 #if IS_NET_9_0_OR_GREATER
-    internal Lock? InitializationAccess = new();
+    internal Lock? InitializationAccess;
 #else
-    internal object? InitializationAccess = new();
+    internal object? InitializationAccess;
 #endif
     internal Exception? InitializationException;
     internal bool IsInitialized;

@@ -1,6 +1,6 @@
 ﻿namespace Epiforge.Extensions.Benchmarking;
 
-[AgainstReleasedExpressions("7.0.0")]
+[AgainstReleasedExpressions("7.0.1")]
 [MemoryDiagnoser]
 public class ObserveSelectManyBenchmarks
 {

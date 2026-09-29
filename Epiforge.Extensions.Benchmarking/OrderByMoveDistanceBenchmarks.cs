@@ -17,6 +17,7 @@ using System.Reactive.Linq;
 /// <remarks>
 /// DynamicData is measured alongside, not because its result is in question but because it establishes whether this library's loss at a thousand elements holds at every move distance or only at short ones, which is a different sentence for a reader either way
 /// </remarks>
+[AgainstReleasedExpressions("7.0.1")]
 [MemoryDiagnoser]
 public class OrderByMoveDistanceBenchmarks
 {

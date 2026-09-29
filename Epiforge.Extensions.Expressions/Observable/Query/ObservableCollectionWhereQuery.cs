@@ -54,7 +54,7 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
     int liveEnumerations;
     readonly PrefixWeightedSequence<IObservableExpression<TElement, bool>> memberships = new();
     PropertyChangedEventHandler? observableExpressionPropertyChangedHandler;
-    readonly Dictionary<IObservableExpression<TElement, bool>, (List<PrefixWeightedSequenceNode<IObservableExpression<TElement, bool>>> Nodes, Exception? Fault)> observableExpressionStates = [];
+    readonly Dictionary<IObservableExpression<TElement, bool>, (NodeSet<IObservableExpression<TElement, bool>> Nodes, Exception? Fault)> observableExpressionStates = [];
     internal readonly Expression<Func<TElement, bool>> Predicate = predicate;
     bool released;
     ObservableQuerySubscription? sourceSubscription;
@@ -205,11 +205,12 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
         faultList.Check(observableExpression);
         if (result)
             ++runningCount;
-        if (observableExpressionStates.TryGetValue(observableExpression, out var state))
+        ref var state = ref CollectionsMarshal.GetValueRefOrNullRef(observableExpressionStates, observableExpression);
+        if (!Unsafe.IsNullRef(ref state))
             state.Nodes.Add(node);
         else
         {
-            observableExpressionStates.Add(observableExpression, ([node], fault));
+            observableExpressionStates.Add(observableExpression, (new(node), fault));
             observableExpression.PropertyChanged += ObservableExpressionPropertyChangedHandler;
         }
     }
@@ -236,7 +237,7 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
     void ReleaseMembershipWithAccess(PrefixWeightedSequenceNode<IObservableExpression<TElement, bool>> node)
     {
         var observableExpression = node.Item;
-        var state = observableExpressionStates[observableExpression];
+        ref var state = ref CollectionsMarshal.GetValueRefOrNullRef(observableExpressionStates, observableExpression);
         state.Nodes.Remove(node);
         if (state.Nodes.Count == 0)
         {
@@ -316,11 +317,12 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
                             var observableExpression = collectionObserver.ExpressionObserver.ObserveWithoutOptimization(Predicate, element);
                             var (fault, result) = observableExpression.Evaluation;
                             var node = memberships.Insert(e.NewStartingIndex + i, observableExpression, result ? 1 : 0);
-                            if (observableExpressionStates.TryGetValue(observableExpression, out var state))
+                            ref var state = ref CollectionsMarshal.GetValueRefOrNullRef(observableExpressionStates, observableExpression);
+                            if (!Unsafe.IsNullRef(ref state))
                                 state.Nodes.Add(node);
                             else
                             {
-                                observableExpressionStates.Add(observableExpression, ([node], fault));
+                                observableExpressionStates.Add(observableExpression, (new(node), fault));
                                 observableExpression.PropertyChanged += ObservableExpressionPropertyChangedHandler;
                             }
                             if (fault is not null)

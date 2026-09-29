@@ -29,6 +29,8 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
         SelectorsAndDirections = selectorsAndDirections;
     }
 
+    const int farthestGallopingStep = 8;
+
     readonly object access;
     NullableKeyDictionary<TElement, ObservableCollectionRankQuery<TElement>>? cachedRankQueries;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
@@ -115,6 +117,12 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
         return node.Item;
     }
 
+    /// <summary>
+    /// Finds where an element whose key changed belongs, counting as though it were not in the order, by comparing it with its neighbors and then with elements one, two, four and eight places further on, before searching by halves whatever the last comparison left
+    /// </summary>
+    /// <remarks>
+    /// A key change usually moves an element a few places, which this settles in a few comparisons, where a search by halves over everything on the side it moves to takes the logarithm of the order's size however near it lands; a move across the order costs at most four comparisons more than that search
+    /// </remarks>
     int FindDestinationWithAccess(TElement element, PrefixWeightedSequenceNode<TElement> node, int currentIndex)
     {
         var elementComparables = comparer!.ComparablesOf(element);
@@ -124,6 +132,18 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
         {
             var low = 0;
             var high = currentIndex - 1;
+            for (var step = 1; step <= farthestGallopingStep; step <<= 1)
+            {
+                var probe = high - step;
+                if (probe < 0)
+                    break;
+                if (comparer!.CompareWithComparablesOf(element, ref elementComparables, ElementAtExcludingWithAccess(probe, currentIndex, ref finger, ref fingerIndex)) >= 0)
+                {
+                    low = probe + 1;
+                    break;
+                }
+                high = probe;
+            }
             while (low < high)
             {
                 var middle = low + (high - low) / 2;
@@ -137,8 +157,20 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
         var reducedCount = positions.Count - 1;
         if (currentIndex < reducedCount && comparer!.CompareWithComparablesOf(element, ref elementComparables, ElementAtExcludingWithAccess(currentIndex, currentIndex, ref finger, ref fingerIndex)) > 0)
         {
-            var low = currentIndex;
+            var low = currentIndex + 1;
             var high = reducedCount;
+            for (var step = 1; step <= farthestGallopingStep; step <<= 1)
+            {
+                var probe = low - 1 + step;
+                if (probe >= reducedCount)
+                    break;
+                if (comparer!.CompareWithComparablesOf(element, ref elementComparables, ElementAtExcludingWithAccess(probe, currentIndex, ref finger, ref fingerIndex)) <= 0)
+                {
+                    high = probe;
+                    break;
+                }
+                low = probe + 1;
+            }
             while (low < high)
             {
                 var middle = low + (high - low) / 2;
@@ -315,7 +347,7 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
         if (destinationIndex == currentIndex)
             return;
         var startingIndex = positions.PrefixWeightBefore(currentIndex);
-        positions.MoveRange(currentIndex, destinationIndex, 1);
+        positions.Move(node, destinationIndex);
         results.MoveRange(startingIndex, positions.PrefixWeightBefore(node), node.Weight);
     }
 

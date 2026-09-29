@@ -23,6 +23,7 @@ using System.Reactive.Linq;
 /// <remarks>
 /// NMF Expressions and ObservableComputations are each measured in the form their documentation leads with, ordering by the rank itself rather than by a boxed comparable, which is the form their APIs take. NMF's view is built over <c>WithUpdates</c> and given a dummy successor, because an NMF view with nothing attached to it does not follow its source; ObservableComputations' view is bound to an <c>OcConsumer</c>, whose disposal tears it down
 /// </remarks>
+[AgainstReleasedExpressions("7.0.1")]
 [MemoryDiagnoser]
 public class OrderedComparisonBenchmarks
 {

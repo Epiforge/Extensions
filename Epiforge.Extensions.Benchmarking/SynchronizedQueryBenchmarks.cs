@@ -6,7 +6,7 @@ namespace Epiforge.Extensions.Benchmarking;
 /// <remarks>
 /// Each arm adds an element at the end of a thousand and removes it again. The unobserved arm prices the list's own work and the observed arm an observation of it and nothing else; every other arm adds one synchronized query over that observation. The context runs whatever it is sent or posted at once, on the thread which sent or posted it, and the callback takes a lock around what it is given, so that the arms price the queries' own work rather than a thread switch. A consistent query synchronized with a context is changed from a thread other than the context's in <see cref="UsingSynchronizationContext"/> and from the context's own in <see cref="UsingSynchronizationContextFromItsThread"/>, which makes the context current around each change and so adds the cost of doing that. Every synchronized query is verified before it is measured
 /// </remarks>
-[AgainstReleasedExpressions("7.0.0")]
+[AgainstReleasedExpressions("7.0.1")]
 [MemoryDiagnoser]
 public class SynchronizedQueryBenchmarks
 {

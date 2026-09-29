@@ -10,3 +10,4 @@ global using System.Collections.Specialized;
 global using System.ComponentModel;
 global using System.Diagnostics.CodeAnalysis;
 global using System.Runtime.CompilerServices;
+global using System.Runtime.InteropServices;

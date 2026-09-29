@@ -6,7 +6,7 @@ sealed class ObservableCollectionUsingSynchronizationCallbackQuery<TElement>(Col
     Action? applyPendingChangesAction;
     Action? applyPendingChangesInCallbackAction;
     ObservableRangeCollection<TElement>? elements;
-    readonly Queue<(NotifyCollectionChangedEventArgs change, List<TElement>? reset)> pending = new();
+    readonly ConcurrentQueue<(NotifyCollectionChangedEventArgs change, List<TElement>? reset)> pending = new();
     internal readonly object Context = context;
     internal readonly CollectionSynchronizationCallback SynchronizationCallback = synchronizationCallback;
 
@@ -55,40 +55,38 @@ sealed class ObservableCollectionUsingSynchronizationCallbackQuery<TElement>(Col
         OnPropertyChanged(e);
 
     /// <summary>
+    /// Applies one change of the source to what this query keeps
+    /// </summary>
+    void Apply(NotifyCollectionChangedEventArgs e, List<TElement>? reset)
+    {
+        switch (e.Action)
+        {
+            case NotifyCollectionChangedAction.Add:
+                elements!.InsertRange(e.NewStartingIndex, e.NewItems!.Cast<TElement>());
+                break;
+            case NotifyCollectionChangedAction.Move:
+                elements!.MoveRange(e.OldStartingIndex, e.NewStartingIndex, e.OldItems!.Count);
+                break;
+            case NotifyCollectionChangedAction.Remove:
+                elements!.RemoveRange(e.OldStartingIndex, e.OldItems!.Count);
+                break;
+            case NotifyCollectionChangedAction.Replace:
+                elements!.ReplaceRange(e.OldStartingIndex, e.OldItems!.Count, e.NewItems!.Cast<TElement>());
+                break;
+            case NotifyCollectionChangedAction.Reset:
+                elements!.Reset(reset!);
+                break;
+        }
+    }
+
+    /// <summary>
     /// Applies, within the callback, every change of the source not yet applied, in the order the source announced them
     /// </summary>
     void ApplyPendingChanges()
     {
         using var changeHold = HoldOwnChanges();
-        while (true)
-        {
-            NotifyCollectionChangedEventArgs e;
-            List<TElement>? reset;
-            lock (pending)
-            {
-                if (!pending.TryDequeue(out var next))
-                    return;
-                (e, reset) = next;
-            }
-            switch (e.Action)
-            {
-                case NotifyCollectionChangedAction.Add:
-                    elements!.InsertRange(e.NewStartingIndex, e.NewItems!.Cast<TElement>());
-                    break;
-                case NotifyCollectionChangedAction.Move:
-                    elements!.MoveRange(e.OldStartingIndex, e.NewStartingIndex, e.OldItems!.Count);
-                    break;
-                case NotifyCollectionChangedAction.Remove:
-                    elements!.RemoveRange(e.OldStartingIndex, e.OldItems!.Count);
-                    break;
-                case NotifyCollectionChangedAction.Replace:
-                    elements!.ReplaceRange(e.OldStartingIndex, e.OldItems!.Count, e.NewItems!.Cast<TElement>());
-                    break;
-                case NotifyCollectionChangedAction.Reset:
-                    elements!.Reset(reset!);
-                    break;
-            }
-        }
+        while (pending.TryDequeue(out var next))
+            Apply(next.change, next.reset);
     }
 
     /// <summary>
@@ -105,8 +103,7 @@ sealed class ObservableCollectionUsingSynchronizationCallbackQuery<TElement>(Col
 
     void SourceCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
-        lock (pending)
-            pending.Enqueue((e, e.Action is NotifyCollectionChangedAction.Reset ? [.. source] : null));
+        pending.Enqueue((e, e.Action is NotifyCollectionChangedAction.Reset ? [.. source] : null));
         DeferUntilChangeLocksReleased(ApplyPendingChangesInCallbackAction);
     }
 

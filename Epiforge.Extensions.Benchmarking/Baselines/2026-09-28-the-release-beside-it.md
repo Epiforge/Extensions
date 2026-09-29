@@ -150,7 +150,7 @@ This library's view raises nothing when nothing handles it, while the others rai
 
 ## What remains
 
-- **What makes a synchronized query's change twice as expensive, decomposed.** The queue, the deferral and the drain are not separated, and reading the code has not predicted costs in this library.
+- **What makes a synchronized query's change twice as expensive, decomposed.** The queue, the deferral and the drain are not separated, and reading the code has not predicted costs in this library. Taken up in `2026-09-29-what-the-others-knew.md`: three monitor pairs a change around the queue, removed, for 0.61x to 0.78x of 7.0.1's time.
 - **What each lock held while building costs, and whether it must grow with them.** About 23 to 27 ns a build per lock beyond the first; a concatenation of eight holds fifteen.
-- **Why ObservableComputations' views hold less**, filtered by 5%, sorted by 29% and grouped by 17%.
-- **View changes against 7.0.0 in one run.** The six comparison classes carry no 7.0.0 job.
+- **Why ObservableComputations' views hold less**, filtered by 5%, sorted by 29% and grouped by 17%. Taken up in `2026-09-29-what-the-others-knew.md`: a filtered view here now holds less than ObservableComputations'; sorted and grouped ones still hold more.
+- **View changes against 7.0.0 in one run.** The six comparison classes carry no 7.0.0 job. Taken up against 7.0.1 in `2026-09-29-what-the-others-knew.md`.

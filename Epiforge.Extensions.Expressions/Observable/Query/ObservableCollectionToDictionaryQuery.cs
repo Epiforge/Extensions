@@ -29,7 +29,7 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>(Colle
     IReadOnlyList<KeyValuePair<TKey, TValue>>? enumerationSnapshot;
     IReadOnlyList<TKey>? keysSnapshot;
     readonly PrefixWeightedSequence<KeyValuePair<TKey, TValue>> claims = new();
-    readonly Dictionary<TKey, List<PrefixWeightedSequenceNode<KeyValuePair<TKey, TValue>>>> claimantsByKey = new(equalityComparer);
+    readonly Dictionary<TKey, NodeSet<KeyValuePair<TKey, TValue>>> claimantsByKey = new(equalityComparer);
     readonly ObservableDictionary<TKey, TValue> dictionary = new(equalityComparer);
     IReadOnlyList<TValue>? valuesSnapshot;
     int nullKeys;
@@ -97,10 +97,11 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>(Colle
 
     void ClaimWithAccess(TKey key, PrefixWeightedSequenceNode<KeyValuePair<TKey, TValue>> node)
     {
-        if (claimantsByKey.TryGetValue(key, out var claimants))
+        ref var claimants = ref CollectionsMarshal.GetValueRefOrNullRef(claimantsByKey, key);
+        if (!Unsafe.IsNullRef(ref claimants))
             claimants.Add(node);
         else
-            claimantsByKey.Add(key, [node]);
+            claimantsByKey.Add(key, new(node));
     }
 
     public override bool Contains(KeyValuePair<TKey, TValue> item)
@@ -214,7 +215,8 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>(Colle
 
     void RelinquishWithAccess(TKey key, PrefixWeightedSequenceNode<KeyValuePair<TKey, TValue>> node)
     {
-        if (!claimantsByKey.TryGetValue(key, out var claimants))
+        ref var claimants = ref CollectionsMarshal.GetValueRefOrNullRef(claimantsByKey, key);
+        if (Unsafe.IsNullRef(ref claimants))
             return;
         claimants.Remove(node);
         if (claimants.Count == 0)
@@ -312,7 +314,7 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>(Colle
             return dictionary.TryGetValue(key, out value);
     }
 
-    TValue WinningValueWithAccess(List<PrefixWeightedSequenceNode<KeyValuePair<TKey, TValue>>> claimants)
+    TValue WinningValueWithAccess(NodeSet<KeyValuePair<TKey, TValue>> claimants)
     {
         var winner = claimants[0];
         if (claimants.Count > 1)

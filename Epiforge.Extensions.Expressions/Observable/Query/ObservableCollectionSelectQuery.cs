@@ -58,7 +58,7 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
     bool enumerationSnapshotShared;
     int liveEnumerations;
     PropertyChangedEventHandler? observableExpressionPropertyChangedHandler;
-    readonly Dictionary<IObservableExpression<TElement, TResult>, (Projection Projection, List<PrefixWeightedSequenceNode<Projection>> Nodes, Exception? Fault)> observableExpressionStates = [];
+    readonly Dictionary<IObservableExpression<TElement, TResult>, (Projection Projection, NodeSet<Projection> Nodes, Exception? Fault)> observableExpressionStates = [];
     readonly PrefixWeightedSequence<Projection> positions = new();
     bool released;
     readonly EqualityComparer<TResult> resultComparer = EqualityComparer<TResult>.Default;
@@ -197,12 +197,13 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
         var (fault, result) = observableExpression.Evaluation;
         if (fault is not null)
             faultList.Add(new EvaluationFaultException(element, fault));
-        if (observableExpressionStates.TryGetValue(observableExpression, out var state))
+        ref var state = ref CollectionsMarshal.GetValueRefOrNullRef(observableExpressionStates, observableExpression);
+        if (!Unsafe.IsNullRef(ref state))
             state.Nodes.Add(positions.Insert(index, state.Projection, 1));
         else
         {
             var projection = new Projection(observableExpression, result);
-            observableExpressionStates.Add(observableExpression, (projection, [positions.Insert(index, projection, 1)], fault));
+            observableExpressionStates.Add(observableExpression, (projection, new(positions.Insert(index, projection, 1)), fault));
             observableExpression.PropertyChanged += ObservableExpressionPropertyChangedHandler;
         }
     }
@@ -227,7 +228,7 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
     void ReleaseProjectionWithAccess(PrefixWeightedSequenceNode<Projection> node)
     {
         var observableExpression = node.Item.ObservableExpression;
-        var state = observableExpressionStates[observableExpression];
+        ref var state = ref CollectionsMarshal.GetValueRefOrNullRef(observableExpressionStates, observableExpression);
         state.Nodes.Remove(node);
         if (state.Nodes.Count == 0)
         {

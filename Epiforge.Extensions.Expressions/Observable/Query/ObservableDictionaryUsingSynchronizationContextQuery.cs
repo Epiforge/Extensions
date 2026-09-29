@@ -7,7 +7,7 @@ sealed class ObservableDictionaryUsingSynchronizationContextQuery<TKey, TValue>(
     Action? applyPendingChangesAction;
     ObservableDictionary<TKey, TValue>? dictionary;
     Action? sendPendingChangesAction;
-    readonly Queue<(NotifyDictionaryChangedEventArgs<TKey, TValue> change, Dictionary<TKey, TValue>? reset)> pending = new();
+    readonly ConcurrentQueue<(NotifyDictionaryChangedEventArgs<TKey, TValue> change, Dictionary<TKey, TValue>? reset)> pending = new();
     internal readonly SynchronizationContext SynchronizationContext = synchronizationContext;
 
     public override TValue this[TKey key] =>
@@ -92,37 +92,35 @@ sealed class ObservableDictionaryUsingSynchronizationContextQuery<TKey, TValue>(
     }
 
     /// <summary>
+    /// Applies one change of the source to what this query keeps
+    /// </summary>
+    void Apply(NotifyDictionaryChangedEventArgs<TKey, TValue> e, Dictionary<TKey, TValue>? reset)
+    {
+        switch (e.Action)
+        {
+            case NotifyDictionaryChangedAction.Add:
+                dictionary!.AddRange(e.NewItems);
+                break;
+            case NotifyDictionaryChangedAction.Remove:
+                dictionary!.RemoveRange(e.OldItems.Select(oldKeyValuePair => oldKeyValuePair.Key));
+                break;
+            case NotifyDictionaryChangedAction.Replace:
+                dictionary!.ReplaceRange(e.OldItems.Select(oldKeyValuePair => oldKeyValuePair.Key), e.NewItems);
+                break;
+            case NotifyDictionaryChangedAction.Reset:
+                dictionary!.Reset(reset!);
+                break;
+        }
+    }
+
+    /// <summary>
     /// Applies, on the context's thread, every change of the source not yet applied, in the order the source announced them
     /// </summary>
     void ApplyPendingChanges()
     {
         using var changeHold = HoldOwnChanges();
-        while (true)
-        {
-            NotifyDictionaryChangedEventArgs<TKey, TValue> e;
-            Dictionary<TKey, TValue>? reset;
-            lock (pending)
-            {
-                if (!pending.TryDequeue(out var next))
-                    return;
-                (e, reset) = next;
-            }
-            switch (e.Action)
-            {
-                case NotifyDictionaryChangedAction.Add:
-                    dictionary!.AddRange(e.NewItems);
-                    break;
-                case NotifyDictionaryChangedAction.Remove:
-                    dictionary!.RemoveRange(e.OldItems.Select(oldKeyValuePair => oldKeyValuePair.Key));
-                    break;
-                case NotifyDictionaryChangedAction.Replace:
-                    dictionary!.ReplaceRange(e.OldItems.Select(oldKeyValuePair => oldKeyValuePair.Key), e.NewItems);
-                    break;
-                case NotifyDictionaryChangedAction.Reset:
-                    dictionary!.Reset(reset!);
-                    break;
-            }
-        }
+        while (pending.TryDequeue(out var next))
+            Apply(next.change, next.reset);
     }
 
     /// <summary>
@@ -139,8 +137,14 @@ sealed class ObservableDictionaryUsingSynchronizationContextQuery<TKey, TValue>(
 
     void SourceDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e)
     {
-        lock (pending)
-            pending.Enqueue((e, e.Action is NotifyDictionaryChangedAction.Reset ? source.ToDictionary(kv => kv.Key, kv => kv.Value) : null));
+        var reset = e.Action is NotifyDictionaryChangedAction.Reset ? source.ToDictionary(kv => kv.Key, kv => kv.Value) : null;
+        if (SynchronizationContext == SynchronizationContext.Current && pending.IsEmpty)
+        {
+            using var changeHold = HoldOwnChanges();
+            Apply(e, reset);
+            return;
+        }
+        pending.Enqueue((e, reset));
         if (SynchronizationContext == SynchronizationContext.Current)
             ApplyPendingChanges();
         else

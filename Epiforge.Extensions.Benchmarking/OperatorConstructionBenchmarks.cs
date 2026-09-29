@@ -6,7 +6,7 @@ namespace Epiforge.Extensions.Benchmarking;
 /// <remarks>
 /// GS5 builds about eight queries for each time slice, and most of its slices hold one trait value and no list values. Each arm builds over each of 256 standing sources, none of which shares a query with another, with lambdas held in static fields so that no arm pays the compiler or an optimizer miss, and then disposes everything it built. <see cref="Root"/> builds a source query over a collection nothing else observes. <see cref="Slice"/> builds what <c>TraverseTraitValues</c> builds from a lookup's grouping: a cast, a filter, a projection of what passed, two flattenings of that projection and two concatenations
 /// </remarks>
-[AgainstReleasedExpressions("7.0.0")]
+[AgainstReleasedExpressions("7.0.1")]
 [MemoryDiagnoser]
 public class OperatorConstructionBenchmarks
 {

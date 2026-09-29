@@ -165,6 +165,18 @@ public class ObservableRangeCollection<T> :
                         Move(oldStartIndex + i, newStartIndex + i);
                 }
             }
+            else if (count == 1 && Items is List<T> list)
+            {
+                var items = CollectionsMarshal.AsSpan(list);
+                var item = items[oldStartIndex];
+                if (oldStartIndex < newStartIndex)
+                    items.Slice(oldStartIndex + 1, newStartIndex - oldStartIndex).CopyTo(items[oldStartIndex..]);
+                else
+                    items.Slice(newStartIndex, oldStartIndex - newStartIndex).CopyTo(items[(newStartIndex + 1)..]);
+                items[newStartIndex] = item;
+                NotifyIndexerChanged();
+                OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Move, (object?)item, newStartIndex, oldStartIndex));
+            }
             else
             {
                 var insertionIndex = newStartIndex - 1;

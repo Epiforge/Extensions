@@ -136,6 +136,68 @@ public class PrefixWeightedSequence
 
     [TestMethod]
     [Timeout(300000)]
+    public void MovingANodeAgreesWithAListOfTheSameContent()
+    {
+        for (var seed = 0; seed < 15; ++seed)
+        {
+            var random = new Random(seed);
+            var sequence = new PrefixWeightedSequence<int>();
+            var reference = new List<(int Item, int Weight)>();
+            var nodes = new List<PrefixWeightedSequenceNode<int>>();
+            for (var item = 0; item < 200; ++item)
+            {
+                var weight = random.Next(4);
+                nodes.Add(sequence.Insert(item, item, weight));
+                reference.Add((item, weight));
+            }
+            for (var operation = 0; operation < 2000; ++operation)
+            {
+                var count = reference.Count;
+                string performed;
+                if (random.Next(10) == 0)
+                {
+                    var index = random.Next(count);
+                    var weight = random.Next(4);
+                    sequence.SetWeight(nodes[index], weight);
+                    reference[index] = (reference[index].Item, weight);
+                    performed = $"set the weight at {index} to {weight}";
+                }
+                else
+                {
+                    var oldIndex = random.Next(count);
+                    var newIndex = random.Next(3) == 0 ? Math.Clamp(oldIndex + random.Next(-2, 3), 0, count - 1) : random.Next(count);
+                    var node = nodes[oldIndex];
+                    sequence.Move(node, newIndex);
+                    var entry = reference[oldIndex];
+                    reference.RemoveAt(oldIndex);
+                    reference.Insert(newIndex, entry);
+                    nodes.RemoveAt(oldIndex);
+                    nodes.Insert(newIndex, node);
+                    Assert.AreEqual(newIndex, sequence.IndexOf(node), $"seed {seed}, operation {operation}: the moved node is not where it was moved to");
+                    performed = $"move the node at {oldIndex} to {newIndex}";
+                }
+                CheckAgainstReference(sequence, reference, nodes, random, $"seed {seed}, operation {operation}, after {performed}");
+            }
+        }
+    }
+
+    [TestMethod]
+    public void MovingANodeValidatesItsArguments()
+    {
+        var sequence = new PrefixWeightedSequence<int>();
+        var first = sequence.Insert(0, 1, 1);
+        var second = sequence.Insert(1, 2, 1);
+        Assert.ThrowsException<ArgumentNullException>(() => sequence.Move(null!, 0));
+        Assert.ThrowsException<ArgumentOutOfRangeException>(() => sequence.Move(first, -1));
+        Assert.ThrowsException<ArgumentOutOfRangeException>(() => sequence.Move(first, 2));
+        sequence.Move(first, 1);
+        Assert.AreSame(second, sequence.NodeAt(0));
+        Assert.AreSame(first, sequence.NodeAt(1));
+        Assert.AreEqual(1, sequence.PrefixWeightBefore(first));
+    }
+
+    [TestMethod]
+    [Timeout(300000)]
     public void ClearingEmptiesTheSequence()
     {
         var sequence = new PrefixWeightedSequence<int>();

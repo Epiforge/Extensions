@@ -6,16 +6,16 @@ sealed class ObservableCollectionLookupQuery<TKey, TElement> :
     where TKey : notnull
 {
     static readonly Expression<Func<IObservableGrouping<TKey, TElement>, TKey>> groupingKey = grouping => grouping.Key;
-    static readonly ConditionalWeakTable<Expression<Func<TElement, TKey>>, Expression<Func<TElement, Tuple<TElement, TKey>>>> wrappedSelectors = [];
+    static readonly ConditionalWeakTable<Expression<Func<TElement, TKey>>, Expression<Func<TElement, KeyedElement<TElement, TKey>>>> wrappedSelectors = [];
 
     /// <summary>
     /// Yields the lambda pairing an element with its key, built once for each key selector and kept for as long as the key selector is, since the observer's caches of optimized and compiled lambdas match by reference
     /// </summary>
-    static Expression<Func<TElement, Tuple<TElement, TKey>>> WrapSelector(Expression<Func<TElement, TKey>> selector) =>
+    static Expression<Func<TElement, KeyedElement<TElement, TKey>>> WrapSelector(Expression<Func<TElement, TKey>> selector) =>
         wrappedSelectors.GetValue(selector, static source =>
         {
             var parameter = Expression.Parameter(typeof(TElement), "element");
-            return Expression.Lambda<Func<TElement, Tuple<TElement, TKey>>>(Expression.New(typeof(Tuple<TElement, TKey>).GetConstructor([typeof(TElement), typeof(TKey)])!, parameter, LambdaInvocationRewriter.Apply(source, parameter) ?? Expression.Invoke(source, parameter)), parameter);
+            return Expression.Lambda<Func<TElement, KeyedElement<TElement, TKey>>>(Expression.New(typeof(KeyedElement<TElement, TKey>).GetConstructor([typeof(TElement), typeof(TKey)])!, parameter, LambdaInvocationRewriter.Apply(source, parameter) ?? Expression.Invoke(source, parameter)), parameter);
         });
 
     public ObservableCollectionLookupQuery(CollectionObserver collectionObserver, ObservableCollectionQuery<TElement> source, Expression<Func<TElement, TKey>> keySelector, IEqualityComparer<TKey> keyEqualityComparer) :
@@ -33,14 +33,14 @@ sealed class ObservableCollectionLookupQuery<TKey, TElement> :
 
     readonly object access;
     IReadOnlyList<IObservableGrouping<TKey, TElement>>? enumerationSnapshot;
-    readonly Dictionary<TKey, (ObservableRangeCollection<TElement> collection, IObservableGrouping<TKey, TElement> grouping)> collectionAndGroupingByKey;
+    readonly Dictionary<TKey, (GroupCollection<TElement> collection, IObservableGrouping<TKey, TElement> grouping)> collectionAndGroupingByKey;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     readonly IObservableDictionaryQuery<TKey, IObservableGrouping<TKey, TElement>> groupingByKey;
     readonly ObservableRangeCollection<IObservableGrouping<TKey, TElement>> groupings;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
     readonly IObservableCollectionQuery<IObservableGrouping<TKey, TElement>> groupingsQuery;
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
-    IObservableCollectionQuery<Tuple<TElement, TKey>>? select;
+    IObservableCollectionQuery<KeyedElement<TElement, TKey>>? select;
     readonly ObservableCollectionQuery<TElement> source;
 
     internal readonly Expression<Func<TElement, TKey>> KeySelector;
@@ -64,7 +64,7 @@ sealed class ObservableCollectionLookupQuery<TKey, TElement> :
             {
                 if (groupingByKey.TryGetValue(key, out var existingGrouping))
                     return existingGrouping;
-                var collection = collectionObserver.ExpressionObserver.Logger is { } logger ? new ObservableRangeCollection<TElement>(logger) : new ObservableRangeCollection<TElement>();
+                var collection = collectionObserver.ExpressionObserver.Logger is { } logger ? new GroupCollection<TElement>(logger) : new GroupCollection<TElement>();
                 var grouping = new ObservableGrouping<TKey, TElement>(collectionObserver, key, collectionObserver.GetObservableCollectionQuery(collection, this), this);
                 grouping.Initialize();
                 var collectionAndGrouping = (collection, grouping);
@@ -144,7 +144,7 @@ sealed class ObservableCollectionLookupQuery<TKey, TElement> :
 
     void AddElement(TElement element, TKey key)
     {
-        ObservableRangeCollection<TElement> collection;
+        GroupCollection<TElement> collection;
         if (!collectionAndGroupingByKey.TryGetValue(key, out var collectionAndGrouping))
         {
             collection = collectionObserver.ExpressionObserver.Logger is { } logger ? new(logger) : new();
@@ -235,7 +235,7 @@ sealed class ObservableCollectionLookupQuery<TKey, TElement> :
     {
         groupings.CollectionChanged += GroupingsCollectionChanged;
         select = source.ObserveSelect(WrapSelector(KeySelector));
-        using var changeHold = HoldChangesOf(((ScopedObservableCollectionQuery<Tuple<TElement, TKey>>)select).query);
+        using var changeHold = HoldChangesOf(((ScopedObservableCollectionQuery<KeyedElement<TElement, TKey>>)select).query);
         lock (access)
             foreach (var (element, key) in select)
                 AddElement(element, key);
@@ -254,7 +254,7 @@ sealed class ObservableCollectionLookupQuery<TKey, TElement> :
         if (collectionAndGroupingByKey.TryGetValue(key, out var collectionAndGrouping))
         {
             var collection = collectionAndGrouping.collection;
-            collection.Remove(element);
+            collection.RemoveInstance(element);
         }
     }
 
@@ -285,11 +285,17 @@ sealed class ObservableCollectionLookupQuery<TKey, TElement> :
             else if (e.Action is not NotifyCollectionChangedAction.Move)
             {
                 if (e.OldItems is { } oldItems)
-                    foreach (var (element, key) in oldItems.Cast<Tuple<TElement, TKey>>())
+                    for (int i = 0, ii = oldItems.Count; i < ii; ++i)
+                    {
+                        var (element, key) = (KeyedElement<TElement, TKey>)oldItems[i]!;
                         RemoveElement(element, key);
+                    }
                 if (e.NewItems is { } newItems)
-                    foreach (var (element, key) in newItems.Cast<Tuple<TElement, TKey>>())
+                    for (int i = 0, ii = newItems.Count; i < ii; ++i)
+                    {
+                        var (element, key) = (KeyedElement<TElement, TKey>)newItems[i]!;
                         AddElement(element, key);
+                    }
             }
         }
     }

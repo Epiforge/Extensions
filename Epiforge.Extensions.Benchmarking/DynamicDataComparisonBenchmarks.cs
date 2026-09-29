@@ -23,6 +23,7 @@ using System.Reactive.Linq;
 /// <remarks>
 /// NMF Expressions and ObservableComputations are each measured in the form their documentation leads with, from the predicate written once. NMF's view is built over <c>WithUpdates</c> and given a dummy successor, because an NMF view with nothing attached to it does not follow its source; ObservableComputations' view is bound to an <c>OcConsumer</c>, whose disposal tears it down. Their standing views are each verified before they are measured, because a view which quietly failed to follow its source would otherwise be reported as a very fast one.
 /// </remarks>
+[AgainstReleasedExpressions("7.0.1")]
 [MemoryDiagnoser]
 public class DynamicDataComparisonBenchmarks
 {

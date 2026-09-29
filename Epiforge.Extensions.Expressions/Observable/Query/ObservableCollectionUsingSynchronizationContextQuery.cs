@@ -6,7 +6,7 @@ sealed class ObservableCollectionUsingSynchronizationContextQuery<TElement>(Coll
     Action? applyPendingChangesAction;
     ObservableRangeCollection<TElement>? elements;
     Action? sendPendingChangesAction;
-    readonly Queue<(NotifyCollectionChangedEventArgs change, List<TElement>? reset)> pending = new();
+    readonly ConcurrentQueue<(NotifyCollectionChangedEventArgs change, List<TElement>? reset)> pending = new();
     internal readonly SynchronizationContext SynchronizationContext = synchronizationContext;
 
     public override TElement this[int index] =>
@@ -60,40 +60,38 @@ sealed class ObservableCollectionUsingSynchronizationContextQuery<TElement>(Coll
         OnPropertyChanged(e);
 
     /// <summary>
+    /// Applies one change of the source to what this query keeps
+    /// </summary>
+    void Apply(NotifyCollectionChangedEventArgs e, List<TElement>? reset)
+    {
+        switch (e.Action)
+        {
+            case NotifyCollectionChangedAction.Add:
+                elements!.InsertRange(e.NewStartingIndex, e.NewItems!.Cast<TElement>());
+                break;
+            case NotifyCollectionChangedAction.Move:
+                elements!.MoveRange(e.OldStartingIndex, e.NewStartingIndex, e.OldItems!.Count);
+                break;
+            case NotifyCollectionChangedAction.Remove:
+                elements!.RemoveRange(e.OldStartingIndex, e.OldItems!.Count);
+                break;
+            case NotifyCollectionChangedAction.Replace:
+                elements!.ReplaceRange(e.OldStartingIndex, e.OldItems!.Count, e.NewItems!.Cast<TElement>());
+                break;
+            case NotifyCollectionChangedAction.Reset:
+                elements!.Reset(reset!);
+                break;
+        }
+    }
+
+    /// <summary>
     /// Applies, on the context's thread, every change of the source not yet applied, in the order the source announced them
     /// </summary>
     void ApplyPendingChanges()
     {
         using var changeHold = HoldOwnChanges();
-        while (true)
-        {
-            NotifyCollectionChangedEventArgs e;
-            List<TElement>? reset;
-            lock (pending)
-            {
-                if (!pending.TryDequeue(out var next))
-                    return;
-                (e, reset) = next;
-            }
-            switch (e.Action)
-            {
-                case NotifyCollectionChangedAction.Add:
-                    elements!.InsertRange(e.NewStartingIndex, e.NewItems!.Cast<TElement>());
-                    break;
-                case NotifyCollectionChangedAction.Move:
-                    elements!.MoveRange(e.OldStartingIndex, e.NewStartingIndex, e.OldItems!.Count);
-                    break;
-                case NotifyCollectionChangedAction.Remove:
-                    elements!.RemoveRange(e.OldStartingIndex, e.OldItems!.Count);
-                    break;
-                case NotifyCollectionChangedAction.Replace:
-                    elements!.ReplaceRange(e.OldStartingIndex, e.OldItems!.Count, e.NewItems!.Cast<TElement>());
-                    break;
-                case NotifyCollectionChangedAction.Reset:
-                    elements!.Reset(reset!);
-                    break;
-            }
-        }
+        while (pending.TryDequeue(out var next))
+            Apply(next.change, next.reset);
     }
 
     /// <summary>
@@ -110,8 +108,14 @@ sealed class ObservableCollectionUsingSynchronizationContextQuery<TElement>(Coll
 
     void SourceCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
-        lock (pending)
-            pending.Enqueue((e, e.Action is NotifyCollectionChangedAction.Reset ? [.. source] : null));
+        var reset = e.Action is NotifyCollectionChangedAction.Reset ? [.. source] : (List<TElement>?)null;
+        if (SynchronizationContext == SynchronizationContext.Current && pending.IsEmpty)
+        {
+            using var changeHold = HoldOwnChanges();
+            Apply(e, reset);
+            return;
+        }
+        pending.Enqueue((e, reset));
         if (SynchronizationContext == SynchronizationContext.Current)
             ApplyPendingChanges();
         else

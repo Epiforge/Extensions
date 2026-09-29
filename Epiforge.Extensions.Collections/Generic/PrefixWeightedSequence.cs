@@ -165,6 +165,68 @@ public sealed class PrefixWeightedSequence<T>
     }
 
     /// <summary>
+    /// Moves the specified node to a new position, which is expressed relative to the sequence with the node already removed from it
+    /// </summary>
+    /// <param name="node">A node belonging to this sequence</param>
+    /// <param name="newIndex">The zero-based position at which to reinsert the node</param>
+    /// <remarks>This takes the node out where it stands and reinserts it where it belongs, touching two paths through the sequence where moving a range of one by position touches six</remarks>
+    public void Move(PrefixWeightedSequenceNode<T> node, int newIndex)
+    {
+        ArgumentNullException.ThrowIfNull(node);
+        if (newIndex < 0 || newIndex > Count - 1)
+            throw new ArgumentOutOfRangeException(nameof(newIndex));
+        var weight = node.Weight;
+        var merged = Merge(node.Left, node.Right);
+        var parent = node.Parent;
+        if (merged is not null)
+            merged.Parent = parent;
+        if (parent is null)
+            root = merged;
+        else if (ReferenceEquals(parent.Left, node))
+            parent.Left = merged;
+        else
+            parent.Right = merged;
+        for (var ancestor = parent; ancestor is not null; ancestor = ancestor.Parent)
+        {
+            --ancestor.SubtreeCount;
+            ancestor.SubtreeWeight -= weight;
+        }
+        PrefixWeightedSequenceNode<T>? attachTo = null;
+        var attachLeft = false;
+        var current = root;
+        var index = newIndex;
+        while (current is not null && current.Priority > node.Priority)
+        {
+            ++current.SubtreeCount;
+            current.SubtreeWeight += weight;
+            attachTo = current;
+            var leftCount = CountOf(current.Left);
+            if (index <= leftCount)
+            {
+                attachLeft = true;
+                current = current.Left;
+            }
+            else
+            {
+                attachLeft = false;
+                index -= leftCount + 1;
+                current = current.Right;
+            }
+        }
+        var (first, remainder) = Split(current, index);
+        node.Left = first;
+        node.Right = remainder;
+        Update(node);
+        node.Parent = attachTo;
+        if (attachTo is null)
+            root = node;
+        else if (attachLeft)
+            attachTo.Left = node;
+        else
+            attachTo.Right = node;
+    }
+
+    /// <summary>
     /// Moves a range of items to a new position, which is expressed relative to the sequence with the range already removed from it
     /// </summary>
     /// <param name="oldIndex">The zero-based position of the first item to move</param>

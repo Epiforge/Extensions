@@ -25,6 +25,10 @@ using System.Reactive.Linq;
 /// <remarks>
 /// NMF Expressions and ObservableComputations are each measured in the form their documentation leads with, and both hold their groups as collections which can be read, so neither needs anything materialized. NMF's view is built over <c>WithUpdates</c> and given a dummy successor, because an NMF view with nothing attached to it does not follow its source; ObservableComputations' view is bound to an <c>OcConsumer</c>, whose disposal tears it down
 /// </remarks>
+/// <remarks>
+/// A lookup built with <c>ObserveToLookup</c> keeps its groups the way a grouping does, so its arm moves the same elements through the same groups
+/// </remarks>
+[AgainstReleasedExpressions("7.0.1")]
 [MemoryDiagnoser]
 public class GroupedComparisonBenchmarks
 {
@@ -34,6 +38,7 @@ public class GroupedComparisonBenchmarks
     static readonly Expression<Func<BenchmarkPerson, int>> hoistedKeySelector = person => person.Rank % groupCount;
 
     IObservableCollectionQuery<IObservableGrouping<int, BenchmarkPerson>> groupBy = null!;
+    IObservableLookupQuery<int, BenchmarkPerson> lookup = null!;
     INotifyEnumerable<INotifyGrouping<int, BenchmarkPerson>> nmfGroupBy = null!;
     OcConsumer observableComputationsConsumer = null!;
     Grouping<BenchmarkPerson, int> observableComputationsGrouping = null!;
@@ -62,6 +67,10 @@ public class GroupedComparisonBenchmarks
 
     [Benchmark]
     public void ChangeEveryRankWithExpressions() =>
+        ChangeEveryRank();
+
+    [Benchmark]
+    public void ChangeEveryRankWithExpressionsLookup() =>
         ChangeEveryRank();
 
     [Benchmark]
@@ -119,6 +128,13 @@ public class GroupedComparisonBenchmarks
     public void CleanupStandingExpressions()
     {
         groupBy.Dispose();
+        sourceQuery.Dispose();
+    }
+
+    [GlobalCleanup(Target = nameof(ChangeEveryRankWithExpressionsLookup))]
+    public void CleanupStandingExpressionsLookup()
+    {
+        lookup.Dispose();
         sourceQuery.Dispose();
     }
 
@@ -200,6 +216,16 @@ public class GroupedComparisonBenchmarks
         sourceQuery = observer.ObserveReadOnlyList(source);
         groupBy = sourceQuery.ObserveGroupBy(hoistedKeySelector);
         Probe(key => groupBy.FirstOrDefault(grouping => grouping.Key == key) is { } found ? [.. found] : [], "this library's grouped query");
+    }
+
+    [GlobalSetup(Target = nameof(ChangeEveryRankWithExpressionsLookup))]
+    public void SetupStandingExpressionsLookup()
+    {
+        SetupSource();
+        observer = new CollectionObserver();
+        sourceQuery = observer.ObserveReadOnlyList(source);
+        lookup = sourceQuery.ObserveToLookup(hoistedKeySelector);
+        Probe(key => lookup.TryGetValue(key, out var found) ? [.. found] : [], "this library's lookup");
     }
 
     [GlobalSetup(Target = nameof(ChangeEveryRankWithNmf))]

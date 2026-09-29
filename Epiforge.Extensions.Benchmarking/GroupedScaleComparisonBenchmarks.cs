@@ -17,11 +17,15 @@ using System.Reactive.Linq;
 /// The workload is a thousand changes at every size rather than one per element, for the reason <c>OrderedScaleComparisonBenchmarks</c> gives: changing every element would make the total grow whether the per-change cost did or not. The changed elements are spread by stride and each rank is exclusive-ored with 2, which changes the rank modulo sixteen, so <b>every change moves its element out of one group and into another</b> at every size
 /// </remarks>
 /// <remarks>
+/// The largest size, 65,536, makes groups of 4,096, where finding an element in the group it is leaving is most of what a change costs, so a change to how a group finds the element leaving it shows there first
+/// </remarks>
+/// <remarks>
 /// The arms which read after changing exist because a cost which comes back suspiciously cheap may belong to a view deferring its work until somebody looks, which the counts a probe checks would not reveal if the read is what performs the migration
 /// </remarks>
 /// <remarks>
 /// NMF Expressions and ObservableComputations are measured as <c>GroupedComparisonBenchmarks</c> measures them, and their standing views are verified at every size before they are measured
 /// </remarks>
+[AgainstReleasedExpressions("7.0.1")]
 [MemoryDiagnoser]
 public class GroupedScaleComparisonBenchmarks
 {
@@ -41,7 +45,7 @@ public class GroupedScaleComparisonBenchmarks
     IObservableCollectionQuery<BenchmarkPerson> sourceQuery = null!;
     int stride;
 
-    [Params(1_000, 4_000, 10_000)]
+    [Params(1_000, 4_000, 10_000, 65_536)]
     public int ElementCount { get; set; }
 
     void ChangeAThousandRanks()

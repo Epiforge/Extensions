@@ -7,7 +7,7 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
     readonly object access = new();
     Dictionary<IEnumerable<TResult>, List<TResult>>? copies;
     int count;
-    readonly Dictionary<IEnumerable<TResult>, List<PrefixWeightedSequenceNode<IEnumerable<TResult>?>>> enumerableNodes = [];
+    readonly Dictionary<IEnumerable<TResult>, NodeSet<IEnumerable<TResult>?>> enumerableNodes = [];
     List<TResult>? enumerationSnapshot;
     readonly PrefixWeightedSequence<IEnumerable<TResult>?> positions = new();
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
@@ -158,17 +158,18 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
             positions.Insert(index, enumerable, 0);
             return;
         }
-        if (enumerableNodes.TryGetValue(enumerable, out var nodes))
+        ref var nodes = ref CollectionsMarshal.GetValueRefOrNullRef(enumerableNodes, enumerable);
+        if (!Unsafe.IsNullRef(ref nodes))
             nodes.Add(positions.Insert(index, enumerable, ContentsWithAccess(enumerable).Count()));
         else if (enumerable is INotifyCollectionChanged collectionChangedNotifier)
         {
             List<TResult> copy = [.. enumerable];
             (copies ??= []).Add(enumerable, copy);
-            enumerableNodes.Add(enumerable, [positions.Insert(index, enumerable, copy.Count)]);
+            enumerableNodes.Add(enumerable, new(positions.Insert(index, enumerable, copy.Count)));
             collectionChangedNotifier.CollectionChanged += CollectionChangedNotifierCollectionChanged;
         }
         else
-            enumerableNodes.Add(enumerable, [positions.Insert(index, enumerable, enumerable.Count())]);
+            enumerableNodes.Add(enumerable, new(positions.Insert(index, enumerable, enumerable.Count())));
     }
 
     protected override void OnInitialization()
@@ -188,7 +189,10 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
 
     void ReleaseProjectionWithAccess(PrefixWeightedSequenceNode<IEnumerable<TResult>?> node)
     {
-        if (node.Item is not { } enumerable || !enumerableNodes.TryGetValue(enumerable, out var nodes))
+        if (node.Item is not { } enumerable)
+            return;
+        ref var nodes = ref CollectionsMarshal.GetValueRefOrNullRef(enumerableNodes, enumerable);
+        if (Unsafe.IsNullRef(ref nodes))
             return;
         nodes.Remove(node);
         if (nodes.Count == 0)
