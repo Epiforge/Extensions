@@ -1,6 +1,7 @@
-﻿![Extensions Logo](Extensions.jpg) 
-
-<h1>Extensions</h1>
+﻿<picture>
+<source media="(prefers-color-scheme: dark)" srcset="Extensions-dark.png">
+<img src="Extensions.png" alt="Extensions Logo" width="218" height="236">
+</picture> 
 
 General utilities to help with stuff in .NET Development, from Epiforge.
 
@@ -47,7 +48,7 @@ Supports `net6.0`, `net7.0`, `net8.0`, `net9.0`, and `net10.0`.
 
 # Libraries
 
-## <img src="Epiforge.Extensions.Components/NuGet.jpg" alt="Components" style="float: left !important; padding-right: 0.5em !important;"> Components
+## <img src="Epiforge.Extensions.Components/NuGet.png" width="64" height="64" alt="Components" style="float: left !important; padding-right: 0.5em !important;"> Components
 [![Epiforge.Extensions.Components Nuget](https://img.shields.io/nuget/v/Epiforge.Extensions.Components.svg?logo=nuget) ![Downloads](https://img.shields.io/nuget/dt/epiforge.extensions.components)](https://www.nuget.org/packages/Epiforge.Extensions.Components)
 
 ### Property Change Notification
@@ -112,7 +113,7 @@ This library provides classes for use in threading scenarios:
 
 ---
 
-## <img src="Epiforge.Extensions.Collections/NuGet.jpg" alt="Collections" style="float: left !important; padding-right: 0.5em !important;"> Collections
+## <img src="Epiforge.Extensions.Collections/NuGet.png" width="64" height="64" alt="Collections" style="float: left !important; padding-right: 0.5em !important;"> Collections
 [![Epiforge.Extensions.Collections Nuget](https://img.shields.io/nuget/v/Epiforge.Extensions.Collections.svg?logo=nuget) ![Downloads](https://img.shields.io/nuget/dt/epiforge.extensions.collections)](https://www.nuget.org/packages/Epiforge.Extensions.Collections)
 
 This library provides a number of extension methods for collections and dictionaries:
@@ -160,7 +161,7 @@ This library provides a number of extension methods for collections and dictiona
 
 ---
 
-## <img src="Epiforge.Extensions.Expressions/NuGet.jpg" alt="Expressions" style="float: left !important; padding-right: 0.5em !important;"> Expressions
+## <img src="Epiforge.Extensions.Expressions/NuGet.png" width="64" height="64" alt="Expressions" style="float: left !important; padding-right: 0.5em !important;"> Expressions
 [![Epiforge.Extensions.Expressions Nuget](https://img.shields.io/nuget/v/Epiforge.Extensions.Expressions.svg?logo=nuget) ![Downloads](https://img.shields.io/nuget/dt/epiforge.extensions.expressions)](https://www.nuget.org/packages/Epiforge.Extensions.Expressions)
 
 This library has useful tools for dealing with expressions:
@@ -508,7 +509,7 @@ These comparisons were written by someone who uses none of the other three, whic
 
 ## Platforms
 
-### <img src="Epiforge.Extensions.Platforms.Windows/NuGet.jpg" alt="Platforms.Windows" style="float: left !important; padding-right: 0.5em !important;"> Windows
+### <img src="Epiforge.Extensions.Platforms.Windows/NuGet.png" width="64" height="64" alt="Platforms.Windows" style="float: left !important; padding-right: 0.5em !important;"> Windows
 [![Epiforge.Extensions.Platforms.Windows Nuget](https://img.shields.io/nuget/v/Epiforge.Extensions.Platforms.Windows.svg?logo=nuget) ![Downloads](https://img.shields.io/nuget/dt/epiforge.extensions.platforms.windows)](https://www.nuget.org/packages/Epiforge.Extensions.Platforms.Windows)
 
 This library includes utilities for interoperation with Microsoft Windows, including:
