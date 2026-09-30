@@ -50,6 +50,9 @@ sealed class ObservableGrouping<TKey, TElement>(CollectionObserver collectionObs
     void IObservableQueryDependent.OnDependencyPropertyChanging(ObservableQuerySubscription subscription, PropertyChangingEventArgs e) =>
         OnPropertyChanging(e);
 
+    internal void InheritOwnerFault(Exception? fault) =>
+        InheritOperationFault(fault);
+
     internal void InternalDispose()
     {
         ownerDisposing = true;

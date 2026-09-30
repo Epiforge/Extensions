@@ -61,6 +61,7 @@ sealed class ObservableCollectionLookupQuery<TKey, TElement> :
                     return existingGrouping;
                 var collection = collectionObserver.ExpressionObserver.Logger is { } logger ? new GroupCollection<TElement>(logger) : new GroupCollection<TElement>();
                 var grouping = new ObservableGrouping<TKey, TElement>(collectionObserver, key, collectionObserver.GetObservableCollectionQuery(collection, this), this);
+                grouping.InheritOwnerFault(OperationFault);
                 grouping.Initialize();
                 var collectionAndGrouping = (collection, grouping);
                 collectionAndGroupingByKey.Add(key, collectionAndGrouping);
@@ -150,6 +151,7 @@ sealed class ObservableCollectionLookupQuery<TKey, TElement> :
         {
             collection = collectionObserver.ExpressionObserver.Logger is { } logger ? new(logger) : new();
             var grouping = new ObservableGrouping<TKey, TElement>(collectionObserver, key, collectionObserver.GetObservableCollectionQuery(collection, this), this);
+            grouping.InheritOwnerFault(OperationFault);
             grouping.Initialize();
             collectionAndGrouping = (collection, grouping);
             collectionAndGroupingByKey.Add(key, collectionAndGrouping);
@@ -313,6 +315,12 @@ sealed class ObservableCollectionLookupQuery<TKey, TElement> :
                 if (!released)
                     InheritOperationFault(source.OperationFault);
         }
+    }
+
+    private protected override void OnOperationFaultPublished(Exception? fault)
+    {
+        foreach (var grouping in groupings.ToArray())
+            ((ObservableGrouping<TKey, TElement>)grouping).InheritOwnerFault(fault);
     }
 
     void RebuildWithAccess()

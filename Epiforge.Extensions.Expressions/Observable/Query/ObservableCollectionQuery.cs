@@ -293,7 +293,8 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
             faultList.Add(ownOperationFault);
             fault = faultList.Fault;
         }
-        SetBackedProperty(ref operationFault, in fault, operationFaultPropertyChangingEventArgs, operationFaultPropertyChangedEventArgs);
+        if (SetBackedProperty(ref operationFault, in fault, operationFaultPropertyChangingEventArgs, operationFaultPropertyChangedEventArgs))
+            OnOperationFaultPublished(fault);
     }
 
     public virtual object SyncRoot =>
@@ -462,6 +463,13 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
         if (!DeferNotification(e))
             RaiseCollectionChanged(e);
+    }
+
+    /// <summary>
+    /// Called once this query has announced a change in <see cref="OperationFault" />, so that queries which are part of this one can report it
+    /// </summary>
+    private protected virtual void OnOperationFaultPublished(Exception? fault)
+    {
     }
 
     void RaiseCollectionChanged(NotifyCollectionChangedEventArgs e)
