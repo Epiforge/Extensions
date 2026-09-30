@@ -1,1 +1,0 @@
-﻿A group taken from a grouping or a lookup reports its owner's fault, whether it arose beneath the owner or in its key selector, and drops it when it clears, so a sum, count or other scalar built over a group reports the fault instead of computing over what remains; 7.0.2 carried the fault to the grouping and the lookup but not to the groups taken from them.
