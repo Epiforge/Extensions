@@ -534,6 +534,7 @@ public sealed class PrefixWeightedSequence<T>
     /// <param name="weight">The weight to assign</param>
     /// <param name="prefixWeightBefore">The total weight of the items before <paramref name="node"/>, which the assignment does not affect</param>
     /// <remarks>Accumulating that total over the climb which repairs the tree spares a caller which needs it a second climb, and costs a caller which does not more than the climb it rides on, which is why the two are separate methods</remarks>
+    [SuppressMessage("Design", "CA1021: Avoid out parameters", Justification = "The overload without the out parameter already has this name and returns nothing, so the weight cannot be returned without renaming a released member.")]
     public void SetWeight(PrefixWeightedSequenceNode<T> node, int weight, out int prefixWeightBefore)
     {
         ArgumentNullException.ThrowIfNull(node);
