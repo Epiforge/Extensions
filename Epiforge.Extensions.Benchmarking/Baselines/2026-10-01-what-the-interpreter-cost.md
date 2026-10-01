@@ -55,7 +55,25 @@ Every allocation came in as predicted. Times did not, in both runs:
 
 With dynamic code nothing in this change runs. The current job in the last run is within 2.4% of 7.0.4 on every arm but the raising one, 4.7% over on a deviation of 0.60 μs, and its unobserved floor moved 3.3% the other way.
 
+## What Apple Silicon showed
+
+Before this release, `DynamicCodeBenchmarks` ran on an M3 MacBook Air with dynamic code, against 7.0.4, to see whether anything done for ahead-of-time compilation cost a JIT. Allocation was identical on every arm, and time was within 3% on every arm but the raising one. That arm, a thousand cheap evaluations, came in 5.7% slower, then 6.2% and 6.1% in two runs of it alone: about 0.49 ns an evaluation. On the reference machine the same arm had read +0.0%, +0.6%, +1.1% and +4.7% across four runs, within the variance between runs there.
+
+With dynamic code, the only thing an evaluation does that 7.0.4's did not was the change of the morning's round which made direct subscription's delegate take two parameters and read the observation's values, reached groups, links and held slots from the observation itself. A runtime without dynamic code needs that, because it can make a delegate of at most two parameters from an interpreted lambda without a generated thunk, but a JIT does not, and closures do not either. So:
+
+- **With dynamic code**, direct subscription compiles 7.0.4's five-parameter delegate again; `DirectObservableExpression` is 7.0.4's to the byte, but for line endings.
+- **Without it**, closures take the five as parameters through a C# lambda, which also spares them the two virtual reads they made through the observation.
+- **Only a lambda closures do not cover** keeps a two-parameter interpreted delegate, and `DirectEvaluationState` (new) carries the four arrays to it: one carrier per thread, read into locals before anything else and cleared after each call, so it allocates nothing and keeps nothing alive.
+
+| `RaiseUnderAThousandObservations`, with dynamic code, against 7.0.4 | two parameters | five |
+|---|---:|---:|
+| M3 MacBook Air | +5.7%, +6.2%, +6.1% | +0.1%, −1.2% |
+| reference machine | +4.7% (last of four runs) | +1.8% |
+
+Allocation is 48 B in every run on both. Without dynamic code the arm measured 44.3 μs and 24,048 B on the reference machine, against 44.4 μs before, and 57.1 and 56.3 μs on the Mac. The reference machine's run had two misses of the "unchanged" I predicted, both in arms this does not reach: the graph's change with dynamic code at +6.4% against 7.0.4, on a deviation of 2.39 μs against 0.84, and building without dynamic code at +3.7%, in a run whose builds with dynamic code were also 3% to 4% slower than the last. Every suite passed on both machines at the counts above, and on the Mac the probe passed 26 of 26 on the JIT with and without dynamic code, under Native AOT for osx-arm64, and in the iOS simulator in Debug, Release, and Release with the interpreter.
+
 ## The readmes and the release notes
 
 - **Both readmes:** the Ahead-of-Time Compilation section gives the last run's figures, says why an observation costs more there, and gives the cost of an evaluation under Native AOT itself.
 - **Expressions' release notes** gain a line on the closures and replace the cost line with the same figures.
+- **Expressions' release notes** also say that the two-parameter delegate is only for what closures do not cover without dynamic code, and that with dynamic code direct subscription compiles 7.0.4's delegate; the cost line claims only allocation equal to 7.0.4's with dynamic code.
