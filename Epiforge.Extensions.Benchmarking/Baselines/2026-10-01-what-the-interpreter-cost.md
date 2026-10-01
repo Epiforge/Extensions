@@ -74,6 +74,6 @@ Allocation is 48 B in every run on both. Without dynamic code the arm measured 4
 
 ## The readmes and the release notes
 
-- **Both readmes:** the Ahead-of-Time Compilation section gives the last run's figures, says why an observation costs more there, and gives the cost of an evaluation under Native AOT itself.
+- **Both readmes:** the Ahead-of-Time Compilation section gives the figures of the run after the five parameters came back, says why an observation costs more there, and says that with a JIT an observation allocates what 7.0.4's did and evaluates repeatedly within 2% of its time on x64 and on Apple Silicon.
 - **Expressions' release notes** gain a line on the closures and replace the cost line with the same figures.
-- **Expressions' release notes** also say that the two-parameter delegate is only for what closures do not cover without dynamic code, and that with dynamic code direct subscription compiles 7.0.4's delegate; the cost line claims only allocation equal to 7.0.4's with dynamic code.
+- **Expressions' release notes** also say that the two-parameter delegate is only for what closures do not cover without dynamic code, and that with dynamic code direct subscription compiles 7.0.4's delegate; the cost line takes the same figures and says the same of a JIT.

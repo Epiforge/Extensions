@@ -517,12 +517,14 @@ Without code generation, an observation costs more, because the observer evaluat
 
 | | With dynamic code | Without |
 |---|---|---|
-| An evaluation on the shortcut | 12.5 ns, 0 B | 44.4 ns, 24 B |
-| A property change in a filtered view of a thousand, on the shortcut | 13.2 ns, 0 B | 49.8 ns, 24 B |
-| The same on the graph | 35.7 ns, 24 B | 569.1 ns, 72 B |
-| Building and disposing of a filtered view of a thousand | 290 μs, 856 KB | 583 μs, 903 KB |
+| An evaluation on the shortcut | 12.3 ns, 0 B | 44.3 ns, 24 B |
+| A property change in a filtered view of a thousand, on the shortcut | 13.4 ns, 0 B | 50.1 ns, 24 B |
+| The same on the graph | 39.5 ns, 24 B | 579.5 ns, 72 B |
+| Building and disposing of a filtered view of a thousand | 301 μs, 856 KB | 605 μs, 903 KB |
 
-Without code generation, the shortcut costs 3.6x to 3.8x what it does with a JIT, the graph 15.9x, and building a view 2.01x. Under Native AOT itself, an evaluation on the shortcut costs 38.4 ns and 24 B. So the shortcut matters more there: an expression on the graph costs 11.4x what one on the shortcut does, against 2.7x with a JIT. `DirectSubscriptionAnalyzer` tells you which one an expression gets.
+Without code generation, the shortcut costs 3.6x to 3.7x what it does with a JIT, the graph 14.7x, and building a view 2.01x. So the shortcut matters more there: an expression on the graph costs 11.6x what one on the shortcut does, against 3.0x with a JIT. `DirectSubscriptionAnalyzer` tells you which one an expression gets.
+
+With a JIT, an observation takes none of these paths. It allocates what it did in 7.0.4, and repeated evaluation, the measure the work for ahead-of-time compilation could have slowed, is within 2% of 7.0.4's time on x64 and on Apple Silicon.
 
 ---
 
