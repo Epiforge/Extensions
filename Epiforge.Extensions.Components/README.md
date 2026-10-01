@@ -46,7 +46,9 @@ To address this, this library offers the following extension methods which will 
 
 Use of these methods in .NET 7 or later will simply call the built-in methods, as they are now optimized.
 
-This library also offers `FastComparer` and `FastEqualityComparer`, which implement `IComparer` and `IEqualityComaprer`, respectively, but quickly use the methods of `Comparer<>.Default` and `EqualityComaprer<>.Default`, respectively, to do their work.
+This library also offers `FastComparer` and `FastEqualityComparer`, which implement `IComparer` and `IEqualityComparer`, respectively, but quickly use the methods of `Comparer<>.Default` and `EqualityComparer<>.Default`, respectively, to do their work.
+
+Where the runtime cannot generate code, as under Native AOT and on iOS, these methods, `FastComparer` and `FastEqualityComparer` invoke, construct and compare through reflection instead, with the same results, including comparisons which honor a type's own `IComparable<T>` or `IEquatable<T>` as the default comparers do; `GetImplementationEvents`, `GetImplementationMethods` and `GetImplementationProperties` are annotated as reflecting over members which trimming may remove.
 
 In addition (pun intended), this library offers `GenericAddition`, `GenericSubtraction`, `GenericMultiplication`, and `GenericDivision`, which will produce delegates that will perform the respective operations with values of supplied generic type arguments.
 

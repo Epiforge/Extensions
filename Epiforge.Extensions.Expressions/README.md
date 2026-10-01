@@ -339,3 +339,19 @@ Two more things worth knowing before you weigh any of the above.
 
 These comparisons were written by someone who uses none of the other three, which is a real limitation on them. The harness and the tests are in this repository, the workloads are ordinary ones, and corrections are welcome.
 
+# Ahead-of-Time Compilation
+Observable expressions and queries work where the runtime cannot generate code, as under Native AOT and on iOS. Both ways an expression gets observed work there, the shortcut and the graph, and they give the same values through the same events as they do with a JIT. This was checked under Native AOT on macOS on Apple Silicon and on Linux on x64, and in the iOS 26.5 simulator, where a .NET for iOS app is compiled ahead of time by Mono in Debug as well as in Release. Before 7.1.0, nearly every observation threw `PlatformNotSupportedException` in all of them. An app which turns on Mono's interpreter, as .NET MAUI does for Debug builds, can generate code by interpreting it, and it worked before 7.1.0 too.
+
+The package is marked as compatible with ahead-of-time compilation, so trimming and AOT analysis report nothing for it. Where it rebuilds a part of an expression you hand it, whatever that part needs from trimming or code generation, your own expression needed first.
+
+Without code generation, an observation costs more, because every lambda the observer compiles is interpreted and every member it reaches by reflection is invoked without a generated method. These figures come from the same benchmarks run with dynamic code turned off, which takes the paths an application compiled ahead of time takes while still running on the JIT, so they price the paths rather than any one compiler. Each change is above what the same changes cost with nothing observing them.
+
+| | With dynamic code | Without |
+|---|---|---|
+| An evaluation on the shortcut | 12.3 ns, 0 B | 97.0 ns, 232 B |
+| A property change in a filtered view of a thousand, on the shortcut | 13.7 ns, 0 B | 103.9 ns, 232 B |
+| The same on the graph | 36.4 ns, 24 B | 616.4 ns, 296 B |
+| Building and disposing of a filtered view of a thousand | 299 μs, 856 KB | 669 μs, 1,106 KB |
+
+Without code generation, the shortcut costs 7.6x to 7.9x what it does with a JIT, the graph 16.9x, and building a view 2.24x. So the shortcut matters more there: an expression on the graph costs 5.9x what one on the shortcut does, against 2.6x with a JIT. `DirectSubscriptionAnalyzer` tells you which one an expression gets.
+
