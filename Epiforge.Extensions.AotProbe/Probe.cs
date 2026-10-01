@@ -156,7 +156,7 @@ public static class Probe
         direct && observer.CachedObservableExpressions != 0 ? $"the fast path was not used ({observer.CachedObservableExpressions} graph nodes cached)" : null;
 
     /// <summary>
-    /// Runs every check and returns the report, beginning with what the runtime says about dynamic code
+    /// Runs every check and every timing and returns the report, beginning with what the runtime says about dynamic code
     /// </summary>
     public static IReadOnlyList<string> Run(string host)
     {
@@ -174,6 +174,14 @@ public static class Probe
         {
             CheckExpressions(lines, direct);
             CheckQueries(lines, direct);
+        }
+        try
+        {
+            ProbeTiming.Run(lines);
+        }
+        catch (Exception ex)
+        {
+            lines.Add($"timing failed: {Describe(ex)}");
         }
         var failed = lines.Count(line => line.StartsWith("FAIL ", StringComparison.Ordinal));
         var passed = lines.Count(line => line.StartsWith("PASS ", StringComparison.Ordinal));

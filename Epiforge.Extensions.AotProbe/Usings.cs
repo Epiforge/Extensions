@@ -3,6 +3,7 @@ global using Epiforge.Extensions.Collections.ObjectModel;
 global using Epiforge.Extensions.Components;
 global using Epiforge.Extensions.Expressions.Observable;
 global using Epiforge.Extensions.Expressions.Observable.Query;
+global using System.Diagnostics;
 global using System.Diagnostics.CodeAnalysis;
 global using System.Globalization;
 global using System.Linq.Expressions;

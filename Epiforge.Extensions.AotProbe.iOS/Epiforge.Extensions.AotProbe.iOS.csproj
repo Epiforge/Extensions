@@ -18,6 +18,7 @@
     <ItemGroup>
         <Compile Include="..\Epiforge.Extensions.AotProbe\Probe.cs" Link="Probe.cs" />
         <Compile Include="..\Epiforge.Extensions.AotProbe\ProbePerson.cs" Link="ProbePerson.cs" />
+        <Compile Include="..\Epiforge.Extensions.AotProbe\ProbeTiming.cs" Link="ProbeTiming.cs" />
         <Compile Include="..\Epiforge.Extensions.AotProbe\Usings.cs" Link="Usings.cs" />
     </ItemGroup>
 
