@@ -3,6 +3,7 @@ global using BenchmarkDotNet.Configs;
 global using BenchmarkDotNet.Filters;
 global using BenchmarkDotNet.Jobs;
 global using BenchmarkDotNet.Running;
+global using BenchmarkDotNet.Toolchains.NativeAot;
 global using Epiforge.Extensions.Collections.ObjectModel;
 global using Epiforge.Extensions.Components;
 global using Epiforge.Extensions.Expressions;

@@ -5,8 +5,14 @@ sealed class ObservableScalarTransformQuery<TResult, TTransform>(CollectionObser
 {
     static readonly ConcurrentDictionary<Expression<Func<TResult, TTransform>>, Func<TResult, TTransform>> compiledTransformCache = new(ExpressionEqualityComparer.Default);
 
-    static Func<TResult, TTransform> CompileTransform(Expression<Func<TResult, TTransform>> transform) =>
-        transform.Compile();
+    static Func<TResult, TTransform> CompileTransform(Expression<Func<TResult, TTransform>> transform)
+    {
+#if IS_NET_8_0_OR_GREATER
+        if (!RuntimeFeature.IsDynamicCodeSupported && ClosureCompiler.TryCompile(transform) is { } closures)
+            return value => (TTransform)closures.Invoke(value)!;
+#endif
+        return transform.Compile();
+    }
 
     Func<TResult, TTransform>? transformDelegate;
 
@@ -47,7 +53,7 @@ sealed class ObservableScalarTransformQuery<TResult, TTransform>(CollectionObser
 
     protected override void OnInitialization()
     {
-        transformDelegate = ExpressionKeyStability.IsStable(Transform) ? compiledTransformCache.GetOrAdd(Transform, CompileTransform) : Transform.Compile();
+        transformDelegate = ExpressionKeyStability.IsStable(Transform) ? compiledTransformCache.GetOrAdd(Transform, CompileTransform) : CompileTransform(Transform);
         using var changeHold = HoldChangesOf(sourceQuery);
         sourceQuery.PropertyChanged += SourceQueryPropertyChanged;
         sourceQuery.PropertyChanging += SourceQueryPropertyChanging;

@@ -193,6 +193,26 @@ class DirectObservableExpression<TArgument, TResult> :
     private protected readonly object?[] held;
     private protected readonly object?[] values;
 
+#if IS_NET_8_0_OR_GREATER
+    /// <summary>
+    /// Gets the groups of deferred operands the evaluation has reached, of which an observation which defers nothing has none
+    /// </summary>
+    private protected virtual bool[] EvaluationReached =>
+        noDeferredGroups;
+
+    /// <summary>
+    /// Gets the values the evaluation records for the observation to follow, of which an observation with no link has none
+    /// </summary>
+    private protected virtual object?[] EvaluationLinks =>
+        noLinks;
+
+    /// <summary>
+    /// Evaluates through closures, handing them the observation's values, reached groups, links and held slots as parameters rather than having them read from fields, which closures could only do through reflection
+    /// </summary>
+    internal static Func<TArgument, DirectObservableExpression<TArgument, TResult>, TResult> EvaluateThrough(ClosureLambda closures) =>
+        (argument, state) => (TResult)closures.Invoke(argument, state.values, state.EvaluationReached, state.EvaluationLinks, state.held)!;
+#endif
+
     /// <summary>
     /// Disposes of what every held slot the observer disposes of resolved to, which is once each because a held value is resolved once and never replaced
     /// </summary>
@@ -278,6 +298,14 @@ class DeferringDirectObservableExpression<TArgument, TResult> :
 
     long attachedGroups;
     readonly bool[] reached;
+
+#if IS_NET_8_0_OR_GREATER
+    private protected override bool[] EvaluationReached =>
+        reached;
+
+    private protected override object?[] EvaluationLinks =>
+        Links;
+#endif
 
     internal override bool CanChange =>
         true;

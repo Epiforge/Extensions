@@ -30,7 +30,12 @@ sealed class ObservableCoalesceExpression(ExpressionObserver observer, BinaryExp
     static UnaryOperationDelegate ConversionDelegatesFactory(LambdaExpression lambdaExpression)
     {
         var parameter = Expression.Parameter(typeof(object));
-        return Expression.Lambda<UnaryOperationDelegate>(BooleanBoxes.Convert(Expression.Invoke(lambdaExpression, Expression.Convert(parameter, lambdaExpression.Parameters[0].Type))), parameter).Compile();
+        var conversion = Expression.Lambda<UnaryOperationDelegate>(BooleanBoxes.Convert(Expression.Invoke(lambdaExpression, Expression.Convert(parameter, lambdaExpression.Parameters[0].Type))), parameter);
+#if IS_NET_8_0_OR_GREATER
+        if (!RuntimeFeature.IsDynamicCodeSupported && ClosureCompiler.TryCompile(conversion) is { } closures)
+            return closures.Invoke;
+#endif
+        return conversion.Compile();
     }
 
     UnaryOperationDelegate? conversionDelegate;

@@ -21,7 +21,12 @@ class ObservableBinaryExpression(ExpressionObserver observer, BinaryExpression b
         var leftConversion = Expression.Convert(leftParameter, key.LeftType);
         var rightConversion = Expression.Convert(rightParameter, key.RightType);
         var operation = key.Method is null ? Expression.MakeBinary(key.NodeType, leftConversion, rightConversion) : Expression.MakeBinary(key.NodeType, leftConversion, rightConversion, key.IsLiftedToNull, key.Method);
-        return Expression.Lambda<BinaryOperationDelegate>(BooleanBoxes.Convert(operation), leftParameter, rightParameter).Compile();
+        var lambda = Expression.Lambda<BinaryOperationDelegate>(BooleanBoxes.Convert(operation), leftParameter, rightParameter);
+#if IS_NET_8_0_OR_GREATER
+        if (!RuntimeFeature.IsDynamicCodeSupported && ClosureCompiler.TryCompile(lambda) is { } closures)
+            return closures.Invoke;
+#endif
+        return lambda.Compile();
     }
 
     BinaryOperationDelegate? @delegate;

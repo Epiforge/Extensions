@@ -344,14 +344,14 @@ Observable expressions and queries work where the runtime cannot generate code, 
 
 The package is marked as compatible with ahead-of-time compilation, so trimming and AOT analysis report nothing for it. Where it rebuilds a part of an expression you hand it, whatever that part needs from trimming or code generation, your own expression needed first.
 
-Without code generation, an observation costs more, because every lambda the observer compiles is interpreted and every member it reaches by reflection is invoked without a generated method. These figures come from the same benchmarks run with dynamic code turned off, which takes the paths an application compiled ahead of time takes while still running on the JIT, so they price the paths rather than any one compiler. Each change is above what the same changes cost with nothing observing them.
+Without code generation, an observation costs more, because the observer evaluates the expressions it would otherwise compile, reaching each property by reflection and each method without a generated method, and interprets any it cannot evaluate that way. These figures come from the same benchmarks run with dynamic code turned off, which takes the paths an application compiled ahead of time takes while still running on the JIT, so they price the paths rather than any one compiler. Each change is above what the same changes cost with nothing observing them.
 
 | | With dynamic code | Without |
 |---|---|---|
-| An evaluation on the shortcut | 12.3 ns, 0 B | 97.0 ns, 232 B |
-| A property change in a filtered view of a thousand, on the shortcut | 13.7 ns, 0 B | 103.9 ns, 232 B |
-| The same on the graph | 36.4 ns, 24 B | 616.4 ns, 296 B |
-| Building and disposing of a filtered view of a thousand | 299 μs, 856 KB | 669 μs, 1,106 KB |
+| An evaluation on the shortcut | 12.5 ns, 0 B | 44.4 ns, 24 B |
+| A property change in a filtered view of a thousand, on the shortcut | 13.2 ns, 0 B | 49.8 ns, 24 B |
+| The same on the graph | 35.7 ns, 24 B | 569.1 ns, 72 B |
+| Building and disposing of a filtered view of a thousand | 290 μs, 856 KB | 583 μs, 903 KB |
 
-Without code generation, the shortcut costs 7.6x to 7.9x what it does with a JIT, the graph 16.9x, and building a view 2.24x. So the shortcut matters more there: an expression on the graph costs 5.9x what one on the shortcut does, against 2.6x with a JIT. `DirectSubscriptionAnalyzer` tells you which one an expression gets.
+Without code generation, the shortcut costs 3.6x to 3.8x what it does with a JIT, the graph 15.9x, and building a view 2.01x. Under Native AOT itself, an evaluation on the shortcut costs 38.4 ns and 24 B. So the shortcut matters more there: an expression on the graph costs 11.4x what one on the shortcut does, against 2.7x with a JIT. `DirectSubscriptionAnalyzer` tells you which one an expression gets.
 

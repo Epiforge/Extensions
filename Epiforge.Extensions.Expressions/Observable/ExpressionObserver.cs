@@ -955,12 +955,23 @@ public class ExpressionObserver :
             var sites = new DirectSubscriptionSite[subscriptions.Count];
             for (var i = 0; i < sites.Length; ++i)
                 sites[i] = Site(subscriptions[i], observed, fixedSubexpressions, plan.Links);
-            var state = Expression.Parameter(typeof(DirectObservableExpression<TArgument, TResult>), "state");
-            var bound = DirectObservableExpression<TArgument, TResult>.BindState(body, state, values, reached, links, held, plan.DeferredGroups.Count > 0 || plan.Links.Count > 0, plan.Links.Count > 0);
-            evaluator = new DirectEvaluator(lambdaExpression, Expression.Lambda<Func<TArgument, DirectObservableExpression<TArgument, TResult>, TResult>>(bound, observed.Parameters[0], state).Compile(), [.. fixedSubexpressions], sites, plan.DeferredGroups.Count, plan.Links.Count, plan.Held);
+            evaluator = new DirectEvaluator(lambdaExpression, CompileEvaluation<TArgument, TResult>(body, observed.Parameters[0], values, reached, links, held, plan.DeferredGroups.Count > 0 || plan.Links.Count > 0, plan.Links.Count > 0), [.. fixedSubexpressions], sites, plan.DeferredGroups.Count, plan.Links.Count, plan.Held);
         }
         compiled.AddOrUpdate(lambdaExpression, evaluator);
         return evaluator;
+    }
+
+    /// <summary>
+    /// Compiles the evaluation of a direct observation: into closures which take the observation's state as parameters where the runtime cannot generate code and would otherwise interpret it, and otherwise into a delegate of two parameters which reads that state from the observation
+    /// </summary>
+    static Func<TArgument, DirectObservableExpression<TArgument, TResult>, TResult> CompileEvaluation<TArgument, TResult>(Expression body, ParameterExpression argument, ParameterExpression values, ParameterExpression reached, ParameterExpression links, ParameterExpression held, bool defers, bool follows)
+    {
+#if IS_NET_8_0_OR_GREATER
+        if (!RuntimeFeature.IsDynamicCodeSupported && ClosureCompiler.TryCompile(body, [argument, values, reached, links, held]) is { } closures)
+            return DirectObservableExpression<TArgument, TResult>.EvaluateThrough(closures);
+#endif
+        var state = Expression.Parameter(typeof(DirectObservableExpression<TArgument, TResult>), "state");
+        return Expression.Lambda<Func<TArgument, DirectObservableExpression<TArgument, TResult>, TResult>>(DirectObservableExpression<TArgument, TResult>.BindState(body, state, values, reached, links, held, defers, follows), argument, state).Compile();
     }
 
     static DirectSubscriptionSite Site(DirectSubscription subscription, LambdaExpression lambdaExpression, List<Expression> fixedSubexpressions, IReadOnlyList<Expression> links)

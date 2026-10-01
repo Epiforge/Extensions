@@ -15,7 +15,12 @@ sealed class ObservableTypeBinaryExpression(ExpressionObserver observer, TypeBin
     static TypeIsDelegate CreateDelegate(Type type)
     {
         var parameter = Expression.Parameter(typeof(object));
-        return Expression.Lambda<TypeIsDelegate>(BooleanBoxes.Convert(Expression.TypeIs(parameter, type)), parameter).Compile();
+        var lambda = Expression.Lambda<TypeIsDelegate>(BooleanBoxes.Convert(Expression.TypeIs(parameter, type)), parameter);
+#if IS_NET_8_0_OR_GREATER
+        if (!RuntimeFeature.IsDynamicCodeSupported && ClosureCompiler.TryCompile(lambda) is { } closures)
+            return closures.Invoke;
+#endif
+        return lambda.Compile();
     }
 
     TypeIsDelegate? @delegate;
