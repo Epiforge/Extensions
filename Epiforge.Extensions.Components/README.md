@@ -44,7 +44,7 @@ To address this, this library offers the following extension methods which will 
 * `Type.GetImplementationMethods`: searches for the methods of a type, including interfaces and interface inheritance
 * `Type.GetImplementationProperties`: searches for the properties of a type, including interfaces and interface inheritance
 
-Use of these methods in .NET 7 or later will simply call the built-in methods, as they are now optimized.
+`FastGetValue` and `FastSetValue` simply call the built-in methods, which are optimized from .NET 7 on.
 
 This library also offers `FastComparer` and `FastEqualityComparer`, which implement `IComparer` and `IEqualityComparer`, respectively, but quickly use the methods of `Comparer<>.Default` and `EqualityComparer<>.Default`, respectively, to do their work.
 

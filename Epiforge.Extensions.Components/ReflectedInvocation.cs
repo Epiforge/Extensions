@@ -4,12 +4,18 @@ namespace Epiforge.Extensions.Components;
 /// Invokes a constructor or a method through reflection without wrapping what it throws, which is how the invokers work where the runtime cannot generate code
 /// </summary>
 /// <remarks>
-/// An argument of <see langword="null"/> for a parameter of a value type is passed as that type's default value here, where the generated invokers throw a <see cref="NullReferenceException"/>; an argument of the wrong type throws an <see cref="ArgumentException"/> here and an <see cref="InvalidCastException"/> there
+/// The instance and the arguments are cast first as the generated invokers cast them, so that what one refuses the other refuses with the same exception, and what one converts, such as an enumeration value for a parameter of its underlying type, the other converts; an instance method refuses a <see langword="null"/> instance with a <see cref="NullReferenceException"/>, as calling it does
 /// </remarks>
 sealed class ReflectedInvocation
 {
     internal ReflectedInvocation(MethodBase member)
     {
+        if (member is MethodInfo { IsStatic: false, DeclaringType: { } declaringType })
+            instanceCast = new(declaringType);
+        var parameters = member.GetParameters();
+        argumentCasts = new ObjectCast[parameters.Length];
+        for (var i = 0; i < parameters.Length; ++i)
+            argumentCasts[i] = new(parameters[i].ParameterType);
 #if IS_NET_8_0_OR_GREATER
         if (member is ConstructorInfo constructor)
             constructorInvoker = ConstructorInvoker.Create(constructor);
@@ -20,6 +26,8 @@ sealed class ReflectedInvocation
 #endif
     }
 
+    readonly ObjectCast[] argumentCasts;
+    readonly ObjectCast? instanceCast;
 #if IS_NET_8_0_OR_GREATER
     readonly ConstructorInvoker? constructorInvoker;
     readonly MethodInvoker? methodInvoker;
@@ -40,34 +48,61 @@ sealed class ReflectedInvocation
         return null;
     }
 
-    internal object Construct(object?[] arguments) =>
-        Invoke(null, arguments)!;
+    object? CastInstance(object? instance) =>
+        instanceCast is { } cast ? cast.Apply(instance ?? throw new NullReferenceException()) : null;
 
-    internal object? Invoke(object? instance, object?[] arguments) =>
+    internal object? Invoke(object? instance, object?[] arguments)
+    {
+        instance = CastInstance(instance);
+        var castArguments = arguments;
+        for (var i = 0; i < argumentCasts.Length; ++i)
+        {
+            var argument = arguments[i];
+            var castArgument = argumentCasts[i].Apply(argument);
+            if (!ReferenceEquals(castArgument, argument))
+            {
+                if (ReferenceEquals(castArguments, arguments))
+                    castArguments = (object?[])arguments.Clone();
+                castArguments[i] = castArgument;
+            }
+        }
 #if IS_NET_8_0_OR_GREATER
-        constructorInvoker is { } constructor ? constructor.Invoke(arguments) : methodInvoker!.Invoke(instance, arguments);
+        return constructorInvoker is { } constructor ? constructor.Invoke(castArguments) : methodInvoker!.Invoke(instance, castArguments);
 #else
-        member is ConstructorInfo constructor ? constructor.Invoke(BindingFlags.DoNotWrapExceptions, null, arguments, null) : member.Invoke(instance, BindingFlags.DoNotWrapExceptions, null, arguments, null);
+        return member is ConstructorInfo constructor ? constructor.Invoke(BindingFlags.DoNotWrapExceptions, null, castArguments, null) : member.Invoke(instance, BindingFlags.DoNotWrapExceptions, null, castArguments, null);
 #endif
+    }
 
-    internal object? InvokeWithNoArgument(object? instance) =>
+    internal object? InvokeWithNoArgument(object? instance)
+    {
 #if IS_NET_8_0_OR_GREATER
-        constructorInvoker is { } constructor ? constructor.Invoke() : methodInvoker!.Invoke(instance);
+        instance = CastInstance(instance);
+        return constructorInvoker is { } constructor ? constructor.Invoke() : methodInvoker!.Invoke(instance);
 #else
-        Invoke(instance, []);
+        return Invoke(instance, []);
 #endif
+    }
 
-    internal object? InvokeWithOneArgument(object? instance, object? argument0) =>
+    internal object? InvokeWithOneArgument(object? instance, object? argument0)
+    {
 #if IS_NET_8_0_OR_GREATER
-        constructorInvoker is { } constructor ? constructor.Invoke(argument0) : methodInvoker!.Invoke(instance, argument0);
+        instance = CastInstance(instance);
+        argument0 = argumentCasts[0].Apply(argument0);
+        return constructorInvoker is { } constructor ? constructor.Invoke(argument0) : methodInvoker!.Invoke(instance, argument0);
 #else
-        Invoke(instance, [argument0]);
+        return Invoke(instance, [argument0]);
 #endif
+    }
 
-    internal object? InvokeWithTwoArguments(object? instance, object? argument0, object? argument1) =>
+    internal object? InvokeWithTwoArguments(object? instance, object? argument0, object? argument1)
+    {
 #if IS_NET_8_0_OR_GREATER
-        constructorInvoker is { } constructor ? constructor.Invoke(argument0, argument1) : methodInvoker!.Invoke(instance, argument0, argument1);
+        instance = CastInstance(instance);
+        argument0 = argumentCasts[0].Apply(argument0);
+        argument1 = argumentCasts[1].Apply(argument1);
+        return constructorInvoker is { } constructor ? constructor.Invoke(argument0, argument1) : methodInvoker!.Invoke(instance, argument0, argument1);
 #else
-        Invoke(instance, [argument0, argument1]);
+        return Invoke(instance, [argument0, argument1]);
 #endif
+    }
 }

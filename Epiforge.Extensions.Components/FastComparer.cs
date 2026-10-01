@@ -7,15 +7,20 @@ public class FastComparer :
     IComparer
 {
     /// <summary>
-    /// Compares as <see cref="Comparer{T}.Default"/> would, through reflection, where the runtime cannot generate code: <see langword="null"/> first, then the type's own <see cref="IComparable{T}"/> where it implements one, otherwise <see cref="IComparable"/>
+    /// Compares as <see cref="Comparer{T}.Default"/> would, through reflection, where the runtime cannot generate code: each value cast to the type as the generated comparer casts it, then <see langword="null"/> first, then the type's own <see cref="IComparable{T}"/> where it implements one, otherwise <see cref="IComparable"/>
     /// </summary>
     sealed class ReflectedComparer(Type type) :
         TypedComparer
     {
+        readonly ObjectCast cast = new(type);
         readonly ReflectedInvocation? compareTo = ReflectedInvocation.OfOwnGenericInterface(Nullable.GetUnderlyingType(type) ?? type, typeof(IComparable<>), nameof(IComparable<object>.CompareTo));
 
-        internal override int Compare(object? x, object? y) =>
-            x is null ? y is null ? 0 : -1 : y is null ? 1 : compareTo is { } invocation ? (int)invocation.InvokeWithOneArgument(x, y)! : Comparer.Default.Compare(x, y);
+        internal override int Compare(object? x, object? y)
+        {
+            x = cast.Apply(x);
+            y = cast.Apply(y);
+            return x is null ? y is null ? 0 : -1 : y is null ? 1 : compareTo is { } invocation ? (int)invocation.InvokeWithOneArgument(x, y)! : Comparer.Default.Compare(x, y);
+        }
     }
 
     abstract class TypedComparer

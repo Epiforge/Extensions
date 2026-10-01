@@ -58,82 +58,6 @@ public static class ReflectionExtensions
     static MethodInfo GetDefaultValueByTypeValueFactory(Type type) =>
         typeof(ReflectionExtensions).GetMethod(nameof(GetDefaultValue), BindingFlags.NonPublic | BindingFlags.Static)!.MakeGenericMethod(type);
 
-    delegate object InvokeConstructorDelegate(object?[] arguments);
-    delegate object? InvokeMethodDelegate(object? instance, object?[] arguments);
-
-    static readonly ConcurrentDictionary<ConstructorInfo, InvokeConstructorDelegate> invokeConstructorDelegateByConstructor = new();
-    static readonly ConcurrentDictionary<MethodInfo, InvokeMethodDelegate> invokeMethodDelegateByMethod = new();
-
-    [UnconditionalSuppressMessage("AOT", "IL3050", Justification = "The code which needs dynamic code runs only where RuntimeFeature.IsDynamicCodeSupported is true, which the analyzer recognizes as a guard from .NET 9 on")]
-    static InvokeConstructorDelegate InvokeConstructorDelegateByConstructorValueFactory(ConstructorInfo constructor)
-    {
-        if (constructor.DeclaringType is not { } declaringType)
-            throw new ArgumentException("Cannot handle constructors without declaring types");
-        if (RuntimeFeature.IsDynamicCodeSupported)
-            return EmitConstructorInvocation(constructor, declaringType);
-        return new ReflectedInvocation(constructor).Construct;
-    }
-
-    [RequiresDynamicCode("Generates a method which invokes the constructor")]
-    static InvokeConstructorDelegate EmitConstructorInvocation(ConstructorInfo constructor, Type declaringType)
-    {
-        var dynamicMethod = new DynamicMethod($"CreateInstance_{declaringType.Name}", typeof(object), [typeof(object[])]);
-        var ilGenerator = dynamicMethod.GetILGenerator();
-        var parameters = constructor.GetParameters();
-        for (var i = 0; i < parameters.Length; i++)
-        {
-            ilGenerator.Emit(OpCodes.Ldarg_0);
-            ilGenerator.Emit(OpCodes.Ldc_I4, i);
-            ilGenerator.Emit(OpCodes.Ldelem_Ref);
-            var parameterType = parameters[i].ParameterType;
-            ilGenerator.Emit(parameterType.IsValueType ? OpCodes.Unbox_Any : OpCodes.Castclass, parameterType);
-        }
-        ilGenerator.Emit(OpCodes.Newobj, constructor);
-        if (declaringType.IsValueType)
-            ilGenerator.Emit(OpCodes.Box, declaringType);
-        ilGenerator.Emit(OpCodes.Ret);
-        return (InvokeConstructorDelegate)dynamicMethod.CreateDelegate(typeof(InvokeConstructorDelegate));
-    }
-
-    [UnconditionalSuppressMessage("AOT", "IL3050", Justification = "The code which needs dynamic code runs only where RuntimeFeature.IsDynamicCodeSupported is true, which the analyzer recognizes as a guard from .NET 9 on")]
-    static InvokeMethodDelegate InvokeMethodDelegateByMethodValueFactory(MethodInfo method)
-    {
-        if (method.DeclaringType is not { } declaringType)
-            throw new ArgumentException("Cannot handle methods without declaring types");
-        if (RuntimeFeature.IsDynamicCodeSupported)
-            return EmitMethodInvocation(method, declaringType);
-        return new ReflectedInvocation(method).Invoke;
-    }
-
-    [RequiresDynamicCode("Generates a method which invokes the method")]
-    static InvokeMethodDelegate EmitMethodInvocation(MethodInfo method, Type declaringType)
-    {
-        var dynamicMethod = new DynamicMethod($"Invoke_{method.Name}", typeof(object), [typeof(object), typeof(object[])]);
-        var ilGenerator = dynamicMethod.GetILGenerator();
-        if (!method.IsStatic)
-        {
-            ilGenerator.Emit(OpCodes.Ldarg_0);
-            ilGenerator.Emit(declaringType.IsValueType ? OpCodes.Unbox : OpCodes.Castclass, declaringType);
-        }
-        var parameters = method.GetParameters();
-        for (var i = 0; i < parameters.Length; i++)
-        {
-            ilGenerator.Emit(OpCodes.Ldarg_1);
-            ilGenerator.Emit(OpCodes.Ldc_I4, i);
-            ilGenerator.Emit(OpCodes.Ldelem_Ref);
-            var parameterType = parameters[i].ParameterType;
-            ilGenerator.Emit(parameterType.IsValueType ? OpCodes.Unbox_Any : OpCodes.Castclass, parameterType);
-        }
-        ilGenerator.Emit(method.IsStatic || declaringType.IsValueType ? OpCodes.Call : OpCodes.Callvirt, method);
-        var returnType = method.ReturnType;
-        if (returnType == typeof(void))
-            ilGenerator.Emit(OpCodes.Ldnull);
-        else if (returnType.IsValueType)
-            ilGenerator.Emit(OpCodes.Box, method.ReturnType);
-        ilGenerator.Emit(OpCodes.Ret);
-        return (InvokeMethodDelegate)dynamicMethod.CreateDelegate(typeof(InvokeMethodDelegate));
-    }
-
     /// <summary>
     /// Returns the default value for the specified type as quickly as possible
     /// </summary>
@@ -145,6 +69,8 @@ public static class ReflectionExtensions
         ArgumentNullException.ThrowIfNull(type);
         if (!type.IsValueType)
             return null;
+        if (type == typeof(void) || type.IsByRefLike || type.ContainsGenericParameters)
+            throw new ArgumentException($"{type} has no default value which can be boxed", nameof(type));
         if (RuntimeFeature.IsDynamicCodeSupported)
             return getDefaultValueByType.GetOrAdd(type, GetDefaultValueByTypeValueFactory).FastInvoke(null);
         return Nullable.GetUnderlyingType(type) is null ? RuntimeHelpers.GetUninitializedObject(type) : null;
@@ -160,13 +86,7 @@ public static class ReflectionExtensions
     public static object? FastGetValue(this PropertyInfo property, object? instance, params object?[] index)
     {
         ArgumentNullException.ThrowIfNull(property);
-#if IS_NET_7_0_OR_GREATER
         return property.GetValue(instance, BindingFlags.DoNotWrapExceptions, null, index, null);
-#else
-        if (property.GetMethod is not { } getMethod)
-            throw new ArgumentException("Cannot handle properties without getters");
-        return FastInvoke(getMethod, instance, index);
-#endif
     }
 
     /// <summary>
@@ -178,7 +98,7 @@ public static class ReflectionExtensions
     public static object? FastInvoke(this ConstructorInfo constructor, params object?[] arguments)
     {
         ArgumentNullException.ThrowIfNull(constructor);
-        return invokeConstructorDelegateByConstructor.GetOrAdd(constructor, InvokeConstructorDelegateByConstructorValueFactory)(arguments);
+        return FastInvoker.Of(constructor).Invoke(null, arguments ?? []);
     }
 
     /// <summary>
@@ -191,7 +111,7 @@ public static class ReflectionExtensions
     public static object? FastInvoke(this MethodInfo method, object? instance, params object?[] arguments)
     {
         ArgumentNullException.ThrowIfNull(method);
-        return invokeMethodDelegateByMethod.GetOrAdd(method, InvokeMethodDelegateByMethodValueFactory)(instance, arguments);
+        return FastInvoker.Of(method).Invoke(instance, arguments ?? []);
     }
 
     /// <summary>
@@ -225,13 +145,7 @@ public static class ReflectionExtensions
     public static void FastSetValue(this PropertyInfo property, object? instance, object? value, params object?[] index)
     {
         ArgumentNullException.ThrowIfNull(property);
-#if IS_NET_7_0_OR_GREATER
         property.SetValue(instance, value, BindingFlags.DoNotWrapExceptions, null, index, null);
-#else
-        if (property.SetMethod is not { } setMethod)
-            throw new ArgumentException("Cannot handle properties without setters");
-        FastInvoke(setMethod, instance, [..index, ..new object?[] { value }]);
-#endif
     }
 
     /// <summary>

@@ -7,7 +7,7 @@ public class FastEqualityComparer :
     IEqualityComparer
 {
     /// <summary>
-    /// Compares values of a type which arrive already boxed without unboxing them, which the default comparer for a value type that does not implement <see cref="IEquatable{T}"/> cannot do without boxing one of them again to reach the same comparison
+    /// Compares values of a type which arrive already boxed without unboxing them, which the default comparer for a value type that does not implement <see cref="IEquatable{T}"/> cannot do without boxing one of them again to reach the same comparison; <see langword="null"/>, which is how a nullable value type without a value arrives, equals only itself and hashes to zero
     /// </summary>
     sealed class BoxedComparer :
         TypedComparer
@@ -16,22 +16,26 @@ public class FastEqualityComparer :
             x is null ? y is null : x.Equals(y);
 
         internal override int HashCodeOf(object obj) =>
-            obj.GetHashCode();
+            obj?.GetHashCode() ?? 0;
     }
 
     /// <summary>
-    /// Compares as <see cref="EqualityComparer{T}.Default"/> would, through reflection, where the runtime cannot generate code: the type's own <see cref="IEquatable{T}"/> where it implements one, otherwise <see cref="object.Equals(object?)"/>
+    /// Compares as <see cref="EqualityComparer{T}.Default"/> would, through reflection, where the runtime cannot generate code: each value cast to the type as the generated comparer casts it, then the type's own <see cref="IEquatable{T}"/> where it implements one, otherwise <see cref="object.Equals(object?)"/>
     /// </summary>
-    sealed class ReflectedComparer(Type type) :
+    sealed class ReflectedComparer(Type type, ReflectedInvocation? equals) :
         TypedComparer
     {
-        readonly ReflectedInvocation? equals = ReflectedInvocation.OfOwnGenericInterface(Nullable.GetUnderlyingType(type) ?? type, typeof(IEquatable<>), nameof(IEquatable<object>.Equals));
+        readonly ObjectCast cast = new(type);
 
-        internal override bool AreEqual(object? x, object? y) =>
-            x is null ? y is null : y is not null && (equals is { } invocation ? (bool)invocation.InvokeWithOneArgument(x, y)! : x.Equals(y));
+        internal override bool AreEqual(object? x, object? y)
+        {
+            x = cast.Apply(x);
+            y = cast.Apply(y);
+            return x is null ? y is null : y is not null && (equals is { } invocation ? (bool)invocation.InvokeWithOneArgument(x, y)! : x.Equals(y));
+        }
 
         internal override int HashCodeOf(object obj) =>
-            obj.GetHashCode();
+            cast.Apply(obj)?.GetHashCode() ?? 0;
     }
 
     abstract class TypedComparer
@@ -78,10 +82,16 @@ public class FastEqualityComparer :
         if (RuntimeFeature.IsDynamicCodeSupported)
             typedComparer = Typed(type);
         else
-            typedComparer = new ReflectedComparer(type);
+            typedComparer = Reflected(type);
     }
 
     readonly TypedComparer typedComparer;
+
+    static TypedComparer Reflected(Type type)
+    {
+        var equals = ReflectedInvocation.OfOwnGenericInterface(type, typeof(IEquatable<>), nameof(IEquatable<object>.Equals));
+        return type.IsValueType && equals is null ? new BoxedComparer() : new ReflectedComparer(type, equals);
+    }
 
     [RequiresDynamicCode("Constructs a comparer for the type")]
     static TypedComparer Typed(Type type) =>

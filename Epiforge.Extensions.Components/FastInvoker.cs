@@ -19,6 +19,9 @@ public sealed class FastInvoker
     static readonly ConcurrentDictionary<ConstructorInfo, FastInvoker> invokersByConstructor = new();
     static readonly ConcurrentDictionary<MethodInfo, FastInvoker> invokersByMethod = new();
 
+    static bool CannotBeAnObject(Type type) =>
+        type.IsByRef || type.IsPointer || type.IsByRefLike;
+
     static FastInvoker InvokersByConstructorValueFactory(ConstructorInfo constructor) =>
         new(constructor, constructor.DeclaringType ?? throw new ArgumentException("Cannot handle constructors without declaring types", nameof(constructor)));
 
@@ -31,12 +34,38 @@ public sealed class FastInvoker
     internal static FastInvoker Of(MethodInfo method) =>
         invokersByMethod.GetOrAdd(method, InvokersByMethodValueFactory);
 
+    /// <summary>
+    /// Gets what invoking the member throws when no invoker can invoke it through objects, which is the same whether or not the runtime can generate code
+    /// </summary>
+    static Func<Exception>? RefusalOf(MethodBase member, Type declaringType, ParameterInfo[] parameters)
+    {
+        if (member.ContainsGenericParameters)
+            return static () => new InvalidOperationException("Late bound operations cannot be performed on types or methods for which ContainsGenericParameters is true.");
+        if (member is ConstructorInfo && declaringType.IsAbstract)
+            return static () => new InvalidOperationException("Instances of abstract classes cannot be created.");
+        if ((member is MethodInfo method && CannotBeAnObject(method.ReturnType)) || Array.Exists(parameters, parameter => CannotBeAnObject(parameter.ParameterType)))
+            return () => new NotSupportedException($"{member} takes or returns a reference, a pointer or a by-reference-like value, which cannot be passed or returned as an object");
+        return null;
+    }
+
     [UnconditionalSuppressMessage("AOT", "IL3050", Justification = "The code which needs dynamic code runs only where RuntimeFeature.IsDynamicCodeSupported is true, which the analyzer recognizes as a guard from .NET 9 on")]
     FastInvoker(MethodBase member, Type declaringType)
     {
         var parameters = member.GetParameters();
         ParameterCount = parameters.Length;
         var packed = ParameterCount > 2;
+        if (RefusalOf(member, declaringType, parameters) is { } refusal)
+        {
+            if (packed)
+                withArguments = (_, _) => throw refusal();
+            else if (ParameterCount == 0)
+                withNoArgument = _ => throw refusal();
+            else if (ParameterCount == 1)
+                withOneArgument = (_, _) => throw refusal();
+            else
+                withTwoArguments = (_, _, _) => throw refusal();
+            return;
+        }
         if (!RuntimeFeature.IsDynamicCodeSupported)
         {
             var reflected = new ReflectedInvocation(member);
