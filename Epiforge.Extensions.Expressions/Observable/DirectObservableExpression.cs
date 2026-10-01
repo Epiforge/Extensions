@@ -172,7 +172,7 @@ class DirectObservableExpression<TArgument, TResult> :
     /// <remarks>
     /// Everything belonging to the lambda rather than to this observation of it is reached through the evaluator, which every observation of that lambda shares, so that an observation carries a reference to it instead of one to each. What remains here is what differs between two observations of one lambda: the argument, the values resolved for it, and the slots its held subexpressions resolve into
     /// </remarks>
-    internal DirectObservableExpression(ExpressionObserver observer, DirectEvaluator evaluator, Func<TArgument, DirectObservableExpression<TArgument, TResult>, TResult> evaluate, TArgument argument, object?[] values, object?[] held) :
+    internal DirectObservableExpression(ExpressionObserver observer, DirectEvaluator evaluator, Func<TArgument, object?[], bool[], object?[], object?[], TResult> evaluate, TArgument argument, object?[] values, object?[] held) :
         base(observer, evaluator.LambdaExpression.Body.Type)
     {
         this.argument = argument;
@@ -183,35 +183,12 @@ class DirectObservableExpression<TArgument, TResult> :
         this.values = values;
     }
 
-    static readonly FieldInfo heldField = typeof(DirectObservableExpression<TArgument, TResult>).GetField(nameof(held), BindingFlags.Instance | BindingFlags.NonPublic)!;
-    static readonly FieldInfo valuesField = typeof(DirectObservableExpression<TArgument, TResult>).GetField(nameof(values), BindingFlags.Instance | BindingFlags.NonPublic)!;
-
     private protected readonly TArgument argument;
     readonly bool comparesBeforeBoxing;
-    private protected readonly Func<TArgument, DirectObservableExpression<TArgument, TResult>, TResult> evaluate;
+    private protected readonly Func<TArgument, object?[], bool[], object?[], object?[], TResult> evaluate;
     private protected readonly DirectEvaluator evaluator;
     private protected readonly object?[] held;
     private protected readonly object?[] values;
-
-#if IS_NET_8_0_OR_GREATER
-    /// <summary>
-    /// Gets the groups of deferred operands the evaluation has reached, of which an observation which defers nothing has none
-    /// </summary>
-    private protected virtual bool[] EvaluationReached =>
-        noDeferredGroups;
-
-    /// <summary>
-    /// Gets the values the evaluation records for the observation to follow, of which an observation with no link has none
-    /// </summary>
-    private protected virtual object?[] EvaluationLinks =>
-        noLinks;
-
-    /// <summary>
-    /// Evaluates through closures, handing them the observation's values, reached groups, links and held slots as parameters rather than having them read from fields, which closures could only do through reflection
-    /// </summary>
-    internal static Func<TArgument, DirectObservableExpression<TArgument, TResult>, TResult> EvaluateThrough(ClosureLambda closures) =>
-        (argument, state) => (TResult)closures.Invoke(argument, state.values, state.EvaluationReached, state.EvaluationLinks, state.held)!;
-#endif
 
     /// <summary>
     /// Disposes of what every held slot the observer disposes of resolved to, which is once each because a held value is resolved once and never replaced
@@ -228,17 +205,6 @@ class DirectObservableExpression<TArgument, TResult> :
     private protected override Expression Materialize() =>
         ExpressionObserver.ReplaceParametersWithoutOptimization(evaluator.LambdaExpression, argument)!;
 
-    /// <summary>
-    /// Wraps the body of a compiled evaluation so that it reads the values, the reached groups, the links and the held slots from the observation it is given rather than from parameters of its own, which keeps the compiled delegate to two parameters; a runtime without dynamic code can make a delegate of at most two parameters from an interpreted lambda without emitting a thunk
-    /// </summary>
-    internal static Expression BindState(Expression body, ParameterExpression state, ParameterExpression values, ParameterExpression reached, ParameterExpression links, ParameterExpression held, bool defers, bool follows) =>
-        Expression.Block(body.Type, [values, reached, links, held],
-            Expression.Assign(values, Expression.Field(state, valuesField)),
-            Expression.Assign(reached, defers ? Expression.Field(Expression.Convert(state, typeof(DeferringDirectObservableExpression<TArgument, TResult>)), DeferringDirectObservableExpression<TArgument, TResult>.ReachedField) : Expression.Constant(noDeferredGroups)),
-            Expression.Assign(links, follows ? Expression.Field(Expression.Convert(state, typeof(LinkingDirectObservableExpression<TArgument, TResult>)), LinkingDirectObservableExpression<TArgument, TResult>.LinksField) : Expression.Constant(noLinks)),
-            Expression.Assign(held, Expression.Field(state, heldField)),
-            body);
-
     private protected static object? Box(TResult value) =>
         sharesBooleanBoxes ? BooleanBoxes.Box(EqualityComparer<TResult>.Default.Equals(value, trueResult)) : value;
 
@@ -246,7 +212,7 @@ class DirectObservableExpression<TArgument, TResult> :
     {
         try
         {
-            var value = evaluate(argument, this);
+            var value = evaluate(argument, values, noDeferredGroups, noLinks, held);
             if (!IsCurrentResult(value))
                 Evaluation = (null, Box(value));
             observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{Expression} evaluated directly: {Value}", Expression, value);
@@ -290,22 +256,12 @@ class DirectObservableExpression<TArgument, TResult> :
 class DeferringDirectObservableExpression<TArgument, TResult> :
     DirectObservableExpression<TArgument, TResult>
 {
-    internal DeferringDirectObservableExpression(ExpressionObserver observer, DirectEvaluator evaluator, Func<TArgument, DirectObservableExpression<TArgument, TResult>, TResult> evaluate, TArgument argument, object?[] values, object?[] held, bool[] reached) :
+    internal DeferringDirectObservableExpression(ExpressionObserver observer, DirectEvaluator evaluator, Func<TArgument, object?[], bool[], object?[], object?[], TResult> evaluate, TArgument argument, object?[] values, object?[] held, bool[] reached) :
         base(observer, evaluator, evaluate, argument, values, held) =>
         this.reached = reached;
 
-    internal static readonly FieldInfo ReachedField = typeof(DeferringDirectObservableExpression<TArgument, TResult>).GetField(nameof(reached), BindingFlags.Instance | BindingFlags.NonPublic)!;
-
     long attachedGroups;
     readonly bool[] reached;
-
-#if IS_NET_8_0_OR_GREATER
-    private protected override bool[] EvaluationReached =>
-        reached;
-
-    private protected override object?[] EvaluationLinks =>
-        Links;
-#endif
 
     internal override bool CanChange =>
         true;
@@ -352,7 +308,7 @@ class DeferringDirectObservableExpression<TArgument, TResult> :
         {
             try
             {
-                var value = evaluate(argument, this);
+                var value = evaluate(argument, values, reached, Links, held);
                 var again = AttachNewlyReached();
                 if (!moved && AttachChangedLinks())
                     again = moved = true;
@@ -387,15 +343,13 @@ class DeferringDirectObservableExpression<TArgument, TResult> :
 sealed class LinkingDirectObservableExpression<TArgument, TResult> :
     DeferringDirectObservableExpression<TArgument, TResult>
 {
-    internal LinkingDirectObservableExpression(ExpressionObserver observer, DirectEvaluator evaluator, Func<TArgument, DirectObservableExpression<TArgument, TResult>, TResult> evaluate, TArgument argument, object?[] values, object?[] held, bool[] reached, object?[] links) :
+    internal LinkingDirectObservableExpression(ExpressionObserver observer, DirectEvaluator evaluator, Func<TArgument, object?[], bool[], object?[], object?[], TResult> evaluate, TArgument argument, object?[] values, object?[] held, bool[] reached, object?[] links) :
         base(observer, evaluator, evaluate, argument, values, held, reached)
     {
         attachedLinks = links.Length == 0 ? links : new object?[links.Length];
         linkAttachments = evaluator.LinkSites.Length == 0 ? [] : new DirectSubscriptionAttachment?[evaluator.LinkSites.Length];
         this.links = links;
     }
-
-    internal static readonly FieldInfo LinksField = typeof(LinkingDirectObservableExpression<TArgument, TResult>).GetField(nameof(links), BindingFlags.Instance | BindingFlags.NonPublic)!;
 
     readonly object?[] attachedLinks;
     readonly DirectSubscriptionAttachment?[] linkAttachments;
