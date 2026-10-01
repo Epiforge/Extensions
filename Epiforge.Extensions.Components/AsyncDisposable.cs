@@ -33,7 +33,7 @@ public abstract class AsyncDisposable :
     /// </summary>
     public bool IsDisposed
     {
-        get => isDisposed;
+        get => Volatile.Read(ref isDisposed);
         private set => SetBackedProperty(ref isDisposed, in value, Disposable.IsDisposedPropertyChanging, Disposable.IsDisposedPropertyChanged);
     }
 

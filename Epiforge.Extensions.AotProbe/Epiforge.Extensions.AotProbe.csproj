@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <EnableNETAnalyzers>true</EnableNETAnalyzers>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <IsPackable>false</IsPackable>
+        <LangVersion>latest</LangVersion>
+        <NoWarn>CA2252;IDE0032;IDE0079</NoWarn>
+        <Nullable>enable</Nullable>
+        <OutputType>Exe</OutputType>
+        <PublishAot>true</PublishAot>
+        <TargetFramework>net10.0</TargetFramework>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Epiforge.Extensions.Expressions\Epiforge.Extensions.Expressions.csproj" />
+    </ItemGroup>
+
+</Project>

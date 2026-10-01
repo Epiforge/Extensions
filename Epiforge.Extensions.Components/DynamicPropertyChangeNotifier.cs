@@ -3,6 +3,7 @@ namespace Epiforge.Extensions.Components;
 /// <summary>
 /// Provides a mechanism for notifying about property changes for a <see cref="DynamicObject"/>
 /// </summary>
+[RequiresDynamicCode("Dynamic objects are bound at run time by binders which generate code")]
 public class DynamicPropertyChangeNotifier :
     DynamicObject,
     INotifyPropertyChanged,

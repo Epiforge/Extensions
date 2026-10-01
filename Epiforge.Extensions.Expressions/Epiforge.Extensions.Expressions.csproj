@@ -4,12 +4,13 @@
 
     <PropertyGroup>
         <Product>Epiforge.Extensions.Expressions</Product>
-        <Version>7.0.5</Version>
+        <Version>7.1.0</Version>
         <PackageValidationBaselineVersion>7.0.4</PackageValidationBaselineVersion>
         <Description>This package assists in operating with expressions.</Description>
     </PropertyGroup>
 
     <PropertyGroup>
+        <IsAotCompatible Condition="$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net8.0'))">true</IsAotCompatible>
         <TargetFrameworks>net6.0;net7.0;net8.0;net9.0;net10.0</TargetFrameworks>
     </PropertyGroup>
 

@@ -1,0 +1,3 @@
+﻿Observable expressions and queries now work where the runtime cannot generate code, on both the graph and direct subscription: checked under Native AOT on macOS and Linux and under Mono's ahead-of-time compilation in the iOS simulator, where before nearly every observation threw PlatformNotSupportedException.
+Direct subscription now compiles each observed lambda to a delegate of two parameters, which a runtime without code generation can make from an interpreted lambda; a delegate of more than two parameters needed a generated thunk there.
+The package is marked as compatible with ahead-of-time compilation; where it rebuilds a part of a caller's expression, whatever that part needs from trimming or code generation the caller's own expression needed first.

@@ -71,6 +71,7 @@ sealed class InvocationReducer :
     /// <remarks>
     /// A value type's default is its zeroed instance, which is not necessarily what its parameterless constructor produces, so it is made without running one; a nullable value type's default is null
     /// </remarks>
+    [UnconditionalSuppressMessage("Trimming", "IL2072", Justification = "The default of a value type is its instance with every field zeroed, which no constructor makes, so nothing a constructor needs has to survive trimming")]
     internal static ConstantExpression Constant(DefaultExpression defaultExpression) =>
         Expression.Constant(defaultExpression.Type.IsValueType && Nullable.GetUnderlyingType(defaultExpression.Type) is null ? RuntimeHelpers.GetUninitializedObject(defaultExpression.Type) : null, defaultExpression.Type);
 

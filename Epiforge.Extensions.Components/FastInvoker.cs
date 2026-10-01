@@ -31,11 +31,25 @@ public sealed class FastInvoker
     internal static FastInvoker Of(MethodInfo method) =>
         invokersByMethod.GetOrAdd(method, InvokersByMethodValueFactory);
 
+    [UnconditionalSuppressMessage("AOT", "IL3050", Justification = "The code which needs dynamic code runs only where RuntimeFeature.IsDynamicCodeSupported is true, which the analyzer recognizes as a guard from .NET 9 on")]
     FastInvoker(MethodBase member, Type declaringType)
     {
         var parameters = member.GetParameters();
         ParameterCount = parameters.Length;
         var packed = ParameterCount > 2;
+        if (!RuntimeFeature.IsDynamicCodeSupported)
+        {
+            var reflected = new ReflectedInvocation(member);
+            if (packed)
+                withArguments = reflected.Invoke;
+            else if (ParameterCount == 0)
+                withNoArgument = reflected.InvokeWithNoArgument;
+            else if (ParameterCount == 1)
+                withOneArgument = reflected.InvokeWithOneArgument;
+            else
+                withTwoArguments = reflected.InvokeWithTwoArguments;
+            return;
+        }
         Type[] signature;
         if (packed)
             signature = [typeof(object), typeof(object[])];

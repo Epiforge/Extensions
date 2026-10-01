@@ -1,0 +1,1 @@
+﻿The package is marked as compatible with ahead-of-time compilation.

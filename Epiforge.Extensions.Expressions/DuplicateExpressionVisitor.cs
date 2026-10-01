@@ -23,6 +23,7 @@ sealed class DuplicateExpressionVisitor :
     protected override Expression VisitConditional(ConditionalExpression node) =>
         Expression.Condition(Visit(node.Test), Visit(node.IfTrue), Visit(node.IfFalse));
 
+    [UnconditionalSuppressMessage("AOT", "IL3050", Justification = "Rebuilds a node the caller's expression already contains, with the same types and members, so whatever this needs the caller's own expression needed first")]
     protected override Expression VisitDynamic(DynamicExpression node) =>
         Expression.Dynamic(node.Binder, node.Type, node.Arguments);
 
@@ -77,9 +78,12 @@ sealed class DuplicateExpressionVisitor :
     protected override Expression VisitMethodCall(MethodCallExpression node) =>
         Expression.Call(Visit(node.Object), node.Method, Visit(node.Arguments));
 
+    [UnconditionalSuppressMessage("Trimming", "IL2026", Justification = "Rebuilds a node the caller's expression already contains, with the same types and members, so whatever this needs the caller's own expression needed first")]
+    [UnconditionalSuppressMessage("Trimming", "IL2072", Justification = "Rebuilds a node the caller's expression already contains, with the same types and members, so whatever this needs the caller's own expression needed first")]
     protected override Expression VisitNew(NewExpression node) =>
         node.Constructor is null ? Expression.New(node.Type) : node.Members is null ? Expression.New(node.Constructor, Visit(node.Arguments)) : Expression.New(node.Constructor, Visit(node.Arguments), node.Members);
 
+    [UnconditionalSuppressMessage("AOT", "IL3050", Justification = "Rebuilds a node the caller's expression already contains, with the same types and members, so whatever this needs the caller's own expression needed first")]
     protected override Expression VisitNewArray(NewArrayExpression node) =>
         node.NodeType switch
         {

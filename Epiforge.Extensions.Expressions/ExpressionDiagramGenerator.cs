@@ -35,7 +35,7 @@ static class ExpressionDiagramGenerator
 
     static object[] CreateBoxedNodeTypes()
     {
-        var nodeTypes = (ExpressionType[])Enum.GetValues(typeof(ExpressionType));
+        var nodeTypes = Enum.GetValues<ExpressionType>();
         var largest = 0;
         for (int i = 0, ii = nodeTypes.Length; i < ii; ++i)
             largest = Math.Max(largest, (int)nodeTypes[i]);

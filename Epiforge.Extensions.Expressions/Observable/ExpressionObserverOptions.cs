@@ -21,6 +21,7 @@ public class ExpressionObserverOptions
     internal static MethodInfo GetGenericMethodDefinitionFromGenericMethod(MethodInfo methodInfo) =>
         methodInfo.GetGenericMethodDefinition();
 
+    [UnconditionalSuppressMessage("Trimming", "IL2075", Justification = "A get method reaches here from the caller's expression; were its property trimmed away, the call is observed as the method call it is, which re-evaluates when its object changes rather than when the property announces")]
     internal static PropertyInfo? GetPropertyFromGetMethod(MethodInfo getMethod) =>
         getMethod.DeclaringType?.GetProperties().FirstOrDefault(property => property.GetMethod == getMethod);
 

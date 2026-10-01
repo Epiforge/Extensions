@@ -59,8 +59,8 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
             byPredicate.GetValue(predicate, static source =>
             {
                 var keyValuePairParameter = Expression.Parameter(typeof(KeyValuePair<TKey, TValue>));
-                var keyExpression = Expression.Property(keyValuePairParameter, nameof(KeyValuePair<,>.Key));
-                var valueExpression = Expression.Property(keyValuePairParameter, nameof(KeyValuePair<,>.Value));
+                var keyExpression = Expression.Property(keyValuePairParameter, typeof(KeyValuePair<TKey, TValue>).GetProperty(nameof(KeyValuePair<,>.Key))!);
+                var valueExpression = Expression.Property(keyValuePairParameter, typeof(KeyValuePair<TKey, TValue>).GetProperty(nameof(KeyValuePair<,>.Value))!);
                 var predicateExpression = LambdaInvocationRewriter.Apply(source, keyExpression, valueExpression) ?? Expression.Invoke(source, keyExpression, valueExpression);
                 return Expression.Lambda<Func<KeyValuePair<TKey, TValue>, bool>>(predicateExpression, keyValuePairParameter);
             });
@@ -77,8 +77,8 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
             byValueSelector.GetValue(valueSelector, _ =>
             {
                 var sourceKeyValuePairParameter = Expression.Parameter(typeof(KeyValuePair<TKey, TValue>));
-                var sourceKeyExpression = Expression.Property(sourceKeyValuePairParameter, nameof(KeyValuePair<,>.Key));
-                var sourceValueExpression = Expression.Property(sourceKeyValuePairParameter, nameof(KeyValuePair<,>.Value));
+                var sourceKeyExpression = Expression.Property(sourceKeyValuePairParameter, typeof(KeyValuePair<TKey, TValue>).GetProperty(nameof(KeyValuePair<,>.Key))!);
+                var sourceValueExpression = Expression.Property(sourceKeyValuePairParameter, typeof(KeyValuePair<TKey, TValue>).GetProperty(nameof(KeyValuePair<,>.Value))!);
                 var keyExpression = LambdaInvocationRewriter.Apply(keySelector, sourceKeyExpression, sourceValueExpression) ?? Expression.Invoke(keySelector, sourceKeyExpression, sourceValueExpression);
                 var valueExpression = LambdaInvocationRewriter.Apply(valueSelector, sourceKeyExpression, sourceValueExpression) ?? Expression.Invoke(valueSelector, sourceKeyExpression, sourceValueExpression);
                 var keyValuePairExpression = Expression.New(typeof(KeyValuePair<TResultKey, TResultValue>).GetConstructor([typeof(TResultKey), typeof(TResultValue)])!, keyExpression, valueExpression);
@@ -103,8 +103,8 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
             bySelector.GetValue(selector, static source =>
             {
                 var keyValuePairParameter = Expression.Parameter(typeof(KeyValuePair<TKey, TValue>));
-                var keyExpression = Expression.Property(keyValuePairParameter, nameof(KeyValuePair<,>.Key));
-                var valueExpression = Expression.Property(keyValuePairParameter, nameof(KeyValuePair<,>.Value));
+                var keyExpression = Expression.Property(keyValuePairParameter, typeof(KeyValuePair<TKey, TValue>).GetProperty(nameof(KeyValuePair<,>.Key))!);
+                var valueExpression = Expression.Property(keyValuePairParameter, typeof(KeyValuePair<TKey, TValue>).GetProperty(nameof(KeyValuePair<,>.Value))!);
                 var selectorExpression = LambdaInvocationRewriter.Apply(source, keyExpression, valueExpression) ?? Expression.Invoke(source, keyExpression, valueExpression);
                 return Expression.Lambda<Func<KeyValuePair<TKey, TValue>, TElement>>(selectorExpression, keyValuePairParameter);
             });

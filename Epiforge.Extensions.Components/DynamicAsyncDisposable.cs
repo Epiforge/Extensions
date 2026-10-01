@@ -3,6 +3,7 @@ namespace Epiforge.Extensions.Components;
 /// <summary>
 /// Provides an overridable mechanism for releasing unmanaged resources asynchronously for a <see cref="DynamicObject"/>
 /// </summary>
+[RequiresDynamicCode("Dynamic objects are bound at run time by binders which generate code")]
 public abstract class DynamicAsyncDisposable :
     DynamicPropertyChangeNotifier,
     IAsyncDisposable,
@@ -33,7 +34,7 @@ public abstract class DynamicAsyncDisposable :
     /// </summary>
     public bool IsDisposed
     {
-        get => isDisposed;
+        get => Volatile.Read(ref isDisposed);
         private set => SetBackedProperty(ref isDisposed, in value, Disposable.IsDisposedPropertyChanging, Disposable.IsDisposedPropertyChanged);
     }
 

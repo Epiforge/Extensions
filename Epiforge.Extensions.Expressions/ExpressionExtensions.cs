@@ -41,6 +41,8 @@ public static class ExpressionExtensions
     }
 
     [SuppressMessage("Code Analysis", "CA1506: Avoid excessive class coupling")]
+    [UnconditionalSuppressMessage("AOT", "IL3050", Justification = "Rebuilds a node the caller's expression already contains, with the same types and members, so whatever this needs the caller's own expression needed first")]
+    [UnconditionalSuppressMessage("Trimming", "IL2026", Justification = "Rebuilds a node the caller's expression already contains, with the same types and members, so whatever this needs the caller's own expression needed first")]
     static Expression SubstituteMethodsImplementation(Expression expression, (MethodInfo replace, MethodInfo substitution)[] substitutions)
     {
         try

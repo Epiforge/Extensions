@@ -54,6 +54,7 @@ public static class ReflectionExtensions
     static T? GetDefaultValue<T>() =>
         default;
 
+    [RequiresDynamicCode("Constructs a generic method for the type")]
     static MethodInfo GetDefaultValueByTypeValueFactory(Type type) =>
         typeof(ReflectionExtensions).GetMethod(nameof(GetDefaultValue), BindingFlags.NonPublic | BindingFlags.Static)!.MakeGenericMethod(type);
 
@@ -63,10 +64,19 @@ public static class ReflectionExtensions
     static readonly ConcurrentDictionary<ConstructorInfo, InvokeConstructorDelegate> invokeConstructorDelegateByConstructor = new();
     static readonly ConcurrentDictionary<MethodInfo, InvokeMethodDelegate> invokeMethodDelegateByMethod = new();
 
+    [UnconditionalSuppressMessage("AOT", "IL3050", Justification = "The code which needs dynamic code runs only where RuntimeFeature.IsDynamicCodeSupported is true, which the analyzer recognizes as a guard from .NET 9 on")]
     static InvokeConstructorDelegate InvokeConstructorDelegateByConstructorValueFactory(ConstructorInfo constructor)
     {
         if (constructor.DeclaringType is not { } declaringType)
             throw new ArgumentException("Cannot handle constructors without declaring types");
+        if (RuntimeFeature.IsDynamicCodeSupported)
+            return EmitConstructorInvocation(constructor, declaringType);
+        return new ReflectedInvocation(constructor).Construct;
+    }
+
+    [RequiresDynamicCode("Generates a method which invokes the constructor")]
+    static InvokeConstructorDelegate EmitConstructorInvocation(ConstructorInfo constructor, Type declaringType)
+    {
         var dynamicMethod = new DynamicMethod($"CreateInstance_{declaringType.Name}", typeof(object), [typeof(object[])]);
         var ilGenerator = dynamicMethod.GetILGenerator();
         var parameters = constructor.GetParameters();
@@ -85,10 +95,19 @@ public static class ReflectionExtensions
         return (InvokeConstructorDelegate)dynamicMethod.CreateDelegate(typeof(InvokeConstructorDelegate));
     }
 
+    [UnconditionalSuppressMessage("AOT", "IL3050", Justification = "The code which needs dynamic code runs only where RuntimeFeature.IsDynamicCodeSupported is true, which the analyzer recognizes as a guard from .NET 9 on")]
     static InvokeMethodDelegate InvokeMethodDelegateByMethodValueFactory(MethodInfo method)
     {
         if (method.DeclaringType is not { } declaringType)
             throw new ArgumentException("Cannot handle methods without declaring types");
+        if (RuntimeFeature.IsDynamicCodeSupported)
+            return EmitMethodInvocation(method, declaringType);
+        return new ReflectedInvocation(method).Invoke;
+    }
+
+    [RequiresDynamicCode("Generates a method which invokes the method")]
+    static InvokeMethodDelegate EmitMethodInvocation(MethodInfo method, Type declaringType)
+    {
         var dynamicMethod = new DynamicMethod($"Invoke_{method.Name}", typeof(object), [typeof(object), typeof(object[])]);
         var ilGenerator = dynamicMethod.GetILGenerator();
         if (!method.IsStatic)
@@ -119,10 +138,16 @@ public static class ReflectionExtensions
     /// Returns the default value for the specified type as quickly as possible
     /// </summary>
     /// <param name="type">The type</param>
+    [UnconditionalSuppressMessage("AOT", "IL3050", Justification = "The code which needs dynamic code runs only where RuntimeFeature.IsDynamicCodeSupported is true, which the analyzer recognizes as a guard from .NET 9 on")]
+    [UnconditionalSuppressMessage("Trimming", "IL2067", Justification = "The default of a value type is its instance with every field zeroed, which no constructor makes, so nothing a constructor needs has to survive trimming")]
     public static object? FastDefault(this Type type)
     {
         ArgumentNullException.ThrowIfNull(type);
-        return type.IsValueType ? getDefaultValueByType.GetOrAdd(type, GetDefaultValueByTypeValueFactory).FastInvoke(null) : null;
+        if (!type.IsValueType)
+            return null;
+        if (RuntimeFeature.IsDynamicCodeSupported)
+            return getDefaultValueByType.GetOrAdd(type, GetDefaultValueByTypeValueFactory).FastInvoke(null);
+        return Nullable.GetUnderlyingType(type) is null ? RuntimeHelpers.GetUninitializedObject(type) : null;
     }
 
     /// <summary>
@@ -214,6 +239,7 @@ public static class ReflectionExtensions
     /// </summary>
     /// <param name="type">The <see cref="Type"/></param>
     /// <param name="bindingAttr">A bitwise combination of the enumeration values that specify how the search is conducted</param>
+    [RequiresUnreferencedCode("Reflects over the interfaces the type implements and their members, which trimming can remove")]
     public static EventInfo[] GetImplementationEvents(this Type type, BindingFlags bindingAttr = BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy)
     {
         ArgumentNullException.ThrowIfNull(type);
@@ -246,6 +272,7 @@ public static class ReflectionExtensions
     /// </summary>
     /// <param name="type">The <see cref="Type"/></param>
     /// <param name="bindingAttr">A bitwise combination of the enumeration values that specify how the search is conducted</param>
+    [RequiresUnreferencedCode("Reflects over the interfaces the type implements and their members, which trimming can remove")]
     public static MethodInfo[] GetImplementationMethods(this Type type, BindingFlags bindingAttr = BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy)
     {
         ArgumentNullException.ThrowIfNull(type);
@@ -278,6 +305,7 @@ public static class ReflectionExtensions
     /// </summary>
     /// <param name="type">The <see cref="Type"/></param>
     /// <param name="bindingAttr">A bitwise combination of the enumeration values that specify how the search is conducted</param>
+    [RequiresUnreferencedCode("Reflects over the interfaces the type implements and their members, which trimming can remove")]
     public static PropertyInfo[] GetImplementationProperties(this Type type, BindingFlags bindingAttr = BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy)
     {
         ArgumentNullException.ThrowIfNull(type);

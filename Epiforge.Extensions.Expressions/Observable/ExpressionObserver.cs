@@ -33,9 +33,12 @@ public class ExpressionObserver :
         return expression => optimized.GetValue(expression, optimize);
     }
 
+    [UnconditionalSuppressMessage("Trimming", "IL2075", Justification = "A get method reaches here from the caller's expression; were its property trimmed away, the call is observed as the method call it is, which re-evaluates when its object changes rather than when the property announces")]
     static PropertyInfo? GetPropertyFromGetMethod(MethodInfo getMethod) =>
         getMethod.DeclaringType?.GetProperties().FirstOrDefault(property => property.GetMethod == getMethod);
 
+    [UnconditionalSuppressMessage("AOT", "IL3050", Justification = "Rebuilds a node the caller's expression already contains, with the same types and members, so whatever this needs the caller's own expression needed first")]
+    [UnconditionalSuppressMessage("Trimming", "IL2026", Justification = "Rebuilds a node the caller's expression already contains, with the same types and members, so whatever this needs the caller's own expression needed first")]
     static Expression ReplaceParameters(Dictionary<ParameterExpression, ConstantExpression> parameterTranslation, Expression expression)
     {
         switch (expression)
@@ -952,7 +955,9 @@ public class ExpressionObserver :
             var sites = new DirectSubscriptionSite[subscriptions.Count];
             for (var i = 0; i < sites.Length; ++i)
                 sites[i] = Site(subscriptions[i], observed, fixedSubexpressions, plan.Links);
-            evaluator = new DirectEvaluator(lambdaExpression, Expression.Lambda<Func<TArgument, object?[], bool[], object?[], object?[], TResult>>(body, observed.Parameters[0], values, reached, links, held).Compile(), [.. fixedSubexpressions], sites, plan.DeferredGroups.Count, plan.Links.Count, plan.Held);
+            var state = Expression.Parameter(typeof(DirectObservableExpression<TArgument, TResult>), "state");
+            var bound = DirectObservableExpression<TArgument, TResult>.BindState(body, state, values, reached, links, held, plan.DeferredGroups.Count > 0 || plan.Links.Count > 0, plan.Links.Count > 0);
+            evaluator = new DirectEvaluator(lambdaExpression, Expression.Lambda<Func<TArgument, DirectObservableExpression<TArgument, TResult>, TResult>>(bound, observed.Parameters[0], state).Compile(), [.. fixedSubexpressions], sites, plan.DeferredGroups.Count, plan.Links.Count, plan.Held);
         }
         compiled.AddOrUpdate(lambdaExpression, evaluator);
         return evaluator;
@@ -1007,7 +1012,7 @@ public class ExpressionObserver :
             for (var i = 0; i < values.Length; ++i)
                 values[i] = DirectObservableExpression.Resolve(fixedSubexpressions[i], resolutionArgument);
         }
-        var evaluate = (Func<TArgument, object?[], bool[], object?[], object?[], TResult>)evaluator.Evaluate;
+        var evaluate = (Func<TArgument, DirectObservableExpression<TArgument, TResult>, TResult>)evaluator.Evaluate;
         object?[] held = evaluator.HeldCount == 0 ? [] : Unresolved(evaluator.HeldCount);
         DirectObservableExpression<TArgument, TResult> directObservableExpression = evaluator.LinkCount > 0
             ? new LinkingDirectObservableExpression<TArgument, TResult>(this, evaluator, evaluate, argument, values, held, evaluator.DeferredGroupCount == 0 ? [] : new bool[evaluator.DeferredGroupCount], new object?[evaluator.LinkCount])

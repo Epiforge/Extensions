@@ -19,6 +19,21 @@ public class FastEqualityComparer :
             obj.GetHashCode();
     }
 
+    /// <summary>
+    /// Compares as <see cref="EqualityComparer{T}.Default"/> would, through reflection, where the runtime cannot generate code: the type's own <see cref="IEquatable{T}"/> where it implements one, otherwise <see cref="object.Equals(object?)"/>
+    /// </summary>
+    sealed class ReflectedComparer(Type type) :
+        TypedComparer
+    {
+        readonly ReflectedInvocation? equals = ReflectedInvocation.OfOwnGenericInterface(Nullable.GetUnderlyingType(type) ?? type, typeof(IEquatable<>), nameof(IEquatable<object>.Equals));
+
+        internal override bool AreEqual(object? x, object? y) =>
+            x is null ? y is null : y is not null && (equals is { } invocation ? (bool)invocation.InvokeWithOneArgument(x, y)! : x.Equals(y));
+
+        internal override int HashCodeOf(object obj) =>
+            obj.GetHashCode();
+    }
+
     abstract class TypedComparer
     {
         internal abstract bool AreEqual(object? x, object? y);
@@ -55,16 +70,24 @@ public class FastEqualityComparer :
     /// Initializes a new instance of the <see cref="FastEqualityComparer"/> class
     /// </summary>
     /// <param name="type">The type</param>
+    [UnconditionalSuppressMessage("AOT", "IL3050", Justification = "The code which needs dynamic code runs only where RuntimeFeature.IsDynamicCodeSupported is true, which the analyzer recognizes as a guard from .NET 9 on")]
     public FastEqualityComparer(Type type)
     {
         ArgumentNullException.ThrowIfNull(type);
         Type = type;
-        typedComparer = type.IsValueType && !typeof(IEquatable<>).MakeGenericType(type).IsAssignableFrom(type)
-            ? new BoxedComparer()
-            : (TypedComparer)Activator.CreateInstance(typeof(TypedComparer<>).MakeGenericType(type))!;
+        if (RuntimeFeature.IsDynamicCodeSupported)
+            typedComparer = Typed(type);
+        else
+            typedComparer = new ReflectedComparer(type);
     }
 
     readonly TypedComparer typedComparer;
+
+    [RequiresDynamicCode("Constructs a comparer for the type")]
+    static TypedComparer Typed(Type type) =>
+        type.IsValueType && !typeof(IEquatable<>).MakeGenericType(type).IsAssignableFrom(type)
+            ? new BoxedComparer()
+            : (TypedComparer)Activator.CreateInstance(typeof(TypedComparer<>).MakeGenericType(type))!;
 
     /// <summary>
     /// Gets the type

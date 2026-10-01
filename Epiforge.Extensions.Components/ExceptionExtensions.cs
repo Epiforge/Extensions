@@ -10,6 +10,7 @@ public static class ExceptionExtensions
     static readonly Regex stackTraceIndentation = new(@"^   ", RegexOptions.Compiled | RegexOptions.Multiline);
     static readonly ConcurrentDictionary<Type, DefaultObjectPool<XmlSerializer>> xmlSerializerObjectPoolByType = new();
 
+    [RequiresUnreferencedCode("Reads the properties of the exception type by reflection")]
     static IReadOnlyList<PropertyInfo> PropertiesByTypeValueFactory(Type type) =>
         type.GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy)
             .Where
@@ -39,6 +40,7 @@ public static class ExceptionExtensions
                 )
             ).ToList().AsReadOnly();
 
+    [RequiresUnreferencedCode("Reads the properties of the exception type by reflection")]
     static IEnumerable<(string name, object? value)> GetAdditionalProperties(Exception ex, Type type) =>
         propertiesByType.GetOrAdd(type, PropertiesByTypeValueFactory).Select(property =>
         {
@@ -65,6 +67,8 @@ public static class ExceptionExtensions
     /// </summary>
     /// <param name="ex">The exception for which to generate the representation</param>
     /// <param name="format">The format in which to create the representation</param>
+    [RequiresUnreferencedCode("Reads every public property of the exception by reflection, and the JSON and XML formats serialize their values by reflection, which trimming can break")]
+    [RequiresDynamicCode("The JSON and XML formats serialize property values with serializers which generate code at run time")]
     public static string GetFullDetails(this Exception ex, ExceptionFullDetailsFormat? format = null)
     {
         ArgumentNullException.ThrowIfNull(ex);
@@ -107,6 +111,8 @@ public static class ExceptionExtensions
         }
     }
 
+    [RequiresUnreferencedCode("Serializes property values by reflection")]
+    [RequiresDynamicCode("Serializes property values by reflection")]
     [SuppressMessage("Maintainability", "CA1502: Avoid excessive complexity")]
     static void GetFullDetailsInJson(Exception ex, Utf8JsonWriter json, HashSet<Exception>? visitedExs = null)
     {
@@ -261,6 +267,7 @@ public static class ExceptionExtensions
         json.WriteEndObject();
     }
 
+    [RequiresUnreferencedCode("Reads the properties of the exception type by reflection")]
     static string GetFullDetailsInPlainText(Exception ex, int indent, HashSet<Exception>? visitedExs = null)
     {
         visitedExs ??= [ex];
@@ -317,6 +324,8 @@ public static class ExceptionExtensions
         return string.Join($"{Environment.NewLine}{Environment.NewLine}", exceptionDetails);
     }
 
+    [RequiresUnreferencedCode("Serializes property values by reflection")]
+    [RequiresDynamicCode("Generates serializers at run time")]
     [SuppressMessage("Maintainability", "CA1502: Avoid excessive complexity")]
     static void GetFullDetailsInXml(Exception ex, XmlWriter xml, HashSet<Exception>? visitedExs = null)
     {
@@ -423,6 +432,8 @@ public static class ExceptionExtensions
         }
     }
 
+    [RequiresUnreferencedCode("Constructs a serializer for the type")]
+    [RequiresDynamicCode("Constructs a serializer for the type")]
     static DefaultObjectPool<XmlSerializer> XmlSerializerObjectPoolByTypeValueFactory(Type type) =>
         new(new XmlSerializerPooledObjectPolicy(type));
 }

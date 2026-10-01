@@ -17,6 +17,7 @@ static class ExpressionKeyStability
 
     static readonly ConcurrentDictionary<Type, bool> typesWithValueEquality = new();
 
+    [UnconditionalSuppressMessage("Trimming", "IL2070", Justification = "Were an override of Equals or GetHashCode trimmed away, the type would be treated as lacking value equality, which only keeps it out of the cache compared by structure")]
     static bool HasValueEquality(Type type) =>
         type.IsValueType
         || type.GetMethod(nameof(Equals), [typeof(object)])?.DeclaringType != typeof(object)

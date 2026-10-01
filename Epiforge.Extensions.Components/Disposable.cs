@@ -35,7 +35,7 @@ public abstract class Disposable :
     /// </summary>
 	public bool IsDisposed
     {
-        get => isDisposed;
+        get => Volatile.Read(ref isDisposed);
         private set => SetBackedProperty(ref isDisposed, in value, IsDisposedPropertyChanging, IsDisposedPropertyChanged);
     }
 

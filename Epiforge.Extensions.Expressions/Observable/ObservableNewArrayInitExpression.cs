@@ -31,6 +31,7 @@ sealed class ObservableNewArrayInitExpression(ExpressionObserver observer, NewAr
         RemovedFromCache();
     }
 
+    [UnconditionalSuppressMessage("AOT", "IL3050", Justification = "The array is of the type the caller's expression already created with Expression.NewArrayInit, so whatever this needs the caller's own expression needed first")]
     protected override void Evaluate()
     {
         if (initializers is { } faultedInitializers && FirstFault(faultedInitializers) is { } initializerFault)
