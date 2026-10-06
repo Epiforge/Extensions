@@ -1,1 +1,0 @@
-﻿An invocation of a lambda whose argument is faulted when the observation is built now takes that argument's fault and never evaluates the lambda's body; before, on both the graph and direct subscription, the body was evaluated with the argument's default value and the invocation reported whatever that raised.
