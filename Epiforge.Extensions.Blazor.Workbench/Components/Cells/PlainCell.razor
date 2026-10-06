@@ -1,0 +1,24 @@
+@inject RenderLedger Ledger
+@if (Column is { } column && Binder is { } binder)
+{
+    Ledger.Rendered(binder, Implementations.Plain);
+    if (ShowType)
+    {
+        <td class="@(column.DisplayDataType == TypeCode.Int32 && binder.Value >= 0 ? "number" : "text")">@binder.TextValue</td>
+    }
+    else
+    {
+        <td>@binder.TextValue</td>
+    }
+}
+
+@code {
+    [Parameter]
+    public Binder? Binder { get; set; }
+
+    [Parameter]
+    public Column? Column { get; set; }
+
+    [Parameter]
+    public bool ShowType { get; set; }
+}

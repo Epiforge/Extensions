@@ -1,0 +1,14 @@
+global using Epiforge.Extensions.Blazor;
+global using Microsoft.AspNetCore.Components;
+global using Microsoft.AspNetCore.Components.RenderTree;
+global using Microsoft.AspNetCore.Components.Rendering;
+global using Microsoft.Extensions.DependencyInjection;
+global using Microsoft.Extensions.Logging.Abstractions;
+global using Microsoft.VisualStudio.TestTools.UnitTesting;
+global using System.Collections.ObjectModel;
+global using System.Collections.Specialized;
+global using System.ComponentModel;
+global using System.Linq.Expressions;
+global using System.Reflection;
+global using System.Runtime.CompilerServices;
+global using IComponent = Microsoft.AspNetCore.Components.IComponent;

@@ -1,0 +1,28 @@
+@inherits Phork.Blazor.ReactiveComponentBase
+@inject RenderLedger Ledger
+@if (Column is { } column && Binder is { } binder)
+{
+    Ledger.Rendered(binder, Implementations.Phork);
+    var textValue = Observed(() => binder.TextValue);
+    var value = Observed(() => binder.Value);
+    if (ShowType)
+    {
+        var displayDataType = Observed(() => column.DisplayDataType);
+        <td class="@(displayDataType == TypeCode.Int32 && value >= 0 ? "number" : "text")">@textValue</td>
+    }
+    else
+    {
+        <td>@textValue</td>
+    }
+}
+
+@code {
+    [Parameter]
+    public Binder? Binder { get; set; }
+
+    [Parameter]
+    public Column? Column { get; set; }
+
+    [Parameter]
+    public bool ShowType { get; set; }
+}

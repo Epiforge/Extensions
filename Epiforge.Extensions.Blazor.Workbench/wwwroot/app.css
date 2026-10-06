@@ -1,0 +1,140 @@
+:root {
+    --background: #f7f5f0;
+    --surface: #ffffff;
+    --ink: #1f2630;
+    --muted: #6b7280;
+    --accent: #2f6f8f;
+    --pass: #2e7d4f;
+    --fail: #b3261e;
+    --rule: #e3dfd6;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --background: #161b22;
+        --surface: #1f2630;
+        --ink: #ece8df;
+        --muted: #9aa3ad;
+        --accent: #7fb7d1;
+        --pass: #6cc28f;
+        --fail: #f28b82;
+        --rule: #2d3540;
+    }
+}
+
+body {
+    background: var(--background);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    margin: 0;
+}
+
+header {
+    align-items: center;
+    background: var(--surface);
+    border-bottom: 1px solid var(--rule);
+    display: flex;
+    gap: 2rem;
+    padding: 0.75rem 1.5rem;
+}
+
+header .title {
+    font-weight: 600;
+}
+
+nav a {
+    color: var(--muted);
+    margin-right: 1rem;
+    text-decoration: none;
+}
+
+nav a.active {
+    color: var(--accent);
+    font-weight: 600;
+}
+
+main {
+    padding: 1rem 1.5rem;
+}
+
+.controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.group {
+    align-items: center;
+    display: flex;
+    gap: 0.5rem;
+}
+
+.label {
+    color: var(--muted);
+    font-size: 0.85rem;
+}
+
+button {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    color: var(--ink);
+    cursor: pointer;
+    padding: 0.35rem 0.75rem;
+}
+
+button.selected {
+    border-color: var(--accent);
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.stats {
+    color: var(--muted);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+table.cells {
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
+}
+
+table.cells td {
+    border: 1px solid var(--rule);
+    padding: 0.15rem 0.5rem;
+}
+
+td.number {
+    text-align: right;
+}
+
+table.results {
+    border-collapse: collapse;
+    margin: 1rem 0;
+}
+
+table.results td, table.results th {
+    border-bottom: 1px solid var(--rule);
+    padding: 0.35rem 0.75rem;
+    text-align: left;
+}
+
+td.pass {
+    color: var(--pass);
+    font-weight: 600;
+}
+
+td.fail {
+    color: var(--fail);
+    font-weight: 600;
+}
+
+.probes {
+    display: flex;
+    gap: 2rem;
+    opacity: 0.6;
+}

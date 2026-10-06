@@ -1,0 +1,16 @@
+@inherits ReactiveLayoutComponentBase
+@inject RenderLedger Ledger
+@inject WorkbenchState State
+@{
+    Ledger.Rendered(State, Implementations.Epiforge);
+}
+<header>
+    <span class="title" id="layout-title">@Observed(() => State.Title)</span>
+    <nav>
+        <NavLink href="" Match="NavLinkMatch.All">Grid</NavLink>
+        <NavLink href="verify">Verify</NavLink>
+    </nav>
+</header>
+<main>
+    @Body
+</main>

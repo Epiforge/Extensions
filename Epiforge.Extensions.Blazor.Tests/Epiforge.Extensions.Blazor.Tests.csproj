@@ -1,0 +1,19 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <Import Project="..\Common\TestProject.props" />
+
+    <PropertyGroup>
+        <NoWarn>$(NoWarn);BL0006</NoWarn>
+        <TargetFrameworks>net6.0;net7.0;net8.0;net9.0;net10.0</TargetFrameworks>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Epiforge.Extensions.Blazor\Epiforge.Extensions.Blazor.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.4" />
+        <PackageReference Include="Phork.Blazor.Reactivity" Version="1.1.3" />
+    </ItemGroup>
+
+</Project>

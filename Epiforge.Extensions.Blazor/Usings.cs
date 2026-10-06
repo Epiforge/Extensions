@@ -1,0 +1,12 @@
+global using IComponent = Microsoft.AspNetCore.Components.IComponent;
+global using Microsoft.AspNetCore.Components;
+global using Microsoft.AspNetCore.Components.Rendering;
+global using Microsoft.Extensions.DependencyInjection;
+global using System.Collections.Concurrent;
+global using System.Collections.Specialized;
+global using System.ComponentModel;
+global using System.Diagnostics.CodeAnalysis;
+global using System.Linq.Expressions;
+global using System.Reflection;
+global using System.Reflection.Emit;
+global using System.Runtime.CompilerServices;

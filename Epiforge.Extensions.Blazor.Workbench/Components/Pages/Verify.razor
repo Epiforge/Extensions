@@ -1,0 +1,41 @@
+@page "/verify"
+@inject RenderLedger Ledger
+@inject WorkbenchState State
+
+<PageTitle>Verify</PageTitle>
+
+<h1>Verification</h1>
+<p>Each scenario drives real components on this circuit and checks what they rendered and what they still observe.</p>
+
+@if (RendererInfo.IsInteractive)
+{
+    <button id="run" disabled="@running" @onclick="RunAsync">Run every scenario</button>
+}
+
+<table class="results" id="results">
+    <thead>
+        <tr><th>Scenario</th><th>Verdict</th><th>Detail</th></tr>
+    </thead>
+    <tbody>
+        @foreach (var result in results)
+        {
+            <tr data-scenario="@result.Name" data-verdict="@(result.Passed ? "pass" : "fail")">
+                <td>@result.Name</td>
+                <td class="@(result.Passed ? "pass" : "fail")">@(result.Passed ? "pass" : "fail")</td>
+                <td>@result.Detail</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<p id="summary" data-complete="@(complete ? "true" : "false")" data-failed="@results.Count(result => !result.Passed)">
+    @if (complete)
+    {
+        @($"{results.Count(result => result.Passed)} of {results.Count} scenarios passed")
+    }
+</p>
+
+<div class="probes">
+    <CellTable TCell="EpiforgeCell" Model="epiforgeModel" Rows="epiforgeRows" ShowType="epiforgeShowType" />
+    <CellTable TCell="PhorkCell" Model="phorkModel" Rows="phorkRows" ShowType="true" />
+</div>

@@ -1,0 +1,87 @@
+@page "/"
+@inject RenderLedger Ledger
+@inject WorkbenchState State
+
+<PageTitle>Grid</PageTitle>
+
+<section class="controls">
+    <div class="group">
+        <span class="label">Implementation</span>
+        @foreach (var candidate in new[] { Implementations.Epiforge, Implementations.Phork, Implementations.Plain })
+        {
+            <button class="@(implementation == candidate ? "selected" : null)" @onclick="() => Select(candidate)">@candidate</button>
+        }
+    </div>
+    <div class="group">
+        <span class="label">Rows</span>
+        <button @onclick="() => Operate(() => rows = Model.Rows.Length)">Show @Model.Rows.Length</button>
+        <button @onclick="() => Operate(() => rows = 0)">Hide all</button>
+        <button @onclick="() => Operate(() => showType = !showType)">@(showType ? "Hide" : "Show") types</button>
+    </div>
+    <div class="group">
+        <span class="label">Changes</span>
+        <button @onclick="() => Operate(Model.ChangeEveryValue)">Change every value</button>
+        <button @onclick="ChangeEveryValueFromAnotherThread">Change every value from another thread</button>
+        <button @onclick="() => Operate(() => State.Title = State.Title == Workbench ? Renamed : Workbench)">Rename the layout</button>
+    </div>
+</section>
+
+<section class="stats" id="stats">
+    <span>@implementation</span>
+    <span>@rows rows × @Model.Columns.Length columns</span>
+    <span>last operation: @lastRenders cell renders over @lastSpan.TotalMilliseconds.ToString("N1") ms</span>
+    <span>@Ledger.RendersOffTheCircuit renders off the circuit</span>
+</section>
+
+@switch (implementation)
+{
+    case Implementations.Epiforge:
+        <CellTable TCell="EpiforgeCell" Model="Model" Rows="rows" ShowType="showType" />
+        break;
+    case Implementations.Phork:
+        <CellTable TCell="PhorkCell" Model="Model" Rows="rows" ShowType="showType" />
+        break;
+    default:
+        <CellTable TCell="PlainCell" Model="Model" Rows="rows" ShowType="showType" />
+        break;
+}
+
+@code {
+    const string Renamed = "Workbench (renamed)";
+    const string Workbench = "Workbench";
+
+    string implementation = Implementations.Epiforge;
+    int lastRenders;
+    TimeSpan lastSpan;
+    int rows = 100;
+    bool showType = true;
+
+    TableModel Model { get; } = new(200, 10);
+
+    async Task ChangeEveryValueFromAnotherThread()
+    {
+        var before = Ledger.Total(implementation);
+        var started = Stopwatch.GetTimestamp();
+        await Task.Run(Model.ChangeEveryValue);
+        await ReportAsync(before, started);
+    }
+
+    async Task Operate(Action operation)
+    {
+        var before = Ledger.Total(implementation);
+        var started = Stopwatch.GetTimestamp();
+        operation();
+        await ReportAsync(before, started);
+    }
+
+    async Task ReportAsync(int before, long started)
+    {
+        await Task.Delay(250);
+        lastRenders = Ledger.Total(implementation) - before;
+        var last = Ledger.LastRenderTimestamp;
+        lastSpan = last > started ? Stopwatch.GetElapsedTime(started, last) : TimeSpan.Zero;
+    }
+
+    Task Select(string candidate) =>
+        Operate(() => implementation = candidate);
+}

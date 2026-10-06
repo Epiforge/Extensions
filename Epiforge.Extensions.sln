@@ -55,6 +55,14 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Epiforge.Extensions.Compone
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Epiforge.Extensions.Expressions.WithoutDynamicCode.Tests", "Epiforge.Extensions.Expressions.WithoutDynamicCode.Tests\Epiforge.Extensions.Expressions.WithoutDynamicCode.Tests.csproj", "{567015C3-634D-4661-AF2D-86C3C936AFAD}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Epiforge.Extensions.Blazor", "Epiforge.Extensions.Blazor\Epiforge.Extensions.Blazor.csproj", "{D76BA478-7748-4029-8272-3E2ADC282DC4}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Epiforge.Extensions.Blazor.Tests", "Epiforge.Extensions.Blazor.Tests\Epiforge.Extensions.Blazor.Tests.csproj", "{70683A68-CE26-448D-A98A-83CD7B4B1ED0}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Epiforge.Extensions.Blazor.WithoutDynamicCode.Tests", "Epiforge.Extensions.Blazor.WithoutDynamicCode.Tests\Epiforge.Extensions.Blazor.WithoutDynamicCode.Tests.csproj", "{3EB6FADC-5186-4D26-B0D4-648BA1161C7A}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Epiforge.Extensions.Blazor.Workbench", "Epiforge.Extensions.Blazor.Workbench\Epiforge.Extensions.Blazor.Workbench.csproj", "{FC1B881F-029D-422F-ABC0-2E291F378B59}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -113,6 +121,22 @@ Global
 		{567015C3-634D-4661-AF2D-86C3C936AFAD}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{567015C3-634D-4661-AF2D-86C3C936AFAD}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{567015C3-634D-4661-AF2D-86C3C936AFAD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D76BA478-7748-4029-8272-3E2ADC282DC4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D76BA478-7748-4029-8272-3E2ADC282DC4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D76BA478-7748-4029-8272-3E2ADC282DC4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D76BA478-7748-4029-8272-3E2ADC282DC4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{70683A68-CE26-448D-A98A-83CD7B4B1ED0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{70683A68-CE26-448D-A98A-83CD7B4B1ED0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{70683A68-CE26-448D-A98A-83CD7B4B1ED0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{70683A68-CE26-448D-A98A-83CD7B4B1ED0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3EB6FADC-5186-4D26-B0D4-648BA1161C7A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3EB6FADC-5186-4D26-B0D4-648BA1161C7A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3EB6FADC-5186-4D26-B0D4-648BA1161C7A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3EB6FADC-5186-4D26-B0D4-648BA1161C7A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FC1B881F-029D-422F-ABC0-2E291F378B59}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FC1B881F-029D-422F-ABC0-2E291F378B59}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FC1B881F-029D-422F-ABC0-2E291F378B59}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FC1B881F-029D-422F-ABC0-2E291F378B59}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
