@@ -150,7 +150,8 @@ sealed class ObservableInvocationExpression(ExpressionObserver observer, Invocat
                     if (observableArgumentsList[i] is { CanChange: true } observableArgument)
                         subscriptions[i] = observableArgument.SubscribeDependent(this);
             }
-            CreateObservableExpression();
+            if (observableArguments is not { } faultCheckedArguments || FirstFault(faultCheckedArguments) is null)
+                CreateObservableExpression();
             EvaluateIfNotDeferred();
         }
         catch (Exception ex)

@@ -8,6 +8,21 @@ public class ObservableInvocationExpression
     public TestPerson CombinePeople(TestPerson a, TestPerson b) =>
         new() { Name = $"{a.Name} {b.Name}" };
 
+    int nullNamesMeasured;
+
+    public int MeasureName(string name)
+    {
+        if (name is null)
+        {
+            ++nullNamesMeasured;
+            throw new ArgumentNullException(nameof(name));
+        }
+        return name.Length;
+    }
+
+    public static string RequireName(string? name) =>
+        name ?? throw new InvalidOperationException("found no name");
+
     #endregion TestMethod Methods
 
     [TestMethod]
@@ -46,6 +61,29 @@ public class ObservableInvocationExpression
             emily.Name = "Emily";
             Assert.IsNull(expr.Evaluation.Fault);
         }
+        Assert.AreEqual(0, observer.CachedObservableExpressions);
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void FaultedArgumentFaultsTheInvocationWithoutEvaluatingTheBody(bool useDirectSubscription)
+    {
+        var person = new TestPerson();
+        var parameter = Expression.Parameter(typeof(TestPerson));
+        Expression<Func<string, int>> measure = name => MeasureName(name);
+        Expression<Func<string?, string>> require = name => RequireName(name);
+        var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
+        using (var expr = observer.Observe<int>(Expression.Lambda(Expression.Invoke(measure, Expression.Invoke(require, Expression.Property(parameter, nameof(TestPerson.Name)))), parameter), person))
+        {
+            Assert.IsInstanceOfType<InvalidOperationException>(expr.Evaluation.Fault);
+            person.Name = "John";
+            Assert.IsNull(expr.Evaluation.Fault);
+            Assert.AreEqual(4, expr.Evaluation.Result);
+            person.Name = null;
+            Assert.IsInstanceOfType<InvalidOperationException>(expr.Evaluation.Fault);
+        }
+        Assert.AreEqual(0, nullNamesMeasured);
         Assert.AreEqual(0, observer.CachedObservableExpressions);
     }
 
