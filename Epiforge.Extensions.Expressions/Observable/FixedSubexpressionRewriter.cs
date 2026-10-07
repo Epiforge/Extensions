@@ -6,9 +6,27 @@
 /// <remarks>
 /// Each operand whose evaluation the expression defers is also wrapped so that reaching it records the fact in an array the observation reads once the evaluation has returned, which is how the fast path learns to attach the subscriptions it planned for that operand. A property read on a value type other than a primitive, and an operator whose method takes its operands by reference, reads what contains a try from a temporary, whether the try is the expression's own or the one a held subexpression is resolved inside, because the compiler refuses to move such an operand into a temporary itself when one is evaluated after another
 /// </remarks>
+/// <remarks>
+/// A let releases every link its body or its variables follow before it assigns its arguments and restores those of its body once they are assigned, so that an argument which faults leaves them released, which is what the graph's node does when it builds no body
+/// </remarks>
 sealed class FixedSubexpressionRewriter :
     ExpressionVisitor
 {
+    sealed class Containment(IReadOnlyList<Expression> candidates) :
+        ExpressionVisitor
+    {
+        internal readonly HashSet<int> Contained = [];
+
+        public override Expression? Visit(Expression? node)
+        {
+            if (node is not null)
+                for (int i = 0, ii = candidates.Count; i < ii; ++i)
+                    if (ReferenceEquals(candidates[i], node))
+                        Contained.Add(i);
+            return base.Visit(node);
+        }
+    }
+
     static readonly ConstructorInfo slotFaultConstructor = typeof(DirectSlotFault).GetConstructor([typeof(Exception)])!;
     static readonly MethodInfo unwrapMethod = typeof(DirectObservableExpression).GetMethod(nameof(DirectObservableExpression.Unwrap), BindingFlags.NonPublic | BindingFlags.Static)!;
     static readonly ConstantExpression unresolved = Expression.Constant(DirectObservableExpression.Unresolved, typeof(object));
@@ -87,6 +105,14 @@ sealed class FixedSubexpressionRewriter :
     static bool IsReadInPlace(Type type) =>
         type.IsValueType && Type.GetTypeCode(type) == TypeCode.Object;
 
+    static bool IsAssignmentIn(ReadOnlyCollection<Expression> expressions, Expression node)
+    {
+        for (int i = 0, ii = expressions.Count - 1; i < ii; ++i)
+            if (ReferenceEquals(expressions[i], node))
+                return true;
+        return false;
+    }
+
     int LinkOf(Expression node)
     {
         for (int i = 0, ii = linkTargets.Count; i < ii; ++i)
@@ -151,6 +177,41 @@ sealed class FixedSubexpressionRewriter :
         var left = Expression.Variable(binaryExpression.Left.Type);
         var right = Expression.Variable(binaryExpression.Right.Type);
         return Expression.Block(binaryExpression.Type, [left, right], Expression.Assign(left, binaryExpression.Left), Expression.Assign(right, binaryExpression.Right), binaryExpression.Update(left, binaryExpression.Conversion, right));
+    }
+
+    protected override Expression VisitBlock(BlockExpression node)
+    {
+        if (!DirectSubscriptionAnalyzer.IsLet(node))
+            return base.VisitBlock(node);
+        var expressions = node.Expressions;
+        var body = expressions[^1];
+        var containment = new Containment(linkTargets);
+        if (linkTargets.Count > 0)
+            containment.Visit(body);
+        var variables = new List<ParameterExpression>(node.Variables);
+        var rewritten = new List<Expression>();
+        var restored = new List<(int Link, ParameterExpression Saved)>();
+        for (int i = 0, ii = linkTargets.Count; i < ii; ++i)
+            if (containment.Contained.Contains(i))
+            {
+                var saved = Expression.Variable(typeof(object));
+                variables.Add(saved);
+                restored.Add((i, saved));
+                rewritten.Add(Expression.Assign(saved, Expression.ArrayIndex(links, Expression.Constant(i))));
+            }
+        for (int i = 0, ii = linkTargets.Count; i < ii; ++i)
+            if (containment.Contained.Contains(i) || IsAssignmentIn(expressions, linkTargets[i]))
+                rewritten.Add(Expression.Assign(Expression.ArrayAccess(links, Expression.Constant(i)), Expression.Constant(null, typeof(object))));
+        for (int i = 0, ii = expressions.Count - 1; i < ii; ++i)
+        {
+            var assignment = (BinaryExpression)expressions[i];
+            var assigned = assignment.Update(assignment.Left, null, Visit(assignment.Right)!);
+            rewritten.Add(LinkOf(assignment) is var link && link >= 0 ? Record(link, assigned) : assigned);
+        }
+        for (int i = 0, ii = restored.Count; i < ii; ++i)
+            rewritten.Add(Expression.Assign(Expression.ArrayAccess(links, Expression.Constant(restored[i].Link)), restored[i].Saved));
+        rewritten.Add(Visit(body)!);
+        return Expression.Block(node.Type, variables, rewritten);
     }
 
     protected override Expression VisitMember(MemberExpression node)

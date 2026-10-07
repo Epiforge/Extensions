@@ -100,8 +100,8 @@ public class InvocationReduction
         AssertMechanismsAgree(Invocation(absolute), true);
 
     [TestMethod]
-    public void AnInvocationWhoseParameterIsReadTwiceIsRefused() =>
-        AssertMechanismsAgree(Invocation(doubled), false);
+    public void AnInvocationWhoseParameterIsReadTwiceIsServedByTheFastPath() =>
+        AssertMechanismsAgree(Invocation(doubled), true);
 
     [TestMethod]
     public void NestedInvocationsAreServedByTheFastPath() =>

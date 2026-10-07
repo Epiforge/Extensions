@@ -4,15 +4,15 @@ namespace Epiforge.Extensions.Expressions.Tests.Observable;
 /// Invocations of literal lambdas whose parameters are read where the body might not evaluate them, which reducing the invocation would change the meaning of
 /// </summary>
 /// <remarks>
-/// An invocation evaluates its arguments before its body, and so does the graph, whose node for one builds the body only once no argument has faulted. Reducing such an invocation substitutes each argument where its parameter is read, which moves an argument read only in a deferred operand to where it may never be evaluated, and one read inside a try to where the try catches its fault. Either way a fault the argument raised would go unreported by the fast path alone. An argument which is a constant or the argument of the observation can raise nothing, so reducing it where it is read changes nothing
+/// An invocation evaluates its arguments before its body, and so does the graph, whose node for one builds the body only once no argument has faulted. Reducing such an invocation would substitute each argument where its parameter is read, which moves an argument read only in a deferred operand to where it may never be evaluated, and one read inside a try to where the try catches its fault. Either way a fault the argument raised would go unreported, so the fast path binds such an invocation as a let instead, evaluating every argument before the body. An argument which is a constant or the argument of the observation can raise nothing, so reducing it where it is read changes nothing
 /// </remarks>
 [TestClass]
 public class InvocationReductionDeferral
 {
-    static void AssertTheGraphWasBuilt(ExpressionObserver observer, bool useDirectSubscription)
+    static void AssertTheFastPathServed(ExpressionObserver observer, bool useDirectSubscription)
     {
         if (useDirectSubscription)
-            Assert.AreNotEqual(0, observer.CachedObservableExpressions, "the fast path reduced an invocation whose argument it would have moved");
+            Assert.AreEqual(0, observer.CachedObservableExpressions, "the fast path declined an invocation it can bind as a let");
     }
 
     static Expression<Func<Recorded, T>> InvokeWithSubject<T>(LambdaExpression lambda, Func<ParameterExpression, Expression[]> arguments)
@@ -31,7 +31,7 @@ public class InvocationReductionDeferral
         var subject = new Recorded(new SubscriptionLog()) { Rank = 0, Score = 0 };
         var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using var expression = observer.Observe(lambda, subject);
-        AssertTheGraphWasBuilt(observer, useDirectSubscription);
+        AssertTheFastPathServed(observer, useDirectSubscription);
         Assert.IsInstanceOfType<DivideByZeroException>(expression.Evaluation.Fault);
         subject.Score = 5;
         Assert.IsNull(expression.Evaluation.Fault);
@@ -52,7 +52,7 @@ public class InvocationReductionDeferral
         var subject = new Recorded(new SubscriptionLog()) { Rank = 0, Score = 0 };
         var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using var expression = observer.Observe(lambda, subject);
-        AssertTheGraphWasBuilt(observer, useDirectSubscription);
+        AssertTheFastPathServed(observer, useDirectSubscription);
         Assert.IsInstanceOfType<DivideByZeroException>(expression.Evaluation.Fault);
         subject.Score = 5;
         Assert.IsNull(expression.Evaluation.Fault);
@@ -72,7 +72,7 @@ public class InvocationReductionDeferral
         var subject = new Recorded(log) { Tag = "tag" };
         var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using var expression = observer.Observe(lambda, subject);
-        AssertTheGraphWasBuilt(observer, useDirectSubscription);
+        AssertTheFastPathServed(observer, useDirectSubscription);
         Assert.IsInstanceOfType<NullReferenceException>(expression.Evaluation.Fault);
         subject.Next = new Recorded(log) { Tag = "next" };
         Assert.IsNull(expression.Evaluation.Fault);
@@ -92,7 +92,7 @@ public class InvocationReductionDeferral
         var subject = new Recorded(new SubscriptionLog()) { Score = 0 };
         var observer = ExpressionObserverHelpers.Create(useDirectSubscription);
         using var expression = observer.Observe(lambda, subject);
-        AssertTheGraphWasBuilt(observer, useDirectSubscription);
+        AssertTheFastPathServed(observer, useDirectSubscription);
         Assert.IsInstanceOfType<DivideByZeroException>(expression.Evaluation.Fault, "the try caught a fault its argument raised before the try was entered");
         subject.Score = 5;
         Assert.IsNull(expression.Evaluation.Fault);

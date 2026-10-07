@@ -36,6 +36,9 @@
 /// <remarks>
 /// A property read through a target which is not fixed contributes no subscription of its own when no value the target could hold raises a change notification, which is decided by its type being sealed and implementing none of the notification interfaces, exactly as the graph's node for it subscribes to nothing. A target which could notify becomes a link: the target's value is recorded by the evaluation which produces it, and the subscription naming that link attaches to whatever it holds and moves when it changes, which is what the graph's node does when the value it read last is not the value it reads now
 /// </remarks>
+/// <remarks>
+/// A let in which the invocation reducer bound arguments is admitted on the terms of its parts. Each argument is analyzed where the let is, because it is evaluated before the body whatever the body defers, and the body is analyzed as any expression is, reading each variable as a target which is not fixed: a member read through one is a link which moves when its argument does. The contents of a variable the body reads are followed the same way, because the graph's body holds the argument's value as a constant whose contents it watches, and every link the body or its variables follow is released while an argument has faulted, because the graph builds no body then. The graph also builds the body again whenever an argument changes, detaching what the old body attached and attaching what the new one reaches, so a let is admitted only where that cannot differ from what the fast path does: its body may subscribe to a source which could notify only through one of its variables and outside any operand it defers, and then only in a let binding a single variable, whose change is the only one which rebuilds the body and which moves the link exactly as the rebuild would
+/// </remarks>
 public sealed class DirectSubscriptionAnalyzer
 {
     sealed class ExpressionIdentityComparer :
@@ -93,6 +96,14 @@ public sealed class DirectSubscriptionAnalyzer
             Held.Add((expression, disposed));
         }
 
+        internal void AddLink(Expression target)
+        {
+            for (int i = 0, ii = Links.Count; i < ii; ++i)
+                if (ReferenceEquals(Links[i], target))
+                    return;
+            Links.Add(target);
+        }
+
         internal void AddLinked(Expression owner, Expression target, string propertyName)
         {
             for (int i = 0, ii = Links.Count; i < ii; ++i)
@@ -125,6 +136,26 @@ public sealed class DirectSubscriptionAnalyzer
 
         internal void EndDeferredGroup(int enclosing) =>
             CurrentGroup = enclosing;
+
+        /// <summary>
+        /// Determines why the subscriptions planned since the specified number of subscriptions, to sources which could notify, are not all made through the specified variables outside the deferred groups begun since the specified number of them, yielding <see cref="DirectSubscriptionIneligibility.None"/> where they are and noting whether there were any
+        /// </summary>
+        internal DirectSubscriptionIneligibility FollowsOnly(int subscriptions, int deferredGroups, ReadOnlyCollection<ParameterExpression> variables, out bool following)
+        {
+            following = false;
+            for (int i = subscriptions, ii = Subscriptions.Count; i < ii; ++i)
+            {
+                var source = Subscriptions[i].Source!;
+                if (CannotNotify(source.Type))
+                    continue;
+                if (groups[owners[i]] > deferredGroups)
+                    return DirectSubscriptionIneligibility.DeferredBranch;
+                if (source is not ParameterExpression variable || !variables.Contains(variable))
+                    return DirectSubscriptionIneligibility.UnsupportedExpressionKind;
+                following = true;
+            }
+            return DirectSubscriptionIneligibility.None;
+        }
 
         bool IsAncestorOrSelf(int candidate, int group) =>
             NearestCommonAncestor(candidate, group) == candidate;
@@ -244,7 +275,7 @@ public sealed class DirectSubscriptionAnalyzer
         expression switch
         {
             ConstantExpression => true,
-            ParameterExpression => true,
+            ParameterExpression parameterExpression => !InvocationReducer.IsLetVariable(parameterExpression),
             MemberExpression { Member: FieldInfo } memberExpression => memberExpression.Expression is not { } target || IsFixed(target),
             MemberExpression { Member: PropertyInfo, Expression: null } => true,
             UnaryExpression unaryExpression when unaryExpression.NodeType is ExpressionType.Quote => true,
@@ -281,6 +312,21 @@ public sealed class DirectSubscriptionAnalyzer
         return true;
     }
 
+    /// <summary>
+    /// Determines whether a block is a let the invocation reducer made, whose every expression but the last assigns an argument to one of its variables, in the order of those variables
+    /// </summary>
+    internal static bool IsLet(BlockExpression blockExpression)
+    {
+        var variables = blockExpression.Variables;
+        var expressions = blockExpression.Expressions;
+        if (variables.Count == 0 || expressions.Count != variables.Count + 1)
+            return false;
+        for (int i = 0, ii = variables.Count; i < ii; ++i)
+            if (!InvocationReducer.IsLetVariable(variables[i]) || expressions[i] is not BinaryExpression { NodeType: ExpressionType.Assign } assignment || !ReferenceEquals(assignment.Left, variables[i]))
+                return false;
+        return true;
+    }
+
     static bool CannotNotify(Type type) =>
         type.IsSealed && !typeof(INotifyPropertyChanged).IsAssignableFrom(type) && !typeof(INotifyCollectionChanged).IsAssignableFrom(type) && !typeof(INotifyDictionaryChanged).IsAssignableFrom(type);
 
@@ -289,6 +335,9 @@ public sealed class DirectSubscriptionAnalyzer
 
     static bool IsCompilerGenerated(Expression? expression) =>
         expression?.Type.Name.StartsWith('<') ?? false;
+
+    bool ContentsCanBeWatched(Type type) =>
+        (constantsListenForCollectionChanged || constantsListenForDictionaryChanged) && (!type.IsSealed || constantsListenForCollectionChanged && typeof(INotifyCollectionChanged).IsAssignableFrom(type) || constantsListenForDictionaryChanged && typeof(INotifyDictionaryChanged).IsAssignableFrom(type));
 
     static ExpressionObserverOptions Validated(ExpressionObserverOptions options)
     {
@@ -399,6 +448,37 @@ public sealed class DirectSubscriptionAnalyzer
             AddPropertyChangedSubscription(planner, indexExpression, target, DirectSubscriptionKind.IndexerPropertyChanged, indexer.Name);
         }
         return DirectSubscriptionAnalysis.Eligible;
+    }
+
+    DirectSubscriptionAnalysis AnalyzeLet(BlockExpression blockExpression, Planner? planner)
+    {
+        var expressions = blockExpression.Expressions;
+        var following = false;
+        for (int i = 0, ii = expressions.Count - 1; i < ii; ++i)
+        {
+            var assignment = (BinaryExpression)expressions[i];
+            var argumentAnalysis = AnalyzeNode(assignment.Right, planner);
+            if (!argumentAnalysis.IsEligible)
+                return argumentAnalysis;
+            if (planner is not null && InvocationReducer.IsReadLetVariable((ParameterExpression)assignment.Left) && ContentsCanBeWatched(assignment.Left.Type))
+            {
+                planner.Reached(assignment);
+                planner.AddLink(assignment);
+                AddContentsSubscription(planner, assignment, assignment, constantsListenForDictionaryChanged, constantsListenForCollectionChanged);
+                following = true;
+            }
+        }
+        if (planner is null)
+            return AnalyzeNode(expressions[^1], planner);
+        var subscriptions = planner.Subscriptions.Count;
+        var deferredGroups = planner.DeferredGroups.Count;
+        var bodyAnalysis = AnalyzeNode(expressions[^1], planner);
+        if (!bodyAnalysis.IsEligible)
+            return bodyAnalysis;
+        var ineligibility = planner.FollowsOnly(subscriptions, deferredGroups, blockExpression.Variables, out var followingInBody);
+        if (ineligibility is DirectSubscriptionIneligibility.None && (following || followingInBody) && blockExpression.Variables.Count > 1)
+            ineligibility = DirectSubscriptionIneligibility.UnsupportedExpressionKind;
+        return ineligibility is DirectSubscriptionIneligibility.None ? bodyAnalysis : new(blockExpression, ineligibility);
     }
 
     /// <summary>
@@ -546,7 +626,7 @@ public sealed class DirectSubscriptionAnalyzer
 
     DirectSubscriptionAnalysis AnalyzeParameter(ParameterExpression parameterExpression, Planner? planner)
     {
-        if (planner is not null)
+        if (planner is not null && !InvocationReducer.IsLetVariable(parameterExpression))
             AddContentsSubscription(planner, parameterExpression, parameterExpression, constantsListenForDictionaryChanged, constantsListenForCollectionChanged);
         return DirectSubscriptionAnalysis.Eligible;
     }
@@ -600,6 +680,7 @@ public sealed class DirectSubscriptionAnalyzer
             BinaryExpression binaryExpression => AnalyzeNode(binaryExpression.Left, planner) is { IsEligible: false } left ? left : AnalyzeNode(binaryExpression.Right, planner),
             ConditionalExpression conditionalExpression => AnalyzeConditional(conditionalExpression, planner),
             TryExpression tryExpression => AnalyzeTry(tryExpression, planner),
+            BlockExpression blockExpression when IsLet(blockExpression) => AnalyzeLet(blockExpression, planner),
             TypeBinaryExpression typeBinaryExpression when typeBinaryExpression.NodeType is not ExpressionType.TypeAs => AnalyzeNode(typeBinaryExpression.Expression, planner),
             UnaryExpression unaryExpression when unaryExpression.NodeType is ExpressionType.Quote => DirectSubscriptionAnalysis.Eligible,
             UnaryExpression unaryExpression when ExpressionObserver.IsRethrow(unaryExpression) => new(unaryExpression, DirectSubscriptionIneligibility.UnsupportedExpressionKind),
