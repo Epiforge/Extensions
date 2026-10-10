@@ -421,7 +421,7 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
                     if (oldItems.Count == results.Count + withheldOccurrences)
                     {
                         ReleaseEntriesWithAccess();
-                        results.Clear();
+                        results.RemoveRange(0, results.Count);
                     }
                     else if (oldItems.Count == 1)
                         RemoveElementOccurrencesWithAccess((TElement)oldItems[0]!, 1);
@@ -438,8 +438,7 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
                             ObserveOccurrenceWithAccess((TElement)newItems[i]!, firstOccurrences);
                         var ordered = new List<TElement>();
                         PlaceAllWithAccess(firstOccurrences, ordered);
-                        if (ordered.Count > 0)
-                            results.Reset(ordered);
+                        results.InsertRange(0, ordered);
                     }
                     else if (newItems.Count == 1)
                         InsertElementOccurrencesWithAccess((TElement)newItems[0]!, 1, null);

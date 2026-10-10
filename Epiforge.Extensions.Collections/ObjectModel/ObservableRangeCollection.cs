@@ -82,6 +82,12 @@ public class ObservableRangeCollection<T> :
     /// </summary>
     public bool RaiseCollectionChangedEventsForIndividualElements { get; }
 
+    /// <summary>
+    /// Gets the list holding the elements, which <see cref="ObservableCollection{T}"/> always constructs as a <see cref="List{T}"/>, so that a range is copied, shifted or removed in one pass rather than by shifting the rest of the list once for each element
+    /// </summary>
+    List<T> BackingList =>
+        (List<T>)Items;
+
     /// <inheritdoc/>
     public void AddRange(IEnumerable<T> items) =>
         InsertRange(Items.Count, items);
@@ -127,14 +133,10 @@ public class ObservableRangeCollection<T> :
                 InsertItem(++index, item);
         else
         {
-            var list = new List<T>();
-            foreach (var item in items)
-            {
-                Items.Insert(++index, item);
-                list.Add(item);
-            }
+            var list = new List<T>(items);
             if (list.Count > 0)
             {
+                BackingList.InsertRange(originalIndex, list);
                 NotifyCountChanged();
                 NotifyIndexerChanged();
                 OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, list, originalIndex));
@@ -179,16 +181,13 @@ public class ObservableRangeCollection<T> :
             }
             else
             {
-                var insertionIndex = newStartIndex - 1;
-                var movedItems = new List<T>();
-                for (var i = 0; i < count; ++i)
-                {
-                    var item = Items[oldStartIndex];
-                    Items.RemoveAt(oldStartIndex);
-                    movedItems.Add(item);
-                }
-                foreach (var item in movedItems)
-                    Items.Insert(++insertionIndex, item);
+                var items = CollectionsMarshal.AsSpan(BackingList);
+                var movedItems = items.Slice(oldStartIndex, count).ToArray();
+                if (oldStartIndex < newStartIndex)
+                    items.Slice(oldStartIndex + count, newStartIndex - oldStartIndex).CopyTo(items[oldStartIndex..]);
+                else
+                    items.Slice(newStartIndex, oldStartIndex - newStartIndex).CopyTo(items[(newStartIndex + count)..]);
+                movedItems.CopyTo(items[newStartIndex..]);
                 NotifyIndexerChanged();
                 OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Move, movedItems, newStartIndex, oldStartIndex));
             }
@@ -277,12 +276,9 @@ public class ObservableRangeCollection<T> :
             }
             else
             {
-                var run = new T[runLength];
-                for (var i = 0; i < runLength; ++i)
-                {
-                    run[i] = Items[index];
-                    Items.RemoveAt(index);
-                }
+                var backingList = BackingList;
+                var run = CollectionsMarshal.AsSpan(backingList).Slice(index, runLength).ToArray();
+                backingList.RemoveRange(index, runLength);
                 removed?.AddRange(run);
                 eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, run, index);
             }
@@ -346,12 +342,9 @@ public class ObservableRangeCollection<T> :
                     RemoveAt(index);
             else
             {
-                var removedItems = new T[count];
-                for (var removalIndex = 0; removalIndex < count; ++removalIndex)
-                {
-                    removedItems[removalIndex] = Items[index];
-                    Items.RemoveAt(index);
-                }
+                var backingList = BackingList;
+                var removedItems = CollectionsMarshal.AsSpan(backingList).Slice(index, count).ToArray();
+                backingList.RemoveRange(index, count);
                 NotifyCountChanged();
                 NotifyIndexerChanged();
                 OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, removedItems, index));
@@ -399,22 +392,18 @@ public class ObservableRangeCollection<T> :
         }
         else
         {
-            var originalIndex = index;
-            var oldItems = new T[count];
-            for (var i = 0; i < count; ++i)
+            var backingList = BackingList;
+            var replacedItems = CollectionsMarshal.AsSpan(backingList).Slice(index, count);
+            var oldItems = replacedItems.ToArray();
+            var list = collection is null ? [] : new List<T>(collection);
+            if (list.Count == count)
+                CollectionsMarshal.AsSpan(list).CopyTo(replacedItems);
+            else
             {
-                oldItems[i] = Items[index];
-                Items.RemoveAt(index);
+                backingList.RemoveRange(index, count);
+                backingList.InsertRange(index, list);
             }
-            var list = new List<T>();
-            index -= 1;
-            if (collection is not null)
-                foreach (var element in collection)
-                {
-                    Items.Insert(++index, element);
-                    list.Add(element);
-                }
-            NotifyReplacement(oldItems, list, originalIndex);
+            NotifyReplacement(oldItems, list, index);
             return [..oldItems];
         }
     }
