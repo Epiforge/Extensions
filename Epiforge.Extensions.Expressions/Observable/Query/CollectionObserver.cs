@@ -82,16 +82,29 @@ public class CollectionObserver :
         ObservableCollectionQueryEnumerable enumerableObservableCollection;
         lock (cachedEnumerableObservableCollectionsAccess)
         {
-            if (!cachedEnumerableObservableCollections.TryGetValue(enumerable, out var cachedCollectionObservableCollection))
+            if (cachedEnumerableObservableCollections.TryGetValue(enumerable, out var cachedCollectionObservableCollection))
             {
-                enumerableObservableCollection = new ObservableCollectionQueryEnumerable(this, enumerable);
-                cachedEnumerableObservableCollections.Add(enumerable, enumerableObservableCollection);
-            }
-            else
                 enumerableObservableCollection = (ObservableCollectionQueryEnumerable)cachedCollectionObservableCollection;
+                ++enumerableObservableCollection.Observations;
+                return enumerableObservableCollection.AsScoped();
+            }
+        }
+        var built = new ObservableCollectionQueryEnumerable(this, enumerable);
+        built.Observations = 1;
+        built.Initialize();
+        lock (cachedEnumerableObservableCollectionsAccess)
+        {
+            ref var cached = ref CollectionsMarshal.GetValueRefOrAddDefault(cachedEnumerableObservableCollections, enumerable, out var exists);
+            if (!exists)
+            {
+                cached = built;
+                built.IsCached = true;
+                return built.AsScoped();
+            }
+            enumerableObservableCollection = (ObservableCollectionQueryEnumerable)cached!;
             ++enumerableObservableCollection.Observations;
         }
-        enumerableObservableCollection.Initialize();
+        built.Release();
         return enumerableObservableCollection.AsScoped();
     }
 
@@ -102,16 +115,29 @@ public class CollectionObserver :
         ObservableCollectionQueryList listObservableCollection;
         lock (cachedListObservableCollectionsAccess)
         {
-            if (!cachedListObservableCollections.TryGetValue(list, out var cachedCollectionObservableCollection))
+            if (cachedListObservableCollections.TryGetValue(list, out var cachedCollectionObservableCollection))
             {
-                listObservableCollection = new ObservableCollectionQueryList(this, list);
-                cachedListObservableCollections.Add(list, listObservableCollection);
-            }
-            else
                 listObservableCollection = (ObservableCollectionQueryList)cachedCollectionObservableCollection;
+                ++listObservableCollection.Observations;
+                return listObservableCollection.AsScoped();
+            }
+        }
+        var built = new ObservableCollectionQueryList(this, list);
+        built.Observations = 1;
+        built.Initialize();
+        lock (cachedListObservableCollectionsAccess)
+        {
+            ref var cached = ref CollectionsMarshal.GetValueRefOrAddDefault(cachedListObservableCollections, list, out var exists);
+            if (!exists)
+            {
+                cached = built;
+                built.IsCached = true;
+                return built.AsScoped();
+            }
+            listObservableCollection = (ObservableCollectionQueryList)cached!;
             ++listObservableCollection.Observations;
         }
-        listObservableCollection.Initialize();
+        built.Release();
         return listObservableCollection.AsScoped();
     }
 
@@ -122,16 +148,29 @@ public class CollectionObserver :
         ObservableCollectionQueryGenericEnumerable<TElement> enumerableObservableCollection;
         lock (cachedGenericEnumerableObservableCollectionsAccess)
         {
-            if (!cachedGenericEnumerableObservableCollections.TryGetValue(enumerable, out var cachedEnumerableObservableCollection))
+            if (cachedGenericEnumerableObservableCollections.TryGetValue(enumerable, out var cachedEnumerableObservableCollection))
             {
-                enumerableObservableCollection = new ObservableCollectionQueryGenericEnumerable<TElement>(this, enumerable);
-                cachedGenericEnumerableObservableCollections.Add(enumerable, enumerableObservableCollection);
-            }
-            else
                 enumerableObservableCollection = (ObservableCollectionQueryGenericEnumerable<TElement>)cachedEnumerableObservableCollection;
+                ++enumerableObservableCollection.Observations;
+                return enumerableObservableCollection.AsScoped();
+            }
+        }
+        var built = new ObservableCollectionQueryGenericEnumerable<TElement>(this, enumerable);
+        built.Observations = 1;
+        built.Initialize();
+        lock (cachedGenericEnumerableObservableCollectionsAccess)
+        {
+            ref var cached = ref CollectionsMarshal.GetValueRefOrAddDefault(cachedGenericEnumerableObservableCollections, enumerable, out var exists);
+            if (!exists)
+            {
+                cached = built;
+                built.IsCached = true;
+                return built.AsScoped();
+            }
+            enumerableObservableCollection = (ObservableCollectionQueryGenericEnumerable<TElement>)cached!;
             ++enumerableObservableCollection.Observations;
         }
-        enumerableObservableCollection.Initialize();
+        built.Release();
         return enumerableObservableCollection.AsScoped();
     }
 
@@ -142,16 +181,29 @@ public class CollectionObserver :
         ObservableCollectionQueryGenericList<TElement> listObservableCollection;
         lock (cachedGenericListObservableCollectionsAccess)
         {
-            if (!cachedGenericListObservableCollections.TryGetValue(list, out var cachedListObservableCollection))
+            if (cachedGenericListObservableCollections.TryGetValue(list, out var cachedListObservableCollection))
             {
-                listObservableCollection = new ObservableCollectionQueryGenericList<TElement>(this, list);
-                cachedGenericListObservableCollections.Add(list, listObservableCollection);
-            }
-            else
                 listObservableCollection = (ObservableCollectionQueryGenericList<TElement>)cachedListObservableCollection;
+                ++listObservableCollection.Observations;
+                return listObservableCollection.AsScoped();
+            }
+        }
+        var built = new ObservableCollectionQueryGenericList<TElement>(this, list);
+        built.Observations = 1;
+        built.Initialize();
+        lock (cachedGenericListObservableCollectionsAccess)
+        {
+            ref var cached = ref CollectionsMarshal.GetValueRefOrAddDefault(cachedGenericListObservableCollections, list, out var exists);
+            if (!exists)
+            {
+                cached = built;
+                built.IsCached = true;
+                return built.AsScoped();
+            }
+            listObservableCollection = (ObservableCollectionQueryGenericList<TElement>)cached!;
             ++listObservableCollection.Observations;
         }
-        listObservableCollection.Initialize();
+        built.Release();
         return listObservableCollection.AsScoped();
     }
 
@@ -161,16 +213,29 @@ public class CollectionObserver :
         ObservableCollectionQueryReadOnlyList<TElement> readOnlyListObservableCollection;
         lock (cachedReadOnlyListObservableCollectionsAccess)
         {
-            if (!cachedReadOnlyListObservableCollections.TryGetValue(readOnlyList, out var cachedReadOnlyListObservableCollection))
+            if (cachedReadOnlyListObservableCollections.TryGetValue(readOnlyList, out var cachedReadOnlyListObservableCollection))
             {
-                readOnlyListObservableCollection = new ObservableCollectionQueryReadOnlyList<TElement>(this, readOnlyList, changeLockHolder);
-                cachedReadOnlyListObservableCollections.Add(readOnlyList, readOnlyListObservableCollection);
-            }
-            else
                 readOnlyListObservableCollection = (ObservableCollectionQueryReadOnlyList<TElement>)cachedReadOnlyListObservableCollection;
+                ++readOnlyListObservableCollection.Observations;
+                return readOnlyListObservableCollection;
+            }
+        }
+        var built = new ObservableCollectionQueryReadOnlyList<TElement>(this, readOnlyList, changeLockHolder);
+        built.Observations = 1;
+        built.Initialize();
+        lock (cachedReadOnlyListObservableCollectionsAccess)
+        {
+            ref var cached = ref CollectionsMarshal.GetValueRefOrAddDefault(cachedReadOnlyListObservableCollections, readOnlyList, out var exists);
+            if (!exists)
+            {
+                cached = built;
+                built.IsCached = true;
+                return built;
+            }
+            readOnlyListObservableCollection = (ObservableCollectionQueryReadOnlyList<TElement>)cached!;
             ++readOnlyListObservableCollection.Observations;
         }
-        readOnlyListObservableCollection.Initialize();
+        built.Release();
         return readOnlyListObservableCollection;
     }
 
@@ -186,16 +251,29 @@ public class CollectionObserver :
         ObservableDictionaryQueryReadOnlyDictionary<TKey, TValue> readOnlyDictionaryObservableDictionary;
         lock (cachedReadOnlyDictionaryObservableDictionariesAccess)
         {
-            if (!cachedReadOnlyDictionaryObservableDictionaries.TryGetValue(dictionary, out var cachedReadOnlyDictionaryObservableDictionary))
+            if (cachedReadOnlyDictionaryObservableDictionaries.TryGetValue(dictionary, out var cachedReadOnlyDictionaryObservableDictionary))
             {
-                readOnlyDictionaryObservableDictionary = new ObservableDictionaryQueryReadOnlyDictionary<TKey, TValue>(this, dictionary);
-                cachedReadOnlyDictionaryObservableDictionaries.Add(dictionary, readOnlyDictionaryObservableDictionary);
-            }
-            else
                 readOnlyDictionaryObservableDictionary = (ObservableDictionaryQueryReadOnlyDictionary<TKey, TValue>)cachedReadOnlyDictionaryObservableDictionary;
+                ++readOnlyDictionaryObservableDictionary.Observations;
+                return readOnlyDictionaryObservableDictionary.AsScoped();
+            }
+        }
+        var built = new ObservableDictionaryQueryReadOnlyDictionary<TKey, TValue>(this, dictionary);
+        built.Observations = 1;
+        built.Initialize();
+        lock (cachedReadOnlyDictionaryObservableDictionariesAccess)
+        {
+            ref var cached = ref CollectionsMarshal.GetValueRefOrAddDefault(cachedReadOnlyDictionaryObservableDictionaries, dictionary, out var exists);
+            if (!exists)
+            {
+                cached = built;
+                built.IsCached = true;
+                return built.AsScoped();
+            }
+            readOnlyDictionaryObservableDictionary = (ObservableDictionaryQueryReadOnlyDictionary<TKey, TValue>)cached!;
             ++readOnlyDictionaryObservableDictionary.Observations;
         }
-        readOnlyDictionaryObservableDictionary.Initialize();
+        built.Release();
         return readOnlyDictionaryObservableDictionary.AsScoped();
     }
 
@@ -208,7 +286,8 @@ public class CollectionObserver :
                 throw new InvalidOperationException("an observation was released more times than it was acquired");
             if (remaining == 0)
             {
-                cachedEnumerableObservableCollections.Remove(enumerableObservableCollection.Enumerable);
+                if (enumerableObservableCollection.IsCached)
+                    cachedEnumerableObservableCollections.Remove(enumerableObservableCollection.Enumerable);
                 return true;
             }
         }
@@ -224,7 +303,8 @@ public class CollectionObserver :
                 throw new InvalidOperationException("an observation was released more times than it was acquired");
             if (remaining == 0)
             {
-                cachedListObservableCollections.Remove(listObservableCollection.List);
+                if (listObservableCollection.IsCached)
+                    cachedListObservableCollections.Remove(listObservableCollection.List);
                 return true;
             }
         }
@@ -240,7 +320,8 @@ public class CollectionObserver :
                 throw new InvalidOperationException("an observation was released more times than it was acquired");
             if (remaining == 0)
             {
-                cachedGenericEnumerableObservableCollections.Remove(enumerableObservableCollection.Enumerable);
+                if (enumerableObservableCollection.IsCached)
+                    cachedGenericEnumerableObservableCollections.Remove(enumerableObservableCollection.Enumerable);
                 return true;
             }
         }
@@ -256,7 +337,8 @@ public class CollectionObserver :
                 throw new InvalidOperationException("an observation was released more times than it was acquired");
             if (remaining == 0)
             {
-                cachedGenericListObservableCollections.Remove(listObservableCollection.List);
+                if (listObservableCollection.IsCached)
+                    cachedGenericListObservableCollections.Remove(listObservableCollection.List);
                 return true;
             }
         }
@@ -272,7 +354,8 @@ public class CollectionObserver :
                 throw new InvalidOperationException("an observation was released more times than it was acquired");
             if (remaining == 0)
             {
-                cachedReadOnlyListObservableCollections.Remove(readOnlyListObservableCollection.ReadOnlyList);
+                if (readOnlyListObservableCollection.IsCached)
+                    cachedReadOnlyListObservableCollections.Remove(readOnlyListObservableCollection.ReadOnlyList);
                 return true;
             }
         }
@@ -289,7 +372,8 @@ public class CollectionObserver :
                 throw new InvalidOperationException("an observation was released more times than it was acquired");
             if (remaining == 0)
             {
-                cachedReadOnlyDictionaryObservableDictionaries.Remove(readOnlyDictionaryObservableDictionary.ReadOnlyDictionary);
+                if (readOnlyDictionaryObservableDictionary.IsCached)
+                    cachedReadOnlyDictionaryObservableDictionaries.Remove(readOnlyDictionaryObservableDictionary.ReadOnlyDictionary);
                 return true;
             }
         }

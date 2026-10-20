@@ -42,14 +42,28 @@ abstract class ObservableScalarQuery<TResult>(CollectionObserver collectionObser
         ObservableQuery transformQuery;
         lock (ChildrenAccess)
         {
-            if (!(cachedTransformQueries ??= new(ExpressionEqualityComparer.Default)).TryGetValue(transform, out transformQuery!))
+            if ((cachedTransformQueries ??= new(ExpressionEqualityComparer.Default)).TryGetValue(transform, out transformQuery!))
             {
-                transformQuery = new ObservableScalarTransformQuery<TResult, TTransform>(collectionObserver, this, transform);
-                cachedTransformQueries.Add(transform, transformQuery);
+                ++transformQuery.Observations;
+                return ((ObservableScalarQuery<TTransform>)transformQuery).AsScoped();
             }
+        }
+        var built = new ObservableScalarTransformQuery<TResult, TTransform>(collectionObserver, this, transform);
+        built.Observations = 1;
+        built.Initialize();
+        lock (ChildrenAccess)
+        {
+            ref var cached = ref CollectionsMarshal.GetValueRefOrAddDefault(cachedTransformQueries ??= new(ExpressionEqualityComparer.Default), transform, out var exists);
+            if (!exists)
+            {
+                cached = built;
+                built.IsCached = true;
+                return ((ObservableScalarQuery<TTransform>)built).AsScoped();
+            }
+            transformQuery = cached!;
             ++transformQuery.Observations;
         }
-        transformQuery.Initialize();
+        built.Release();
         return ((ObservableScalarQuery<TTransform>)transformQuery).AsScoped();
     }
 
@@ -62,7 +76,8 @@ abstract class ObservableScalarQuery<TResult>(CollectionObserver collectionObser
                 throw new InvalidOperationException("an observation was released more times than it was acquired");
             if (remaining == 0)
             {
-                cachedTransformQueries!.Remove(query.Transform);
+                if (query.IsCached)
+                    cachedTransformQueries!.Remove(query.Transform);
                 return true;
             }
         }

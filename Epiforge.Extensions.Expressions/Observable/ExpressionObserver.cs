@@ -356,7 +356,8 @@ public class ExpressionObserver :
                 throw new InvalidOperationException($"an observation of {observableBinaryExpression.Expression} was released more times than it was acquired");
             if (remaining == 0)
             {
-                cachedObservableBinaryExpressions.Remove(observableBinaryExpression.BinaryExpression);
+                if (observableBinaryExpression.IsCached)
+                    cachedObservableBinaryExpressions.Remove(observableBinaryExpression.BinaryExpression);
                 return true;
             }
         }
@@ -372,7 +373,8 @@ public class ExpressionObserver :
                 throw new InvalidOperationException($"an observation of {observableConditionalExpression.Expression} was released more times than it was acquired");
             if (remaining == 0)
             {
-                cachedObservableConditionalExpressions.Remove(observableConditionalExpression.ConditionalExpression);
+                if (observableConditionalExpression.IsCached)
+                    cachedObservableConditionalExpressions.Remove(observableConditionalExpression.ConditionalExpression);
                 return true;
             }
         }
@@ -389,7 +391,8 @@ public class ExpressionObserver :
                 throw new InvalidOperationException($"an observation of {observableConstantExpression.Expression} was released more times than it was acquired");
             if (remaining == 0)
             {
-                cachedExpressions.Remove(observableConstantExpression.ConstantExpression);
+                if (observableConstantExpression.IsCached)
+                    cachedExpressions.Remove(observableConstantExpression.ConstantExpression);
                 return true;
             }
         }
@@ -405,7 +408,8 @@ public class ExpressionObserver :
                 throw new InvalidOperationException($"an observation of {observableIndexExpression.Expression} was released more times than it was acquired");
             if (remaining == 0)
             {
-                cachedObservableIndexExpressions.Remove(observableIndexExpression.IndexExpression);
+                if (observableIndexExpression.IsCached)
+                    cachedObservableIndexExpressions.Remove(observableIndexExpression.IndexExpression);
                 return true;
             }
         }
@@ -421,7 +425,8 @@ public class ExpressionObserver :
                 throw new InvalidOperationException($"an observation of {observableInvocationExpression.Expression} was released more times than it was acquired");
             if (remaining == 0)
             {
-                cachedObservableInvocationExpressions.Remove(observableInvocationExpression.InvocationExpression);
+                if (observableInvocationExpression.IsCached)
+                    cachedObservableInvocationExpressions.Remove(observableInvocationExpression.InvocationExpression);
                 return true;
             }
         }
@@ -437,7 +442,8 @@ public class ExpressionObserver :
                 throw new InvalidOperationException($"an observation of {observableMemberExpression.Expression} was released more times than it was acquired");
             if (remaining == 0)
             {
-                cachedObservableMemberExpressions.Remove(observableMemberExpression.MemberExpression);
+                if (observableMemberExpression.IsCached)
+                    cachedObservableMemberExpressions.Remove(observableMemberExpression.MemberExpression);
                 return true;
             }
         }
@@ -453,7 +459,8 @@ public class ExpressionObserver :
                 throw new InvalidOperationException($"an observation of {observableMemberInitExpression.Expression} was released more times than it was acquired");
             if (remaining == 0)
             {
-                cachedObservableMemberInitExpressions.Remove(observableMemberInitExpression.MemberInitExpression);
+                if (observableMemberInitExpression.IsCached)
+                    cachedObservableMemberInitExpressions.Remove(observableMemberInitExpression.MemberInitExpression);
                 return true;
             }
         }
@@ -469,7 +476,8 @@ public class ExpressionObserver :
                 throw new InvalidOperationException($"an observation of {observableMethodCallExpression.Expression} was released more times than it was acquired");
             if (remaining == 0)
             {
-                cachedObservableMethodCallExpressions.Remove(observableMethodCallExpression.MethodCallExpression);
+                if (observableMethodCallExpression.IsCached)
+                    cachedObservableMethodCallExpressions.Remove(observableMethodCallExpression.MethodCallExpression);
                 return true;
             }
         }
@@ -485,7 +493,8 @@ public class ExpressionObserver :
                 throw new InvalidOperationException($"an observation of {observableNewArrayInitExpression.Expression} was released more times than it was acquired");
             if (remaining == 0)
             {
-                cachedObservableNewArrayInitExpressions.Remove(observableNewArrayInitExpression.NewArrayExpression);
+                if (observableNewArrayInitExpression.IsCached)
+                    cachedObservableNewArrayInitExpressions.Remove(observableNewArrayInitExpression.NewArrayExpression);
                 return true;
             }
         }
@@ -501,7 +510,8 @@ public class ExpressionObserver :
                 throw new InvalidOperationException($"an observation of {observableNewExpression.Expression} was released more times than it was acquired");
             if (remaining == 0)
             {
-                cachedObservableNewExpressions.Remove(observableNewExpression.NewExpression);
+                if (observableNewExpression.IsCached)
+                    cachedObservableNewExpressions.Remove(observableNewExpression.NewExpression);
                 return true;
             }
         }
@@ -517,7 +527,8 @@ public class ExpressionObserver :
                 throw new InvalidOperationException($"an observation of {observableTryExpression.Expression} was released more times than it was acquired");
             if (remaining == 0)
             {
-                cachedObservableTryExpressions.Remove(observableTryExpression.TryExpression);
+                if (observableTryExpression.IsCached)
+                    cachedObservableTryExpressions.Remove(observableTryExpression.TryExpression);
                 return true;
             }
         }
@@ -533,7 +544,8 @@ public class ExpressionObserver :
                 throw new InvalidOperationException($"an observation of {observableTypeBinaryExpression.Expression} was released more times than it was acquired");
             if (remaining == 0)
             {
-                cachedObservableTypeBinaryExpressions.Remove(observableTypeBinaryExpression.TypeBinaryExpression);
+                if (observableTypeBinaryExpression.IsCached)
+                    cachedObservableTypeBinaryExpressions.Remove(observableTypeBinaryExpression.TypeBinaryExpression);
                 return true;
             }
         }
@@ -549,7 +561,8 @@ public class ExpressionObserver :
                 throw new InvalidOperationException($"an observation of {observableUnaryExpression.Expression} was released more times than it was acquired");
             if (remaining == 0)
             {
-                cachedObservableUnaryExpressions.Remove(observableUnaryExpression.UnaryExpression);
+                if (observableUnaryExpression.IsCached)
+                    cachedObservableUnaryExpressions.Remove(observableUnaryExpression.UnaryExpression);
                 return true;
             }
         }
@@ -577,220 +590,412 @@ public class ExpressionObserver :
             UnaryExpression unaryExpression => GetObservableExpression(unaryExpression, deferEvaluation),
             _ => throw new NotSupportedException($"expression type {expression.NodeType} is not supported")
         };
-        if (Volatile.Read(ref observableExpression.InitializationAccess) is { } initializationAccess)
-            lock (initializationAccess)
-            {
-                if (observableExpression.InitializationException is { } initializationException)
-                    ExceptionDispatchInfo.Capture(initializationException).Throw();
-                try
-                {
-                    if (!observableExpression.IsInitialized)
-                    {
-                        observableExpression.Initialize();
-                        observableExpression.IsInitialized = true;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    observableExpression.InitializationException = ex;
-                    observableExpression.Release();
-                    ExceptionDispatchInfo.Capture(ex).Throw();
-                }
-                Volatile.Write(ref observableExpression.InitializationAccess, null);
-            }
         if (!deferEvaluation)
             observableExpression.EvaluateIfDeferred();
         return observableExpression;
     }
 
+    /// <summary>
+    /// Builds a node before the observer caches it, holding the observation it is built for, so that no thread is handed a node another thread is still building and none waits on one; a node which fails to build is released, tearing down what it built
+    /// </summary>
+    static void Build(ObservableExpression observableExpression)
+    {
+        observableExpression.Observations = 1;
+        try
+        {
+            observableExpression.Initialize();
+        }
+        catch
+        {
+            observableExpression.Release();
+            throw;
+        }
+    }
+
     ObservableBinaryExpression GetObservableExpression(BinaryExpression binaryExpression, bool deferEvaluation)
     {
+        ObservableBinaryExpression? observableBinaryExpression;
         lock (cachedObservableBinaryExpressionsAccess)
         {
-            if (!cachedObservableBinaryExpressions.TryGetValue(binaryExpression, out var observableBinaryExpression))
+            if (cachedObservableBinaryExpressions.TryGetValue(binaryExpression, out observableBinaryExpression))
             {
-                observableBinaryExpression = binaryExpression.NodeType switch
-                {
-                    ExpressionType.AndAlso => new ObservableAndAlsoExpression(this, binaryExpression, deferEvaluation),
-                    ExpressionType.Coalesce => new ObservableCoalesceExpression(this, binaryExpression, deferEvaluation),
-                    ExpressionType.OrElse => new ObservableOrElseExpression(this, binaryExpression, deferEvaluation),
-                    _ => new ObservableBinaryExpression(this, binaryExpression, deferEvaluation)
-                };
-                cachedObservableBinaryExpressions.Add(binaryExpression, observableBinaryExpression);
+                ++observableBinaryExpression.Observations;
+                return observableBinaryExpression;
             }
-            ++observableBinaryExpression.Observations;
-            return observableBinaryExpression;
         }
+        var built = binaryExpression.NodeType switch
+        {
+            ExpressionType.AndAlso => new ObservableAndAlsoExpression(this, binaryExpression, deferEvaluation),
+            ExpressionType.Coalesce => new ObservableCoalesceExpression(this, binaryExpression, deferEvaluation),
+            ExpressionType.OrElse => new ObservableOrElseExpression(this, binaryExpression, deferEvaluation),
+            _ => new ObservableBinaryExpression(this, binaryExpression, deferEvaluation)
+        };
+        Build(built);
+        lock (cachedObservableBinaryExpressionsAccess)
+        {
+            ref var cached = ref CollectionsMarshal.GetValueRefOrAddDefault(cachedObservableBinaryExpressions, binaryExpression, out var exists);
+            if (!exists)
+            {
+                cached = built;
+                built.IsCached = true;
+                return built;
+            }
+            observableBinaryExpression = cached!;
+            ++observableBinaryExpression.Observations;
+        }
+        built.Release();
+        return observableBinaryExpression;
     }
 
     ObservableConditionalExpression GetObservableExpression(ConditionalExpression conditionalExpression, bool deferEvaluation)
     {
+        ObservableConditionalExpression? observableConditionalExpression;
         lock (cachedObservableConditionalExpressionsAccess)
         {
-            if (!cachedObservableConditionalExpressions.TryGetValue(conditionalExpression, out var observableConditionalExpression))
+            if (cachedObservableConditionalExpressions.TryGetValue(conditionalExpression, out observableConditionalExpression))
             {
-                observableConditionalExpression = new ObservableConditionalExpression(this, conditionalExpression, deferEvaluation);
-                cachedObservableConditionalExpressions.Add(conditionalExpression, observableConditionalExpression);
+                ++observableConditionalExpression.Observations;
+                return observableConditionalExpression;
             }
-            ++observableConditionalExpression.Observations;
-            return observableConditionalExpression;
         }
+        var built = new ObservableConditionalExpression(this, conditionalExpression, deferEvaluation);
+        Build(built);
+        lock (cachedObservableConditionalExpressionsAccess)
+        {
+            ref var cached = ref CollectionsMarshal.GetValueRefOrAddDefault(cachedObservableConditionalExpressions, conditionalExpression, out var exists);
+            if (!exists)
+            {
+                cached = built;
+                built.IsCached = true;
+                return built;
+            }
+            observableConditionalExpression = cached!;
+            ++observableConditionalExpression.Observations;
+        }
+        built.Release();
+        return observableConditionalExpression;
     }
 
     ObservableConstantExpression GetObservableExpression(ConstantExpression constantExpression, bool deferEvaluation)
     {
+        ObservableConstantExpression? observableConstantExpression;
         lock (cachedObservableConstantExpressionsAccess)
         {
             var cachedExpressions = typeof(Expression).IsAssignableFrom(constantExpression.Type) ? cachedObservableConstantExpressionExpressions : cachedObservableConstantExpressions;
-            if (!cachedExpressions.TryGetValue(constantExpression, out var observableConstantExpression))
+            if (cachedExpressions.TryGetValue(constantExpression, out observableConstantExpression))
             {
-                observableConstantExpression = new ObservableConstantExpression(this, constantExpression, deferEvaluation);
-                cachedExpressions.Add(constantExpression, observableConstantExpression);
+                ++observableConstantExpression.Observations;
+                return observableConstantExpression;
             }
-            ++observableConstantExpression.Observations;
-            return observableConstantExpression;
         }
+        var built = new ObservableConstantExpression(this, constantExpression, deferEvaluation);
+        Build(built);
+        lock (cachedObservableConstantExpressionsAccess)
+        {
+            var cachedExpressions = typeof(Expression).IsAssignableFrom(constantExpression.Type) ? cachedObservableConstantExpressionExpressions : cachedObservableConstantExpressions;
+            ref var cached = ref CollectionsMarshal.GetValueRefOrAddDefault(cachedExpressions, constantExpression, out var exists);
+            if (!exists)
+            {
+                cached = built;
+                built.IsCached = true;
+                return built;
+            }
+            observableConstantExpression = cached!;
+            ++observableConstantExpression.Observations;
+        }
+        built.Release();
+        return observableConstantExpression;
     }
 
     ObservableIndexExpression GetObservableExpression(IndexExpression indexExpression, bool deferEvaluation)
     {
+        ObservableIndexExpression? observableIndexExpression;
         lock (cachedObservableIndexExpressionsAccess)
         {
-            if (!cachedObservableIndexExpressions.TryGetValue(indexExpression, out var observableIndexExpression))
+            if (cachedObservableIndexExpressions.TryGetValue(indexExpression, out observableIndexExpression))
             {
-                observableIndexExpression = new ObservableIndexExpression(this, indexExpression, deferEvaluation);
-                cachedObservableIndexExpressions.Add(indexExpression, observableIndexExpression);
+                ++observableIndexExpression.Observations;
+                return observableIndexExpression;
             }
-            ++observableIndexExpression.Observations;
-            return observableIndexExpression;
         }
+        var built = new ObservableIndexExpression(this, indexExpression, deferEvaluation);
+        Build(built);
+        lock (cachedObservableIndexExpressionsAccess)
+        {
+            ref var cached = ref CollectionsMarshal.GetValueRefOrAddDefault(cachedObservableIndexExpressions, indexExpression, out var exists);
+            if (!exists)
+            {
+                cached = built;
+                built.IsCached = true;
+                return built;
+            }
+            observableIndexExpression = cached!;
+            ++observableIndexExpression.Observations;
+        }
+        built.Release();
+        return observableIndexExpression;
     }
 
     ObservableInvocationExpression GetObservableExpression(InvocationExpression invocationExpression, bool deferEvaluation)
     {
+        ObservableInvocationExpression? observableInvocationExpression;
         lock (cachedObservableInvocationExpressionsAccess)
         {
-            if (!cachedObservableInvocationExpressions.TryGetValue(invocationExpression, out var observableInvocationExpression))
+            if (cachedObservableInvocationExpressions.TryGetValue(invocationExpression, out observableInvocationExpression))
             {
-                observableInvocationExpression = new ObservableInvocationExpression(this, invocationExpression, deferEvaluation);
-                cachedObservableInvocationExpressions.Add(invocationExpression, observableInvocationExpression);
+                ++observableInvocationExpression.Observations;
+                return observableInvocationExpression;
             }
-            ++observableInvocationExpression.Observations;
-            return observableInvocationExpression;
         }
+        var built = new ObservableInvocationExpression(this, invocationExpression, deferEvaluation);
+        Build(built);
+        lock (cachedObservableInvocationExpressionsAccess)
+        {
+            ref var cached = ref CollectionsMarshal.GetValueRefOrAddDefault(cachedObservableInvocationExpressions, invocationExpression, out var exists);
+            if (!exists)
+            {
+                cached = built;
+                built.IsCached = true;
+                return built;
+            }
+            observableInvocationExpression = cached!;
+            ++observableInvocationExpression.Observations;
+        }
+        built.Release();
+        return observableInvocationExpression;
     }
 
     ObservableMemberExpression GetObservableExpression(MemberExpression memberExpression, bool deferEvaluation)
     {
+        ObservableMemberExpression? observableInvocationExpression;
         lock (cachedObservableMemberExpressionsAccess)
         {
-            if (!cachedObservableMemberExpressions.TryGetValue(memberExpression, out var observableInvocationExpression))
+            if (cachedObservableMemberExpressions.TryGetValue(memberExpression, out observableInvocationExpression))
             {
-                observableInvocationExpression = new ObservableMemberExpression(this, memberExpression, deferEvaluation);
-                cachedObservableMemberExpressions.Add(memberExpression, observableInvocationExpression);
+                ++observableInvocationExpression.Observations;
+                return observableInvocationExpression;
             }
-            ++observableInvocationExpression.Observations;
-            return observableInvocationExpression;
         }
+        var built = new ObservableMemberExpression(this, memberExpression, deferEvaluation);
+        Build(built);
+        lock (cachedObservableMemberExpressionsAccess)
+        {
+            ref var cached = ref CollectionsMarshal.GetValueRefOrAddDefault(cachedObservableMemberExpressions, memberExpression, out var exists);
+            if (!exists)
+            {
+                cached = built;
+                built.IsCached = true;
+                return built;
+            }
+            observableInvocationExpression = cached!;
+            ++observableInvocationExpression.Observations;
+        }
+        built.Release();
+        return observableInvocationExpression;
     }
 
     ObservableMemberInitExpression GetObservableExpression(MemberInitExpression memberInitExpression, bool deferEvaluation)
     {
+        ObservableMemberInitExpression? observableInvocationExpression;
         lock (cachedObservableMemberInitExpressionsAccess)
         {
-            if (!cachedObservableMemberInitExpressions.TryGetValue(memberInitExpression, out var observableInvocationExpression))
+            if (cachedObservableMemberInitExpressions.TryGetValue(memberInitExpression, out observableInvocationExpression))
             {
-                observableInvocationExpression = new ObservableMemberInitExpression(this, memberInitExpression, deferEvaluation);
-                cachedObservableMemberInitExpressions.Add(memberInitExpression, observableInvocationExpression);
+                ++observableInvocationExpression.Observations;
+                return observableInvocationExpression;
             }
-            ++observableInvocationExpression.Observations;
-            return observableInvocationExpression;
         }
+        var built = new ObservableMemberInitExpression(this, memberInitExpression, deferEvaluation);
+        Build(built);
+        lock (cachedObservableMemberInitExpressionsAccess)
+        {
+            ref var cached = ref CollectionsMarshal.GetValueRefOrAddDefault(cachedObservableMemberInitExpressions, memberInitExpression, out var exists);
+            if (!exists)
+            {
+                cached = built;
+                built.IsCached = true;
+                return built;
+            }
+            observableInvocationExpression = cached!;
+            ++observableInvocationExpression.Observations;
+        }
+        built.Release();
+        return observableInvocationExpression;
     }
 
     ObservableMethodCallExpression GetObservableExpression(MethodCallExpression methodCallExpression, bool deferEvaluation)
     {
+        ObservableMethodCallExpression? observableMethodCallExpression;
         lock (cachedObservableMethodCallExpressionsAccess)
         {
-            if (!cachedObservableMethodCallExpressions.TryGetValue(methodCallExpression, out var observableMethodCallExpression))
+            if (cachedObservableMethodCallExpressions.TryGetValue(methodCallExpression, out observableMethodCallExpression))
             {
-                observableMethodCallExpression = new ObservableMethodCallExpression(this, methodCallExpression, deferEvaluation);
-                cachedObservableMethodCallExpressions.Add(methodCallExpression, observableMethodCallExpression);
+                ++observableMethodCallExpression.Observations;
+                return observableMethodCallExpression;
             }
-            ++observableMethodCallExpression.Observations;
-            return observableMethodCallExpression;
         }
+        var built = new ObservableMethodCallExpression(this, methodCallExpression, deferEvaluation);
+        Build(built);
+        lock (cachedObservableMethodCallExpressionsAccess)
+        {
+            ref var cached = ref CollectionsMarshal.GetValueRefOrAddDefault(cachedObservableMethodCallExpressions, methodCallExpression, out var exists);
+            if (!exists)
+            {
+                cached = built;
+                built.IsCached = true;
+                return built;
+            }
+            observableMethodCallExpression = cached!;
+            ++observableMethodCallExpression.Observations;
+        }
+        built.Release();
+        return observableMethodCallExpression;
     }
 
     ObservableNewArrayInitExpression GetObservableExpression(NewArrayExpression newArrayInitExpression, bool deferEvaluation)
     {
+        ObservableNewArrayInitExpression? observableNewArrayInitExpression;
         lock (cachedObservableNewArrayInitExpressionsAccess)
         {
-            if (!cachedObservableNewArrayInitExpressions.TryGetValue(newArrayInitExpression, out var observableNewArrayInitExpression))
+            if (cachedObservableNewArrayInitExpressions.TryGetValue(newArrayInitExpression, out observableNewArrayInitExpression))
             {
-                observableNewArrayInitExpression = new ObservableNewArrayInitExpression(this, newArrayInitExpression, deferEvaluation);
-                cachedObservableNewArrayInitExpressions.Add(newArrayInitExpression, observableNewArrayInitExpression);
+                ++observableNewArrayInitExpression.Observations;
+                return observableNewArrayInitExpression;
             }
-            ++observableNewArrayInitExpression.Observations;
-            return observableNewArrayInitExpression;
         }
+        var built = new ObservableNewArrayInitExpression(this, newArrayInitExpression, deferEvaluation);
+        Build(built);
+        lock (cachedObservableNewArrayInitExpressionsAccess)
+        {
+            ref var cached = ref CollectionsMarshal.GetValueRefOrAddDefault(cachedObservableNewArrayInitExpressions, newArrayInitExpression, out var exists);
+            if (!exists)
+            {
+                cached = built;
+                built.IsCached = true;
+                return built;
+            }
+            observableNewArrayInitExpression = cached!;
+            ++observableNewArrayInitExpression.Observations;
+        }
+        built.Release();
+        return observableNewArrayInitExpression;
     }
 
     ObservableNewExpression GetObservableExpression(NewExpression newExpression, bool deferEvaluation)
     {
+        ObservableNewExpression? observableNewExpression;
         lock (cachedObservableNewExpressionsAccess)
         {
-            if (!cachedObservableNewExpressions.TryGetValue(newExpression, out var observableNewExpression))
+            if (cachedObservableNewExpressions.TryGetValue(newExpression, out observableNewExpression))
             {
-                observableNewExpression = new ObservableNewExpression(this, newExpression, deferEvaluation);
-                cachedObservableNewExpressions.Add(newExpression, observableNewExpression);
+                ++observableNewExpression.Observations;
+                return observableNewExpression;
             }
-            ++observableNewExpression.Observations;
-            return observableNewExpression;
         }
+        var built = new ObservableNewExpression(this, newExpression, deferEvaluation);
+        Build(built);
+        lock (cachedObservableNewExpressionsAccess)
+        {
+            ref var cached = ref CollectionsMarshal.GetValueRefOrAddDefault(cachedObservableNewExpressions, newExpression, out var exists);
+            if (!exists)
+            {
+                cached = built;
+                built.IsCached = true;
+                return built;
+            }
+            observableNewExpression = cached!;
+            ++observableNewExpression.Observations;
+        }
+        built.Release();
+        return observableNewExpression;
     }
 
     ObservableTryExpression GetObservableExpression(TryExpression tryExpression, bool deferEvaluation)
     {
         ThrowIfUnobservable(tryExpression);
+        ObservableTryExpression? observableTryExpression;
         lock (cachedObservableTryExpressionsAccess)
         {
-            if (!cachedObservableTryExpressions.TryGetValue(tryExpression, out var observableTryExpression))
+            if (cachedObservableTryExpressions.TryGetValue(tryExpression, out observableTryExpression))
             {
-                observableTryExpression = new ObservableTryExpression(this, tryExpression, deferEvaluation);
-                cachedObservableTryExpressions.Add(tryExpression, observableTryExpression);
+                ++observableTryExpression.Observations;
+                return observableTryExpression;
             }
-            ++observableTryExpression.Observations;
-            return observableTryExpression;
         }
+        var built = new ObservableTryExpression(this, tryExpression, deferEvaluation);
+        Build(built);
+        lock (cachedObservableTryExpressionsAccess)
+        {
+            ref var cached = ref CollectionsMarshal.GetValueRefOrAddDefault(cachedObservableTryExpressions, tryExpression, out var exists);
+            if (!exists)
+            {
+                cached = built;
+                built.IsCached = true;
+                return built;
+            }
+            observableTryExpression = cached!;
+            ++observableTryExpression.Observations;
+        }
+        built.Release();
+        return observableTryExpression;
     }
 
     ObservableTypeBinaryExpression GetObservableExpression(TypeBinaryExpression typeBinaryExpression, bool deferEvaluation)
     {
+        ObservableTypeBinaryExpression? observableTypeBinaryExpression;
         lock (cachedObservableTypeBinaryExpressionsAccess)
         {
-            if (!cachedObservableTypeBinaryExpressions.TryGetValue(typeBinaryExpression, out var observableTypeBinaryExpression))
+            if (cachedObservableTypeBinaryExpressions.TryGetValue(typeBinaryExpression, out observableTypeBinaryExpression))
             {
-                observableTypeBinaryExpression = new ObservableTypeBinaryExpression(this, typeBinaryExpression, deferEvaluation);
-                cachedObservableTypeBinaryExpressions.Add(typeBinaryExpression, observableTypeBinaryExpression);
+                ++observableTypeBinaryExpression.Observations;
+                return observableTypeBinaryExpression;
             }
-            ++observableTypeBinaryExpression.Observations;
-            return observableTypeBinaryExpression;
         }
+        var built = new ObservableTypeBinaryExpression(this, typeBinaryExpression, deferEvaluation);
+        Build(built);
+        lock (cachedObservableTypeBinaryExpressionsAccess)
+        {
+            ref var cached = ref CollectionsMarshal.GetValueRefOrAddDefault(cachedObservableTypeBinaryExpressions, typeBinaryExpression, out var exists);
+            if (!exists)
+            {
+                cached = built;
+                built.IsCached = true;
+                return built;
+            }
+            observableTypeBinaryExpression = cached!;
+            ++observableTypeBinaryExpression.Observations;
+        }
+        built.Release();
+        return observableTypeBinaryExpression;
     }
 
     ObservableUnaryExpression GetObservableExpression(UnaryExpression unaryExpression, bool deferEvaluation)
     {
+        ObservableUnaryExpression? observableUnaryExpression;
         lock (cachedObservableUnaryExpressionsAccess)
         {
-            if (!cachedObservableUnaryExpressions.TryGetValue(unaryExpression, out var observableUnaryExpression))
+            if (cachedObservableUnaryExpressions.TryGetValue(unaryExpression, out observableUnaryExpression))
             {
-                observableUnaryExpression = new ObservableUnaryExpression(this, unaryExpression, deferEvaluation);
-                cachedObservableUnaryExpressions.Add(unaryExpression, observableUnaryExpression);
+                ++observableUnaryExpression.Observations;
+                return observableUnaryExpression;
             }
-            ++observableUnaryExpression.Observations;
-            return observableUnaryExpression;
         }
+        var built = new ObservableUnaryExpression(this, unaryExpression, deferEvaluation);
+        Build(built);
+        lock (cachedObservableUnaryExpressionsAccess)
+        {
+            ref var cached = ref CollectionsMarshal.GetValueRefOrAddDefault(cachedObservableUnaryExpressions, unaryExpression, out var exists);
+            if (!exists)
+            {
+                cached = built;
+                built.IsCached = true;
+                return built;
+            }
+            observableUnaryExpression = cached!;
+            ++observableUnaryExpression.Observations;
+        }
+        built.Release();
+        return observableUnaryExpression;
     }
 
     internal bool IsConstructedTypeDisposed(Type type, EquatableList<Type> constructorParameterTypes) =>
@@ -1033,7 +1238,6 @@ public class ExpressionObserver :
             ? new DeferringDirectObservableExpression<TArgument, TResult>(this, evaluator, evaluate, argument, values, held, new bool[evaluator.DeferredGroupCount])
             : new DirectObservableExpression<TArgument, TResult>(this, evaluator, evaluate, argument, values, held);
         directObservableExpression.Initialize();
-        directObservableExpression.IsInitialized = true;
         return directObservableExpression;
     }
 

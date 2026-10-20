@@ -197,6 +197,11 @@ abstract class ObservableQuery :
     bool isInitialized;
     ObservableQuerySubscription? lastDependent;
 
+    /// <summary>
+    /// Is set once the query or observer which built this query has cached it, which it does only once the query is built, so that a query built while another thread cached one under the same key, and released for it, leaves that one in the cache
+    /// </summary>
+    internal bool IsCached;
+
     internal int Observations;
 
     /// <summary>

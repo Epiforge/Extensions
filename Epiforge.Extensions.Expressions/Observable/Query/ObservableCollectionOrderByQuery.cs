@@ -389,14 +389,27 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
         lock (access)
         {
             cachedRankQueries ??= [];
+            if (cachedRankQueries.TryGetValue(element, out rankQuery!))
+            {
+                ++rankQuery.Observations;
+                return rankQuery.AsScoped();
+            }
+        }
+        var built = new ObservableCollectionRankQuery<TElement>(collectionObserver, this, element);
+        built.Observations = 1;
+        built.Initialize();
+        lock (access)
+        {
+            cachedRankQueries ??= [];
             if (!cachedRankQueries.TryGetValue(element, out rankQuery!))
             {
-                rankQuery = new ObservableCollectionRankQuery<TElement>(collectionObserver, this, element);
-                cachedRankQueries.Add(element, rankQuery);
+                cachedRankQueries.Add(element, built);
+                built.IsCached = true;
+                return built.AsScoped();
             }
             ++rankQuery.Observations;
         }
-        rankQuery.Initialize();
+        built.Release();
         return rankQuery.AsScoped();
     }
 
@@ -518,7 +531,8 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
                 throw new InvalidOperationException("an observation was released more times than it was acquired");
             if (remaining == 0)
             {
-                cachedRankQueries!.Remove(rankQuery.Element);
+                if (rankQuery.IsCached)
+                    cachedRankQueries!.Remove(rankQuery.Element);
                 return true;
             }
         }

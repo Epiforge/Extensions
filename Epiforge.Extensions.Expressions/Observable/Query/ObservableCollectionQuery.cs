@@ -536,16 +536,31 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         {
             var caches = childQueryCaches ??= new();
             var key = (seedFactory, func, resultSelector);
-            if (!(caches.AggregateQueries ??= []).TryGetValue(key, out var cachedAggregateQuery))
+            if ((caches.AggregateQueries ??= []).TryGetValue(key, out var cachedAggregateQuery))
             {
-                aggregateQuery = new ObservableCollectionAggregateQuery<TElement, TAccumulate, TResult>(collectionObserver, this, seedFactory, func, resultSelector);
-                caches.AggregateQueries.Add(key, aggregateQuery);
-            }
-            else
                 aggregateQuery = (ObservableCollectionAggregateQuery<TElement, TAccumulate, TResult>)cachedAggregateQuery;
+                ++aggregateQuery.Observations;
+                return aggregateQuery.AsScoped();
+            }
+        }
+        var built = new ObservableCollectionAggregateQuery<TElement, TAccumulate, TResult>(collectionObserver, this, seedFactory, func, resultSelector);
+        built.Observations = 1;
+        built.Initialize();
+        lock (ChildrenAccess)
+        {
+            var caches = childQueryCaches ??= new();
+            var key = (seedFactory, func, resultSelector);
+            ref var cached = ref CollectionsMarshal.GetValueRefOrAddDefault(caches.AggregateQueries ??= [], key, out var exists);
+            if (!exists)
+            {
+                cached = built;
+                built.IsCached = true;
+                return built.AsScoped();
+            }
+            aggregateQuery = (ObservableCollectionAggregateQuery<TElement, TAccumulate, TResult>)cached!;
             ++aggregateQuery.Observations;
         }
-        aggregateQuery.Initialize();
+        built.Release();
         return aggregateQuery.AsScoped();
     }
 
@@ -560,14 +575,29 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         lock (ChildrenAccess)
         {
             var caches = childQueryCaches ??= new();
-            if (!(caches.AllQueries ??= new(ExpressionEqualityComparer.Default)).TryGetValue(key, out allQuery!))
+            if ((caches.AllQueries ??= new(ExpressionEqualityComparer.Default)).TryGetValue(key, out allQuery!))
             {
-                allQuery = new ObservableCollectionAllQuery<TElement>(collectionObserver, this, key);
-                caches.AllQueries.Add(key, allQuery);
+                ++allQuery.Observations;
+                return allQuery.AsScoped();
             }
+        }
+        var built = new ObservableCollectionAllQuery<TElement>(collectionObserver, this, key);
+        built.Observations = 1;
+        built.Initialize();
+        lock (ChildrenAccess)
+        {
+            var caches = childQueryCaches ??= new();
+            ref var cached = ref CollectionsMarshal.GetValueRefOrAddDefault(caches.AllQueries ??= new(ExpressionEqualityComparer.Default), key, out var exists);
+            if (!exists)
+            {
+                cached = built;
+                built.IsCached = true;
+                return built.AsScoped();
+            }
+            allQuery = cached!;
             ++allQuery.Observations;
         }
-        allQuery.Initialize();
+        built.Release();
         return allQuery.AsScoped();
     }
 
@@ -578,14 +608,27 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         lock (ChildrenAccess)
         {
             var caches = childQueryCaches ??= new();
+            if ((caches.AnyQueries ??= new(ExpressionEqualityComparer.Default!)).TryGetValue(null, out anyQuery!))
+            {
+                ++anyQuery.Observations;
+                return anyQuery.AsScoped();
+            }
+        }
+        var built = new ObservableCollectionAnyQuery<TElement>(collectionObserver, this);
+        built.Observations = 1;
+        built.Initialize();
+        lock (ChildrenAccess)
+        {
+            var caches = childQueryCaches ??= new();
             if (!(caches.AnyQueries ??= new(ExpressionEqualityComparer.Default!)).TryGetValue(null, out anyQuery!))
             {
-                anyQuery = new ObservableCollectionAnyQuery<TElement>(collectionObserver, this);
-                caches.AnyQueries.Add(null, anyQuery);
+                caches.AnyQueries.Add(null, built);
+                built.IsCached = true;
+                return built.AsScoped();
             }
             ++anyQuery.Observations;
         }
-        anyQuery.Initialize();
+        built.Release();
         return anyQuery.AsScoped();
     }
 
@@ -600,14 +643,27 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         lock (ChildrenAccess)
         {
             var caches = childQueryCaches ??= new();
+            if ((caches.AnyQueries ??= new(ExpressionEqualityComparer.Default!)).TryGetValue(key, out anyQuery!))
+            {
+                ++anyQuery.Observations;
+                return anyQuery.AsScoped();
+            }
+        }
+        var built = new ObservableCollectionAnyQuery<TElement>(collectionObserver, this, key);
+        built.Observations = 1;
+        built.Initialize();
+        lock (ChildrenAccess)
+        {
+            var caches = childQueryCaches ??= new();
             if (!(caches.AnyQueries ??= new(ExpressionEqualityComparer.Default!)).TryGetValue(key, out anyQuery!))
             {
-                anyQuery = new ObservableCollectionAnyQuery<TElement>(collectionObserver, this, key);
-                caches.AnyQueries.Add(key, anyQuery);
+                caches.AnyQueries.Add(key, built);
+                built.IsCached = true;
+                return built.AsScoped();
             }
             ++anyQuery.Observations;
         }
-        anyQuery.Initialize();
+        built.Release();
         return anyQuery.AsScoped();
     }
 
@@ -622,14 +678,27 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         lock (ChildrenAccess)
         {
             var caches = childQueryCaches ??= new();
+            if ((caches.AppendQueries ??= []).TryGetValue(element, out appendQuery!))
+            {
+                ++appendQuery.Observations;
+                return appendQuery.AsScoped();
+            }
+        }
+        var built = new ObservableCollectionAppendQuery<TElement>(collectionObserver, this, element);
+        built.Observations = 1;
+        built.Initialize();
+        lock (ChildrenAccess)
+        {
+            var caches = childQueryCaches ??= new();
             if (!(caches.AppendQueries ??= []).TryGetValue(element, out appendQuery!))
             {
-                appendQuery = new ObservableCollectionAppendQuery<TElement>(collectionObserver, this, element);
-                caches.AppendQueries.Add(element, appendQuery);
+                caches.AppendQueries.Add(element, built);
+                built.IsCached = true;
+                return built.AsScoped();
             }
             ++appendQuery.Observations;
         }
-        appendQuery.Initialize();
+        built.Release();
         return appendQuery.AsScoped();
     }
 
@@ -644,14 +713,29 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         lock (ChildrenAccess)
         {
             var caches = childQueryCaches ??= new();
-            if (!(caches.AverageQueries ??= new(ExpressionEqualityComparer.Default)).TryGetValue(key, out averageQuery!))
+            if ((caches.AverageQueries ??= new(ExpressionEqualityComparer.Default)).TryGetValue(key, out averageQuery!))
             {
-                averageQuery = new ObservableCollectionAverageQuery<TElement, TResult>(collectionObserver, this, key);
-                caches.AverageQueries.Add(key, averageQuery);
+                ++averageQuery.Observations;
+                return ((ObservableCollectionAverageQuery<TElement, TResult>)averageQuery).AsScoped();
             }
+        }
+        var built = new ObservableCollectionAverageQuery<TElement, TResult>(collectionObserver, this, key);
+        built.Observations = 1;
+        built.Initialize();
+        lock (ChildrenAccess)
+        {
+            var caches = childQueryCaches ??= new();
+            ref var cached = ref CollectionsMarshal.GetValueRefOrAddDefault(caches.AverageQueries ??= new(ExpressionEqualityComparer.Default), key, out var exists);
+            if (!exists)
+            {
+                cached = built;
+                built.IsCached = true;
+                return ((ObservableCollectionAverageQuery<TElement, TResult>)built).AsScoped();
+            }
+            averageQuery = cached!;
             ++averageQuery.Observations;
         }
-        averageQuery.Initialize();
+        built.Release();
         return ((ObservableCollectionAverageQuery<TElement, TResult>)averageQuery).AsScoped();
     }
 
@@ -667,14 +751,29 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         lock (ChildrenAccess)
         {
             var caches = childQueryCaches ??= new();
-            if (!(caches.ComparisonQueries ??= []).TryGetValue((soughtComparison, comparer), out comparisonQuery!))
+            if ((caches.ComparisonQueries ??= []).TryGetValue((soughtComparison, comparer), out comparisonQuery!))
             {
-                comparisonQuery = new ObservableCollectionComparisonQuery<TElement>(collectionObserver, this, soughtComparison, comparer);
-                caches.ComparisonQueries.Add((soughtComparison, comparer), comparisonQuery);
+                ++comparisonQuery.Observations;
+                return comparisonQuery.AsScoped();
             }
+        }
+        var built = new ObservableCollectionComparisonQuery<TElement>(collectionObserver, this, soughtComparison, comparer);
+        built.Observations = 1;
+        built.Initialize();
+        lock (ChildrenAccess)
+        {
+            var caches = childQueryCaches ??= new();
+            ref var cached = ref CollectionsMarshal.GetValueRefOrAddDefault(caches.ComparisonQueries ??= [], (soughtComparison, comparer), out var exists);
+            if (!exists)
+            {
+                cached = built;
+                built.IsCached = true;
+                return built.AsScoped();
+            }
+            comparisonQuery = cached!;
             ++comparisonQuery.Observations;
         }
-        comparisonQuery.Initialize();
+        built.Release();
         return comparisonQuery.AsScoped();
     }
 
@@ -728,27 +827,60 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         ObservableCollectionConcatQuery<TElement> concatQuery;
         lock (ChildrenAccess)
         {
-            if (!(cachedConcatQueries ??= []).TryGetValue(second, out concatQuery!))
+            if ((cachedConcatQueries ??= []).TryGetValue(second, out concatQuery!))
             {
-                concatQuery = new ObservableCollectionConcatQuery<TElement>(collectionObserver, this, second);
-                cachedConcatQueries.Add(second, concatQuery);
+                ++concatQuery.Observations;
+                return concatQuery.AsScoped();
             }
+        }
+        var built = new ObservableCollectionConcatQuery<TElement>(collectionObserver, this, second);
+        built.Observations = 1;
+        built.Initialize();
+        lock (ChildrenAccess)
+        {
+            ref var cached = ref CollectionsMarshal.GetValueRefOrAddDefault(cachedConcatQueries ??= [], second, out var exists);
+            if (!exists)
+            {
+                cached = built;
+                built.IsCached = true;
+                return built.AsScoped();
+            }
+            concatQuery = cached!;
             ++concatQuery.Observations;
         }
-        concatQuery.Initialize();
+        built.Release();
         return concatQuery.AsScoped();
     }
 
     [return: DisposeWhenDiscarded]
     public IObservableScalarQuery<int> ObserveCount()
     {
-        ObservableCollectionCountQuery<TElement> countQuery;
+        ObservableCollectionCountQuery<TElement>? countQuery;
         lock (ChildrenAccess)
         {
-            countQuery = (childQueryCaches ??= new()).CountQuery ??= new ObservableCollectionCountQuery<TElement>(collectionObserver, this);
+            countQuery = childQueryCaches?.CountQuery;
+            if (countQuery is not null)
+            {
+                ++countQuery.Observations;
+                return countQuery.AsScoped();
+            }
+        }
+        var built = new ObservableCollectionCountQuery<TElement>(collectionObserver, this);
+        built.Observations = 1;
+        built.Initialize();
+        lock (ChildrenAccess)
+        {
+            var caches = childQueryCaches ??= new();
+            countQuery = caches.CountQuery;
+            if (countQuery is null)
+            {
+                caches.CountQuery = built;
+                built.IsCached = true;
+                return built.AsScoped();
+            }
             ++countQuery.Observations;
         }
-        countQuery.Initialize();
+        built.Release();
         return countQuery.AsScoped();
     }
 
@@ -805,14 +937,30 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         {
             var caches = childQueryCaches ??= new();
             caches.IndexForCountQueries ??= [];
-            if (!caches.IndexForCountQueries.TryGetValue(indexForCount, out indexForCountQuery!))
+            if (caches.IndexForCountQueries.TryGetValue(indexForCount, out indexForCountQuery!))
             {
-                indexForCountQuery = new ObservableCollectionIndexForCountQuery<TElement>(collectionObserver, this, indexForCount);
-                caches.IndexForCountQueries.Add(indexForCount, indexForCountQuery);
+                ++indexForCountQuery.Observations;
+                return indexForCountQuery.AsScoped();
             }
+        }
+        var built = new ObservableCollectionIndexForCountQuery<TElement>(collectionObserver, this, indexForCount);
+        built.Observations = 1;
+        built.Initialize();
+        lock (ChildrenAccess)
+        {
+            var caches = childQueryCaches ??= new();
+            caches.IndexForCountQueries ??= [];
+            ref var cached = ref CollectionsMarshal.GetValueRefOrAddDefault(caches.IndexForCountQueries, indexForCount, out var exists);
+            if (!exists)
+            {
+                cached = built;
+                built.IsCached = true;
+                return built.AsScoped();
+            }
+            indexForCountQuery = cached!;
             ++indexForCountQuery.Observations;
         }
-        indexForCountQuery.Initialize();
+        built.Release();
         return indexForCountQuery.AsScoped();
     }
 
@@ -870,29 +1018,62 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         lock (ChildrenAccess)
         {
             var caches = childQueryCaches ??= new();
-            if (!(caches.IndexQueries ??= []).TryGetValue((index, outOfRangeIsDefault), out var cachedIndexQuery))
+            if ((caches.IndexQueries ??= []).TryGetValue((index, outOfRangeIsDefault), out var cachedIndexQuery))
             {
-                indexQuery = new ObservableCollectionIndexQuery<TElement>(collectionObserver, this, index, outOfRangeIsDefault);
-                caches.IndexQueries.Add((index, outOfRangeIsDefault), indexQuery);
-            }
-            else
                 indexQuery = (ObservableCollectionIndexQuery<TElement>)cachedIndexQuery;
+                ++indexQuery.Observations;
+                return indexQuery.AsScoped();
+            }
+        }
+        var built = new ObservableCollectionIndexQuery<TElement>(collectionObserver, this, index, outOfRangeIsDefault);
+        built.Observations = 1;
+        built.Initialize();
+        lock (ChildrenAccess)
+        {
+            var caches = childQueryCaches ??= new();
+            ref var cached = ref CollectionsMarshal.GetValueRefOrAddDefault(caches.IndexQueries ??= [], (index, outOfRangeIsDefault), out var exists);
+            if (!exists)
+            {
+                cached = built;
+                built.IsCached = true;
+                return built.AsScoped();
+            }
+            indexQuery = (ObservableCollectionIndexQuery<TElement>)cached!;
             ++indexQuery.Observations;
         }
-        indexQuery.Initialize();
+        built.Release();
         return indexQuery.AsScoped();
     }
 
     [return: DisposeWhenDiscarded]
     public IObservableCollectionQuery<TElement> ObserveIndividualChanges()
     {
-        ObservableCollectionIndividualChangesQuery<TElement> individualChangesQuery;
+        ObservableCollectionIndividualChangesQuery<TElement>? individualChangesQuery;
         lock (ChildrenAccess)
         {
-            individualChangesQuery = (childQueryCaches ??= new()).IndividualChangeQuery ??= new ObservableCollectionIndividualChangesQuery<TElement>(collectionObserver, this);
+            individualChangesQuery = childQueryCaches?.IndividualChangeQuery;
+            if (individualChangesQuery is not null)
+            {
+                ++individualChangesQuery.Observations;
+                return individualChangesQuery.AsScoped();
+            }
+        }
+        var built = new ObservableCollectionIndividualChangesQuery<TElement>(collectionObserver, this);
+        built.Observations = 1;
+        built.Initialize();
+        lock (ChildrenAccess)
+        {
+            var caches = childQueryCaches ??= new();
+            individualChangesQuery = caches.IndividualChangeQuery;
+            if (individualChangesQuery is null)
+            {
+                caches.IndividualChangeQuery = built;
+                built.IsCached = true;
+                return built.AsScoped();
+            }
             ++individualChangesQuery.Observations;
         }
-        individualChangesQuery.Initialize();
+        built.Release();
         return individualChangesQuery.AsScoped();
     }
 
@@ -913,14 +1094,29 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         lock (ChildrenAccess)
         {
             var caches = childQueryCaches ??= new();
-            if (!(caches.GroupByQueries ??= new(CachedGroupByQueryEqualityComparer.Default)).TryGetValue(key, out groupByQuery!))
+            if ((caches.GroupByQueries ??= new(CachedGroupByQueryEqualityComparer.Default)).TryGetValue(key, out groupByQuery!))
             {
-                groupByQuery = new ObservableCollectionGroupByQuery<TKey, TElement>(collectionObserver, this, optimizedKeySelector, keyEqualityComparer);
-                caches.GroupByQueries.Add(key, groupByQuery);
+                ++groupByQuery.Observations;
+                return ((ObservableCollectionGroupByQuery<TKey, TElement>)groupByQuery).AsScoped();
             }
+        }
+        var built = new ObservableCollectionGroupByQuery<TKey, TElement>(collectionObserver, this, optimizedKeySelector, keyEqualityComparer);
+        built.Observations = 1;
+        built.Initialize();
+        lock (ChildrenAccess)
+        {
+            var caches = childQueryCaches ??= new();
+            ref var cached = ref CollectionsMarshal.GetValueRefOrAddDefault(caches.GroupByQueries ??= new(CachedGroupByQueryEqualityComparer.Default), key, out var exists);
+            if (!exists)
+            {
+                cached = built;
+                built.IsCached = true;
+                return ((ObservableCollectionGroupByQuery<TKey, TElement>)built).AsScoped();
+            }
+            groupByQuery = cached!;
             ++groupByQuery.Observations;
         }
-        groupByQuery.Initialize();
+        built.Release();
         return ((ObservableCollectionGroupByQuery<TKey, TElement>)groupByQuery).AsScoped();
     }
 
@@ -1052,14 +1248,29 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         lock (ChildrenAccess)
         {
             var caches = childQueryCaches ??= new();
-            if (!(caches.OrderByQueries ??= new(CachedOrderByQueryEqualityComparer.Default)).TryGetValue(key, out orderByQuery!))
+            if ((caches.OrderByQueries ??= new(CachedOrderByQueryEqualityComparer.Default)).TryGetValue(key, out orderByQuery!))
             {
-                orderByQuery = new ObservableCollectionOrderByQuery<TElement>(collectionObserver, this, key);
-                caches.OrderByQueries.Add(key, orderByQuery);
+                ++orderByQuery.Observations;
+                return orderByQuery.AsScoped();
             }
+        }
+        var built = new ObservableCollectionOrderByQuery<TElement>(collectionObserver, this, key);
+        built.Observations = 1;
+        built.Initialize();
+        lock (ChildrenAccess)
+        {
+            var caches = childQueryCaches ??= new();
+            ref var cached = ref CollectionsMarshal.GetValueRefOrAddDefault(caches.OrderByQueries ??= new(CachedOrderByQueryEqualityComparer.Default), key, out var exists);
+            if (!exists)
+            {
+                cached = built;
+                built.IsCached = true;
+                return built.AsScoped();
+            }
+            orderByQuery = cached!;
             ++orderByQuery.Observations;
         }
-        orderByQuery.Initialize();
+        built.Release();
         return orderByQuery.AsScoped();
     }
 
@@ -1070,14 +1281,27 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         lock (ChildrenAccess)
         {
             var caches = childQueryCaches ??= new();
+            if ((caches.PrependQueries ??= []).TryGetValue(element, out prependQuery!))
+            {
+                ++prependQuery.Observations;
+                return prependQuery.AsScoped();
+            }
+        }
+        var built = new ObservableCollectionPrependQuery<TElement>(collectionObserver, this, element);
+        built.Observations = 1;
+        built.Initialize();
+        lock (ChildrenAccess)
+        {
+            var caches = childQueryCaches ??= new();
             if (!(caches.PrependQueries ??= []).TryGetValue(element, out prependQuery!))
             {
-                prependQuery = new ObservableCollectionPrependQuery<TElement>(collectionObserver, this, element);
-                caches.PrependQueries.Add(element, prependQuery);
+                caches.PrependQueries.Add(element, built);
+                built.IsCached = true;
+                return built.AsScoped();
             }
             ++prependQuery.Observations;
         }
-        prependQuery.Initialize();
+        built.Release();
         return prependQuery.AsScoped();
     }
 
@@ -1112,14 +1336,28 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
             key = (Expression<Func<TElement, TResult>>)optimizer(key);
         lock (ChildrenAccess)
         {
-            if (!(cachedSelectQueries ??= new(ExpressionEqualityComparer.Default)).TryGetValue(key, out selectQuery!))
+            if ((cachedSelectQueries ??= new(ExpressionEqualityComparer.Default)).TryGetValue(key, out selectQuery!))
             {
-                selectQuery = new ObservableCollectionSelectQuery<TElement, TResult>(collectionObserver, this, key);
-                cachedSelectQueries.Add(key, selectQuery);
+                ++selectQuery.Observations;
+                return ((ObservableCollectionSelectQuery<TElement, TResult>)selectQuery).AsScoped();
             }
+        }
+        var built = new ObservableCollectionSelectQuery<TElement, TResult>(collectionObserver, this, key);
+        built.Observations = 1;
+        built.Initialize();
+        lock (ChildrenAccess)
+        {
+            ref var cached = ref CollectionsMarshal.GetValueRefOrAddDefault(cachedSelectQueries ??= new(ExpressionEqualityComparer.Default), key, out var exists);
+            if (!exists)
+            {
+                cached = built;
+                built.IsCached = true;
+                return ((ObservableCollectionSelectQuery<TElement, TResult>)built).AsScoped();
+            }
+            selectQuery = cached!;
             ++selectQuery.Observations;
         }
-        selectQuery.Initialize();
+        built.Release();
         return ((ObservableCollectionSelectQuery<TElement, TResult>)selectQuery).AsScoped();
     }
 
@@ -1133,14 +1371,28 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
             key = (Expression<Func<TElement, IEnumerable<TResult>>>)optimizer(key);
         lock (ChildrenAccess)
         {
-            if (!(cachedSelectManyQueries ??= new(ExpressionEqualityComparer.Default)).TryGetValue(key, out selectManyQuery!))
+            if ((cachedSelectManyQueries ??= new(ExpressionEqualityComparer.Default)).TryGetValue(key, out selectManyQuery!))
             {
-                selectManyQuery = new ObservableCollectionSelectManyQuery<TElement, TResult>(collectionObserver, this, key);
-                cachedSelectManyQueries.Add(key, selectManyQuery);
+                ++selectManyQuery.Observations;
+                return ((ObservableCollectionSelectManyQuery<TElement, TResult>)selectManyQuery).AsScoped();
             }
+        }
+        var built = new ObservableCollectionSelectManyQuery<TElement, TResult>(collectionObserver, this, key);
+        built.Observations = 1;
+        built.Initialize();
+        lock (ChildrenAccess)
+        {
+            ref var cached = ref CollectionsMarshal.GetValueRefOrAddDefault(cachedSelectManyQueries ??= new(ExpressionEqualityComparer.Default), key, out var exists);
+            if (!exists)
+            {
+                cached = built;
+                built.IsCached = true;
+                return ((ObservableCollectionSelectManyQuery<TElement, TResult>)built).AsScoped();
+            }
+            selectManyQuery = cached!;
             ++selectManyQuery.Observations;
         }
-        selectManyQuery.Initialize();
+        built.Release();
         return ((ObservableCollectionSelectManyQuery<TElement, TResult>)selectManyQuery).AsScoped();
     }
 
@@ -1199,14 +1451,29 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         lock (ChildrenAccess)
         {
             var caches = childQueryCaches ??= new();
-            if (!(caches.SliceQueries ??= []).TryGetValue(range, out sliceQuery!))
+            if ((caches.SliceQueries ??= []).TryGetValue(range, out sliceQuery!))
             {
-                sliceQuery = new ObservableCollectionSliceQuery<TElement>(collectionObserver, this, range);
-                caches.SliceQueries.Add(range, sliceQuery);
+                ++sliceQuery.Observations;
+                return sliceQuery.AsScoped();
             }
+        }
+        var built = new ObservableCollectionSliceQuery<TElement>(collectionObserver, this, range);
+        built.Observations = 1;
+        built.Initialize();
+        lock (ChildrenAccess)
+        {
+            var caches = childQueryCaches ??= new();
+            ref var cached = ref CollectionsMarshal.GetValueRefOrAddDefault(caches.SliceQueries ??= [], range, out var exists);
+            if (!exists)
+            {
+                cached = built;
+                built.IsCached = true;
+                return built.AsScoped();
+            }
+            sliceQuery = cached!;
             ++sliceQuery.Observations;
         }
-        sliceQuery.Initialize();
+        built.Release();
         return sliceQuery.AsScoped();
     }
 
@@ -1225,14 +1492,29 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         lock (ChildrenAccess)
         {
             var caches = childQueryCaches ??= new();
-            if (!(caches.SumQueries ??= new(ExpressionEqualityComparer.Default)).TryGetValue(key, out sumQuery!))
+            if ((caches.SumQueries ??= new(ExpressionEqualityComparer.Default)).TryGetValue(key, out sumQuery!))
             {
-                sumQuery = new ObservableCollectionSumQuery<TElement, TResult>(collectionObserver, this, key);
-                caches.SumQueries.Add(key, sumQuery);
+                ++sumQuery.Observations;
+                return ((ObservableCollectionSumQuery<TElement, TResult>)sumQuery).AsScoped();
             }
+        }
+        var built = new ObservableCollectionSumQuery<TElement, TResult>(collectionObserver, this, key);
+        built.Observations = 1;
+        built.Initialize();
+        lock (ChildrenAccess)
+        {
+            var caches = childQueryCaches ??= new();
+            ref var cached = ref CollectionsMarshal.GetValueRefOrAddDefault(caches.SumQueries ??= new(ExpressionEqualityComparer.Default), key, out var exists);
+            if (!exists)
+            {
+                cached = built;
+                built.IsCached = true;
+                return ((ObservableCollectionSumQuery<TElement, TResult>)built).AsScoped();
+            }
+            sumQuery = cached!;
             ++sumQuery.Observations;
         }
-        sumQuery.Initialize();
+        built.Release();
         return ((ObservableCollectionSumQuery<TElement, TResult>)sumQuery).AsScoped();
     }
 
@@ -1269,14 +1551,29 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         lock (ChildrenAccess)
         {
             var caches = childQueryCaches ??= new();
-            if (!(caches.ToDictionaryQueries ??= new(CachedToDictionaryQueryEqualityComparer.Default)).TryGetValue(key, out toDictionaryQuery!))
+            if ((caches.ToDictionaryQueries ??= new(CachedToDictionaryQueryEqualityComparer.Default)).TryGetValue(key, out toDictionaryQuery!))
             {
-                toDictionaryQuery = new ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>(collectionObserver, this, key.keySelector, key.valueSelector, key.equalityComparer);
-                caches.ToDictionaryQueries.Add(key, toDictionaryQuery);
+                ++toDictionaryQuery.Observations;
+                return ((ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>)toDictionaryQuery).AsScoped();
             }
+        }
+        var built = new ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>(collectionObserver, this, key.keySelector, key.valueSelector, key.equalityComparer);
+        built.Observations = 1;
+        built.Initialize();
+        lock (ChildrenAccess)
+        {
+            var caches = childQueryCaches ??= new();
+            ref var cached = ref CollectionsMarshal.GetValueRefOrAddDefault(caches.ToDictionaryQueries ??= new(CachedToDictionaryQueryEqualityComparer.Default), key, out var exists);
+            if (!exists)
+            {
+                cached = built;
+                built.IsCached = true;
+                return ((ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>)built).AsScoped();
+            }
+            toDictionaryQuery = cached!;
             ++toDictionaryQuery.Observations;
         }
-        toDictionaryQuery.Initialize();
+        built.Release();
         return ((ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>)toDictionaryQuery).AsScoped();
     }
 
@@ -1299,14 +1596,29 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         lock (ChildrenAccess)
         {
             var caches = childQueryCaches ??= new();
-            if (!(caches.ToLookupQueries ??= new(CachedLookupQueryEqualityComparer.Default)).TryGetValue(key, out lookupQuery!))
+            if ((caches.ToLookupQueries ??= new(CachedLookupQueryEqualityComparer.Default)).TryGetValue(key, out lookupQuery!))
             {
-                lookupQuery = new ObservableCollectionLookupQuery<TKey, TElement>(collectionObserver, this, optimizedKeySelector, keyEqualityComparer);
-                caches.ToLookupQueries.Add(key, lookupQuery);
+                ++lookupQuery.Observations;
+                return ((ObservableCollectionLookupQuery<TKey, TElement>)lookupQuery).AsScoped();
             }
+        }
+        var built = new ObservableCollectionLookupQuery<TKey, TElement>(collectionObserver, this, optimizedKeySelector, keyEqualityComparer);
+        built.Observations = 1;
+        built.Initialize();
+        lock (ChildrenAccess)
+        {
+            var caches = childQueryCaches ??= new();
+            ref var cached = ref CollectionsMarshal.GetValueRefOrAddDefault(caches.ToLookupQueries ??= new(CachedLookupQueryEqualityComparer.Default), key, out var exists);
+            if (!exists)
+            {
+                cached = built;
+                built.IsCached = true;
+                return ((ObservableCollectionLookupQuery<TKey, TElement>)built).AsScoped();
+            }
+            lookupQuery = cached!;
             ++lookupQuery.Observations;
         }
-        lookupQuery.Initialize();
+        built.Release();
         return ((ObservableCollectionLookupQuery<TKey, TElement>)lookupQuery).AsScoped();
     }
 
@@ -1320,14 +1632,29 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         lock (ChildrenAccess)
         {
             var caches = childQueryCaches ??= new();
-            if (!(caches.UsingSynchronizationCallbackQueries ??= []).TryGetValue(key, out usingSynchronizationCallbackQuery!))
+            if ((caches.UsingSynchronizationCallbackQueries ??= []).TryGetValue(key, out usingSynchronizationCallbackQuery!))
             {
-                usingSynchronizationCallbackQuery = new ObservableCollectionUsingSynchronizationCallbackQuery<TElement>(collectionObserver, this, context, synchronizationCallback);
-                caches.UsingSynchronizationCallbackQueries.Add(key, usingSynchronizationCallbackQuery);
+                ++usingSynchronizationCallbackQuery.Observations;
+                return usingSynchronizationCallbackQuery.AsScoped();
             }
+        }
+        var built = new ObservableCollectionUsingSynchronizationCallbackQuery<TElement>(collectionObserver, this, context, synchronizationCallback);
+        built.Observations = 1;
+        built.Initialize();
+        lock (ChildrenAccess)
+        {
+            var caches = childQueryCaches ??= new();
+            ref var cached = ref CollectionsMarshal.GetValueRefOrAddDefault(caches.UsingSynchronizationCallbackQueries ??= [], key, out var exists);
+            if (!exists)
+            {
+                cached = built;
+                built.IsCached = true;
+                return built.AsScoped();
+            }
+            usingSynchronizationCallbackQuery = cached!;
             ++usingSynchronizationCallbackQuery.Observations;
         }
-        usingSynchronizationCallbackQuery.Initialize();
+        built.Release();
         return usingSynchronizationCallbackQuery.AsScoped();
     }
 
@@ -1341,14 +1668,29 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         lock (ChildrenAccess)
         {
             var caches = childQueryCaches ??= new();
-            if (!(caches.UsingSynchronizationCallbackEventuallyQueries ??= []).TryGetValue(key, out usingSynchronizationCallbackEventuallyQuery!))
+            if ((caches.UsingSynchronizationCallbackEventuallyQueries ??= []).TryGetValue(key, out usingSynchronizationCallbackEventuallyQuery!))
             {
-                usingSynchronizationCallbackEventuallyQuery = new ObservableCollectionUsingSynchronizationCallbackEventuallyQuery<TElement>(collectionObserver, this, context, synchronizationCallback);
-                caches.UsingSynchronizationCallbackEventuallyQueries.Add(key, usingSynchronizationCallbackEventuallyQuery);
+                ++usingSynchronizationCallbackEventuallyQuery.Observations;
+                return usingSynchronizationCallbackEventuallyQuery.AsScoped();
             }
+        }
+        var built = new ObservableCollectionUsingSynchronizationCallbackEventuallyQuery<TElement>(collectionObserver, this, context, synchronizationCallback);
+        built.Observations = 1;
+        built.Initialize();
+        lock (ChildrenAccess)
+        {
+            var caches = childQueryCaches ??= new();
+            ref var cached = ref CollectionsMarshal.GetValueRefOrAddDefault(caches.UsingSynchronizationCallbackEventuallyQueries ??= [], key, out var exists);
+            if (!exists)
+            {
+                cached = built;
+                built.IsCached = true;
+                return built.AsScoped();
+            }
+            usingSynchronizationCallbackEventuallyQuery = cached!;
             ++usingSynchronizationCallbackEventuallyQuery.Observations;
         }
-        usingSynchronizationCallbackEventuallyQuery.Initialize();
+        built.Release();
         return usingSynchronizationCallbackEventuallyQuery.AsScoped();
     }
 
@@ -1360,14 +1702,29 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         lock (ChildrenAccess)
         {
             var caches = childQueryCaches ??= new();
-            if (!(caches.UsingSynchronizationContextQueries ??= []).TryGetValue(synchronizationContext, out usingSynchronizationContextQuery!))
+            if ((caches.UsingSynchronizationContextQueries ??= []).TryGetValue(synchronizationContext, out usingSynchronizationContextQuery!))
             {
-                usingSynchronizationContextQuery = new ObservableCollectionUsingSynchronizationContextQuery<TElement>(collectionObserver, this, synchronizationContext);
-                caches.UsingSynchronizationContextQueries.Add(synchronizationContext, usingSynchronizationContextQuery);
+                ++usingSynchronizationContextQuery.Observations;
+                return usingSynchronizationContextQuery.AsScoped();
             }
+        }
+        var built = new ObservableCollectionUsingSynchronizationContextQuery<TElement>(collectionObserver, this, synchronizationContext);
+        built.Observations = 1;
+        built.Initialize();
+        lock (ChildrenAccess)
+        {
+            var caches = childQueryCaches ??= new();
+            ref var cached = ref CollectionsMarshal.GetValueRefOrAddDefault(caches.UsingSynchronizationContextQueries ??= [], synchronizationContext, out var exists);
+            if (!exists)
+            {
+                cached = built;
+                built.IsCached = true;
+                return built.AsScoped();
+            }
+            usingSynchronizationContextQuery = cached!;
             ++usingSynchronizationContextQuery.Observations;
         }
-        usingSynchronizationContextQuery.Initialize();
+        built.Release();
         return usingSynchronizationContextQuery.AsScoped();
     }
 
@@ -1379,14 +1736,29 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         lock (ChildrenAccess)
         {
             var caches = childQueryCaches ??= new();
-            if (!(caches.UsingSynchronizationContextEventuallyQueries ??= []).TryGetValue(synchronizationContext, out usingSynchronizationContextEventuallyQuery!))
+            if ((caches.UsingSynchronizationContextEventuallyQueries ??= []).TryGetValue(synchronizationContext, out usingSynchronizationContextEventuallyQuery!))
             {
-                usingSynchronizationContextEventuallyQuery = new ObservableCollectionUsingSynchronizationContextEventuallyQuery<TElement>(collectionObserver, this, synchronizationContext);
-                caches.UsingSynchronizationContextEventuallyQueries.Add(synchronizationContext, usingSynchronizationContextEventuallyQuery);
+                ++usingSynchronizationContextEventuallyQuery.Observations;
+                return usingSynchronizationContextEventuallyQuery.AsScoped();
             }
+        }
+        var built = new ObservableCollectionUsingSynchronizationContextEventuallyQuery<TElement>(collectionObserver, this, synchronizationContext);
+        built.Observations = 1;
+        built.Initialize();
+        lock (ChildrenAccess)
+        {
+            var caches = childQueryCaches ??= new();
+            ref var cached = ref CollectionsMarshal.GetValueRefOrAddDefault(caches.UsingSynchronizationContextEventuallyQueries ??= [], synchronizationContext, out var exists);
+            if (!exists)
+            {
+                cached = built;
+                built.IsCached = true;
+                return built.AsScoped();
+            }
+            usingSynchronizationContextEventuallyQuery = cached!;
             ++usingSynchronizationContextEventuallyQuery.Observations;
         }
-        usingSynchronizationContextEventuallyQuery.Initialize();
+        built.Release();
         return usingSynchronizationContextEventuallyQuery.AsScoped();
     }
 
@@ -1398,14 +1770,29 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         lock (ChildrenAccess)
         {
             var caches = childQueryCaches ??= new();
-            if (!(caches.UsingSyncRootQueries ??= []).TryGetValue(lockObject, out usingSyncRootQuery!))
+            if ((caches.UsingSyncRootQueries ??= []).TryGetValue(lockObject, out usingSyncRootQuery!))
             {
-                usingSyncRootQuery = new ObservableCollectionUsingSyncRootQuery<TElement>(collectionObserver, this, lockObject);
-                caches.UsingSyncRootQueries.Add(lockObject, usingSyncRootQuery);
+                ++usingSyncRootQuery.Observations;
+                return usingSyncRootQuery.AsScoped();
             }
+        }
+        var built = new ObservableCollectionUsingSyncRootQuery<TElement>(collectionObserver, this, lockObject);
+        built.Observations = 1;
+        built.Initialize();
+        lock (ChildrenAccess)
+        {
+            var caches = childQueryCaches ??= new();
+            ref var cached = ref CollectionsMarshal.GetValueRefOrAddDefault(caches.UsingSyncRootQueries ??= [], lockObject, out var exists);
+            if (!exists)
+            {
+                cached = built;
+                built.IsCached = true;
+                return built.AsScoped();
+            }
+            usingSyncRootQuery = cached!;
             ++usingSyncRootQuery.Observations;
         }
-        usingSyncRootQuery.Initialize();
+        built.Release();
         return usingSyncRootQuery.AsScoped();
     }
 
@@ -1417,14 +1804,29 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         lock (ChildrenAccess)
         {
             var caches = childQueryCaches ??= new();
-            if (!(caches.UsingSyncRootEventuallyQueries ??= []).TryGetValue(lockObject, out usingSyncRootEventuallyQuery!))
+            if ((caches.UsingSyncRootEventuallyQueries ??= []).TryGetValue(lockObject, out usingSyncRootEventuallyQuery!))
             {
-                usingSyncRootEventuallyQuery = new ObservableCollectionUsingSyncRootEventuallyQuery<TElement>(collectionObserver, this, lockObject);
-                caches.UsingSyncRootEventuallyQueries.Add(lockObject, usingSyncRootEventuallyQuery);
+                ++usingSyncRootEventuallyQuery.Observations;
+                return usingSyncRootEventuallyQuery.AsScoped();
             }
+        }
+        var built = new ObservableCollectionUsingSyncRootEventuallyQuery<TElement>(collectionObserver, this, lockObject);
+        built.Observations = 1;
+        built.Initialize();
+        lock (ChildrenAccess)
+        {
+            var caches = childQueryCaches ??= new();
+            ref var cached = ref CollectionsMarshal.GetValueRefOrAddDefault(caches.UsingSyncRootEventuallyQueries ??= [], lockObject, out var exists);
+            if (!exists)
+            {
+                cached = built;
+                built.IsCached = true;
+                return built.AsScoped();
+            }
+            usingSyncRootEventuallyQuery = cached!;
             ++usingSyncRootEventuallyQuery.Observations;
         }
-        usingSyncRootEventuallyQuery.Initialize();
+        built.Release();
         return usingSyncRootEventuallyQuery.AsScoped();
     }
 
@@ -1438,14 +1840,28 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
             key = (Expression<Func<TElement, bool>>)optimizer(key);
         lock (ChildrenAccess)
         {
-            if (!(cachedWhereQueries ??= new(ExpressionEqualityComparer.Default)).TryGetValue(key, out whereQuery!))
+            if ((cachedWhereQueries ??= new(ExpressionEqualityComparer.Default)).TryGetValue(key, out whereQuery!))
             {
-                whereQuery = new ObservableCollectionWhereQuery<TElement>(collectionObserver, this, key);
-                cachedWhereQueries.Add(key, whereQuery);
+                ++whereQuery.Observations;
+                return whereQuery.AsScoped();
             }
+        }
+        var built = new ObservableCollectionWhereQuery<TElement>(collectionObserver, this, key);
+        built.Observations = 1;
+        built.Initialize();
+        lock (ChildrenAccess)
+        {
+            ref var cached = ref CollectionsMarshal.GetValueRefOrAddDefault(cachedWhereQueries ??= new(ExpressionEqualityComparer.Default), key, out var exists);
+            if (!exists)
+            {
+                cached = built;
+                built.IsCached = true;
+                return built.AsScoped();
+            }
+            whereQuery = cached!;
             ++whereQuery.Observations;
         }
-        whereQuery.Initialize();
+        built.Release();
         return whereQuery.AsScoped();
     }
 
@@ -1462,7 +1878,8 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
                 throw new InvalidOperationException("an observation was released more times than it was acquired");
             if (remaining == 0)
             {
-                childQueryCaches!.AggregateQueries!.Remove((aggregateQuery.SeedFactory, aggregateQuery.Func, aggregateQuery.ResultSelector));
+                if (aggregateQuery.IsCached)
+                    childQueryCaches!.AggregateQueries!.Remove((aggregateQuery.SeedFactory, aggregateQuery.Func, aggregateQuery.ResultSelector));
                 return true;
             }
         }
@@ -1478,7 +1895,8 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
                 throw new InvalidOperationException("an observation was released more times than it was acquired");
             if (remaining == 0)
             {
-                childQueryCaches!.AllQueries!.Remove(allQuery.Predicate);
+                if (allQuery.IsCached)
+                    childQueryCaches!.AllQueries!.Remove(allQuery.Predicate);
                 return true;
             }
         }
@@ -1494,7 +1912,8 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
                 throw new InvalidOperationException("an observation was released more times than it was acquired");
             if (remaining == 0)
             {
-                childQueryCaches!.AnyQueries!.Remove(anyQuery.Predicate);
+                if (anyQuery.IsCached)
+                    childQueryCaches!.AnyQueries!.Remove(anyQuery.Predicate);
                 return true;
             }
         }
@@ -1510,7 +1929,8 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
                 throw new InvalidOperationException("an observation was released more times than it was acquired");
             if (remaining == 0)
             {
-                childQueryCaches!.AppendQueries!.Remove(appendQuery.Appended);
+                if (appendQuery.IsCached)
+                    childQueryCaches!.AppendQueries!.Remove(appendQuery.Appended);
                 return true;
             }
         }
@@ -1526,7 +1946,8 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
                 throw new InvalidOperationException("an observation was released more times than it was acquired");
             if (remaining == 0)
             {
-                childQueryCaches!.AverageQueries!.Remove(averageQuery.Selector);
+                if (averageQuery.IsCached)
+                    childQueryCaches!.AverageQueries!.Remove(averageQuery.Selector);
                 return true;
             }
         }
@@ -1542,7 +1963,8 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
                 throw new InvalidOperationException("an observation was released more times than it was acquired");
             if (remaining == 0)
             {
-                childQueryCaches!.ComparisonQueries!.Remove((comparisonQuery.SoughtComparison, comparisonQuery.Comparer));
+                if (comparisonQuery.IsCached)
+                    childQueryCaches!.ComparisonQueries!.Remove((comparisonQuery.SoughtComparison, comparisonQuery.Comparer));
                 return true;
             }
         }
@@ -1558,7 +1980,8 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
                 throw new InvalidOperationException("an observation was released more times than it was acquired");
             if (remaining == 0)
             {
-                cachedConcatQueries!.Remove(concatQuery.Second);
+                if (concatQuery.IsCached)
+                    cachedConcatQueries!.Remove(concatQuery.Second);
                 return true;
             }
         }
@@ -1574,7 +1997,8 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
                 throw new InvalidOperationException("an observation was released more times than it was acquired");
             if (remaining == 0)
             {
-                childQueryCaches!.GroupByQueries!.Remove((groupByQuery.KeySelector, groupByQuery.KeyEqualityComparer));
+                if (groupByQuery.IsCached)
+                    childQueryCaches!.GroupByQueries!.Remove((groupByQuery.KeySelector, groupByQuery.KeyEqualityComparer));
                 return true;
             }
         }
@@ -1590,7 +2014,8 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
                 throw new InvalidOperationException("an observation was released more times than it was acquired");
             if (remaining == 0)
             {
-                childQueryCaches!.CountQuery = null;
+                if (countQuery.IsCached)
+                    childQueryCaches!.CountQuery = null;
                 return true;
             }
         }
@@ -1606,7 +2031,8 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
                 throw new InvalidOperationException("an observation was released more times than it was acquired");
             if (remaining == 0)
             {
-                childQueryCaches!.IndexForCountQueries!.Remove(indexForCountQuery.IndexForCount);
+                if (indexForCountQuery.IsCached)
+                    childQueryCaches!.IndexForCountQueries!.Remove(indexForCountQuery.IndexForCount);
                 return true;
             }
         }
@@ -1622,7 +2048,8 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
                 throw new InvalidOperationException("an observation was released more times than it was acquired");
             if (remaining == 0)
             {
-                childQueryCaches!.IndexQueries!.Remove((indexQuery.Index, indexQuery.OutOfRangeIsDefault));
+                if (indexQuery.IsCached)
+                    childQueryCaches!.IndexQueries!.Remove((indexQuery.Index, indexQuery.OutOfRangeIsDefault));
                 return true;
             }
         }
@@ -1638,7 +2065,8 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
                 throw new InvalidOperationException("an observation was released more times than it was acquired");
             if (remaining == 0)
             {
-                childQueryCaches!.IndividualChangeQuery = null;
+                if (individualChangesQuery.IsCached)
+                    childQueryCaches!.IndividualChangeQuery = null;
                 return true;
             }
         }
@@ -1655,7 +2083,8 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
                 throw new InvalidOperationException("an observation was released more times than it was acquired");
             if (remaining == 0)
             {
-                childQueryCaches!.ToLookupQueries!.Remove((lookupQuery.KeySelector, lookupQuery.KeyEqualityComparer));
+                if (lookupQuery.IsCached)
+                    childQueryCaches!.ToLookupQueries!.Remove((lookupQuery.KeySelector, lookupQuery.KeyEqualityComparer));
                 return true;
             }
         }
@@ -1671,7 +2100,8 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
                 throw new InvalidOperationException("an observation was released more times than it was acquired");
             if (remaining == 0)
             {
-                childQueryCaches!.OrderByQueries!.Remove(orderByQuery.SelectorsAndDirections);
+                if (orderByQuery.IsCached)
+                    childQueryCaches!.OrderByQueries!.Remove(orderByQuery.SelectorsAndDirections);
                 return true;
             }
         }
@@ -1687,7 +2117,8 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
                 throw new InvalidOperationException("an observation was released more times than it was acquired");
             if (remaining == 0)
             {
-                childQueryCaches!.PrependQueries!.Remove(prependQuery.Prepended);
+                if (prependQuery.IsCached)
+                    childQueryCaches!.PrependQueries!.Remove(prependQuery.Prepended);
                 return true;
             }
         }
@@ -1703,7 +2134,8 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
                 throw new InvalidOperationException("an observation was released more times than it was acquired");
             if (remaining == 0)
             {
-                cachedSelectQueries!.Remove(selectQuery.Selector);
+                if (selectQuery.IsCached)
+                    cachedSelectQueries!.Remove(selectQuery.Selector);
                 return true;
             }
         }
@@ -1719,7 +2151,8 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
                 throw new InvalidOperationException("an observation was released more times than it was acquired");
             if (remaining == 0)
             {
-                cachedSelectManyQueries!.Remove(selectManyQuery.Selector);
+                if (selectManyQuery.IsCached)
+                    cachedSelectManyQueries!.Remove(selectManyQuery.Selector);
                 return true;
             }
         }
@@ -1735,7 +2168,8 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
                 throw new InvalidOperationException("an observation was released more times than it was acquired");
             if (remaining == 0)
             {
-                childQueryCaches!.SliceQueries!.Remove(sliceQuery.Range);
+                if (sliceQuery.IsCached)
+                    childQueryCaches!.SliceQueries!.Remove(sliceQuery.Range);
                 return true;
             }
         }
@@ -1751,7 +2185,8 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
                 throw new InvalidOperationException("an observation was released more times than it was acquired");
             if (remaining == 0)
             {
-                childQueryCaches!.SumQueries!.Remove(sumQuery.Selector);
+                if (sumQuery.IsCached)
+                    childQueryCaches!.SumQueries!.Remove(sumQuery.Selector);
                 return true;
             }
         }
@@ -1768,7 +2203,8 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
                 throw new InvalidOperationException("an observation was released more times than it was acquired");
             if (remaining == 0)
             {
-                childQueryCaches!.ToDictionaryQueries!.Remove((toDictionaryQuery.KeySelector, toDictionaryQuery.ValueSelector, toDictionaryQuery.EqualityComparer));
+                if (toDictionaryQuery.IsCached)
+                    childQueryCaches!.ToDictionaryQueries!.Remove((toDictionaryQuery.KeySelector, toDictionaryQuery.ValueSelector, toDictionaryQuery.EqualityComparer));
                 return true;
             }
         }
@@ -1784,7 +2220,8 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
                 throw new InvalidOperationException("an observation was released more times than it was acquired");
             if (remaining == 0)
             {
-                childQueryCaches!.UsingSynchronizationCallbackEventuallyQueries!.Remove((usingSynchronizationCallbackEventuallyQuery.Context, usingSynchronizationCallbackEventuallyQuery.SynchronizationCallback));
+                if (usingSynchronizationCallbackEventuallyQuery.IsCached)
+                    childQueryCaches!.UsingSynchronizationCallbackEventuallyQueries!.Remove((usingSynchronizationCallbackEventuallyQuery.Context, usingSynchronizationCallbackEventuallyQuery.SynchronizationCallback));
                 return true;
             }
         }
@@ -1800,7 +2237,8 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
                 throw new InvalidOperationException("an observation was released more times than it was acquired");
             if (remaining == 0)
             {
-                childQueryCaches!.UsingSynchronizationCallbackQueries!.Remove((usingSynchronizationCallbackQuery.Context, usingSynchronizationCallbackQuery.SynchronizationCallback));
+                if (usingSynchronizationCallbackQuery.IsCached)
+                    childQueryCaches!.UsingSynchronizationCallbackQueries!.Remove((usingSynchronizationCallbackQuery.Context, usingSynchronizationCallbackQuery.SynchronizationCallback));
                 return true;
             }
         }
@@ -1816,7 +2254,8 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
                 throw new InvalidOperationException("an observation was released more times than it was acquired");
             if (remaining == 0)
             {
-                childQueryCaches!.UsingSynchronizationContextEventuallyQueries!.Remove(usingSynchronizationContextEventuallyQuery.SynchronizationContext);
+                if (usingSynchronizationContextEventuallyQuery.IsCached)
+                    childQueryCaches!.UsingSynchronizationContextEventuallyQueries!.Remove(usingSynchronizationContextEventuallyQuery.SynchronizationContext);
                 return true;
             }
         }
@@ -1832,7 +2271,8 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
                 throw new InvalidOperationException("an observation was released more times than it was acquired");
             if (remaining == 0)
             {
-                childQueryCaches!.UsingSynchronizationContextQueries!.Remove(usingSynchronizationContextQuery.SynchronizationContext);
+                if (usingSynchronizationContextQuery.IsCached)
+                    childQueryCaches!.UsingSynchronizationContextQueries!.Remove(usingSynchronizationContextQuery.SynchronizationContext);
                 return true;
             }
         }
@@ -1848,7 +2288,8 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
                 throw new InvalidOperationException("an observation was released more times than it was acquired");
             if (remaining == 0)
             {
-                childQueryCaches!.UsingSyncRootEventuallyQueries!.Remove(usingSyncRootEventuallyQuery.SyncRoot);
+                if (usingSyncRootEventuallyQuery.IsCached)
+                    childQueryCaches!.UsingSyncRootEventuallyQueries!.Remove(usingSyncRootEventuallyQuery.SyncRoot);
                 return true;
             }
         }
@@ -1864,7 +2305,8 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
                 throw new InvalidOperationException("an observation was released more times than it was acquired");
             if (remaining == 0)
             {
-                childQueryCaches!.UsingSyncRootQueries!.Remove(usingSyncRootQuery.SyncRoot);
+                if (usingSyncRootQuery.IsCached)
+                    childQueryCaches!.UsingSyncRootQueries!.Remove(usingSyncRootQuery.SyncRoot);
                 return true;
             }
         }
@@ -1880,7 +2322,8 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
                 throw new InvalidOperationException("an observation was released more times than it was acquired");
             if (remaining == 0)
             {
-                cachedWhereQueries!.Remove(whereQuery.Predicate);
+                if (whereQuery.IsCached)
+                    cachedWhereQueries!.Remove(whereQuery.Predicate);
                 return true;
             }
         }
