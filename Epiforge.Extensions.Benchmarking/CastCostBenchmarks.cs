@@ -1,10 +1,10 @@
 ﻿namespace Epiforge.Extensions.Benchmarking;
 
 /// <summary>
-/// Prices a cast over a thousand people as a query is built, disposed and changed through it, alone and in a chain shaped like the one GS5 sums a person's time through, against a projection doing the same conversion
+/// Prices a cast over a thousand people as a query is built, disposed and changed through it, alone and in a chain shaped like the one GS5 sums a person's time through, against a projection doing the same conversion, and a type filter over a thousand elements of which half pass it, with a cast and a type filter over dictionaries of a thousand values built and disposed likewise
 /// </summary>
 /// <remarks>
-/// The chain converts each person to <see cref="object"/> and back, projects the rank, converts that to <see cref="object"/> and back to <see cref="int"/> and sums it, which is the shape of GS5's person total: a cast either side of a projection, twice over, and an aggregate at the end. The projection arm uses a selector with the same body as the cast's, so that what a cast pays over what a conversion needs can be read from the difference
+/// The chain converts each person to <see cref="object"/> and back, projects the rank, converts that to <see cref="object"/> and back to <see cref="int"/> and sums it, which is the shape of GS5's person total: a cast either side of a projection, twice over, and an aggregate at the end. The projection arm uses a selector with the same body as the cast's, so that what a cast pays over what a conversion needs can be read from the difference. The type filter tests for an interface, as GS5's do, over people alternating with text
 /// </remarks>
 [MemoryDiagnoser]
 public class CastCostBenchmarks
@@ -13,7 +13,11 @@ public class CastCostBenchmarks
 
     BenchmarkPerson added = null!;
     int cursor;
+    ObservableRangeCollection<object> mixed = null!;
+    IObservableDictionaryQuery<int, object> mixedByIndexQuery = null!;
+    IObservableCollectionQuery<object> mixedQuery = null!;
     CollectionObserver observer = null!;
+    IObservableDictionaryQuery<int, BenchmarkPerson> peopleByIndexQuery = null!;
     ObservableRangeCollection<BenchmarkPerson> source = null!;
     IObservableCollectionQuery<BenchmarkPerson> sourceQuery = null!;
     IDisposable standing = null!;
@@ -65,7 +69,29 @@ public class CastCostBenchmarks
     {
         standing?.Dispose();
         sourceQuery?.Dispose();
+        mixedQuery?.Dispose();
+        mixedByIndexQuery?.Dispose();
+        peopleByIndexQuery?.Dispose();
     }
+
+    [Benchmark]
+    public void DictionaryCastBuiltAndDisposed() =>
+        peopleByIndexQuery.ObserveCast<object>().Dispose();
+
+    [Benchmark]
+    public void DictionaryOfTypeBuiltAndDisposed() =>
+        mixedByIndexQuery.ObserveOfType<INotifyPropertyChanged>().Dispose();
+
+    [Benchmark]
+    public void OfTypeAfterAnAdditionAndARemoval()
+    {
+        mixed.Add(added);
+        mixed.RemoveAt(elementCount);
+    }
+
+    [Benchmark]
+    public void OfTypeBuiltAndDisposed() =>
+        mixedQuery.ObserveOfType<INotifyPropertyChanged>().Dispose();
 
     [Benchmark]
     public void ProjectionBuiltAndDisposed() =>
@@ -79,10 +105,27 @@ public class CastCostBenchmarks
             people.Add(new BenchmarkPerson($"P{i}", i));
         source = new ObservableRangeCollection<BenchmarkPerson>(people);
         sourceQuery = observer.ObserveReadOnlyList(source);
+        var alternating = new List<object>(elementCount);
+        for (var i = 0; i < elementCount / 2; ++i)
+        {
+            alternating.Add(people[i]);
+            alternating.Add($"T{i}");
+        }
+        mixed = new ObservableRangeCollection<object>(alternating);
+        mixedQuery = observer.ObserveReadOnlyList(mixed);
+        var byIndex = new Dictionary<int, BenchmarkPerson>(elementCount);
+        var alternatingByIndex = new Dictionary<int, object>(elementCount);
+        for (var i = 0; i < elementCount; ++i)
+        {
+            byIndex.Add(i, people[i]);
+            alternatingByIndex.Add(i, alternating[i]);
+        }
+        peopleByIndexQuery = observer.ObserveReadOnlyDictionary(new ObservableDictionary<int, BenchmarkPerson>(byIndex));
+        mixedByIndexQuery = observer.ObserveReadOnlyDictionary(new ObservableDictionary<int, object>(alternatingByIndex));
         added = new BenchmarkPerson("Added", 0);
     }
 
-    [GlobalSetup(Targets = [nameof(CastBuiltAndDisposed), nameof(ChainBuiltAndDisposed), nameof(ProjectionBuiltAndDisposed)])]
+    [GlobalSetup(Targets = [nameof(CastBuiltAndDisposed), nameof(ChainBuiltAndDisposed), nameof(DictionaryCastBuiltAndDisposed), nameof(DictionaryOfTypeBuiltAndDisposed), nameof(OfTypeBuiltAndDisposed), nameof(ProjectionBuiltAndDisposed)])]
     public void SetUpBuilding() =>
         SetUpSource();
 
@@ -98,5 +141,12 @@ public class CastCostBenchmarks
     {
         SetUpSource();
         standing = Chain();
+    }
+
+    [GlobalSetup(Target = nameof(OfTypeAfterAnAdditionAndARemoval))]
+    public void SetUpOfType()
+    {
+        SetUpSource();
+        standing = mixedQuery.ObserveOfType<INotifyPropertyChanged>();
     }
 }

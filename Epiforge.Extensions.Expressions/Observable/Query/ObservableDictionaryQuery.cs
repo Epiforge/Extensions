@@ -39,16 +39,6 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     #endregion Cache Comparers
 
     /// <summary>
-    /// Holds the lambdas a cast observes, built once for each pair of types, since the observer's caches of optimized and compiled lambdas match by reference
-    /// </summary>
-    static class CastLambdas<TResult>
-    {
-        internal static readonly Expression<Func<TKey, TValue, bool>> IsResult = (key, value) => value is TResult;
-        internal static readonly Expression<Func<TKey, TValue, TKey>> Key = (key, value) => key;
-        internal static readonly Expression<Func<TKey, TValue, TResult>> Value = (key, value) => (TResult)(object)value!;
-    }
-
-    /// <summary>
     /// Holds the lambda over a key-value pair observed in place of a caller's predicate, built once for each predicate and kept for as long as its caller keeps the predicate, since the observer's caches of optimized and compiled lambdas match by reference
     /// </summary>
     static class PairPredicates
@@ -136,6 +126,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     Dictionary<Expression, ObservableDictionaryAllQuery<TKey, TValue>>? cachedAllQueries;
     NullableKeyDictionary<Expression?, ObservableDictionaryAnyQuery<TKey, TValue>>? cachedAnyQueries;
     ObservableDictionaryConcurrentQuery<TKey, TValue>? cachedConcurrentQuery;
+    Dictionary<(Type resultType, bool isFilter), ObservableQuery>? cachedConversionQueries;
     ObservableDictionaryCountQuery<TKey, TValue>? cachedCountQuery;
     Dictionary<(IComparer<TKey>? keyComparer, bool notFoundIsDefault), ObservableDictionaryKeyedQuery<TKey, TValue>>? cachedKeyedQueries;
     Dictionary<(Expression keyValuePairSelector, object equalityComparer), ObservableQuery>? cachedSelectQueries;
@@ -177,6 +168,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
                 count += cachedAllQueries?.Values.Sum(allQuery => 1 + allQuery.CachedObservableQueries) ?? 0;
                 count += cachedAnyQueries?.Values.Sum(anyQuery => 1 + anyQuery.CachedObservableQueries) ?? 0;
                 count += cachedConcurrentQuery is null ? 0 : 1 + cachedConcurrentQuery.CachedObservableQueries;
+                count += cachedConversionQueries?.Values.Sum(conversionQuery => 1 + conversionQuery.CachedObservableQueries) ?? 0;
                 count += cachedCountQuery is null ? 0 : 1 + cachedCountQuery.CachedObservableQueries;
                 count += cachedKeyedQueries?.Values.Sum(keyedQuery => 1 + keyedQuery.CachedObservableQueries) ?? 0;
                 count += cachedSelectQueries?.Values.Sum(selectQuery => 1 + selectQuery.CachedObservableQueries) ?? 0;
@@ -630,7 +622,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
 
     [return: DisposeWhenDiscarded]
     public IObservableDictionaryQuery<TKey, TResult> ObserveCast<TResult>() =>
-        ObserveSelect(CastLambdas<TResult>.Key, CastLambdas<TResult>.Value);
+        ObserveConversion<TResult>(false);
 
     [return: DisposeWhenDiscarded]
     public IObservableDictionaryQuery<TKey, TValue> ObserveConcurrently()
@@ -661,6 +653,35 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
         }
         built.Release();
         return concurrentQuery.AsScoped();
+    }
+
+    IObservableDictionaryQuery<TKey, TResult> ObserveConversion<TResult>(bool isFilter)
+    {
+        ObservableQuery conversionQuery;
+        var key = (typeof(TResult), isFilter);
+        lock (ChildrenAccess)
+        {
+            if ((cachedConversionQueries ??= []).TryGetValue(key, out conversionQuery!))
+            {
+                ++conversionQuery.Observations;
+                return ((ObservableDictionaryConversionQuery<TKey, TValue, TResult>)conversionQuery).AsScoped();
+            }
+        }
+        var built = new ObservableDictionaryConversionQuery<TKey, TValue, TResult>(collectionObserver, this, isFilter);
+        built.Observations = 1;
+        built.Initialize();
+        lock (ChildrenAccess)
+        {
+            if (!(cachedConversionQueries ??= []).TryGetValue(key, out conversionQuery!))
+            {
+                cachedConversionQueries.Add(key, built);
+                built.IsCached = true;
+                return built.AsScoped();
+            }
+            ++conversionQuery.Observations;
+        }
+        built.Release();
+        return ((ObservableDictionaryConversionQuery<TKey, TValue, TResult>)conversionQuery).AsScoped();
     }
 
     [return: DisposeWhenDiscarded]
@@ -904,21 +925,8 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     }
 
     [return: DisposeWhenDiscarded]
-    public IObservableDictionaryQuery<TKey, TResult> ObserveOfType<TResult>()
-    {
-        var where = ObserveWhere(CastLambdas<TResult>.IsResult);
-        try
-        {
-            var cast = where.ObserveCast<TResult>();
-            cast.Disposed += (_, _) => where.Dispose();
-            return cast;
-        }
-        catch
-        {
-            where.Dispose();
-            throw;
-        }
-    }
+    public IObservableDictionaryQuery<TKey, TResult> ObserveOfType<TResult>() =>
+        ObserveConversion<TResult>(true);
 
     [return: DisposeWhenDiscarded]
     public IObservableDictionaryQuery<TResultKey, TResultValue> ObserveSelect<TResultKey, TResultValue>(Expression<Func<TKey, TValue, TResultKey>> keySelector, Expression<Func<TKey, TValue, TResultValue>> valueSelector)
@@ -1272,6 +1280,23 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
             {
                 if (query.IsCached)
                     cachedConcurrentQuery = null;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    internal bool QueryDisposed<TResult>(ObservableDictionaryConversionQuery<TKey, TValue, TResult> query)
+    {
+        lock (ChildrenAccess)
+        {
+            var remaining = --query.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
+            {
+                if (query.IsCached)
+                    cachedConversionQueries!.Remove((typeof(TResult), query.IsFilter));
                 return true;
             }
         }
