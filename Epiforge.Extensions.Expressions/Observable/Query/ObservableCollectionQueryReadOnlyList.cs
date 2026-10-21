@@ -107,4 +107,14 @@ sealed class ObservableCollectionQueryReadOnlyList<TElement>(CollectionObserver 
 
     public override string ToString() =>
         $"read-only list of {typeof(TElement).FullName} elements (hash code {ReadOnlyList.GetHashCode()})";
+
+    private protected override bool TryCopyTo(TElement[] array, int arrayIndex)
+    {
+        if (copy is not { } kept)
+            return base.TryCopyTo(array, arrayIndex);
+        if (array.Length - arrayIndex < kept.Count)
+            return false;
+        kept.CopyTo(array, arrayIndex);
+        return true;
+    }
 }

@@ -337,6 +337,8 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
 
     public virtual void CopyTo(Array array, int index)
     {
+        if (array is TElement[] typedArray && IsCopiedDirectlyInto(typedArray, index) && TryCopyTo(typedArray, index))
+            return;
         if (!HasIndexerPenalty)
             for (int i = 0, ii = Count; i < ii; ++i)
                 array.SetValue(this[i], index + i);
@@ -350,6 +352,33 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
 
     public void CopyTo(TElement[] array, int arrayIndex) =>
         CopyTo((Array)array, arrayIndex);
+
+    /// <summary>
+    /// Determines whether elements may be stored into an array without <see cref="Array.SetValue(object, int)"/>, which is so where the array is exactly an array of the element type, since a store into an array of a derived type would fail differently than <see cref="Array.SetValue(object, int)"/> does
+    /// </summary>
+    static bool IsCopiedDirectlyInto(TElement[] array, int arrayIndex) =>
+        array.GetType() == typeof(TElement[]) && arrayIndex >= 0;
+
+    /// <summary>
+    /// Copies the elements into an array of exactly their type, where they fit from the index, without boxing them or checking the type of each store
+    /// </summary>
+    /// <returns><c>true</c> if the elements were copied; otherwise, <c>false</c>, having written nothing, so that the caller fails as <see cref="Array.SetValue(object, int)"/> would</returns>
+    private protected virtual bool TryCopyTo(TElement[] array, int arrayIndex)
+    {
+        var count = Count;
+        if (array.Length - arrayIndex < count)
+            return false;
+        if (!HasIndexerPenalty)
+            for (var i = 0; i < count; ++i)
+                array[arrayIndex + i] = this[i];
+        else
+        {
+            var i = arrayIndex - 1;
+            foreach (var item in this)
+                array[++i] = item;
+        }
+        return true;
+    }
 
     /// <summary>
     /// Brings this query's copy of an observed sequence up to date with a change the sequence announced and then announces it, reading the whole sequence again where the announcement does not say precisely what changed

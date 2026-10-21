@@ -129,17 +129,10 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
     {
         lock (access)
         {
-            if (enumerationSnapshot is null)
-            {
-                var results = new List<TResult>(positions.Count);
-                for (var node = positions.FirstNode; node is not null; node = positions.Next(node))
-                    results.Add(node.Item.CommittedResult);
-                enumerationSnapshot = results;
-            }
-            enumerationSnapshotPatches = 0;
+            var snapshot = UseEnumerationSnapshotWithAccess();
             enumerationSnapshotShared = true;
             Interlocked.Increment(ref liveEnumerations);
-            return new SnapshotEnumerator(this, enumerationSnapshot);
+            return new SnapshotEnumerator(this, snapshot);
         }
     }
 
@@ -422,5 +415,32 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
         InvalidateEnumerationSnapshotWithAccess();
         snapshot = null;
         return false;
+    }
+
+    private protected override bool TryCopyTo(TResult[] array, int arrayIndex)
+    {
+        lock (access)
+        {
+            if (array.Length - arrayIndex < positions.Count)
+                return false;
+            UseEnumerationSnapshotWithAccess().CopyTo(array, arrayIndex);
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Gets the snapshot of the results kept for reading them in order, taking one where none is kept, and restarts the count of changes it may be patched for, since it is being read
+    /// </summary>
+    List<TResult> UseEnumerationSnapshotWithAccess()
+    {
+        if (enumerationSnapshot is null)
+        {
+            var results = new List<TResult>(positions.Count);
+            for (var node = positions.FirstNode; node is not null; node = positions.Next(node))
+                results.Add(node.Item.CommittedResult);
+            enumerationSnapshot = results;
+        }
+        enumerationSnapshotPatches = 0;
+        return enumerationSnapshot;
     }
 }

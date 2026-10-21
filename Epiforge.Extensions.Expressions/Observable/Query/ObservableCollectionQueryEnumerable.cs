@@ -54,4 +54,14 @@ sealed class ObservableCollectionQueryEnumerable(CollectionObserver collectionOb
 
     public override string ToString() =>
         $"enumerable of object elements (hash code {Enumerable.GetHashCode()})";
+
+    private protected override bool TryCopyTo(object?[] array, int arrayIndex)
+    {
+        if (copy is not { } kept)
+            return base.TryCopyTo(array, arrayIndex);
+        if (array.Length - arrayIndex < kept.Count)
+            return false;
+        kept.CopyTo(array, arrayIndex);
+        return true;
+    }
 }

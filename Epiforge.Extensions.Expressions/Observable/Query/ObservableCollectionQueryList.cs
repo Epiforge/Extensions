@@ -85,4 +85,14 @@ sealed class ObservableCollectionQueryList(CollectionObserver collectionObserver
 
     public override string ToString() =>
         $"list of object elements (hash code {List.GetHashCode()})";
+
+    private protected override bool TryCopyTo(object?[] array, int arrayIndex)
+    {
+        if (copy is not { } kept)
+            return base.TryCopyTo(array, arrayIndex);
+        if (array.Length - arrayIndex < kept.Count)
+            return false;
+        kept.CopyTo(array, arrayIndex);
+        return true;
+    }
 }

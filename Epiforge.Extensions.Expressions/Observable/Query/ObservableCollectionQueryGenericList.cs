@@ -85,4 +85,14 @@ sealed class ObservableCollectionQueryGenericList<TElement>(CollectionObserver c
 
     public override string ToString() =>
         $"list of {typeof(TElement).FullName} elements (hash code {List.GetHashCode()})";
+
+    private protected override bool TryCopyTo(TElement[] array, int arrayIndex)
+    {
+        if (copy is not { } kept)
+            return base.TryCopyTo(array, arrayIndex);
+        if (array.Length - arrayIndex < kept.Count)
+            return false;
+        kept.CopyTo(array, arrayIndex);
+        return true;
+    }
 }

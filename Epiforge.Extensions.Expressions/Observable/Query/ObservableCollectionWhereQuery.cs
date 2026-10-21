@@ -144,18 +144,10 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
     {
         lock (access)
         {
-            if (enumerationSnapshot is null)
-            {
-                var elements = new List<TElement>(count);
-                for (var node = memberships.FirstNode; node is not null; node = memberships.Next(node))
-                    if (node.Weight == 1)
-                        elements.Add(node.Item.Argument);
-                enumerationSnapshot = elements;
-            }
-            enumerationSnapshotPatches = 0;
+            var snapshot = UseEnumerationSnapshotWithAccess();
             enumerationSnapshotShared = true;
             Interlocked.Increment(ref liveEnumerations);
-            return new SnapshotEnumerator(this, enumerationSnapshot);
+            return new SnapshotEnumerator(this, snapshot);
         }
     }
 
@@ -430,4 +422,32 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
 
     public override string ToString() =>
         $"{source} matching {Predicate}";
+
+    private protected override bool TryCopyTo(TElement[] array, int arrayIndex)
+    {
+        lock (access)
+        {
+            if (array.Length - arrayIndex < count)
+                return false;
+            UseEnumerationSnapshotWithAccess().CopyTo(array, arrayIndex);
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Gets the snapshot of the elements kept for reading them in order, taking one where none is kept, and restarts the count of changes it may be patched for, since it is being read
+    /// </summary>
+    List<TElement> UseEnumerationSnapshotWithAccess()
+    {
+        if (enumerationSnapshot is null)
+        {
+            var elements = new List<TElement>(count);
+            for (var node = memberships.FirstNode; node is not null; node = memberships.Next(node))
+                if (node.Weight == 1)
+                    elements.Add(node.Item.Argument);
+            enumerationSnapshot = elements;
+        }
+        enumerationSnapshotPatches = 0;
+        return enumerationSnapshot;
+    }
 }
