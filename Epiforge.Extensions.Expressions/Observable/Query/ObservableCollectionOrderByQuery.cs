@@ -545,14 +545,14 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
     /// <remarks>
     /// Two searches over the distinct elements in order, the first for the earliest which does not sort ahead of the element and the second, starting there, for the earliest which sorts after it; the weights before each are the counts. Each search finds its nodes from the one before, as the search for an insertion point does
     /// </remarks>
-    internal (Exception? Fault, (int Ahead, int Tied) Result) RankOf(TElement element)
+    internal (Exception? Fault, (int Ahead, int Tied) Result, bool Unmatched) RankOf(TElement element)
     {
         lock (access)
         {
             if (OperationFault is { } fault)
-                return (fault, default);
+                return (fault, default, false);
             if (!entries.TryGetValue(element, out var entry) || entry.Node is null)
-                return (ExceptionHelper.SequenceContainsNoMatchingElement, default);
+                return (ExceptionHelper.SequenceContainsNoMatchingElement, default, true);
             PrefixWeightedSequenceNode<ObservableCollectionOrderingComparer<TElement>.Entry>? finger = null;
             var fingerIndex = 0;
             var low = 0;
@@ -582,7 +582,7 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
                     high = middle;
             }
             var ahead = positions.PrefixWeightBefore(firstLevel);
-            return (null, (ahead, positions.PrefixWeightBefore(low) - ahead));
+            return (null, (ahead, positions.PrefixWeightBefore(low) - ahead), false);
         }
     }
 

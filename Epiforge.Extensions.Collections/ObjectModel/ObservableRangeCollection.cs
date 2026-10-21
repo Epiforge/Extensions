@@ -136,6 +136,7 @@ public class ObservableRangeCollection<T> :
             var list = new List<T>(items);
             if (list.Count > 0)
             {
+                CheckReentrancy();
                 BackingList.InsertRange(originalIndex, list);
                 NotifyCountChanged();
                 NotifyIndexerChanged();
@@ -153,6 +154,10 @@ public class ObservableRangeCollection<T> :
     {
         if (oldStartIndex != newStartIndex && count > 0)
         {
+            if (oldStartIndex < 0 || oldStartIndex > Items.Count - count)
+                throw new ArgumentOutOfRangeException(nameof(oldStartIndex));
+            if (newStartIndex < 0 || newStartIndex > Items.Count - count)
+                throw new ArgumentOutOfRangeException(nameof(newStartIndex));
             if (RaiseCollectionChangedEventsForIndividualElements)
             {
                 if (oldStartIndex < newStartIndex)
@@ -169,6 +174,7 @@ public class ObservableRangeCollection<T> :
             }
             else if (count == 1 && Items is List<T> list)
             {
+                CheckReentrancy();
                 var items = CollectionsMarshal.AsSpan(list);
                 var item = items[oldStartIndex];
                 if (oldStartIndex < newStartIndex)
@@ -181,6 +187,7 @@ public class ObservableRangeCollection<T> :
             }
             else
             {
+                CheckReentrancy();
                 var items = CollectionsMarshal.AsSpan(BackingList);
                 var movedItems = items.Slice(oldStartIndex, count).ToArray();
                 if (oldStartIndex < newStartIndex)
@@ -254,9 +261,8 @@ public class ObservableRangeCollection<T> :
                     ++i;
             return removedCount;
         }
-        var count = Items.Count;
         var index = 0;
-        while (index < count)
+        while (index < Items.Count)
         {
             if (!predicate(Items[index]))
             {
@@ -264,8 +270,9 @@ public class ObservableRangeCollection<T> :
                 continue;
             }
             var runLength = 1;
-            while (index + runLength < count && predicate(Items[index + runLength]))
+            while (index + runLength < Items.Count && predicate(Items[index + runLength]))
                 ++runLength;
+            CheckReentrancy();
             NotifyCollectionChangedEventArgs eventArgs;
             if (runLength == 1)
             {
@@ -282,7 +289,6 @@ public class ObservableRangeCollection<T> :
                 removed?.AddRange(run);
                 eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, run, index);
             }
-            count -= runLength;
             removedCount += runLength;
             NotifyCountChanged();
             NotifyIndexerChanged();
@@ -303,6 +309,7 @@ public class ObservableRangeCollection<T> :
                 var index = Items.IndexOf(item);
                 if (index >= 0)
                 {
+                    CheckReentrancy();
                     Items.RemoveAt(index);
                     NotifyCountChanged();
                     NotifyIndexerChanged();
@@ -342,6 +349,7 @@ public class ObservableRangeCollection<T> :
                     RemoveAt(index);
             else
             {
+                CheckReentrancy();
                 var backingList = BackingList;
                 var removedItems = CollectionsMarshal.AsSpan(backingList).Slice(index, count).ToArray();
                 backingList.RemoveRange(index, count);
@@ -362,6 +370,7 @@ public class ObservableRangeCollection<T> :
         }
         else
         {
+            CheckReentrancy();
             var oldItems = new T[Items.Count];
             Items.CopyTo(oldItems, 0);
             Items.Clear();
@@ -392,10 +401,12 @@ public class ObservableRangeCollection<T> :
         }
         else
         {
+            var list = collection is null ? [] : new List<T>(collection);
+            if (count > 0 || list.Count > 0)
+                CheckReentrancy();
             var backingList = BackingList;
             var replacedItems = CollectionsMarshal.AsSpan(backingList).Slice(index, count);
             var oldItems = replacedItems.ToArray();
-            var list = collection is null ? [] : new List<T>(collection);
             if (list.Count == count)
                 CollectionsMarshal.AsSpan(list).CopyTo(replacedItems);
             else
@@ -416,6 +427,7 @@ public class ObservableRangeCollection<T> :
     public void Reset(IEnumerable<T> newCollection)
     {
         ArgumentNullException.ThrowIfNull(newCollection);
+        CheckReentrancy();
         var previousCount = Items.Count;
         Items.Clear();
         foreach (var element in newCollection)
@@ -440,6 +452,7 @@ public class ObservableRangeCollection<T> :
             }
         if (firstRemoved < 0)
             return 0;
+        CheckReentrancy();
         var survivors = new List<T>(count - 1);
         for (var i = 0; i < firstRemoved; ++i)
             survivors.Add(Items[i]);

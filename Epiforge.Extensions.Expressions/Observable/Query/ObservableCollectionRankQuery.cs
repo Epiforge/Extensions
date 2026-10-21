@@ -28,8 +28,11 @@ sealed class ObservableCollectionRankQuery<TElement>(CollectionObserver collecti
         return true;
     }
 
-    void Evaluate() =>
-        Evaluation = orderByQuery.RankOf(Element);
+    void Evaluate()
+    {
+        var (fault, rank, unmatched) = orderByQuery.RankOf(Element);
+        Evaluation = (unmatched ? OwnFault(fault!) : fault, rank);
+    }
 
     protected override void OnInitialization()
     {

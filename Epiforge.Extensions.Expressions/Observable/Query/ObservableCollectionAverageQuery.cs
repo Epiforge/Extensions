@@ -58,7 +58,7 @@ sealed class ObservableCollectionAverageQuery<TElement, TResult>(CollectionObser
         else
         {
             var count = select.Count;
-            Evaluation = count > 0 ? (null, divide!(sum, (TResult)Convert.ChangeType(count, typeof(TResult)))) : (ExceptionHelper.SequenceContainsNoElements, default!);
+            Evaluation = count > 0 ? (null, divide!(sum, (TResult)Convert.ChangeType(count, typeof(TResult)))) : (OwnFault(ExceptionHelper.SequenceContainsNoElements), default!);
         }
     }
 

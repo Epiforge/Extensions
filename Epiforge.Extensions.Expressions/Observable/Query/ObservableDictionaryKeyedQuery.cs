@@ -34,12 +34,12 @@ sealed class ObservableDictionaryKeyedQuery<TKey, TValue>(CollectionObserver col
         if (count == 0)
         {
             if (!NotFoundIsDefault)
-                faultList.Add(ExceptionHelper.SequenceContainsNoElements);
+                faultList.Add(OwnFault(ExceptionHelper.SequenceContainsNoElements));
         }
         else if (count == 1 || KeyComparer is not null)
             result = (sortedDictionary ?? (IEnumerable<KeyValuePair<TKey, TValue>>)observableDictionaryQuery).First();
         else
-            faultList.Add(ExceptionHelper.SequenceContainsMoreThanOneElement);
+            faultList.Add(OwnFault(ExceptionHelper.SequenceContainsMoreThanOneElement));
         Evaluation = (faultList.Fault, result);
     }
 

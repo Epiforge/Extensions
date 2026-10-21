@@ -575,16 +575,8 @@ public class ObservableDictionary<TKey, TValue> :
     /// <param name="key">The key of the element to remove</param>
     protected virtual void Remove(object key)
     {
-        if (di.Contains(key) && key is TKey typedKey)
-        {
-            var value = di[key];
-            NotifyCountChanging();
+        if (key is TKey typedKey)
             Remove(typedKey);
-            NotifyCountChanged();
-            NotifyIndexerChanged();
-            if (IsChangeObserved)
-                OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Remove, (TKey)key, (TValue)value!));
-        }
     }
 
     /// <summary>
@@ -690,7 +682,7 @@ public class ObservableDictionary<TKey, TValue> :
     {
         ArgumentNullException.ThrowIfNull(removeKeys);
         ArgumentNullException.ThrowIfNull(newKeyValuePairs);
-        var removingKeys = removeKeys.ToImmutableHashSet();
+        var removingKeys = new HashSet<TKey>(removeKeys, gd.Comparer);
         if (newKeyValuePairs.Where(kvp => !removingKeys.Contains(kvp.Key)).Any(kvp => kvp.Key is null || gd.ContainsKey(kvp.Key)))
             throw new ArgumentException("One of the new keys was null or already found in the dictionary", nameof(newKeyValuePairs));
         var removingKeyValuePairs = new List<KeyValuePair<TKey, TValue>>();

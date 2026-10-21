@@ -6,6 +6,7 @@ abstract class ObservableScalarQuery<TResult>(CollectionObserver collectionObser
 {
     Dictionary<Expression, ObservableQuery>? cachedTransformQueries;
     (Exception? Fault, TResult Result) evaluation;
+    Exception? ownFault;
 
     public override int CachedObservableQueries
     {
@@ -23,6 +24,8 @@ abstract class ObservableScalarQuery<TResult>(CollectionObserver collectionObser
         get => evaluation;
         protected set
         {
+            if (value.Fault is AggregateException && FaultList.DescribeTheSame(evaluation.Fault, value.Fault))
+                value = (evaluation.Fault, value.Result);
             if (SetBackedProperty(ref evaluation, in value) && Logger is { } logger && logger.IsEnabled(LogLevel.Trace))
             {
                 if (value.Fault is { } fault)
@@ -65,6 +68,16 @@ abstract class ObservableScalarQuery<TResult>(CollectionObserver collectionObser
         }
         built.Release();
         return ((ObservableScalarQuery<TTransform>)transformQuery).AsScoped();
+    }
+
+    /// <summary>
+    /// Gets a fault this query raises for a reason of its own, which is the one it already reports when that was raised for the same reason, so that a fault standing through a change is neither replaced nor announced
+    /// </summary>
+    private protected Exception OwnFault(Exception fault)
+    {
+        if (ownFault is { } standing && standing.GetType() == fault.GetType() && standing.Message == fault.Message && (ReferenceEquals(evaluation.Fault, standing) || evaluation.Fault is AggregateException aggregate && aggregate.InnerExceptions.Contains(standing)))
+            return standing;
+        return ownFault = fault;
     }
 
     internal bool QueryDisposed<TTransform>(ObservableScalarTransformQuery<TResult, TTransform> query)

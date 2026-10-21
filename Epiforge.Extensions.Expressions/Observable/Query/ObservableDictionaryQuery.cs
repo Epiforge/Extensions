@@ -211,7 +211,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
         get => operationFault;
         protected set
         {
-            if (ReferenceEquals(ownOperationFault, value))
+            if (FaultList.DescribeTheSame(ownOperationFault, value))
                 return;
             ownOperationFault = value;
             PublishOperationFault();
@@ -248,6 +248,8 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
             faultList.Add(ownOperationFault);
             fault = faultList.Fault;
         }
+        if (FaultList.DescribeTheSame(operationFault, fault))
+            return;
         SetBackedProperty(ref operationFault, in fault, operationFaultPropertyChangingEventArgs, operationFaultPropertyChangedEventArgs);
     }
 

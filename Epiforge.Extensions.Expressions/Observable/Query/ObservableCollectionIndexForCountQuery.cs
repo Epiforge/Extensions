@@ -32,12 +32,12 @@ sealed class ObservableCollectionIndexForCountQuery<TElement>(CollectionObserver
             {
                 var count = observableCollectionQuery.Count;
                 if (count == 0)
-                    Evaluation = (ExceptionHelper.SequenceContainsNoElements, default!);
+                    Evaluation = (OwnFault(ExceptionHelper.SequenceContainsNoElements), default!);
                 else
                 {
                     var index = IndexForCount(count);
                     if (index < 0 || index >= count)
-                        Evaluation = (new IndexOutOfRangeException(), default!);
+                        Evaluation = (OwnFault(new IndexOutOfRangeException()), default!);
                     else
                         Evaluation = (null, observableCollectionQuery.HasIndexerPenalty ? observableCollectionQuery.ElementAt(index) : observableCollectionQuery[index]);
                 }

@@ -210,7 +210,11 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
         {
             var updated = false;
             TValue oldValue = default!;
-            var newValue = Cd.AddOrUpdate(key, value, (k, v) =>
+            var newValue = Cd.AddOrUpdate(key, k =>
+            {
+                updated = false;
+                return value;
+            }, (k, v) =>
             {
                 updated = true;
                 oldValue = v;
@@ -374,7 +378,11 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
         ArgumentNullException.ThrowIfNull(updateValueFactory);
         var updated = false;
         TValue oldValue = default!;
-        var newValue = Cd.AddOrUpdate(key, addValue, (k, v) =>
+        var newValue = Cd.AddOrUpdate(key, k =>
+        {
+            updated = false;
+            return addValue;
+        }, (k, v) =>
         {
             updated = true;
             oldValue = v;
@@ -411,7 +419,11 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
         ArgumentNullException.ThrowIfNull(updateValueFactory);
         var updated = false;
         TValue oldValue = default!;
-        var newValue = Cd.AddOrUpdate(key, addValueFactory, (k, v) =>
+        var newValue = Cd.AddOrUpdate(key, k =>
+        {
+            updated = false;
+            return addValueFactory(k);
+        }, (k, v) =>
         {
             updated = true;
             oldValue = v;
@@ -450,7 +462,11 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
         ArgumentNullException.ThrowIfNull(updateValueFactory);
         var updated = false;
         TValue oldValue = default!;
-        var newValue = Cd.AddOrUpdate(key, addValueFactory, (k, v, a) =>
+        var newValue = Cd.AddOrUpdate(key, (k, a) =>
+        {
+            updated = false;
+            return addValueFactory(k, a);
+        }, (k, v, a) =>
         {
             updated = true;
             oldValue = v;
@@ -527,23 +543,8 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
     /// <returns>The value for the key (this will be either the existing value for the key if the key is already in the dictionary, or the new value if the key was not in the dictionary)</returns>
     /// <exception cref="ArgumentNullException"><paramref name="key"/> is <c>null</c></exception>
     /// <exception cref="OverflowException">The dictionary already contains the maximum number of elements (<see cref="int.MaxValue"/>)</exception>
-    public virtual TValue GetOrAdd(TKey key, TValue value)
-    {
-        var added = false;
-        var retrievedOrAddedValue = Cd.GetOrAdd(key, k =>
-        {
-            added = true;
-            return value;
-        });
-        if (added)
-        {
-            NotifyCountChanged();
-            NotifyIndexerChanged();
-            if (IsChangeObserved)
-                OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, key, retrievedOrAddedValue));
-        }
-        return retrievedOrAddedValue;
-    }
+    public virtual TValue GetOrAdd(TKey key, TValue value) =>
+        Cd.TryGetValue(key, out var present) ? present : GetOrAddProduced(key, value);
 
     /// <summary>
     /// Adds a key/value pair to the <see cref="ObservableConcurrentDictionary{TKey, TValue}"/> by using the specified function if the key does not already exist (returns the new value, or the existing value if the key exists)
@@ -556,20 +557,7 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
     public virtual TValue GetOrAdd(TKey key, Func<TKey, TValue> valueFactory)
     {
         ArgumentNullException.ThrowIfNull(valueFactory);
-        var added = false;
-        var retrievedOrAddedValue = Cd.GetOrAdd(key, k =>
-        {
-            added = true;
-            return valueFactory(k);
-        });
-        if (added)
-        {
-            NotifyCountChanged();
-            NotifyIndexerChanged();
-            if (IsChangeObserved)
-                OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, key, retrievedOrAddedValue));
-        }
-        return retrievedOrAddedValue;
+        return Cd.TryGetValue(key, out var present) ? present : GetOrAddProduced(key, valueFactory(key));
     }
 
     /// <summary>
@@ -585,20 +573,27 @@ public class ObservableConcurrentDictionary<TKey, TValue> :
     public virtual TValue GetOrAdd<TArg>(TKey key, Func<TKey, TArg, TValue> valueFactory, TArg factoryArgument)
     {
         ArgumentNullException.ThrowIfNull(valueFactory);
-        var added = false;
-        var retrievedOrAddedValue = Cd.GetOrAdd(key, (k, a) =>
+        return Cd.TryGetValue(key, out var present) ? present : GetOrAddProduced(key, valueFactory(key, factoryArgument));
+    }
+
+    /// <summary>
+    /// Adds a value produced for a key the dictionary did not contain, or returns the value another thread added for it in the meantime, announcing an addition only when this call made it
+    /// </summary>
+    TValue GetOrAddProduced(TKey key, TValue value)
+    {
+        while (true)
         {
-            added = true;
-            return valueFactory(k, a);
-        }, factoryArgument);
-        if (added)
-        {
-            NotifyCountChanged();
-            NotifyIndexerChanged();
-            if (IsChangeObserved)
-                OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, key, retrievedOrAddedValue));
+            if (Cd.TryAdd(key, value))
+            {
+                NotifyCountChanged();
+                NotifyIndexerChanged();
+                if (IsChangeObserved)
+                    OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, key, value));
+                return value;
+            }
+            if (Cd.TryGetValue(key, out var present))
+                return present;
         }
-        return retrievedOrAddedValue;
     }
 
     /// <summary>

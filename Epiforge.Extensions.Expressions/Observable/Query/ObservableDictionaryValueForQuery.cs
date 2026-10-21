@@ -24,13 +24,27 @@ sealed class ObservableDictionaryValueForQuery<TKey, TValue>(CollectionObserver 
     }
 
     void Evaluate() =>
-        Evaluation = observableDictionaryQuery.OperationFault is { } fault ? (fault, default!) : observableDictionaryQuery.TryGetValue(Key, out var value) ? (null, value) : NotFoundIsDefault ? (null, default!) : (ExceptionHelper.KeyNotFound, default!);
+        Evaluation = observableDictionaryQuery.OperationFault is { } fault ? (fault, default!) : observableDictionaryQuery.TryGetValue(Key, out var value) ? (null, value) : NotFoundIsDefault ? (null, default!) : (OwnFault(ExceptionHelper.KeyNotFound), default!);
 
     void ObservableDictionaryQueryDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e)
     {
         using var changeHold = HoldOwnChanges();
-        if (e.Action is NotifyDictionaryChangedAction.Reset || e.OldItems is { } oldItems && e.OldItems.Select(kv => kv.Key).Contains(Key) || e.NewItems is { } newItems && newItems.Select(kv => kv.Key).Contains(Key))
+        if (e.Action is NotifyDictionaryChangedAction.Reset || Names(e.OldItems) || Names(e.NewItems))
             Evaluate();
+    }
+
+    /// <summary>
+    /// Determines whether a change names this query's key, by the comparer of the dictionary it reads, since a change may name a key the dictionary considers equal to it without being the same
+    /// </summary>
+    bool Names(IReadOnlyList<KeyValuePair<TKey, TValue>>? keyValuePairs)
+    {
+        if (keyValuePairs is null)
+            return false;
+        var keyComparer = observableDictionaryQuery.KeyComparer;
+        for (int i = 0, ii = keyValuePairs.Count; i < ii; ++i)
+            if (keyComparer.Equals(keyValuePairs[i].Key, Key))
+                return true;
+        return false;
     }
 
     void ObservableDictionaryQueryPropertyChanged(object? sender, PropertyChangedEventArgs e)

@@ -10,10 +10,13 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
     IReadOnlyList<TKey>? keysSnapshot;
     readonly Dictionary<TKey, List<TSourceKey>> claimantsByProjectedKey = new(equalityComparer);
     int duplicateClaims;
+    bool faultsChanged = true;
     int nullKeys;
     PropertyChangedEventHandler? observableExpressionPropertyChangedHandler;
     readonly ObservableDictionary<TSourceKey, (IObservableExpression<KeyValuePair<TSourceKey, TSourceValue>, KeyValuePair<TKey, TValue>> ObservableExpression, Exception? CommittedFault, KeyValuePair<TKey, TValue> CommittedProjection)> observableExpressions = new(source.KeyComparer);
     bool released;
+    int reportedDuplicateClaims;
+    int reportedNullKeys;
     readonly ObservableDictionary<TKey, TValue> result = new(equalityComparer);
     IReadOnlyList<TValue>? valuesSnapshot;
     readonly EqualityComparer<TValue> valueEqualityComparer = EqualityComparer<TValue>.Default;
@@ -175,8 +178,9 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
                 if (isApplied)
                     ApplyProjectionWithAccess(sourceKey, newProjection, result);
             }
-            if (!placementIsUnchanged || !ReferenceEquals(committed.CommittedFault, newFault))
-                SetOperationFault();
+            if (!ReferenceEquals(committed.CommittedFault, newFault))
+                faultsChanged = true;
+            SetOperationFault();
         }
     }
 
@@ -190,6 +194,8 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
         var (fault, projection) = observableExpression.Evaluation;
         if (fault is null)
             ApplyProjectionWithAccess(sourceKeyValuePair.Key, projection, into);
+        else
+            faultsChanged = true;
         observableExpressions.Add(sourceKeyValuePair.Key, (observableExpression, fault, projection));
     }
 
@@ -286,8 +292,16 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
         result[key] = value;
     }
 
+    /// <summary>
+    /// Rebuilds the operation fault when what it describes has changed, which is only when a key's fault changed or the counts of null and duplicate keys moved, since rebuilding it otherwise would report a fault standing for the same reasons as a new one
+    /// </summary>
     void SetOperationFault()
     {
+        if (!faultsChanged && nullKeys == reportedNullKeys && duplicateClaims == reportedDuplicateClaims)
+            return;
+        faultsChanged = false;
+        reportedNullKeys = nullKeys;
+        reportedDuplicateClaims = duplicateClaims;
         var faultList = new FaultList();
         if (nullKeys > 0)
             faultList.AddRange(Enumerable.Range(0, nullKeys).Select(_ => ExceptionHelper.KeyNull));
@@ -305,7 +319,10 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
         {
             using var changeHold = HoldOwnChanges();
             lock (access)
+            {
+                faultsChanged = true;
                 SetOperationFault();
+            }
         }
     }
 
@@ -318,6 +335,7 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
                 return;
             if (e.Action is NotifyDictionaryChangedAction.Reset)
             {
+                faultsChanged = true;
                 claimantsByProjectedKey.Clear();
                 duplicateClaims = 0;
                 nullKeys = 0;
@@ -346,6 +364,8 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
                             continue;
                         if (committed.CommittedFault is null)
                             RetractProjectionWithAccess(keyValuePair.Key!, committed.CommittedProjection);
+                        else
+                            faultsChanged = true;
                         committed.ObservableExpression.PropertyChanged -= ObservableExpressionPropertyChangedHandler;
                         committed.ObservableExpression.Dispose();
                         observableExpressions.Remove(keyValuePair.Key!);

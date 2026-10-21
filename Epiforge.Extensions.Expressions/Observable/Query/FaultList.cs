@@ -2,6 +2,25 @@ namespace Epiforge.Extensions.Expressions.Observable.Query;
 
 class FaultList
 {
+    /// <summary>
+    /// Determines whether two faults describe the same exceptions, which they do when they are the same exception or aggregate the same exceptions in the same order, so that a fault rebuilt around nothing new is not reported as a change
+    /// </summary>
+    public static bool DescribeTheSame(Exception? fault, Exception? other)
+    {
+        if (ReferenceEquals(fault, other))
+            return true;
+        if (fault is not AggregateException aggregate || other is not AggregateException otherAggregate)
+            return false;
+        var exceptions = aggregate.InnerExceptions;
+        var otherExceptions = otherAggregate.InnerExceptions;
+        if (exceptions.Count != otherExceptions.Count)
+            return false;
+        for (int i = 0, ii = exceptions.Count; i < ii; ++i)
+            if (!ReferenceEquals(exceptions[i], otherExceptions[i]))
+                return false;
+        return true;
+    }
+
     public static bool ExchangeElementFault<TElement>(Exception? operationFault, TElement element, IEqualityComparer<TElement> elementComparer, Exception? oldFault, Exception? newFault, out Exception? newOperationFault)
     {
         var addedFault = oldFault is null && newFault is not null;

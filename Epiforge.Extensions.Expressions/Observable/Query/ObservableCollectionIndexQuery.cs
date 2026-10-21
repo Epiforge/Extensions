@@ -44,7 +44,7 @@ sealed class ObservableCollectionIndexQuery<TElement>(CollectionObserver collect
                     {
                         var offset = index.GetOffset(observableCollectionQuery.Count);
                         if (offset < 0 || offset >= observableCollectionQuery.Count)
-                            Evaluation = OutOfRangeIsDefault ? (null, default!) : (new IndexOutOfRangeException(), default!);
+                            Evaluation = OutOfRangeIsDefault ? (null, default!) : (OwnFault(new IndexOutOfRangeException()), default!);
                         else
                             Evaluation = (null, observableCollectionQuery[offset]);
                     }
@@ -55,9 +55,9 @@ sealed class ObservableCollectionIndexQuery<TElement>(CollectionObserver collect
                     Evaluation = observableCollectionQuery.Count switch
                     {
                         0 when OutOfRangeIsDefault => (null, default!),
-                        0 => (ExceptionHelper.SequenceContainsNoElements, default!),
+                        0 => (OwnFault(ExceptionHelper.SequenceContainsNoElements), default!),
                         1 => (null, observableCollectionQuery[0]),
-                        _ => (ExceptionHelper.SequenceContainsMoreThanOneElement, default!)
+                        _ => (OwnFault(ExceptionHelper.SequenceContainsMoreThanOneElement), default!)
                     };
             }
             catch (Exception ex)

@@ -169,7 +169,7 @@ sealed class ObservableCollectionComparisonQuery<TResult>(CollectionObserver col
     }
 
     void ReportExtremeWithAccess(SortedSet<Occurrences> set) =>
-        Evaluation = set.Count == 0 ? (ExceptionHelper.SequenceContainsNoElements, default!) : (null, (SoughtComparison > 0 ? set.Max : set.Min)!.Value);
+        Evaluation = set.Count == 0 ? (OwnFault(ExceptionHelper.SequenceContainsNoElements), default!) : (null, (SoughtComparison > 0 ? set.Max : set.Min)!.Value);
 
     public override string ToString() =>
         $"{(SoughtComparison > 0 ? "max" : "min")} of {observableCollectionQuery}";
