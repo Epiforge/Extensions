@@ -45,12 +45,21 @@ abstract class ObservableExpression :
     /// Invokes through the specified invoker with the specified operands' values, without building an argument array where the arity is small enough that the invoker takes the values directly
     /// </summary>
     internal static object? Invoke(FastInvoker invoker, object? instance, IReadOnlyList<ObservableExpression>? expressions) =>
-        (expressions?.Count ?? 0) switch
+        expressions is null ? invoker.Invoke(instance) : InvokeWithEach(invoker, instance, expressions);
+
+    /// <summary>
+    /// Invokes through the specified invoker with the specified operands' values, without building an argument array where the arity is small enough that the invoker takes the values directly, generic over the list rather than taking the interface so that a list which is a value type is not boxed to be read
+    /// </summary>
+    internal static object? InvokeWithEach<TExpressions>(FastInvoker invoker, object? instance, TExpressions expressions)
+        where TExpressions : IReadOnlyList<ObservableExpression> =>
+        expressions.Count switch
         {
             0 => invoker.Invoke(instance),
-            1 => invoker.Invoke(instance, expressions![0].Evaluation.Result),
-            2 => invoker.Invoke(instance, expressions![0].Evaluation.Result, expressions[1].Evaluation.Result),
-            _ => invoker.Invoke(instance, EvaluationResults(expressions!))
+            1 => invoker.Invoke(instance, expressions[0].Evaluation.Result),
+            2 => invoker.Invoke(instance, expressions[0].Evaluation.Result, expressions[1].Evaluation.Result),
+            3 => invoker.Invoke(instance, expressions[0].Evaluation.Result, expressions[1].Evaluation.Result, expressions[2].Evaluation.Result),
+            4 => invoker.Invoke(instance, expressions[0].Evaluation.Result, expressions[1].Evaluation.Result, expressions[2].Evaluation.Result, expressions[3].Evaluation.Result),
+            _ => invoker.Invoke(instance, EvaluationResults(expressions))
         };
 
     /// <summary>
@@ -154,22 +163,24 @@ abstract class ObservableExpression :
     private protected bool IsEvaluatingOnThisThread =>
         (Volatile.Read(ref evaluating) & ~flags) == Environment.CurrentManagedThreadId << ownerShift;
 
+    /// <summary>
+    /// Disposes of a value this node no longer holds where it can be disposed of and ought to be, asking the cheaper question first, since most values cannot be disposed of and asking whether one ought to be takes lookups
+    /// </summary>
     void DisposeIfNecessaryAndPossible(object? value)
     {
-        if (GetShouldValueBeDisposed())
+        if (value is not (IDisposable or IAsyncDisposable) || !GetShouldValueBeDisposed())
+            return;
+        if (!observer.PreferAsyncDisposal && value is IDisposable preferredDisposable)
+            preferredDisposable.Dispose();
+        else if (value is IAsyncDisposable asyncDisposable)
         {
-            if (!observer.PreferAsyncDisposal && value is IDisposable preferredDisposable)
-                preferredDisposable.Dispose();
-            else if (value is IAsyncDisposable asyncDisposable)
-            {
-                if (observer.BlockOnAsyncDisposal)
-                    ExpressionObserver.DisposeAndWait(asyncDisposable);
-                else
-                    Task.Run(async () => await asyncDisposable.DisposeAsync().ConfigureAwait(false));
-            }
-            else if (value is IDisposable disposable)
-                disposable.Dispose();
+            if (observer.BlockOnAsyncDisposal)
+                ExpressionObserver.DisposeAndWait(asyncDisposable);
+            else
+                ExpressionObserver.DisposeOnThreadPool(asyncDisposable);
         }
+        else if (value is IDisposable disposable)
+            disposable.Dispose();
     }
 
     protected void DisposeValueIfNecessaryAndPossible() =>

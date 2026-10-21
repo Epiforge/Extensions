@@ -189,14 +189,22 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
     /// </summary>
     void ObserveElementWithAccess(TElement element, int index, FaultList faultList)
     {
+        if (ObserveElementWithAccess(element, index) is { } fault)
+            faultList.Add(new EvaluationFaultException(element, fault));
+    }
+
+    /// <summary>
+    /// Observes an element as <see cref="ObserveElementWithAccess(TElement, int, FaultList)"/> does, leaving what to do with its fault to the caller, so that a caller which needs a list of faults only where there is one need not make one beforehand
+    /// </summary>
+    /// <returns>The fault of the element's projection, if it has one; otherwise, <c>null</c></returns>
+    Exception? ObserveElementWithAccess(TElement element, int index)
+    {
         var observableExpression = collectionObserver.ExpressionObserver.ObserveWithoutOptimization(Selector, element);
         ref var state = ref CollectionsMarshal.GetValueRefOrNullRef(observableExpressionStates, observableExpression);
         var isObserved = !Unsafe.IsNullRef(ref state);
         if (!isObserved)
             observableExpression.PropertyChanged += ObservableExpressionPropertyChangedHandler;
         var (fault, result) = observableExpression.Evaluation;
-        if (fault is not null)
-            faultList.Add(new EvaluationFaultException(element, fault));
         if (isObserved)
             state.Nodes.Add(positions.Insert(index, state.Projection, 1));
         else
@@ -204,6 +212,7 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
             var projection = new Projection(observableExpression, result);
             observableExpressionStates.Add(observableExpression, (projection, new(positions.Insert(index, projection, 1)), fault));
         }
+        return fault;
     }
 
     protected override void OnInitialization()
@@ -337,10 +346,11 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
                     var newItems = new ChangedElements<TResult>();
                     if (e.NewItems is not null && e.NewStartingIndex >= 0)
                     {
-                        faultList ??= new FaultList(OwnOperationFault);
                         for (var i = 0; i < e.NewItems.Count; ++i)
                         {
-                            ObserveElementWithAccess((TElement)e.NewItems[i]!, e.NewStartingIndex + i, faultList);
+                            var element = (TElement)e.NewItems[i]!;
+                            if (ObserveElementWithAccess(element, e.NewStartingIndex + i) is { } fault)
+                                (faultList ??= new FaultList(OwnOperationFault)).Add(new EvaluationFaultException(element, fault));
                             newItems.Add(positions.NodeAt(e.NewStartingIndex + i).Item.CommittedResult);
                         }
                     }

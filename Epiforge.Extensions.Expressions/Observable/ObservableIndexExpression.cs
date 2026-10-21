@@ -82,7 +82,7 @@ sealed class ObservableIndexExpression(ExpressionObserver observer, IndexExpress
                 }
                 else
                 {
-                    var value = getMethodInvoker is { } invoker ? Invoke(invoker, this.objectResult, arguments) : null;
+                    var value = getMethodInvoker is { } invoker ? arguments is { } evaluatedArguments ? InvokeWithEach(invoker, this.objectResult, evaluatedArguments) : invoker.Invoke(this.objectResult) : null;
                     Evaluation = (null, value);
                     observer.TraceLogger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{IndexExpression} evaluated: {Value}", IndexExpression, value);
                 }

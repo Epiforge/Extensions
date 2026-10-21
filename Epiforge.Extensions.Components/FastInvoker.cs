@@ -10,9 +10,13 @@ public sealed class FastInvoker
 {
     delegate object? InvokeWithArguments(object? instance, object?[] arguments);
 
+    delegate object? InvokeWithFourArguments(object? instance, object? argument0, object? argument1, object? argument2, object? argument3);
+
     delegate object? InvokeWithNoArgument(object? instance);
 
     delegate object? InvokeWithOneArgument(object? instance, object? argument0);
+
+    delegate object? InvokeWithThreeArguments(object? instance, object? argument0, object? argument1, object? argument2);
 
     delegate object? InvokeWithTwoArguments(object? instance, object? argument0, object? argument1);
 
@@ -53,7 +57,7 @@ public sealed class FastInvoker
     {
         var parameters = member.GetParameters();
         ParameterCount = parameters.Length;
-        var packed = ParameterCount > 2;
+        var packed = ParameterCount > 4;
         if (RefusalOf(member, declaringType, parameters) is { } refusal)
         {
             if (packed)
@@ -62,8 +66,12 @@ public sealed class FastInvoker
                 withNoArgument = _ => throw refusal();
             else if (ParameterCount == 1)
                 withOneArgument = (_, _) => throw refusal();
-            else
+            else if (ParameterCount == 2)
                 withTwoArguments = (_, _, _) => throw refusal();
+            else if (ParameterCount == 3)
+                withThreeArguments = (_, _, _, _) => throw refusal();
+            else
+                withFourArguments = (_, _, _, _, _) => throw refusal();
             return;
         }
         if (!RuntimeFeature.IsDynamicCodeSupported)
@@ -75,8 +83,12 @@ public sealed class FastInvoker
                 withNoArgument = reflected.InvokeWithNoArgument;
             else if (ParameterCount == 1)
                 withOneArgument = reflected.InvokeWithOneArgument;
-            else
+            else if (ParameterCount == 2)
                 withTwoArguments = reflected.InvokeWithTwoArguments;
+            else if (ParameterCount == 3)
+                withThreeArguments = reflected.InvokeWithThreeArguments;
+            else
+                withFourArguments = reflected.InvokeWithFourArguments;
             return;
         }
         Type[] signature;
@@ -130,13 +142,19 @@ public sealed class FastInvoker
             withNoArgument = (InvokeWithNoArgument)dynamicMethod.CreateDelegate(typeof(InvokeWithNoArgument));
         else if (ParameterCount == 1)
             withOneArgument = (InvokeWithOneArgument)dynamicMethod.CreateDelegate(typeof(InvokeWithOneArgument));
-        else
+        else if (ParameterCount == 2)
             withTwoArguments = (InvokeWithTwoArguments)dynamicMethod.CreateDelegate(typeof(InvokeWithTwoArguments));
+        else if (ParameterCount == 3)
+            withThreeArguments = (InvokeWithThreeArguments)dynamicMethod.CreateDelegate(typeof(InvokeWithThreeArguments));
+        else
+            withFourArguments = (InvokeWithFourArguments)dynamicMethod.CreateDelegate(typeof(InvokeWithFourArguments));
     }
 
     readonly InvokeWithArguments? withArguments;
+    readonly InvokeWithFourArguments? withFourArguments;
     readonly InvokeWithNoArgument? withNoArgument;
     readonly InvokeWithOneArgument? withOneArgument;
+    readonly InvokeWithThreeArguments? withThreeArguments;
     readonly InvokeWithTwoArguments? withTwoArguments;
 
     /// <summary>
@@ -172,6 +190,27 @@ public sealed class FastInvoker
         withTwoArguments is { } invoke ? invoke(instance, argument0, argument1) : throw Mismatch(2);
 
     /// <summary>
+    /// Invokes the constructor or method, which must take three parameters
+    /// </summary>
+    /// <param name="instance">The object on which to invoke the method, ignored for a constructor or a static method</param>
+    /// <param name="argument0">The first argument</param>
+    /// <param name="argument1">The second argument</param>
+    /// <param name="argument2">The third argument</param>
+    public object? Invoke(object? instance, object? argument0, object? argument1, object? argument2) =>
+        withThreeArguments is { } invoke ? invoke(instance, argument0, argument1, argument2) : throw Mismatch(3);
+
+    /// <summary>
+    /// Invokes the constructor or method, which must take four parameters
+    /// </summary>
+    /// <param name="instance">The object on which to invoke the method, ignored for a constructor or a static method</param>
+    /// <param name="argument0">The first argument</param>
+    /// <param name="argument1">The second argument</param>
+    /// <param name="argument2">The third argument</param>
+    /// <param name="argument3">The fourth argument</param>
+    public object? Invoke(object? instance, object? argument0, object? argument1, object? argument2, object? argument3) =>
+        withFourArguments is { } invoke ? invoke(instance, argument0, argument1, argument2, argument3) : throw Mismatch(4);
+
+    /// <summary>
     /// Invokes the constructor or method with an argument list of any length
     /// </summary>
     /// <param name="instance">The object on which to invoke the method, ignored for a constructor or a static method</param>
@@ -187,7 +226,9 @@ public sealed class FastInvoker
         {
             0 => withNoArgument!(instance),
             1 => withOneArgument!(instance, arguments[0]),
-            _ => withTwoArguments!(instance, arguments[0], arguments[1])
+            2 => withTwoArguments!(instance, arguments[0], arguments[1]),
+            3 => withThreeArguments!(instance, arguments[0], arguments[1], arguments[2]),
+            _ => withFourArguments!(instance, arguments[0], arguments[1], arguments[2], arguments[3])
         };
     }
 }

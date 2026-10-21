@@ -1,1 +1,2 @@
 `PropertyChangeNotifier` and `DynamicPropertyChangeNotifier` ask their logger whether it writes traces before composing one, so a logger set to a level above trace no longer costs an array for every property change, nor boxes for the values of a property set through `SetBackedProperty`; the disposable base classes ask likewise.
+`FastInvoker` invokes a constructor or method of three or four parameters through new `Invoke` overloads which take the arguments directly, without an array for them.

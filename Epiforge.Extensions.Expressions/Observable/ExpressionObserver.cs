@@ -1060,11 +1060,17 @@ public class ExpressionObserver :
             if (BlockOnAsyncDisposal)
                 DisposeAndWait(asyncDisposable);
             else
-                Task.Run(async () => await asyncDisposable.DisposeAsync().ConfigureAwait(false));
+                DisposeOnThreadPool(asyncDisposable);
         }
         else if (value is IDisposable disposable)
             disposable.Dispose();
     }
+
+    /// <summary>
+    /// Begins disposing of a value asynchronously on a thread-pool thread without waiting for its disposal to finish, kept apart from the methods which choose how to dispose because the lambda capturing the value would otherwise be allocated on every call to them, including the ones which dispose of nothing
+    /// </summary>
+    internal static void DisposeOnThreadPool(IAsyncDisposable asyncDisposable) =>
+        Task.Run(async () => await asyncDisposable.DisposeAsync().ConfigureAwait(false));
 
     /// <summary>
     /// Begins disposing of a value asynchronously on a thread-pool thread and waits for its disposal to finish, kept apart from <see cref="DisposeAndWait(IAsyncDisposable)"/> because the lambda capturing the value would otherwise be allocated on every call to that method, including the ones which dispose where they are

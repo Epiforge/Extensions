@@ -105,4 +105,31 @@ sealed class ReflectedInvocation
         return Invoke(instance, [argument0, argument1]);
 #endif
     }
+
+    internal object? InvokeWithThreeArguments(object? instance, object? argument0, object? argument1, object? argument2)
+    {
+#if IS_NET_8_0_OR_GREATER
+        instance = CastInstance(instance);
+        argument0 = argumentCasts[0].Apply(argument0);
+        argument1 = argumentCasts[1].Apply(argument1);
+        argument2 = argumentCasts[2].Apply(argument2);
+        return constructorInvoker is { } constructor ? constructor.Invoke(argument0, argument1, argument2) : methodInvoker!.Invoke(instance, argument0, argument1, argument2);
+#else
+        return Invoke(instance, [argument0, argument1, argument2]);
+#endif
+    }
+
+    internal object? InvokeWithFourArguments(object? instance, object? argument0, object? argument1, object? argument2, object? argument3)
+    {
+#if IS_NET_8_0_OR_GREATER
+        instance = CastInstance(instance);
+        argument0 = argumentCasts[0].Apply(argument0);
+        argument1 = argumentCasts[1].Apply(argument1);
+        argument2 = argumentCasts[2].Apply(argument2);
+        argument3 = argumentCasts[3].Apply(argument3);
+        return constructorInvoker is { } constructor ? constructor.Invoke(argument0, argument1, argument2, argument3) : methodInvoker!.Invoke(instance, argument0, argument1, argument2, argument3);
+#else
+        return Invoke(instance, [argument0, argument1, argument2, argument3]);
+#endif
+    }
 }
