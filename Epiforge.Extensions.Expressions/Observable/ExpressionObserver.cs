@@ -1244,6 +1244,7 @@ public class ExpressionObserver :
             ? new DeferringDirectObservableExpression<TArgument, TResult>(this, evaluator, evaluate, argument, values, held, new bool[evaluator.DeferredGroupCount])
             : new DirectObservableExpression<TArgument, TResult>(this, evaluator, evaluate, argument, values, held);
         directObservableExpression.Initialize();
+        directObservableExpression.TakeFirstEvaluation();
         return directObservableExpression;
     }
 
@@ -1253,7 +1254,7 @@ public class ExpressionObserver :
     {
         ArgumentNullException.ThrowIfNull(expression);
         if (DirectObservation<TArgument, TResult>(expression, argument, true) is { } direct)
-            return new ScopedObservableExpression<TArgument, TResult>(this, null, direct, argument);
+            return direct;
         var parameterReplacedExpression = ReplaceParameters(expression, argument);
         return new ScopedObservableExpression<TArgument, TResult>(this, parameterReplacedExpression!, GetObservableExpression(parameterReplacedExpression!, false), argument);
     }
@@ -1264,7 +1265,7 @@ public class ExpressionObserver :
     {
         ArgumentNullException.ThrowIfNull(expression);
         if (DirectObservation<TArgument, TResult>(expression, argument, false) is { } direct)
-            return new ScopedObservableExpression<TArgument, TResult>(this, null, direct, argument);
+            return direct;
         var parameterReplacedExpression = ExpressionObserver.ReplaceParametersWithoutOptimization(expression, argument);
         return new ScopedObservableExpression<TArgument, TResult>(this, parameterReplacedExpression!, GetObservableExpression(parameterReplacedExpression!, false), argument);
     }

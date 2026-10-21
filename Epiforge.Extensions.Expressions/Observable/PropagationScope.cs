@@ -8,7 +8,7 @@ readonly ref struct PropagationScope
     [ThreadStatic]
     static int depth;
     [ThreadStatic]
-    static List<ScopedObservableExpression>? pending;
+    static List<IEvaluationAnnouncer>? pending;
 
     /// <summary>
     /// Gets whether the calling thread is within a propagation
@@ -19,8 +19,8 @@ readonly ref struct PropagationScope
     /// <summary>
     /// Records an observation to be notified when the outermost scope ends, which each observation may do only once per propagation
     /// </summary>
-    internal static void Enlist(ScopedObservableExpression scopedObservableExpression) =>
-        (pending ??= []).Add(scopedObservableExpression);
+    internal static void Enlist(IEvaluationAnnouncer announcer) =>
+        (pending ??= []).Add(announcer);
 
     public PropagationScope() =>
         ++depth;

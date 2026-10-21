@@ -55,12 +55,6 @@ abstract class DirectObservableExpression(ExpressionObserver observer, Type type
     internal override bool CanChange =>
         attachments is not null;
 
-    /// <summary>
-    /// Releases the observation without serializing, since an observation made directly belongs to one consumer and is never shared, so no other release can meet this one
-    /// </summary>
-    internal override void Release() =>
-        Dispose();
-
     protected override bool DisposeCore()
     {
         if (Interlocked.Exchange(ref released, 1) != 0)
@@ -200,8 +194,13 @@ abstract class DirectObservableExpression(ExpressionObserver observer, Type type
     }
 }
 
+/// <summary>
+/// An observation made by subscribing directly to its change sources, which belongs to one consumer and is never shared, and is therefore consumed as itself rather than through a wrapper, announcing its own evaluation
+/// </summary>
 class DirectObservableExpression<TArgument, TResult> :
-    DirectObservableExpression
+    DirectObservableExpression,
+    IEvaluationAnnouncer,
+    IObservableExpression<TArgument, TResult>
 {
     static readonly bool sharesBooleanBoxes = typeof(TResult) == typeof(bool);
     static readonly TResult trueResult = typeof(TResult) == typeof(bool) ? (TResult)(object)true : default!;
@@ -223,12 +222,59 @@ class DirectObservableExpression<TArgument, TResult> :
         this.values = values;
     }
 
+    /// <summary>
+    /// What the observation last announced, which is what its consumer reads, since a change is announced only once the propagation which made it has ended
+    /// </summary>
+    object? announcedState = EvaluationAnnouncement.Unread;
     private protected readonly TArgument argument;
+    IReadOnlyList<object?>? arguments;
     readonly bool comparesBeforeBoxing;
+    /// <summary>
+    /// Is set as disposal begins, so that the observation reports itself disposed and announces nothing from that moment, as the wrapper it is no longer consumed through did
+    /// </summary>
+    int disposing;
     private protected readonly Func<TArgument, object?[], bool[], object?[], object?[], TResult> evaluate;
     private protected readonly DirectEvaluator evaluator;
     private protected readonly object?[] held;
+    bool notificationForced;
+    bool notificationPending;
     private protected readonly object?[] values;
+
+    public TArgument Argument =>
+        argument;
+
+    /// <summary>
+    /// Gets the arguments the expression is observed with, made when something asks for it, since one observation is made per element of a query and nothing within the library reads it
+    /// </summary>
+    public IReadOnlyList<object?> Arguments
+    {
+        get
+        {
+            if (arguments is { } made)
+                return made;
+            Interlocked.CompareExchange(ref arguments, [argument], null);
+            return arguments!;
+        }
+    }
+
+    (Exception? Fault, TResult Result) IObservableExpression<TResult>.Evaluation
+    {
+        get
+        {
+            var (fault, result) = Decode(Volatile.Read(ref announcedState));
+            return (fault, (TResult)result!);
+        }
+    }
+
+    bool IDisposalStatus.IsDisposed =>
+        Volatile.Read(ref disposing) != 0;
+
+    public IExpressionObserver Observer =>
+        observer;
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    public event PropertyChangingEventHandler? PropertyChanging;
 
     /// <summary>
     /// Disposes of what every held slot the observer disposes of resolved to, which is once each because a held value is resolved once and never replaced
@@ -248,6 +294,15 @@ class DirectObservableExpression<TArgument, TResult> :
     private protected static object? Box(TResult value) =>
         sharesBooleanBoxes ? BooleanBoxes.Box(EqualityComparer<TResult>.Default.Equals(value, trueResult)) : value;
 
+    void IEvaluationAnnouncer.ClearPendingNotification() =>
+        Volatile.Write(ref notificationPending, false);
+
+    void IDisposable.Dispose()
+    {
+        Volatile.Write(ref disposing, 1);
+        Dispose();
+    }
+
     protected override void Evaluate()
     {
         try
@@ -263,6 +318,50 @@ class DirectObservableExpression<TArgument, TResult> :
             observer.TraceLogger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, ex, "{Expression} faulted: {Fault}", Expression, ex);
         }
     }
+
+    /// <summary>
+    /// Announces the evaluation once the propagation ends, the observation being its own consumer's only point of contact where a graph node notifies the wrappers subscribed to it
+    /// </summary>
+    private protected override void NotifyDependentsChanged()
+    {
+        if (Volatile.Read(ref disposing) != 0 || EvaluationAnnouncement.Enlisted(this, observer, ref notificationPending))
+            return;
+        RaiseIfEvaluationChanged();
+    }
+
+    private protected override void NotifyDependentsOfValueContentsChanged()
+    {
+        if (Volatile.Read(ref disposing) != 0)
+            return;
+        notificationForced = true;
+        if (EvaluationAnnouncement.Enlisted(this, observer, ref notificationPending))
+            return;
+        RaiseIfEvaluationChanged();
+    }
+
+    void IEvaluationAnnouncer.RaiseEvaluationChanged() =>
+        PropertyChanged?.Invoke(this, EvaluationPropertyChangedEventArgs);
+
+    void IEvaluationAnnouncer.RaiseEvaluationChanging() =>
+        PropertyChanging?.Invoke(this, EvaluationPropertyChangingEventArgs);
+
+    void RaiseIfEvaluationChanged() =>
+        EvaluationAnnouncement.RaiseIfEvaluationChanged(this, observer, this, ref announcedState, ref notificationForced);
+
+    void IEvaluationAnnouncer.RaisePendingNotification()
+    {
+        if (Volatile.Read(ref disposing) == 0)
+            RaiseIfEvaluationChanged();
+    }
+
+    bool IEvaluationAnnouncer.ResultEquals(object? x, object? y) =>
+        AnnouncedResults<TResult>.AreEqual(x, y);
+
+    /// <summary>
+    /// Reads the evaluation the observation was built to as the first one its consumer sees, unless an announcement since has read it already
+    /// </summary>
+    internal void TakeFirstEvaluation() =>
+        EvaluationAnnouncement.TakeFirstEvaluation(observer, this, ref announcedState);
 
     private protected bool IsCurrentResult(TResult value)
     {

@@ -383,7 +383,7 @@ abstract class ObservableExpression :
         Relinquish(owner);
     }
 
-    private protected void NotifyDependentsChanged()
+    private protected virtual void NotifyDependentsChanged()
     {
         var current = Volatile.Read(ref firstDependent);
         while (current is not null)
@@ -395,7 +395,7 @@ abstract class ObservableExpression :
         }
     }
 
-    private protected void NotifyDependentsOfValueContentsChanged()
+    private protected virtual void NotifyDependentsOfValueContentsChanged()
     {
         var current = Volatile.Read(ref firstDependent);
         while (current is not null)
@@ -500,19 +500,9 @@ abstract class ObservableExpression :
 }
 
 abstract class ScopedObservableExpression :
+    IEvaluationAnnouncer,
     IObservableExpressionDependent
 {
-    /// <summary>
-    /// Determines whether two faults are the same fault, which is by type and message rather than by identity because an expression which is re-evaluated while faulted throws a new exception every time, and announcing that as a change would make the number of notifications a consumer receives depend on how often the mechanism happens to re-evaluate
-    /// </summary>
-    static bool FaultEquals(Exception? x, Exception? y) =>
-        ReferenceEquals(x, y) || x is not null && y is not null && x.GetType() == y.GetType() && x.Message == y.Message;
-
-    /// <summary>
-    /// Stands in for an evaluation not yet read, so that whichever of construction and a first announcement reads the node's evaluation last is the one kept, since construction subscribes before it reads and an announcement can arrive in between on another thread
-    /// </summary>
-    static readonly object unread = new();
-
     protected ScopedObservableExpression(ExpressionObserver observer, Expression? expression, ObservableExpression observableExpression, IReadOnlyList<object?>? arguments)
     {
         ArgumentNullException.ThrowIfNull(observer);
@@ -523,10 +513,7 @@ abstract class ScopedObservableExpression :
         this.observableExpression = observableExpression;
         if (this.observableExpression.CanChange)
             subscription = this.observableExpression.SubscribeDependent(this);
-        if (!observer.IsThreadSafe)
-            evaluationState = observableExpression.CurrentState;
-        else
-            Interlocked.CompareExchange(ref evaluationState, observableExpression.CurrentState, unread);
+        EvaluationAnnouncement.TakeFirstEvaluation(observer, observableExpression, ref evaluationState);
     }
 
     private protected readonly ObservableExpression observableExpression;
@@ -534,7 +521,7 @@ abstract class ScopedObservableExpression :
     IReadOnlyList<object?>? arguments;
     int disposed;
     Expression? expression;
-    object? evaluationState = unread;
+    object? evaluationState = EvaluationAnnouncement.Unread;
     bool notificationForced;
     bool notificationPending;
     readonly ObservableExpressionSubscription? subscription;
@@ -573,9 +560,6 @@ abstract class ScopedObservableExpression :
 
     public event EventHandler? Disposing;
 
-    internal void ClearPendingNotification() =>
-        Volatile.Write(ref notificationPending, false);
-
     public void Dispose()
     {
         if (Interlocked.Exchange(ref disposed, 1) != 0)
@@ -588,9 +572,12 @@ abstract class ScopedObservableExpression :
         Disposed?.Invoke(this, e);
     }
 
+    void IEvaluationAnnouncer.ClearPendingNotification() =>
+        Volatile.Write(ref notificationPending, false);
+
     void IObservableExpressionDependent.OnDependencyEvaluationChanged(ObservableExpression dependency)
     {
-        if (Enlisted())
+        if (EvaluationAnnouncement.Enlisted(this, observer, ref notificationPending))
             return;
         RaiseIfEvaluationChanged();
     }
@@ -598,100 +585,29 @@ abstract class ScopedObservableExpression :
     void IObservableExpressionDependent.OnDependencyValueContentsChanged(ObservableExpression dependency)
     {
         notificationForced = true;
-        if (Enlisted())
+        if (EvaluationAnnouncement.Enlisted(this, observer, ref notificationPending))
             return;
         RaiseIfEvaluationChanged();
     }
 
-    /// <summary>
-    /// Announces an evaluation, a write which is a full fence where observations are shared between threads so that the node read after it is read no earlier than the write
-    /// </summary>
-    void Announce(object? state, bool isFenced)
-    {
-        notificationForced = false;
-        PropertyChanging?.Invoke(this, ObservableExpression.EvaluationPropertyChangingEventArgs);
-        if (isFenced)
-            Interlocked.Exchange(ref evaluationState, state);
-        else
-            Volatile.Write(ref evaluationState, state);
+    void IEvaluationAnnouncer.RaiseEvaluationChanged() =>
         PropertyChanged?.Invoke(this, ObservableExpression.EvaluationPropertyChangedEventArgs);
-    }
 
-    /// <summary>
-    /// Defers this observation's notification to the end of the propagation on this thread, unless one is already pending
-    /// </summary>
-    /// <remarks>
-    /// A pending notification may be another thread's, which may already have read the node without this thread's change, so where observations are shared between threads one seen pending is looked at again behind a full fence, as the thread raising it reads the node again behind one of its own before it finishes, and one of the two must then see the other
-    /// </remarks>
-    bool Enlisted()
-    {
-        if (!PropagationScope.IsPropagating)
-            return false;
-        if (Volatile.Read(ref notificationPending))
-        {
-            if (!observer.IsThreadSafe)
-                return true;
-            Interlocked.MemoryBarrier();
-            if (Volatile.Read(ref notificationPending))
-                return true;
-        }
-        Volatile.Write(ref notificationPending, true);
-        PropagationScope.Enlist(this);
-        return true;
-    }
+    void IEvaluationAnnouncer.RaiseEvaluationChanging() =>
+        PropertyChanging?.Invoke(this, ObservableExpression.EvaluationPropertyChangingEventArgs);
 
-    bool IsAnnounceable(object? announcedState, object? currentState)
-    {
-        if (notificationForced)
-            return true;
-        var (announcedFault, announcedResult) = observableExpression.Decode(announcedState);
-        var (currentFault, currentResult) = observableExpression.Decode(currentState);
-        return !FaultEquals(announcedFault, currentFault) || !ResultEquals(announcedResult, currentResult);
-    }
-
-    /// <summary>
-    /// Announces the node's evaluation if it differs from the one last announced
-    /// </summary>
-    /// <remarks>
-    /// Where observations are shared between threads, two threads can announce at once having read the node at different moments, and the one writing last may write the older evaluation. So after announcing, or finding nothing to announce, a thread reads the node again behind a full fence and goes around again if it has moved, which leaves the last to write holding what the node holds
-    /// </remarks>
-    void RaiseIfEvaluationChanged()
-    {
-        var currentState = observableExpression.CurrentState;
-        if (!observer.IsThreadSafe)
-        {
-            var announcedState = evaluationState;
-            if (ReferenceEquals(announcedState, unread))
-                evaluationState = currentState;
-            else if (IsAnnounceable(announcedState, currentState))
-                Announce(currentState, false);
-            return;
-        }
-        while (true)
-        {
-            var announcedState = Volatile.Read(ref evaluationState);
-            if (ReferenceEquals(announcedState, unread))
-            {
-                if (!ReferenceEquals(Interlocked.CompareExchange(ref evaluationState, currentState, unread), unread))
-                    continue;
-            }
-            else if (IsAnnounceable(announcedState, currentState))
-                Announce(currentState, true);
-            else
-                Interlocked.MemoryBarrier();
-            var latestState = observableExpression.CurrentState;
-            if (ReferenceEquals(latestState, currentState))
-                return;
-            currentState = latestState;
-        }
-    }
+    void RaiseIfEvaluationChanged() =>
+        EvaluationAnnouncement.RaiseIfEvaluationChanged(this, observer, observableExpression, ref evaluationState, ref notificationForced);
 
     private protected virtual IReadOnlyList<object?> MakeArguments() =>
         [];
 
     private protected abstract bool ResultEquals(object? x, object? y);
 
-    internal void RaisePendingNotification()
+    bool IEvaluationAnnouncer.ResultEquals(object? x, object? y) =>
+        ResultEquals(x, y);
+
+    void IEvaluationAnnouncer.RaisePendingNotification()
     {
         if (!IsDisposed)
             RaiseIfEvaluationChanged();
@@ -705,11 +621,6 @@ class ScopedObservableExpression<TResult>(ExpressionObserver observer, Expressio
     ScopedObservableExpression(observer, expression, observableExpression, arguments),
     IObservableExpression<TResult>
 {
-    /// <summary>
-    /// Whether results of this type are best compared as they arrive, already boxed, which is so for a value type that does not implement <see cref="IEquatable{T}"/> because its default comparer boxes one of them again to reach the very same comparison
-    /// </summary>
-    static readonly bool compareResultsBoxed = typeof(TResult).IsValueType && !typeof(IEquatable<TResult>).IsAssignableFrom(typeof(TResult));
-
     public (Exception? Fault, TResult Result) Evaluation
     {
         get
@@ -720,7 +631,7 @@ class ScopedObservableExpression<TResult>(ExpressionObserver observer, Expressio
     }
 
     private protected override bool ResultEquals(object? x, object? y) =>
-        x is null || y is null ? ReferenceEquals(x, y) : compareResultsBoxed ? x.Equals(y) : EqualityComparer<TResult>.Default.Equals((TResult)x, (TResult)y);
+        AnnouncedResults<TResult>.AreEqual(x, y);
 }
 
 class ScopedObservableExpression<TArgument, TResult>(ExpressionObserver observer, Expression? expression, ObservableExpression observableExpression, TArgument argument) :
