@@ -89,9 +89,16 @@ abstract class ObservableExpression :
         this.expression = expression;
     }
 
-    private protected ObservableExpression(ExpressionObserver observer, Type type, bool deferEvaluation)
+    private protected ObservableExpression(ExpressionObserver observer, Type type, bool deferEvaluation) :
+        this(observer, type, deferEvaluation, false)
+    {
+    }
+
+    private protected ObservableExpression(ExpressionObserver observer, Type type, bool deferEvaluation, bool hasSoleDependent)
     {
         ArgumentNullException.ThrowIfNull(observer);
+        if (!hasSoleDependent)
+            dependentsAccess = new();
         this.observer = observer;
         defaultResult = DefaultResult(type);
         resultEqualityComparer = FastEqualityComparer.Get(type);
@@ -106,10 +113,13 @@ abstract class ObservableExpression :
     /// </summary>
     int evaluating;
     Expression? expression;
+    /// <summary>
+    /// Serializes changes to the dependents, and is absent for a node which only ever has one dependent, since that dependent's subscription and unsubscription cannot meet another
+    /// </summary>
 #if IS_NET_9_0_OR_GREATER
-    readonly Lock dependentsAccess = new();
+    readonly Lock? dependentsAccess;
 #else
-    readonly object dependentsAccess = new();
+    readonly object? dependentsAccess;
 #endif
     ObservableExpressionSubscription? firstDependent;
     ObservableExpressionSubscription? lastDependent;
@@ -416,16 +426,22 @@ abstract class ObservableExpression :
     {
         ArgumentNullException.ThrowIfNull(dependent);
         var subscription = new ObservableExpressionSubscription(dependent);
-        lock (dependentsAccess)
-        {
-            subscription.Previous = lastDependent;
-            if (lastDependent is null)
-                Volatile.Write(ref firstDependent, subscription);
-            else
-                lastDependent.Next = subscription;
-            lastDependent = subscription;
-        }
+        if (dependentsAccess is { } access)
+            lock (access)
+                LinkDependent(subscription);
+        else
+            LinkDependent(subscription);
         return subscription;
+    }
+
+    void LinkDependent(ObservableExpressionSubscription subscription)
+    {
+        subscription.Previous = lastDependent;
+        if (lastDependent is null)
+            Volatile.Write(ref firstDependent, subscription);
+        else
+            lastDependent.Next = subscription;
+        lastDependent = subscription;
     }
 
     public override string ToString() =>
@@ -447,33 +463,39 @@ abstract class ObservableExpression :
     /// </summary>
     internal virtual void Release()
     {
-        if (!observer.IsThreadSafe)
+        if (!observer.IsThreadSafe || dependentsAccess is not { } access)
         {
             Dispose();
             return;
         }
-        lock (dependentsAccess)
+        lock (access)
             Dispose();
     }
 
     internal void UnsubscribeDependent(ObservableExpressionSubscription subscription)
     {
         ArgumentNullException.ThrowIfNull(subscription);
-        lock (dependentsAccess)
-        {
-            if (subscription.IsRemoved)
-                return;
-            subscription.IsRemoved = true;
-            if (subscription.Previous is null)
-                Volatile.Write(ref firstDependent, subscription.Next);
-            else
-                subscription.Previous.Next = subscription.Next;
-            if (subscription.Next is null)
-                lastDependent = subscription.Previous;
-            else
-                subscription.Next.Previous = subscription.Previous;
-            subscription.Previous = null;
-        }
+        if (dependentsAccess is { } access)
+            lock (access)
+                UnlinkDependent(subscription);
+        else
+            UnlinkDependent(subscription);
+    }
+
+    void UnlinkDependent(ObservableExpressionSubscription subscription)
+    {
+        if (subscription.IsRemoved)
+            return;
+        subscription.IsRemoved = true;
+        if (subscription.Previous is null)
+            Volatile.Write(ref firstDependent, subscription.Next);
+        else
+            subscription.Previous.Next = subscription.Next;
+        if (subscription.Next is null)
+            lastDependent = subscription.Previous;
+        else
+            subscription.Next.Previous = subscription.Previous;
+        subscription.Previous = null;
     }
 }
 

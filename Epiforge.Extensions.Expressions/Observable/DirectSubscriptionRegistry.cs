@@ -63,18 +63,28 @@ sealed class DirectSubscriptionSource
         switch (registration)
         {
             case DirectSubscriptionRegistration.DictionaryChanged:
-                ((INotifyDictionaryChanged)source).DictionaryChanged += SourceDictionaryChanged;
+                var dictionaryChangedHandler = new EventHandler<NotifyDictionaryChangedEventArgs<object?, object?>>(SourceDictionaryChanged);
+                handler = dictionaryChangedHandler;
+                ((INotifyDictionaryChanged)source).DictionaryChanged += dictionaryChangedHandler;
                 break;
             case DirectSubscriptionRegistration.CollectionChanged:
-                ((INotifyCollectionChanged)source).CollectionChanged += SourceCollectionChanged;
+                var collectionChangedHandler = new NotifyCollectionChangedEventHandler(SourceCollectionChanged);
+                handler = collectionChangedHandler;
+                ((INotifyCollectionChanged)source).CollectionChanged += collectionChangedHandler;
                 break;
             default:
-                ((INotifyPropertyChanged)source).PropertyChanged += SourcePropertyChanged;
+                var propertyChangedHandler = new PropertyChangedEventHandler(SourcePropertyChanged);
+                handler = propertyChangedHandler;
+                ((INotifyPropertyChanged)source).PropertyChanged += propertyChangedHandler;
                 break;
         }
     }
 
     DirectSubscriptionAttachment? firstAttachment;
+    /// <summary>
+    /// The handler registered, which is the one removed on release, since removing another made from the same method would allocate it
+    /// </summary>
+    readonly Delegate handler;
     DirectSubscriptionAttachment? lastAttachment;
     readonly DirectSubscriptionRegistration registration;
     readonly object source;
@@ -124,13 +134,13 @@ sealed class DirectSubscriptionSource
         switch (registration)
         {
             case DirectSubscriptionRegistration.DictionaryChanged:
-                ((INotifyDictionaryChanged)source).DictionaryChanged -= SourceDictionaryChanged;
+                ((INotifyDictionaryChanged)source).DictionaryChanged -= (EventHandler<NotifyDictionaryChangedEventArgs<object?, object?>>)handler;
                 break;
             case DirectSubscriptionRegistration.CollectionChanged:
-                ((INotifyCollectionChanged)source).CollectionChanged -= SourceCollectionChanged;
+                ((INotifyCollectionChanged)source).CollectionChanged -= (NotifyCollectionChangedEventHandler)handler;
                 break;
             default:
-                ((INotifyPropertyChanged)source).PropertyChanged -= SourcePropertyChanged;
+                ((INotifyPropertyChanged)source).PropertyChanged -= (PropertyChangedEventHandler)handler;
                 break;
         }
     }

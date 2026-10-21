@@ -16,7 +16,7 @@ sealed class DirectSlotFault(Exception exception)
 }
 
 abstract class DirectObservableExpression(ExpressionObserver observer, Type type) :
-    ObservableExpression(observer, type, false)
+    ObservableExpression(observer, type, false, true)
 {
     private protected static readonly bool[] noDeferredGroups = [];
     private protected static readonly object?[] noHeld = [];
@@ -46,11 +46,14 @@ abstract class DirectObservableExpression(ExpressionObserver observer, Type type
             _ => throw new NotSupportedException($"the analyzer planned a subscription to {expression}, whose value the execution path cannot resolve without invoking something")
         };
 
-    private protected DirectSubscriptionAttachment[] attachments = [];
+    /// <summary>
+    /// What the observation is attached to: nothing, one attachment held alone, or an array of attachments, so that an observation of one source needs no array
+    /// </summary>
+    object? attachments;
     private protected int released;
 
     internal override bool CanChange =>
-        attachments.Length > 0;
+        attachments is not null;
 
     /// <summary>
     /// Releases the observation without serializing, since an observation made directly belongs to one consumer and is never shared, so no other release can meet this one
@@ -68,10 +71,43 @@ abstract class DirectObservableExpression(ExpressionObserver observer, Type type
 
     private protected override void TearDown()
     {
-        var attached = attachments;
-        for (var i = 0; i < attached.Length; ++i)
-            observer.DirectSubscriptions.Detach(attached[i]);
+        switch (attachments)
+        {
+            case DirectSubscriptionAttachment attachment:
+                observer.DirectSubscriptions.Detach(attachment);
+                break;
+            case DirectSubscriptionAttachment[] attached:
+                for (var i = 0; i < attached.Length; ++i)
+                    observer.DirectSubscriptions.Detach(attached[i]);
+                break;
+        }
         RemovedFromCache();
+    }
+
+    static int CountAttachments(object? attached) =>
+        attached switch
+        {
+            DirectSubscriptionAttachment => 1,
+            DirectSubscriptionAttachment[] array => array.Length,
+            _ => 0
+        };
+
+    /// <summary>
+    /// Copies what the observation is attached to into the start of an array, yielding how many there were
+    /// </summary>
+    static int CopyAttachments(object? attached, DirectSubscriptionAttachment[] destination)
+    {
+        switch (attached)
+        {
+            case DirectSubscriptionAttachment attachment:
+                destination[0] = attachment;
+                return 1;
+            case DirectSubscriptionAttachment[] array:
+                Array.Copy(array, destination, array.Length);
+                return array.Length;
+            default:
+                return 0;
+        }
     }
 
     /// <summary>
@@ -105,15 +141,21 @@ abstract class DirectObservableExpression(ExpressionObserver observer, Type type
     {
         if (Attaching(sites, 0, argument, values, links) is var attaching && attaching == 0)
             return;
-        var attached = new DirectSubscriptionAttachment[attaching];
+        var attached = attaching == 1 ? null : new DirectSubscriptionAttachment[attaching];
         var index = 0;
         for (var i = 0; i < sites.Length; ++i)
         {
             var site = sites[i];
             if (site.DeferredGroup != 0 || site.Link >= 0)
                 continue;
-            if (AttachSite(site, argument, values, links) is { } attachment)
-                attached[index++] = attachment;
+            if (AttachSite(site, argument, values, links) is not { } attachment)
+                continue;
+            if (attached is null)
+            {
+                attachments = attachment;
+                return;
+            }
+            attached[index++] = attachment;
         }
         attachments = attached;
     }
@@ -126,9 +168,8 @@ abstract class DirectObservableExpression(ExpressionObserver observer, Type type
         if (Attaching(sites, group, argument, values, links) is var attaching && attaching == 0)
             return false;
         var current = attachments;
-        var updated = new DirectSubscriptionAttachment[current.Length + attaching];
-        Array.Copy(current, updated, current.Length);
-        var index = current.Length;
+        var updated = new DirectSubscriptionAttachment[CountAttachments(current) + attaching];
+        var index = CopyAttachments(current, updated);
         for (var i = 0; i < sites.Length; ++i)
         {
             var site = sites[i];
@@ -140,9 +181,8 @@ abstract class DirectObservableExpression(ExpressionObserver observer, Type type
         while (!ReferenceEquals(Interlocked.CompareExchange(ref attachments, updated, current), current))
         {
             var latest = attachments;
-            var merged = new DirectSubscriptionAttachment[latest.Length + attaching];
-            Array.Copy(latest, merged, latest.Length);
-            Array.Copy(updated, updated.Length - attaching, merged, latest.Length, attaching);
+            var merged = new DirectSubscriptionAttachment[CountAttachments(latest) + attaching];
+            Array.Copy(updated, updated.Length - attaching, merged, CopyAttachments(latest, merged), attaching);
             current = latest;
             updated = merged;
         }
