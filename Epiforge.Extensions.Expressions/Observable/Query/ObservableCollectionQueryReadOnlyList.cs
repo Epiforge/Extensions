@@ -3,6 +3,10 @@ namespace Epiforge.Extensions.Expressions.Observable.Query;
 sealed class ObservableCollectionQueryReadOnlyList<TElement>(CollectionObserver collectionObserver, IReadOnlyList<TElement> readOnlyList, ObservableQuery? changeLockHolder) :
     ObservableCollectionQuery<TElement>(collectionObserver)
 {
+    /// <summary>
+    /// The handler subscribed to the collection, which is the one unsubscribed, since unsubscribing another made from the same method would allocate it
+    /// </summary>
+    NotifyCollectionChangedEventHandler? collectionChangedHandler;
     List<TElement>? copy;
     internal readonly IReadOnlyList<TElement> ReadOnlyList = readOnlyList;
 
@@ -46,7 +50,7 @@ sealed class ObservableCollectionQueryReadOnlyList<TElement>(CollectionObserver 
             if (removedFromCache)
             {
                 if (ReadOnlyList is INotifyCollectionChanged collectionChangedNotifier)
-                    collectionChangedNotifier.CollectionChanged -= CollectionChangedNotifierCollectionChanged;
+                    collectionChangedNotifier.CollectionChanged -= collectionChangedHandler;
                 if (copy is null)
                 {
                     if (ReadOnlyList is INotifyPropertyChanging propertyChangingNotifier)
@@ -66,7 +70,8 @@ sealed class ObservableCollectionQueryReadOnlyList<TElement>(CollectionObserver 
         {
             if (changeLockHolder is null)
                 copy = [.. ReadOnlyList];
-            collectionChangedNotifier.CollectionChanged += CollectionChangedNotifierCollectionChanged;
+            collectionChangedHandler = CollectionChangedNotifierCollectionChanged;
+            collectionChangedNotifier.CollectionChanged += collectionChangedHandler;
         }
         if (copy is null)
         {

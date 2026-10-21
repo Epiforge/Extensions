@@ -3,6 +3,10 @@ namespace Epiforge.Extensions.Expressions.Observable.Query;
 sealed class ObservableCollectionQueryGenericEnumerable<TElement>(CollectionObserver collectionObserver, IEnumerable<TElement> enumerable) :
     ObservableCollectionQuery<TElement>(collectionObserver)
 {
+    /// <summary>
+    /// The handler subscribed to the collection, which is the one unsubscribed, since unsubscribing another made from the same method would allocate it
+    /// </summary>
+    NotifyCollectionChangedEventHandler? collectionChangedHandler;
     List<TElement>? copy;
     internal readonly IEnumerable<TElement> Enumerable = enumerable;
 
@@ -32,7 +36,7 @@ sealed class ObservableCollectionQueryGenericEnumerable<TElement>(CollectionObse
             if (removedFromCache)
             {
                 if (Enumerable is INotifyCollectionChanged collectionChangedNotifier)
-                    collectionChangedNotifier.CollectionChanged -= CollectionChangedNotifierCollectionChanged;
+                    collectionChangedNotifier.CollectionChanged -= collectionChangedHandler;
             }
             return removedFromCache;
         }
@@ -47,7 +51,8 @@ sealed class ObservableCollectionQueryGenericEnumerable<TElement>(CollectionObse
         if (Enumerable is INotifyCollectionChanged collectionChangedNotifier)
         {
             copy = [.. Enumerable];
-            collectionChangedNotifier.CollectionChanged += CollectionChangedNotifierCollectionChanged;
+            collectionChangedHandler = CollectionChangedNotifierCollectionChanged;
+            collectionChangedNotifier.CollectionChanged += collectionChangedHandler;
         }
     }
 

@@ -57,7 +57,7 @@ class FaultList
         var faultList = new FaultList();
         if (operationFault is not null)
             faultList.Add(operationFault);
-        var exceptionGroups = faultList.exceptions.ToLookup(exception => exception is EvaluationFaultException);
+        var exceptionGroups = ((IEnumerable<Exception>?)faultList.exceptions ?? []).ToLookup(exception => exception is EvaluationFaultException);
         var evaluationFaults = exceptionGroups[true].Cast<EvaluationFaultException>().ToList();
         if (removeExisting)
             evaluationFaults.RemoveAll(elementFault => IsFaultOf(elementFault, element, elementComparer));
@@ -77,7 +77,7 @@ class FaultList
         var faultList = new FaultList();
         if (operationFault is not null)
             faultList.Add(operationFault);
-        var exceptionGroups = faultList.exceptions.ToLookup(exception => exception is EvaluationFaultException);
+        var exceptionGroups = ((IEnumerable<Exception>?)faultList.exceptions ?? []).ToLookup(exception => exception is EvaluationFaultException);
         var evaluationFaults = exceptionGroups[true].Cast<EvaluationFaultException>().ToList();
         if (removeExisting)
             evaluationFaults.RemoveAll(elementFault => IsFaultOf(elementFault, key, keyComparer));
@@ -105,13 +105,16 @@ class FaultList
             Add(operationFault);
     }
 
-    readonly List<Exception> exceptions = [];
+    /// <summary>
+    /// The exceptions listed, made with the first of them, since most lists are made to find that there are none
+    /// </summary>
+    List<Exception>? exceptions;
 
     public Exception? Fault =>
-        exceptions.Count switch
+        exceptions switch
         {
-            0 => null,
-            1 => exceptions[0],
+            null or { Count: 0 } => null,
+            { Count: 1 } => exceptions[0],
             _ => new AggregateException(exceptions)
         };
 
@@ -121,7 +124,7 @@ class FaultList
             foreach (var innerException in aggregateException.InnerExceptions)
                 Add(innerException);
         else
-            exceptions.Add(exception);
+            (exceptions ??= []).Add(exception);
     }
 
     public void AddRange(IEnumerable<Exception> exceptions)
@@ -182,19 +185,21 @@ class FaultList
     }
 
     public void Clear() =>
-        exceptions.Clear();
+        exceptions?.Clear();
 
     public bool RemoveElementOccurrence<TElement>(TElement element, IEqualityComparer<TElement> elementComparer)
     {
-        for (int i = 0, ii = exceptions.Count; i < ii; ++i)
-            if (exceptions[i] is EvaluationFaultException elementFault && IsFaultOf(elementFault, element, elementComparer))
+        if (exceptions is not { } listed)
+            return false;
+        for (int i = 0, ii = listed.Count; i < ii; ++i)
+            if (listed[i] is EvaluationFaultException elementFault && IsFaultOf(elementFault, element, elementComparer))
             {
-                exceptions.RemoveAt(i);
+                listed.RemoveAt(i);
                 return true;
             }
         return false;
     }
 
     public int RemoveKey<TKey>(TKey key, IEqualityComparer<TKey> keyComparer) =>
-        exceptions.RemoveAll(exception => exception is EvaluationFaultException elementFault && IsFaultOf(elementFault, key, keyComparer));
+        exceptions?.RemoveAll(exception => exception is EvaluationFaultException elementFault && IsFaultOf(elementFault, key, keyComparer)) ?? 0;
 }

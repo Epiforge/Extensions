@@ -7,7 +7,10 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
     readonly object access = new();
     Dictionary<IEnumerable<TResult>, List<TResult>>? copies;
     int count;
-    readonly Dictionary<IEnumerable<TResult>, NodeSet<IEnumerable<TResult>?>> enumerableNodes = [];
+    /// <summary>
+    /// Where each enumerable a projection yielded sits, made with the first of them, since a query built over a source with nothing in it often never has one
+    /// </summary>
+    Dictionary<IEnumerable<TResult>, NodeSet<IEnumerable<TResult>?>>? enumerableNodes;
     List<TResult>? enumerationSnapshot;
     readonly PrefixWeightedSequence<IEnumerable<TResult>?> positions = new();
     [SuppressMessage("Usage", "CA2213: Disposable fields should be disposed")]
@@ -51,7 +54,7 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
             return;
         lock (access)
         {
-            if (!enumerableNodes.TryGetValue(enumerable, out var nodes) || copies is null || !copies.TryGetValue(enumerable, out var copy))
+            if (enumerableNodes is null || !enumerableNodes.TryGetValue(enumerable, out var nodes) || copies is null || !copies.TryGetValue(enumerable, out var copy))
                 return;
             enumerationSnapshot = null;
             copies[enumerable] = copy = FollowInnerChange(copy, e, enumerable);
@@ -93,9 +96,10 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
             if (removedFromCache)
                 lock (access)
                 {
-                    foreach (var enumerable in enumerableNodes.Keys)
-                        if (enumerable is INotifyCollectionChanged collectionChangedNotifier)
-                            collectionChangedNotifier.CollectionChanged -= CollectionChangedNotifierCollectionChanged;
+                    if (enumerableNodes is { } observedEnumerables)
+                        foreach (var (enumerable, _) in observedEnumerables)
+                            if (enumerable is INotifyCollectionChanged collectionChangedNotifier)
+                                collectionChangedNotifier.CollectionChanged -= CollectionChangedNotifierCollectionChanged;
                     ((ScopedObservableCollectionQuery<IEnumerable<TResult>>)select!).query.UnsubscribeDependent(selectSubscription!);
                     select.Dispose();
                     RemovedFromCache();
@@ -152,6 +156,16 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
         }
     }
 
+    /// <summary>
+    /// Finds where an enumerable sits, which is a null reference where it sits nowhere, including where nothing has been placed yet
+    /// </summary>
+    ref NodeSet<IEnumerable<TResult>?> NodesOfWithAccess(IEnumerable<TResult> enumerable)
+    {
+        if (enumerableNodes is { } observedEnumerables)
+            return ref CollectionsMarshal.GetValueRefOrNullRef(observedEnumerables, enumerable);
+        return ref Unsafe.NullRef<NodeSet<IEnumerable<TResult>?>>();
+    }
+
     void ObserveProjectionWithAccess(int index, IEnumerable<TResult>? enumerable)
     {
         if (enumerable is null)
@@ -159,18 +173,18 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
             positions.Insert(index, enumerable, 0);
             return;
         }
-        ref var nodes = ref CollectionsMarshal.GetValueRefOrNullRef(enumerableNodes, enumerable);
+        ref var nodes = ref NodesOfWithAccess(enumerable);
         if (!Unsafe.IsNullRef(ref nodes))
             nodes.Add(positions.Insert(index, enumerable, ContentsWithAccess(enumerable).Count()));
         else if (enumerable is INotifyCollectionChanged collectionChangedNotifier)
         {
             List<TResult> copy = [.. enumerable];
             (copies ??= []).Add(enumerable, copy);
-            enumerableNodes.Add(enumerable, new(positions.Insert(index, enumerable, copy.Count)));
+            (enumerableNodes ??= []).Add(enumerable, new(positions.Insert(index, enumerable, copy.Count)));
             collectionChangedNotifier.CollectionChanged += CollectionChangedNotifierCollectionChanged;
         }
         else
-            enumerableNodes.Add(enumerable, new(positions.Insert(index, enumerable, enumerable.Count())));
+            (enumerableNodes ??= []).Add(enumerable, new(positions.Insert(index, enumerable, enumerable.Count())));
     }
 
     protected override void OnInitialization()
@@ -192,13 +206,13 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
     {
         if (node.Item is not { } enumerable)
             return;
-        ref var nodes = ref CollectionsMarshal.GetValueRefOrNullRef(enumerableNodes, enumerable);
+        ref var nodes = ref NodesOfWithAccess(enumerable);
         if (Unsafe.IsNullRef(ref nodes))
             return;
         nodes.Remove(node);
         if (nodes.Count == 0)
         {
-            enumerableNodes.Remove(enumerable);
+            enumerableNodes!.Remove(enumerable);
             copies?.Remove(enumerable);
             if (enumerable is INotifyCollectionChanged collectionChangedNotifier)
                 collectionChangedNotifier.CollectionChanged -= CollectionChangedNotifierCollectionChanged;
@@ -290,10 +304,13 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
                     }
                     break;
                 case NotifyCollectionChangedAction.Reset:
-                    foreach (var enumerable in enumerableNodes.Keys)
-                        if (enumerable is INotifyCollectionChanged collectionChangedNotifier)
-                            collectionChangedNotifier.CollectionChanged -= CollectionChangedNotifierCollectionChanged;
-                    enumerableNodes.Clear();
+                    if (enumerableNodes is { } resetEnumerables)
+                    {
+                        foreach (var (enumerable, _) in resetEnumerables)
+                            if (enumerable is INotifyCollectionChanged collectionChangedNotifier)
+                                collectionChangedNotifier.CollectionChanged -= CollectionChangedNotifierCollectionChanged;
+                        resetEnumerables.Clear();
+                    }
                     copies?.Clear();
                     positions.Clear();
                     for (int i = 0, ii = select!.Count; i < ii; ++i)

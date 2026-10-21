@@ -3,6 +3,10 @@ namespace Epiforge.Extensions.Expressions.Observable.Query;
 sealed class ObservableCollectionQueryList(CollectionObserver collectionObserver, IList list) :
     ObservableCollectionQuery<object?>(collectionObserver)
 {
+    /// <summary>
+    /// The handler subscribed to the collection, which is the one unsubscribed, since unsubscribing another made from the same method would allocate it
+    /// </summary>
+    NotifyCollectionChangedEventHandler? collectionChangedHandler;
     List<object?>? copy;
     internal readonly IList List = list;
 
@@ -32,7 +36,7 @@ sealed class ObservableCollectionQueryList(CollectionObserver collectionObserver
             if (removedFromCache)
             {
                 if (List is INotifyCollectionChanged collectionChangedNotifier)
-                    collectionChangedNotifier.CollectionChanged -= CollectionChangedNotifierCollectionChanged;
+                    collectionChangedNotifier.CollectionChanged -= collectionChangedHandler;
                 else
                 {
                     if (List is INotifyPropertyChanging propertyChangingNotifier)
@@ -54,7 +58,8 @@ sealed class ObservableCollectionQueryList(CollectionObserver collectionObserver
         if (List is INotifyCollectionChanged collectionChangedNotifier)
         {
             copy = [.. List.Cast<object?>()];
-            collectionChangedNotifier.CollectionChanged += CollectionChangedNotifierCollectionChanged;
+            collectionChangedHandler = CollectionChangedNotifierCollectionChanged;
+            collectionChangedNotifier.CollectionChanged += collectionChangedHandler;
         }
         else
         {

@@ -54,7 +54,10 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
     int liveEnumerations;
     readonly PrefixWeightedSequence<IObservableExpression<TElement, bool>> memberships = new();
     PropertyChangedEventHandler? observableExpressionPropertyChangedHandler;
-    readonly Dictionary<IObservableExpression<TElement, bool>, (NodeSet<IObservableExpression<TElement, bool>> Nodes, Exception? Fault)> observableExpressionStates = [];
+    /// <summary>
+    /// What the query keeps of each observation of an element, made with the first element, since a query built over a source with nothing in it often never has one
+    /// </summary>
+    Dictionary<IObservableExpression<TElement, bool>, (NodeSet<IObservableExpression<TElement, bool>> Nodes, Exception? Fault)>? observableExpressionStates;
     internal readonly Expression<Func<TElement, bool>> Predicate = predicate;
     bool released;
     ObservableQuerySubscription? sourceSubscription;
@@ -95,12 +98,13 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
                 lock (access)
                 {
                     released = true;
-                    foreach (var (observableExpression, state) in observableExpressionStates)
-                    {
-                        observableExpression.PropertyChanged -= ObservableExpressionPropertyChangedHandler;
-                        for (int i = 0, ii = state.Nodes.Count; i < ii; ++i)
-                            observableExpression.Dispose();
-                    }
+                    if (observableExpressionStates is { } states)
+                        foreach (var (observableExpression, state) in states)
+                        {
+                            observableExpression.PropertyChanged -= ObservableExpressionPropertyChangedHandler;
+                            for (int i = 0, ii = state.Nodes.Count; i < ii; ++i)
+                                observableExpression.Dispose();
+                        }
                     source.UnsubscribeDependent(sourceSubscription!);
                     enumerationSnapshot = null;
                     enumerationSnapshotShared = false;
@@ -166,12 +170,12 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
         {
             if (released)
                 return;
-            if (!observableExpressionStates.TryGetValue(observableExpression, out var state))
+            if (observableExpressionStates is not { } states || !states.TryGetValue(observableExpression, out var state))
                 return;
             var (newFault, newResult) = observableExpression.Evaluation;
             if (FaultList.ExchangeElementFault(OwnOperationFault, observableExpression.Argument, elementComparer, state.Fault, newFault, out var newOperationFault))
             {
-                observableExpressionStates[observableExpression] = (state.Nodes, newFault);
+                states[observableExpression] = (state.Nodes, newFault);
                 OperationFault = newOperationFault;
             }
             var nodes = state.Nodes;
@@ -192,22 +196,23 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
     /// <summary>
     /// Observes an element, subscribing to the first observation of it before reading it, so that a change made on another thread in between is taken up once the lock is released rather than lost
     /// </summary>
-    void ObserveElementWithAccess(TElement element, FaultList faultList, ref int runningCount)
+    void ObserveElementWithAccess(TElement element, ref FaultList? faultList, ref int runningCount)
     {
         var observableExpression = collectionObserver.ExpressionObserver.ObserveWithoutOptimization(Predicate, element);
-        ref var state = ref CollectionsMarshal.GetValueRefOrNullRef(observableExpressionStates, observableExpression);
+        ref var state = ref StateOfWithAccess(observableExpression);
         var isObserved = !Unsafe.IsNullRef(ref state);
         if (!isObserved)
             observableExpression.PropertyChanged += ObservableExpressionPropertyChangedHandler;
         var (fault, result) = observableExpression.Evaluation;
         var node = memberships.Insert(memberships.Count, observableExpression, result ? 1 : 0);
-        faultList.Check(observableExpression);
+        if (fault is not null)
+            (faultList ??= new()).Add(new EvaluationFaultException(element, fault));
         if (result)
             ++runningCount;
         if (isObserved)
             state.Nodes.Add(node);
         else
-            observableExpressionStates.Add(observableExpression, (new(node), fault));
+            (observableExpressionStates ??= []).Add(observableExpression, (new(node), fault));
     }
 
     protected override void OnInitialization()
@@ -215,29 +220,39 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
         using var changeHold = HoldChangesOf(source);
         lock (access)
         {
-            var faultList = new FaultList();
+            FaultList? faultList = null;
             var runningCount = 0;
             if (!source.HasIndexerPenalty)
                 for (int i = 0, ii = source.Count; i < ii; ++i)
-                    ObserveElementWithAccess(source[i], faultList, ref runningCount);
+                    ObserveElementWithAccess(source[i], ref faultList, ref runningCount);
             else
                 foreach (var element in source)
-                    ObserveElementWithAccess(element, faultList, ref runningCount);
+                    ObserveElementWithAccess(element, ref faultList, ref runningCount);
             count = runningCount;
-            OperationFault = faultList.Fault;
+            OperationFault = faultList?.Fault;
             InheritOperationFault(source.OperationFault);
             sourceSubscription = source.SubscribeDependent(this);
         }
     }
 
+    /// <summary>
+    /// Finds what the query keeps of an observation, which is a null reference where it keeps nothing of it, including where it has yet to keep anything at all
+    /// </summary>
+    ref (NodeSet<IObservableExpression<TElement, bool>> Nodes, Exception? Fault) StateOfWithAccess(IObservableExpression<TElement, bool> observableExpression)
+    {
+        if (observableExpressionStates is { } states)
+            return ref CollectionsMarshal.GetValueRefOrNullRef(states, observableExpression);
+        return ref Unsafe.NullRef<(NodeSet<IObservableExpression<TElement, bool>> Nodes, Exception? Fault)>();
+    }
+
     void ReleaseMembershipWithAccess(PrefixWeightedSequenceNode<IObservableExpression<TElement, bool>> node)
     {
         var observableExpression = node.Item;
-        ref var state = ref CollectionsMarshal.GetValueRefOrNullRef(observableExpressionStates, observableExpression);
+        ref var state = ref CollectionsMarshal.GetValueRefOrNullRef(observableExpressionStates!, observableExpression);
         state.Nodes.Remove(node);
         if (state.Nodes.Count == 0)
         {
-            observableExpressionStates.Remove(observableExpression);
+            observableExpressionStates!.Remove(observableExpression);
             observableExpression.PropertyChanged -= ObservableExpressionPropertyChangedHandler;
         }
     }
@@ -305,7 +320,7 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
                             var element = (TElement)e.OldItems[i]!;
                             var node = memberships.RemoveAt(e.OldStartingIndex + i);
                             var observableExpression = node.Item;
-                            var fault = observableExpressionStates[observableExpression].Fault;
+                            var fault = observableExpressionStates![observableExpression].Fault;
                             ReleaseMembershipWithAccess(node);
                             if (fault is not null)
                             {
@@ -323,7 +338,7 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
                         {
                             var element = (TElement)e.NewItems[i]!;
                             var observableExpression = collectionObserver.ExpressionObserver.ObserveWithoutOptimization(Predicate, element);
-                            ref var state = ref CollectionsMarshal.GetValueRefOrNullRef(observableExpressionStates, observableExpression);
+                            ref var state = ref StateOfWithAccess(observableExpression);
                             var isObserved = !Unsafe.IsNullRef(ref state);
                             if (!isObserved)
                                 observableExpression.PropertyChanged += ObservableExpressionPropertyChangedHandler;
@@ -332,7 +347,7 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
                             if (isObserved)
                                 state.Nodes.Add(node);
                             else
-                                observableExpressionStates.Add(observableExpression, (new(node), fault));
+                                (observableExpressionStates ??= []).Add(observableExpression, (new(node), fault));
                             if (fault is not null)
                             {
                                 faultList ??= new FaultList(OwnOperationFault);
@@ -388,22 +403,25 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
                     break;
                 case NotifyCollectionChangedAction.Reset:
                     faultList = new FaultList();
-                    foreach (var (observableExpression, state) in observableExpressionStates)
+                    if (observableExpressionStates is { } resetStates)
                     {
-                        observableExpression.PropertyChanged -= ObservableExpressionPropertyChangedHandler;
-                        for (int i = 0, ii = state.Nodes.Count; i < ii; ++i)
-                            observableExpression.Dispose();
+                        foreach (var (observableExpression, state) in resetStates)
+                        {
+                            observableExpression.PropertyChanged -= ObservableExpressionPropertyChangedHandler;
+                            for (int i = 0, ii = state.Nodes.Count; i < ii; ++i)
+                                observableExpression.Dispose();
+                        }
+                        resetStates.Clear();
                     }
                     memberships.Clear();
-                    observableExpressionStates.Clear();
                     enumerationSnapshot = null;
                     enumerationSnapshotShared = false;
                     if (!source.HasIndexerPenalty)
                         for (int i = 0, ii = source.Count; i < ii; ++i)
-                            ObserveElementWithAccess(source[i], faultList, ref newCount);
+                            ObserveElementWithAccess(source[i], ref faultList, ref newCount);
                     else
                         foreach (var element in source)
-                            ObserveElementWithAccess(element, faultList, ref newCount);
+                            ObserveElementWithAccess(element, ref faultList, ref newCount);
                     eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset);
                     break;
                 default:
