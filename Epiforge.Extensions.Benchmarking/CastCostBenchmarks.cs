@@ -1,0 +1,102 @@
+﻿namespace Epiforge.Extensions.Benchmarking;
+
+/// <summary>
+/// Prices a cast over a thousand people as a query is built, disposed and changed through it, alone and in a chain shaped like the one GS5 sums a person's time through, against a projection doing the same conversion
+/// </summary>
+/// <remarks>
+/// The chain converts each person to <see cref="object"/> and back, projects the rank, converts that to <see cref="object"/> and back to <see cref="int"/> and sums it, which is the shape of GS5's person total: a cast either side of a projection, twice over, and an aggregate at the end. The projection arm uses a selector with the same body as the cast's, so that what a cast pays over what a conversion needs can be read from the difference
+/// </remarks>
+[MemoryDiagnoser]
+public class CastCostBenchmarks
+{
+    const int elementCount = 1000;
+
+    BenchmarkPerson added = null!;
+    int cursor;
+    CollectionObserver observer = null!;
+    ObservableRangeCollection<BenchmarkPerson> source = null!;
+    IObservableCollectionQuery<BenchmarkPerson> sourceQuery = null!;
+    IDisposable standing = null!;
+
+    [Benchmark]
+    public void CastAfterAnAdditionAndARemoval()
+    {
+        source.Add(added);
+        source.RemoveAt(elementCount);
+    }
+
+    [Benchmark(Baseline = true)]
+    public void CastBuiltAndDisposed() =>
+        sourceQuery.ObserveCast<object>().Dispose();
+
+    [Benchmark]
+    public void ChainAfterAValueChange()
+    {
+        var person = source[cursor];
+        cursor = cursor + 1 == elementCount ? 0 : cursor + 1;
+        person.Rank ^= 2;
+    }
+
+    [Benchmark]
+    public void ChainBuiltAndDisposed() =>
+        Chain().Dispose();
+
+    IDisposable Chain()
+    {
+        var people = sourceQuery.ObserveCast<object>();
+        var cast = people.ObserveCast<BenchmarkPerson>();
+        var ranks = cast.ObserveSelect(person => person.Rank);
+        var boxed = ranks.ObserveCast<object>();
+        var unboxed = boxed.ObserveCast<int>();
+        var total = unboxed.ObserveSum(rank => rank);
+        total.Disposed += (sender, e) =>
+        {
+            unboxed.Dispose();
+            boxed.Dispose();
+            ranks.Dispose();
+            cast.Dispose();
+            people.Dispose();
+        };
+        return total;
+    }
+
+    [GlobalCleanup]
+    public void Cleanup()
+    {
+        standing?.Dispose();
+        sourceQuery?.Dispose();
+    }
+
+    [Benchmark]
+    public void ProjectionBuiltAndDisposed() =>
+        sourceQuery.ObserveSelect(person => (object)person).Dispose();
+
+    void SetUpSource()
+    {
+        observer = new CollectionObserver();
+        var people = new List<BenchmarkPerson>(elementCount);
+        for (var i = 0; i < elementCount; ++i)
+            people.Add(new BenchmarkPerson($"P{i}", i));
+        source = new ObservableRangeCollection<BenchmarkPerson>(people);
+        sourceQuery = observer.ObserveReadOnlyList(source);
+        added = new BenchmarkPerson("Added", 0);
+    }
+
+    [GlobalSetup(Targets = [nameof(CastBuiltAndDisposed), nameof(ChainBuiltAndDisposed), nameof(ProjectionBuiltAndDisposed)])]
+    public void SetUpBuilding() =>
+        SetUpSource();
+
+    [GlobalSetup(Target = nameof(CastAfterAnAdditionAndARemoval))]
+    public void SetUpCast()
+    {
+        SetUpSource();
+        standing = sourceQuery.ObserveCast<object>();
+    }
+
+    [GlobalSetup(Target = nameof(ChainAfterAValueChange))]
+    public void SetUpChain()
+    {
+        SetUpSource();
+        standing = Chain();
+    }
+}

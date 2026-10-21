@@ -107,11 +107,10 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     static class CastLambdas<TResult>
     {
         internal static readonly Expression<Func<TElement, bool>> IsResult = element => element is TResult;
-        internal static readonly Expression<Func<TElement, TResult>> Selector = element => (TResult)(object)element!;
     }
 
     /// <summary>
-    /// Holds a collection query's caches of the kinds of query built over it less often than a projection, a flattening, a filter or a concatenation, whose caches the query keeps itself, created with the first of them, so that a query over which none is built carries one field for these rather than twenty-three
+    /// Holds a collection query's caches of the kinds of query built over it less often than a projection, a flattening, a filter or a concatenation, whose caches the query keeps itself, created with the first of them, so that a query over which none is built carries one field for these rather than twenty-four
     /// </summary>
     sealed class ChildQueryCaches
     {
@@ -120,6 +119,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         internal NullableKeyDictionary<Expression<Func<TElement, bool>>?, ObservableCollectionAnyQuery<TElement>>? AnyQueries;
         internal NullableKeyDictionary<TElement, ObservableCollectionAppendQuery<TElement>>? AppendQueries;
         internal Dictionary<Expression, ObservableQuery>? AverageQueries;
+        internal Dictionary<Type, ObservableQuery>? CastQueries;
         internal Dictionary<(int soughtComparison, IComparer<TElement> comparer), ObservableCollectionComparisonQuery<TElement>>? ComparisonQueries;
         internal ObservableCollectionCountQuery<TElement>? CountQuery;
         internal Dictionary<(Expression keySelector, object keyEqualityComparer), ObservableQuery>? GroupByQueries;
@@ -767,8 +767,35 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     }
 
     [return: DisposeWhenDiscarded]
-    public IObservableCollectionQuery<TResult> ObserveCast<TResult>() =>
-        ObserveSelect(CastLambdas<TResult>.Selector);
+    public IObservableCollectionQuery<TResult> ObserveCast<TResult>()
+    {
+        ObservableQuery castQuery;
+        lock (ChildrenAccess)
+        {
+            var caches = childQueryCaches ??= new();
+            if ((caches.CastQueries ??= []).TryGetValue(typeof(TResult), out castQuery!))
+            {
+                ++castQuery.Observations;
+                return ((ObservableCollectionCastQuery<TElement, TResult>)castQuery).AsScoped();
+            }
+        }
+        var built = new ObservableCollectionCastQuery<TElement, TResult>(collectionObserver, this);
+        built.Observations = 1;
+        built.Initialize();
+        lock (ChildrenAccess)
+        {
+            var caches = childQueryCaches ??= new();
+            if (!(caches.CastQueries ??= []).TryGetValue(typeof(TResult), out castQuery!))
+            {
+                caches.CastQueries.Add(typeof(TResult), built);
+                built.IsCached = true;
+                return built.AsScoped();
+            }
+            ++castQuery.Observations;
+        }
+        built.Release();
+        return ((ObservableCollectionCastQuery<TElement, TResult>)castQuery).AsScoped();
+    }
 
     [return: DisposeWhenDiscarded]
     internal IObservableScalarQuery<TElement> ObserveComparison(int soughtComparison, IComparer<TElement> comparer)
@@ -2146,6 +2173,23 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
             {
                 if (prependQuery.IsCached)
                     childQueryCaches!.PrependQueries!.Remove(prependQuery.Prepended);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    internal bool QueryDisposed<TResult>(ObservableCollectionCastQuery<TElement, TResult> castQuery)
+    {
+        lock (ChildrenAccess)
+        {
+            var remaining = --castQuery.Observations;
+            if (remaining < 0)
+                throw new InvalidOperationException("an observation was released more times than it was acquired");
+            if (remaining == 0)
+            {
+                if (castQuery.IsCached)
+                    childQueryCaches!.CastQueries!.Remove(typeof(TResult));
                 return true;
             }
         }

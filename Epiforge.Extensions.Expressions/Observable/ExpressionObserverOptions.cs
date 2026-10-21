@@ -3,6 +3,9 @@
 /// <summary>
 /// Defines the options available when instantiating a new <see cref="IExpressionObserver"/>
 /// </summary>
+/// <remarks>
+/// An observer copies these options when it is instantiated, so a change made to them afterward, including one made through a method such as <see cref="AddIgnoredPropertyChangeNotification(PropertyInfo)"/>, reaches only observers instantiated after it
+/// </remarks>
 public class ExpressionObserverOptions
 {
     internal static readonly ConcurrentDictionary<MethodInfo, MethodInfo> GenericMethodToGenericMethodDefinition = new();
