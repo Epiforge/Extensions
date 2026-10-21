@@ -91,7 +91,7 @@ static class ListEdits
             return;
         }
         var setAsideLength = Math.Min(firstLength, secondLength);
-        var setAside = System.Buffers.ArrayPool<T>.Shared.Rent(setAsideLength);
+        var setAside = ArrayPool<T>.Shared.Rent(setAsideLength);
         if (firstLength <= secondLength)
         {
             span[start..middle].CopyTo(setAside);
@@ -104,6 +104,6 @@ static class ListEdits
             span[start..middle].CopyTo(span[(start + secondLength)..]);
             setAside.AsSpan(0, secondLength).CopyTo(span[start..]);
         }
-        System.Buffers.ArrayPool<T>.Shared.Return(setAside, RuntimeHelpers.IsReferenceOrContainsReferences<T>());
+        ArrayPool<T>.Shared.Return(setAside, RuntimeHelpers.IsReferenceOrContainsReferences<T>());
     }
 }
