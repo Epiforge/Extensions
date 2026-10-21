@@ -21,7 +21,7 @@ sealed class ObservableCollectionQueryEnumerable(CollectionObserver collectionOb
     void CollectionChangedNotifierCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         using var changeHold = HoldOwnChanges();
-        FollowChange(ref copy, e, Enumerable.Cast<object?>());
+        FollowChange(ref copy, e, Enumerable);
     }
 
     protected override bool Dispose(bool disposing)

@@ -423,16 +423,16 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     void RaiseCollectionChanged(NotifyCollectionChangedEventArgs e)
     {
         var eventArgs = Logger?.IsEnabled(LogLevel.Trace) ?? false ? e.ToStringForLogging() : null;
-        Logger?.LogTrace(Collections.EventIds.Epiforge_Extensions_Collections_RaisingCollectionChanged, "Raising CollectionChanged: {EventArgs}", eventArgs);
+        Logger.WhenTracing()?.LogTrace(Collections.EventIds.Epiforge_Extensions_Collections_RaisingCollectionChanged, "Raising CollectionChanged: {EventArgs}", eventArgs);
         collectionChanged?.Invoke(this, e);
-        Logger?.LogTrace(Collections.EventIds.Epiforge_Extensions_Collections_RaisedCollectionChanged, "Raised CollectionChanged: {EventArgs}", eventArgs);
+        Logger.WhenTracing()?.LogTrace(Collections.EventIds.Epiforge_Extensions_Collections_RaisedCollectionChanged, "Raised CollectionChanged: {EventArgs}", eventArgs);
     }
 
     void RaiseDictionaryChanged(NotifyDictionaryChangedEventArgs<TKey, TValue> e)
     {
-        Logger?.LogTrace(Collections.EventIds.Epiforge_Extensions_Collections_RaisingDictionaryChanged, "Raising DictionaryChanged: {EventArgs}", e);
+        Logger.WhenTracing()?.LogTrace(Collections.EventIds.Epiforge_Extensions_Collections_RaisingDictionaryChanged, "Raising DictionaryChanged: {EventArgs}", e);
         dictionaryChanged?.Invoke(this, e);
-        Logger?.LogTrace(Collections.EventIds.Epiforge_Extensions_Collections_RaisedDictionaryChanged, "Raised DictionaryChanged: {EventArgs}", e);
+        Logger.WhenTracing()?.LogTrace(Collections.EventIds.Epiforge_Extensions_Collections_RaisedDictionaryChanged, "Raised DictionaryChanged: {EventArgs}", e);
     }
 
     void RaiseDictionaryChangedBoxed(NotifyDictionaryChangedEventArgs<object?, object?> e) =>

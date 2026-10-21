@@ -317,7 +317,7 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
                 case NotifyCollectionChangedAction.Add:
                 case NotifyCollectionChangedAction.Replace:
                 case NotifyCollectionChangedAction.Remove:
-                    var oldItems = new List<TResult>();
+                    var oldItems = new ChangedElements<TResult>();
                     if (e.OldItems is not null && e.OldStartingIndex >= 0)
                     {
                         if (e.OldStartingIndex + e.OldItems.Count > positions.Count)
@@ -328,7 +328,7 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
                         for (var i = e.OldItems.Count - 1; i >= 0; --i)
                         {
                             var node = positions.RemoveAt(e.OldStartingIndex + i);
-                            oldItems.Insert(0, node.Item.CommittedResult);
+                            oldItems.Add(node.Item.CommittedResult);
                             var observableExpression = node.Item.ObservableExpression;
                             var fault = observableExpressionStates[observableExpression].Fault;
                             var argument = observableExpression.Argument;
@@ -339,8 +339,9 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
                                 faultList.RemoveElementOccurrence(argument, elementComparer);
                             }
                         }
+                        oldItems.Reverse();
                     }
-                    var newItems = new List<TResult>();
+                    var newItems = new ChangedElements<TResult>();
                     if (e.NewItems is not null && e.NewStartingIndex >= 0)
                     {
                         faultList ??= new FaultList(OwnOperationFault);
@@ -354,19 +355,16 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
                         OperationFault = faultList.Fault;
                     if (oldItems.Count > 0)
                     {
-                        if (newItems.Count > 0)
-                            eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, newItems.AsReadOnly(), oldItems.AsReadOnly(), e.OldStartingIndex);
-                        else
-                            eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, oldItems.AsReadOnly(), e.OldStartingIndex);
+                        eventArgs = newItems.Count > 0 ? newItems.ToReplacementOf(oldItems, e.OldStartingIndex) : oldItems.ToRemoval(e.OldStartingIndex);
                     }
                     else if (newItems.Count > 0)
-                        eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, newItems.AsReadOnly(), e.NewStartingIndex);
+                        eventArgs = newItems.ToAddition(e.NewStartingIndex);
                     if (eventArgs is not null && TryBeginEnumerationSnapshotPatchWithAccess(out var patched))
                     {
                         if (oldItems.Count > 0)
                             patched.RemoveRange(e.OldStartingIndex, oldItems.Count);
                         if (newItems.Count > 0)
-                            patched.InsertRange(e.NewStartingIndex, newItems);
+                            newItems.InsertInto(patched, e.NewStartingIndex);
                     }
                     break;
                 case NotifyCollectionChangedAction.Move:
@@ -377,7 +375,7 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
                             eventArgs = ResetWithAccess();
                             break;
                         }
-                        var movedItems = new List<TResult>(e.OldItems.Count);
+                        var movedItems = new ChangedElements<TResult>();
                         var movedNode = positions.NodeAt(e.OldStartingIndex);
                         for (var i = 0; i < e.OldItems.Count && movedNode is not null; ++i)
                         {
@@ -385,11 +383,11 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
                             movedNode = positions.Next(movedNode);
                         }
                         positions.MoveRange(e.OldStartingIndex, e.NewStartingIndex, e.OldItems.Count);
-                        eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Move, movedItems.AsReadOnly(), e.NewStartingIndex, e.OldStartingIndex);
+                        eventArgs = movedItems.ToMove(e.NewStartingIndex, e.OldStartingIndex);
                         if (TryBeginEnumerationSnapshotPatchWithAccess(out var movedSnapshot))
                         {
                             movedSnapshot.RemoveRange(e.OldStartingIndex, movedItems.Count);
-                            movedSnapshot.InsertRange(e.NewStartingIndex, movedItems);
+                            movedItems.InsertInto(movedSnapshot, e.NewStartingIndex);
                         }
                     }
                     break;

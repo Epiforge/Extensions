@@ -140,7 +140,7 @@ public sealed class NullableKeySortedDictionary<TKey, TValue> :
             }
             else
                 dict[key] = value;
-            logger?.LogTrace("NullableKeySortedDictionary changed: set [{Key}, {Value}]", key, value);
+            logger.WhenTracing()?.LogTrace("NullableKeySortedDictionary changed: set [{Key}, {Value}]", key, value);
         }
     }
 
@@ -160,7 +160,7 @@ public sealed class NullableKeySortedDictionary<TKey, TValue> :
         }
         else
             dict.Add(key, value);
-        logger?.LogTrace("NullableKeySortedDictionary changed: added [{Key}, {Value}]", key, value);
+        logger.WhenTracing()?.LogTrace("NullableKeySortedDictionary changed: added [{Key}, {Value}]", key, value);
     }
 
     void AddRange(IDictionary<TKey, TValue> dictionary)
@@ -180,7 +180,7 @@ public sealed class NullableKeySortedDictionary<TKey, TValue> :
         hasNullKeyedValue = false;
         nullKeyedValue = default!;
         dict.Clear();
-        logger?.LogTrace("NullableKeySortedDictionary changed: cleared");
+        logger.WhenTracing()?.LogTrace("NullableKeySortedDictionary changed: cleared");
     }
 
     bool ICollection<KeyValuePair<TKey, TValue>>.Contains(KeyValuePair<TKey, TValue> item) =>
@@ -228,14 +228,14 @@ public sealed class NullableKeySortedDictionary<TKey, TValue> :
             {
                 nullKeyedValue = default!;
                 hasNullKeyedValue = false;
-                logger?.LogTrace("NullableKeySortedDictionary changed: removed {Key}", key);
+                logger.WhenTracing()?.LogTrace("NullableKeySortedDictionary changed: removed {Key}", key);
                 return true;
             }
             return false;
         }
         var removed = dict.Remove(key);
         if (removed)
-            logger?.LogTrace("NullableKeySortedDictionary changed: removed {Key}", key);
+            logger.WhenTracing()?.LogTrace("NullableKeySortedDictionary changed: removed {Key}", key);
         return removed;
     }
 
@@ -255,7 +255,7 @@ public sealed class NullableKeySortedDictionary<TKey, TValue> :
                 value = nullKeyedValue;
                 nullKeyedValue = default!;
                 hasNullKeyedValue = false;
-                logger?.LogTrace("NullableKeySortedDictionary changed: removed [{Key}, {Value}]", key, value);
+                logger.WhenTracing()?.LogTrace("NullableKeySortedDictionary changed: removed [{Key}, {Value}]", key, value);
                 return true;
             }
             value = default!;
@@ -263,7 +263,7 @@ public sealed class NullableKeySortedDictionary<TKey, TValue> :
         }
         var removed = dict.Remove(key, out value!);
         if (removed)
-            logger?.LogTrace("NullableKeySortedDictionary changed: removed [{Key}, {Value}]", key, value);
+            logger.WhenTracing()?.LogTrace("NullableKeySortedDictionary changed: removed [{Key}, {Value}]", key, value);
         return removed;
     }
 
@@ -275,14 +275,14 @@ public sealed class NullableKeySortedDictionary<TKey, TValue> :
             {
                 nullKeyedValue = default!;
                 hasNullKeyedValue = false;
-                logger?.LogTrace("NullableKeySortedDictionary changed: removed [{Key}, {Value}]", item.Key, item.Value);
+                logger.WhenTracing()?.LogTrace("NullableKeySortedDictionary changed: removed [{Key}, {Value}]", item.Key, item.Value);
                 return true;
             }
             return false;
         }
         var removed = ((IDictionary<TKey, TValue>)dict).Remove(item);
         if (removed)
-            logger?.LogTrace("NullableKeySortedDictionary changed: removed [{Key}, {Value}]", item.Key, item.Value);
+            logger.WhenTracing()?.LogTrace("NullableKeySortedDictionary changed: removed [{Key}, {Value}]", item.Key, item.Value);
         return removed;
     }
 
@@ -300,14 +300,14 @@ public sealed class NullableKeySortedDictionary<TKey, TValue> :
             {
                 hasNullKeyedValue = true;
                 nullKeyedValue = value;
-                logger?.LogTrace("NullableKeySortedDictionary changed: added [{Key}, {Value}]", key, value);
+                logger.WhenTracing()?.LogTrace("NullableKeySortedDictionary changed: added [{Key}, {Value}]", key, value);
                 return true;
             }
             return false;
         }
         var added = dict.TryAdd(key, value);
         if (added)
-            logger?.LogTrace("NullableKeySortedDictionary changed: added [{Key}, {Value}]", key, value);
+            logger.WhenTracing()?.LogTrace("NullableKeySortedDictionary changed: added [{Key}, {Value}]", key, value);
         return added;
     }
 

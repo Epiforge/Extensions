@@ -87,17 +87,17 @@ sealed class ObservableInvocationExpression(ExpressionObserver observer, Invocat
         if (observableExpressionFault is not null)
         {
             Evaluation = (observableExpressionFault, defaultResult);
-            observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, observableExpressionFault, "{InvocationExpression} is faulted: {Fault}", InvocationExpression, observableExpressionFault);
+            observer.TraceLogger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, observableExpressionFault, "{InvocationExpression} is faulted: {Fault}", InvocationExpression, observableExpressionFault);
         }
         else if (observableArguments is { } faultedArguments && FirstFault(faultedArguments) is { } observableArgumentFault)
         {
             Evaluation = (observableArgumentFault, defaultResult);
-            observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, observableArgumentFault, "{InvocationExpression} argument is faulted: {Fault}", InvocationExpression, observableArgumentFault);
+            observer.TraceLogger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, observableArgumentFault, "{InvocationExpression} argument is faulted: {Fault}", InvocationExpression, observableArgumentFault);
         }
         else
         {
             Evaluation = (null, observableExpressionResult);
-            observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{InvocationExpression} evaluated: {Value}", InvocationExpression, observableExpressionResult);
+            observer.TraceLogger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{InvocationExpression} evaluated: {Value}", InvocationExpression, observableExpressionResult);
         }
     }
 

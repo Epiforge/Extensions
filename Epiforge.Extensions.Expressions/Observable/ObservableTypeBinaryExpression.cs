@@ -56,13 +56,13 @@ sealed class ObservableTypeBinaryExpression(ExpressionObserver observer, TypeBin
         if (expressionFault is not null)
         {
             Evaluation = (expressionFault, defaultResult);
-            observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, expressionFault, "{TypeBinaryExpression} expression faulted: {Fault}", TypeBinaryExpression, expressionFault);
+            observer.TraceLogger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, expressionFault, "{TypeBinaryExpression} expression faulted: {Fault}", TypeBinaryExpression, expressionFault);
         }
         else
         {
             var value = @delegate?.Invoke(expressionValue);
             Evaluation = (null, value);
-            observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{TypeBinaryExpression} evaluated: {Value}", TypeBinaryExpression, value);
+            observer.TraceLogger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{TypeBinaryExpression} evaluated: {Value}", TypeBinaryExpression, value);
         }
     }
 

@@ -111,7 +111,7 @@ sealed class ObservableCollectionUsingSyncRootEventuallyQuery<TElement>(Collecti
                             switch (e.Action)
                             {
                                 case NotifyCollectionChangedAction.Add:
-                                    elements!.InsertRange(e.NewStartingIndex, e.NewItems!.Cast<TElement>());
+                                    ListEdits.InsertAnnounced(elements!, e.NewStartingIndex, e.NewItems!);
                                     break;
                                 case NotifyCollectionChangedAction.Move:
                                     elements!.MoveRange(e.OldStartingIndex, e.NewStartingIndex, e.OldItems!.Count);
@@ -120,7 +120,7 @@ sealed class ObservableCollectionUsingSyncRootEventuallyQuery<TElement>(Collecti
                                     elements!.RemoveRange(e.OldStartingIndex, e.OldItems!.Count);
                                     break;
                                 case NotifyCollectionChangedAction.Replace:
-                                    elements!.ReplaceRange(e.OldStartingIndex, e.OldItems!.Count, e.NewItems!.Cast<TElement>());
+                                    ListEdits.ReplaceAnnounced(elements!, e.OldStartingIndex, e.OldItems!, e.NewItems!);
                                     break;
                             }
                         }

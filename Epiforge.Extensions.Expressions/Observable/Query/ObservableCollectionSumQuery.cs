@@ -67,10 +67,8 @@ sealed class ObservableCollectionSumQuery<TElement, TResult>(CollectionObserver 
                 else
                 {
                     var value = Evaluation.Result;
-                    var oldItems = e.OldItems?.Cast<TResult>() ?? [];
-                    var newItems = e.NewItems?.Cast<TResult>() ?? [];
-                    value = subtract!(value, oldItems.Aggregate(default!, add!));
-                    value = add!(value, newItems.Aggregate(default!, add!));
+                    value = subtract!(value, Total(e.OldItems, add!));
+                    value = add!(value, Total(e.NewItems, add!));
                     Evaluation = (null, value);
                 }
                 break;
@@ -85,6 +83,18 @@ sealed class ObservableCollectionSumQuery<TElement, TResult>(CollectionObserver 
         using var changeHold = HoldOwnChanges();
         if (e.PropertyName == nameof(IObservableCollectionQuery<>.OperationFault))
             Evaluate();
+    }
+
+    /// <summary>
+    /// Totals the elements an announcement carries, starting from the default as <see cref="Enumerable.Aggregate{TSource, TAccumulate}(IEnumerable{TSource}, TAccumulate, Func{TAccumulate, TSource, TAccumulate})"/> did, without the cast sequence and its enumerator
+    /// </summary>
+    internal static TResult Total(IList? items, Func<TResult, TResult, TResult> add)
+    {
+        var total = default(TResult)!;
+        if (items is not null)
+            for (int i = 0, ii = items.Count; i < ii; ++i)
+                total = add(total, (TResult)items[i]!);
+        return total;
     }
 
     public override string ToString() =>

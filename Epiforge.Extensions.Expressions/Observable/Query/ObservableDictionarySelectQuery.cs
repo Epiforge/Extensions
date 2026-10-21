@@ -13,7 +13,7 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
     bool faultsChanged = true;
     int nullKeys;
     PropertyChangedEventHandler? observableExpressionPropertyChangedHandler;
-    readonly ObservableDictionary<TSourceKey, (IObservableExpression<KeyValuePair<TSourceKey, TSourceValue>, KeyValuePair<TKey, TValue>> ObservableExpression, Exception? CommittedFault, KeyValuePair<TKey, TValue> CommittedProjection)> observableExpressions = new(source.KeyComparer);
+    readonly Dictionary<TSourceKey, (IObservableExpression<KeyValuePair<TSourceKey, TSourceValue>, KeyValuePair<TKey, TValue>> ObservableExpression, Exception? CommittedFault, KeyValuePair<TKey, TValue> CommittedProjection)> observableExpressions = new(source.KeyComparer);
     bool released;
     int reportedDuplicateClaims;
     int reportedNullKeys;
@@ -68,14 +68,15 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
             ++nullKeys;
             return;
         }
-        if (claimantsByProjectedKey.TryGetValue(key, out var claimants))
+        ref var claimants = ref CollectionsMarshal.GetValueRefOrAddDefault(claimantsByProjectedKey, key, out var claimed);
+        if (claimed)
         {
-            claimants.Add(sourceKey);
+            claimants!.Add(sourceKey);
             ++duplicateClaims;
         }
         else
         {
-            claimantsByProjectedKey.Add(key, [sourceKey]);
+            claimants = [sourceKey];
             DiscardSnapshots();
             into.Add(key, projection.Value);
         }
@@ -154,9 +155,12 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
             if (released)
                 return;
             var sourceKey = observableExpression.Argument.Key;
-            if (!observableExpressions.TryGetValue(sourceKey, out var committed) || !ReferenceEquals(committed.ObservableExpression, observableExpression))
+            ref var entry = ref CollectionsMarshal.GetValueRefOrNullRef(observableExpressions, sourceKey);
+            if (Unsafe.IsNullRef(ref entry) || !ReferenceEquals(entry.ObservableExpression, observableExpression))
                 return;
+            var committed = entry;
             var (newFault, newProjection) = observableExpression.Evaluation;
+            entry = (observableExpression, newFault, newProjection);
             var committedProjection = committed.CommittedProjection;
             var committedKey = committedProjection.Key;
             var newKey = newProjection.Key;
@@ -166,7 +170,6 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
             var placementIsUnchanged = wasApplied == isApplied && keyIsUnchanged;
             if (placementIsUnchanged)
             {
-                observableExpressions[sourceKey] = (observableExpression, newFault, newProjection);
                 if (isApplied && newKey is not null && !valueEqualityComparer.Equals(committedProjection.Value, newProjection.Value) && IsFirstClaimantWithAccess(newKey, sourceKey))
                     SetInResultWithAccess(newKey, newProjection.Value);
             }
@@ -174,7 +177,6 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
             {
                 if (wasApplied)
                     RetractProjectionWithAccess(sourceKey, committedProjection);
-                observableExpressions[sourceKey] = (observableExpression, newFault, newProjection);
                 if (isApplied)
                     ApplyProjectionWithAccess(sourceKey, newProjection, result);
             }
@@ -270,8 +272,12 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
         }
         if (!claimantsByProjectedKey.TryGetValue(key, out var claimants))
             return;
-        var claimantIndex = claimants.FindIndex(claimant => source.KeyComparer.Equals(claimant, sourceKey));
-        if (claimantIndex < 0)
+        var sourceKeyComparer = source.KeyComparer;
+        var claimantSpan = CollectionsMarshal.AsSpan(claimants);
+        var claimantIndex = 0;
+        while (claimantIndex < claimantSpan.Length && !sourceKeyComparer.Equals(claimantSpan[claimantIndex], sourceKey))
+            ++claimantIndex;
+        if (claimantIndex == claimantSpan.Length)
             return;
         claimants.RemoveAt(claimantIndex);
         if (claimants.Count == 0)
@@ -360,7 +366,7 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
                 if (e.OldItems is { } oldItems)
                     foreach (var keyValuePair in oldItems)
                     {
-                        if (!observableExpressions.TryGetValue(keyValuePair.Key!, out var committed))
+                        if (!observableExpressions.Remove(keyValuePair.Key!, out var committed))
                             continue;
                         if (committed.CommittedFault is null)
                             RetractProjectionWithAccess(keyValuePair.Key!, committed.CommittedProjection);
@@ -368,7 +374,6 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
                             faultsChanged = true;
                         committed.ObservableExpression.PropertyChanged -= ObservableExpressionPropertyChangedHandler;
                         committed.ObservableExpression.Dispose();
-                        observableExpressions.Remove(keyValuePair.Key!);
                     }
                 if (e.NewItems is { } newItems)
                     foreach (var keyValuePair in newItems)

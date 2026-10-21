@@ -26,7 +26,7 @@ abstract class ObservableScalarQuery<TResult>(CollectionObserver collectionObser
         {
             if (value.Fault is AggregateException && FaultList.DescribeTheSame(evaluation.Fault, value.Fault))
                 value = (evaluation.Fault, value.Result);
-            if (SetBackedProperty(ref evaluation, in value) && Logger is { } logger && logger.IsEnabled(LogLevel.Trace))
+            if (SetBackedProperty(ref evaluation, in value, ObservableExpression.EvaluationPropertyChangingEventArgs, ObservableExpression.EvaluationPropertyChangedEventArgs) && Logger is { } logger && logger.IsEnabled(LogLevel.Trace))
             {
                 if (value.Fault is { } fault)
                     logger.LogTrace(EventIds.Epiforge_Extensions_Expressions_QueryFaulted, fault, "{ScalarQuery} faulted: {Fault}", this, fault);

@@ -14,6 +14,7 @@ global using Microsoft.AspNetCore.Components;
 global using Microsoft.AspNetCore.Components.RenderTree;
 global using Microsoft.AspNetCore.Components.Rendering;
 global using Microsoft.Extensions.DependencyInjection;
+global using Microsoft.Extensions.Logging;
 global using Microsoft.Extensions.Logging.Abstractions;
 global using Perfolizer.Horology;
 global using System.Collections;

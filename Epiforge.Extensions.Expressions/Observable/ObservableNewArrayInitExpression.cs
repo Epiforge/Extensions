@@ -37,7 +37,7 @@ sealed class ObservableNewArrayInitExpression(ExpressionObserver observer, NewAr
         if (initializers is { } faultedInitializers && FirstFault(faultedInitializers) is { } initializerFault)
         {
             Evaluation = (initializerFault, defaultResult);
-            observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, initializerFault, "{NewArrayExpression} initializer faulted: {Fault}", NewArrayExpression, initializerFault);
+            observer.TraceLogger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, initializerFault, "{NewArrayExpression} initializer faulted: {Fault}", NewArrayExpression, initializerFault);
         }
         else
         {
@@ -45,7 +45,7 @@ sealed class ObservableNewArrayInitExpression(ExpressionObserver observer, NewAr
             for (int i = 0, ii = initializers?.Count ?? 0; i < ii; ++i)
                 array.SetValue(initializers?[i].Evaluation.Result, i);
             Evaluation = (null, array);
-            observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{NewArrayExpression} evaluated: {Value}", NewArrayExpression, array);
+            observer.TraceLogger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{NewArrayExpression} evaluated: {Value}", NewArrayExpression, array);
         }
     }
 

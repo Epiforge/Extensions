@@ -113,22 +113,23 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
         switch (e.Action)
         {
             case NotifyCollectionChangedAction.Add when e.NewItems is { } newItems && e.NewStartingIndex >= 0 && e.NewStartingIndex <= copy.Count:
-                if (newItems.Count == 1)
-                    copy.Insert(e.NewStartingIndex, (TResult)newItems[0]!);
-                else
-                    copy.InsertRange(e.NewStartingIndex, newItems.Cast<TResult>());
+                ListEdits.InsertAll(copy, e.NewStartingIndex, newItems);
                 return copy;
             case NotifyCollectionChangedAction.Remove when e.OldItems is { } oldItems && e.OldStartingIndex >= 0 && e.OldStartingIndex + oldItems.Count <= copy.Count:
                 copy.RemoveRange(e.OldStartingIndex, oldItems.Count);
                 return copy;
             case NotifyCollectionChangedAction.Replace when e.OldItems is { } replacedItems && e.NewItems is { } replacementItems && e.OldStartingIndex >= 0 && e.OldStartingIndex + replacedItems.Count <= copy.Count:
-                copy.RemoveRange(e.OldStartingIndex, replacedItems.Count);
-                copy.InsertRange(e.OldStartingIndex, replacementItems.Cast<TResult>());
+                if (replacedItems.Count == replacementItems.Count)
+                    for (var i = 0; i < replacementItems.Count; ++i)
+                        copy[e.OldStartingIndex + i] = (TResult)replacementItems[i]!;
+                else
+                {
+                    copy.RemoveRange(e.OldStartingIndex, replacedItems.Count);
+                    ListEdits.InsertAll(copy, e.OldStartingIndex, replacementItems);
+                }
                 return copy;
             case NotifyCollectionChangedAction.Move when e.OldItems is { } movedItems && e.OldStartingIndex >= 0 && e.NewStartingIndex >= 0 && e.OldStartingIndex + movedItems.Count <= copy.Count && e.NewStartingIndex + movedItems.Count <= copy.Count:
-                var moved = copy.GetRange(e.OldStartingIndex, movedItems.Count);
-                copy.RemoveRange(e.OldStartingIndex, movedItems.Count);
-                copy.InsertRange(e.NewStartingIndex, moved);
+                ListEdits.MoveRange(copy, e.OldStartingIndex, e.NewStartingIndex, movedItems.Count);
                 return copy;
             default:
                 return [.. enumerable];
@@ -263,12 +264,12 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
                         if (e.OldStartingIndex > e.NewStartingIndex)
                             reducedOldStartingIndex += newItems.Count;
                         if (newItems.Count > 0)
-                            eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, newItems.AsReadOnly(), oldItems.AsReadOnly(), reducedOldStartingIndex);
+                            eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, newItems, oldItems, reducedOldStartingIndex);
                         else
-                            eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, oldItems.AsReadOnly(), reducedOldStartingIndex);
+                            eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, oldItems, reducedOldStartingIndex);
                     }
                     else if (newItems.Count > 0)
-                        eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, newItems.AsReadOnly(), positions.PrefixWeightBefore(e.NewStartingIndex));
+                        eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, newItems, positions.PrefixWeightBefore(e.NewStartingIndex));
                     break;
                 case NotifyCollectionChangedAction.Move:
                     if (e.OldItems is not null && e.OldItems.Count > 0 && e.OldStartingIndex != e.NewStartingIndex)
@@ -285,7 +286,7 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
                         positions.MoveRange(e.OldStartingIndex, e.NewStartingIndex, e.OldItems.Count);
                         var reducedNewStartingIndex = positions.PrefixWeightBefore(e.NewStartingIndex);
                         if (reducedOldStartingIndex != reducedNewStartingIndex && movedItems.Count > 0)
-                            eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Move, movedItems.AsReadOnly(), reducedNewStartingIndex, reducedOldStartingIndex);
+                            eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Move, movedItems, reducedNewStartingIndex, reducedOldStartingIndex);
                     }
                     break;
                 case NotifyCollectionChangedAction.Reset:

@@ -9,12 +9,12 @@ sealed class ObservableOrElseExpression(ExpressionObserver observer, BinaryExpre
         if (leftFault is not null)
         {
             Evaluation = (leftFault, defaultResult);
-            observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, leftFault, "{BinaryExpression} left-hand operand faulted: {Fault}", BinaryExpression, leftFault);
+            observer.TraceLogger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, leftFault, "{BinaryExpression} left-hand operand faulted: {Fault}", BinaryExpression, leftFault);
         }
         else if (leftResult is bool leftBool && leftBool)
         {
             Evaluation = (null, BooleanBoxes.True);
-            observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{BinaryExpression} evaluated: {Value}", BinaryExpression, true);
+            observer.TraceLogger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{BinaryExpression} evaluated: {Value}", BinaryExpression, true);
         }
         else
         {
@@ -22,13 +22,13 @@ sealed class ObservableOrElseExpression(ExpressionObserver observer, BinaryExpre
             if (rightFault is not null)
             {
                 Evaluation = (rightFault, defaultResult);
-                observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, rightFault, "{BinaryExpression} right-hand operand faulted: {Fault}", BinaryExpression, rightFault);
+                observer.TraceLogger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, rightFault, "{BinaryExpression} right-hand operand faulted: {Fault}", BinaryExpression, rightFault);
             }
             else
             {
                 var value = rightResult is bool rightBool && rightBool;
                 Evaluation = (null, BooleanBoxes.Box(value));
-                observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{BinaryExpression} evaluated: {Value}", BinaryExpression, value);
+                observer.TraceLogger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{BinaryExpression} evaluated: {Value}", BinaryExpression, value);
             }
         }
     }

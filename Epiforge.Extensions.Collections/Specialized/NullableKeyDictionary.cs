@@ -174,7 +174,7 @@ public sealed class NullableKeyDictionary<TKey, TValue> :
             }
             else
                 dict[key] = value;
-            logger?.LogTrace("NullableKeyDictionary changed: set [{Key}, {Value}]", key, value);
+            logger.WhenTracing()?.LogTrace("NullableKeyDictionary changed: set [{Key}, {Value}]", key, value);
         }
     }
 
@@ -194,7 +194,7 @@ public sealed class NullableKeyDictionary<TKey, TValue> :
         }
         else
             dict.Add(key, value);
-        logger?.LogTrace("NullableKeyDictionary changed: added [{Key}, {Value}]", key, value);
+        logger.WhenTracing()?.LogTrace("NullableKeyDictionary changed: added [{Key}, {Value}]", key, value);
     }
 
     void AddRange(IDictionary<TKey, TValue> dictionary)
@@ -214,7 +214,7 @@ public sealed class NullableKeyDictionary<TKey, TValue> :
         hasNullKeyedValue = false;
         nullKeyedValue = default!;
         dict.Clear();
-        logger?.LogTrace("NullableKeyDictionary changed: cleared");
+        logger.WhenTracing()?.LogTrace("NullableKeyDictionary changed: cleared");
     }
 
     bool ICollection<KeyValuePair<TKey, TValue>>.Contains(KeyValuePair<TKey, TValue> item) =>
@@ -257,7 +257,7 @@ public sealed class NullableKeyDictionary<TKey, TValue> :
     public int EnsureCapacity(int capacity)
     {
         var ensuredCapacity = dict.EnsureCapacity(capacity);
-        logger?.LogTrace("NullableKeyDictionary ensured capacity {EnsuredCapacity} from request of {Capacity}", ensuredCapacity, capacity);
+        logger.WhenTracing()?.LogTrace("NullableKeyDictionary ensured capacity {EnsuredCapacity} from request of {Capacity}", ensuredCapacity, capacity);
         return ensuredCapacity;
     }
 
@@ -274,14 +274,14 @@ public sealed class NullableKeyDictionary<TKey, TValue> :
             {
                 nullKeyedValue = default!;
                 hasNullKeyedValue = false;
-                logger?.LogTrace("NullableKeyDictionary changed: removed {Key}", key);
+                logger.WhenTracing()?.LogTrace("NullableKeyDictionary changed: removed {Key}", key);
                 return true;
             }
             return false;
         }
         var removed = dict.Remove(key);
         if (removed)
-            logger?.LogTrace("NullableKeyDictionary changed: removed {Key}", key);
+            logger.WhenTracing()?.LogTrace("NullableKeyDictionary changed: removed {Key}", key);
         return removed;
     }
 
@@ -301,7 +301,7 @@ public sealed class NullableKeyDictionary<TKey, TValue> :
                 value = nullKeyedValue;
                 nullKeyedValue = default!;
                 hasNullKeyedValue = false;
-                logger?.LogTrace("NullableKeyDictionary changed: removed [{Key}, {Value}]", key, value);
+                logger.WhenTracing()?.LogTrace("NullableKeyDictionary changed: removed [{Key}, {Value}]", key, value);
                 return true;
             }
             value = default!;
@@ -309,7 +309,7 @@ public sealed class NullableKeyDictionary<TKey, TValue> :
         }
         var removed = dict.Remove(key, out value!);
         if (removed)
-            logger?.LogTrace("NullableKeyDictionary changed: removed [{Key}, {Value}]", key, value);
+            logger.WhenTracing()?.LogTrace("NullableKeyDictionary changed: removed [{Key}, {Value}]", key, value);
         return removed;
     }
 
@@ -321,14 +321,14 @@ public sealed class NullableKeyDictionary<TKey, TValue> :
             {
                 nullKeyedValue = default!;
                 hasNullKeyedValue = false;
-                logger?.LogTrace("NullableKeyDictionary changed: removed [{Key}, {Value}]", item.Key, item.Value);
+                logger.WhenTracing()?.LogTrace("NullableKeyDictionary changed: removed [{Key}, {Value}]", item.Key, item.Value);
                 return true;
             }
             return false;
         }
         var removed = ((IDictionary<TKey, TValue>)dict).Remove(item);
         if (removed)
-            logger?.LogTrace("NullableKeyDictionary changed: removed [{Key}, {Value}]", item.Key, item.Value);
+            logger.WhenTracing()?.LogTrace("NullableKeyDictionary changed: removed [{Key}, {Value}]", item.Key, item.Value);
         return removed;
     }
 
@@ -338,7 +338,7 @@ public sealed class NullableKeyDictionary<TKey, TValue> :
     public void TrimExcess()
     {
         dict.TrimExcess();
-        logger?.LogTrace("NullableKeyDictionary trimmed excess");
+        logger.WhenTracing()?.LogTrace("NullableKeyDictionary trimmed excess");
     }
 
     /// <summary>
@@ -348,7 +348,7 @@ public sealed class NullableKeyDictionary<TKey, TValue> :
     public void TrimExcess(int capacity)
     {
         dict.TrimExcess(capacity);
-        logger?.LogTrace("NullableKeyDictionary trimmed excess to {Capacity}", capacity);
+        logger.WhenTracing()?.LogTrace("NullableKeyDictionary trimmed excess to {Capacity}", capacity);
     }
 
     /// <summary>
@@ -365,14 +365,14 @@ public sealed class NullableKeyDictionary<TKey, TValue> :
             {
                 hasNullKeyedValue = true;
                 nullKeyedValue = value;
-                logger?.LogTrace("NullableKeyDictionary changed: added [{Key}, {Value}]", key, value);
+                logger.WhenTracing()?.LogTrace("NullableKeyDictionary changed: added [{Key}, {Value}]", key, value);
                 return true;
             }
             return false;
         }
         var added = dict.TryAdd(key, value);
         if (added)
-            logger?.LogTrace("NullableKeyDictionary changed: added [{Key}, {Value}]", key, value);
+            logger.WhenTracing()?.LogTrace("NullableKeyDictionary changed: added [{Key}, {Value}]", key, value);
         return added;
     }
 

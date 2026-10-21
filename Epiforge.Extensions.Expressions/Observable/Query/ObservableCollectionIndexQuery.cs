@@ -35,10 +35,11 @@ sealed class ObservableCollectionIndexQuery<TElement>(CollectionObserver collect
                 {
                     if (observableCollectionQuery.HasIndexerPenalty && (!index.IsFromEnd || index.Value == 1))
                     {
+                        var count = observableCollectionQuery.Count;
                         if (index.IsFromEnd)
-                            Evaluation = (null, OutOfRangeIsDefault ? observableCollectionQuery.LastOrDefault() : observableCollectionQuery.Last())!;
+                            Evaluation = count == 0 ? (OutOfRangeIsDefault ? null : OwnFault(ExceptionHelper.SequenceContainsNoElements), default!) : (null, observableCollectionQuery.Last());
                         else
-                            Evaluation = (null, OutOfRangeIsDefault ? observableCollectionQuery.ElementAtOrDefault(index.Value) : observableCollectionQuery.ElementAt(index.Value))!;
+                            Evaluation = index.Value >= count ? (OutOfRangeIsDefault ? null : OwnFault(ExceptionHelper.IndexArgumentWasOutOfRange), default!) : (null, observableCollectionQuery.ElementAt(index.Value));
                     }
                     else
                     {
@@ -49,14 +50,12 @@ sealed class ObservableCollectionIndexQuery<TElement>(CollectionObserver collect
                             Evaluation = (null, observableCollectionQuery[offset]);
                     }
                 }
-                else if (observableCollectionQuery.HasIndexerPenalty)
-                    Evaluation = (null, OutOfRangeIsDefault ? observableCollectionQuery.SingleOrDefault() : observableCollectionQuery.Single())!;
                 else
                     Evaluation = observableCollectionQuery.Count switch
                     {
                         0 when OutOfRangeIsDefault => (null, default!),
                         0 => (OwnFault(ExceptionHelper.SequenceContainsNoElements), default!),
-                        1 => (null, observableCollectionQuery[0]),
+                        1 => (null, observableCollectionQuery.HasIndexerPenalty ? observableCollectionQuery.First() : observableCollectionQuery[0]),
                         _ => (OwnFault(ExceptionHelper.SequenceContainsMoreThanOneElement), default!)
                     };
             }

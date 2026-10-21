@@ -58,8 +58,30 @@ sealed class ObservableCollectionAverageQuery<TElement, TResult>(CollectionObser
         else
         {
             var count = select.Count;
-            Evaluation = count > 0 ? (null, divide!(sum, (TResult)Convert.ChangeType(count, typeof(TResult)))) : (OwnFault(ExceptionHelper.SequenceContainsNoElements), default!);
+            Evaluation = count > 0 ? (null, divide!(sum, CountAsResult(count))) : (OwnFault(ExceptionHelper.SequenceContainsNoElements), default!);
         }
+    }
+
+    /// <summary>
+    /// Converts the count to the type of the average, directly for the types an average is commonly taken in, where the JIT removes the box the conversion appears to make, and through <see cref="Convert.ChangeType(object, Type)"/> otherwise, which keeps its overflow checking for the narrow types
+    /// </summary>
+    static TResult CountAsResult(int count)
+    {
+        if (typeof(TResult) == typeof(int))
+            return (TResult)(object)count;
+        if (typeof(TResult) == typeof(long))
+            return (TResult)(object)(long)count;
+        if (typeof(TResult) == typeof(double))
+            return (TResult)(object)(double)count;
+        if (typeof(TResult) == typeof(float))
+            return (TResult)(object)(float)count;
+        if (typeof(TResult) == typeof(decimal))
+            return (TResult)(object)(decimal)count;
+        if (typeof(TResult) == typeof(uint))
+            return (TResult)(object)(uint)count;
+        if (typeof(TResult) == typeof(ulong))
+            return (TResult)(object)(ulong)count;
+        return (TResult)Convert.ChangeType(count, typeof(TResult));
     }
 
     void Recompute()
@@ -78,10 +100,8 @@ sealed class ObservableCollectionAverageQuery<TElement, TResult>(CollectionObser
                 case NotifyCollectionChangedAction.Add:
                 case NotifyCollectionChangedAction.Remove:
                 case NotifyCollectionChangedAction.Replace:
-                    var oldItems = e.OldItems?.Cast<TResult>() ?? [];
-                    var newItems = e.NewItems?.Cast<TResult>() ?? [];
-                    sum = subtract!(sum, oldItems.Aggregate(default!, add!));
-                    sum = add!(sum, newItems.Aggregate(default!, add!));
+                    sum = subtract!(sum, ObservableCollectionSumQuery<TElement, TResult>.Total(e.OldItems, add!));
+                    sum = add!(sum, ObservableCollectionSumQuery<TElement, TResult>.Total(e.NewItems, add!));
                     Publish();
                     break;
                 case NotifyCollectionChangedAction.Reset:

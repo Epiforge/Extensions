@@ -53,12 +53,12 @@ sealed class ObservableConditionalExpression(ExpressionObserver observer, Condit
         if (testFault is not null)
         {
             Evaluation = (testFault, defaultResult);
-            observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, testFault, "{ConditionalExpression} test faulted: {Fault}", ConditionalExpression, testFault);
+            observer.TraceLogger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, testFault, "{ConditionalExpression} test faulted: {Fault}", ConditionalExpression, testFault);
         }
         else if (testResult is bool testBool)
         {
             Evaluation = testBool ? ifTrue!.Evaluation : ifFalse!.Evaluation;
-            observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{ConditionalExpression} test: {TestResult}", ConditionalExpression, testBool);
+            observer.TraceLogger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{ConditionalExpression} test: {TestResult}", ConditionalExpression, testBool);
         }
         else
         {

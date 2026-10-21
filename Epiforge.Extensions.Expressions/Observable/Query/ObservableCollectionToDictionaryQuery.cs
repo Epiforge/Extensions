@@ -67,6 +67,7 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>(Colle
     PropertyChangedEventHandler? claimEvaluationChangedHandler;
     int claimedOccurrences;
     readonly ObservableDictionary<TKey, TValue> dictionary = new(equalityComparer);
+    HashSet<TKey>? spareKeySet;
     readonly NullableKeyDictionary<TElement, Entry> entries = new(elementComparer);
     IReadOnlyList<KeyValuePair<TKey, TValue>>? enumerationSnapshot;
     readonly FaultList evaluationFaults = new();
@@ -163,11 +164,7 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>(Colle
             return;
         }
         ++claimedOccurrences;
-        ref var claimants = ref CollectionsMarshal.GetValueRefOrNullRef(claimantsByKey, key);
-        if (!Unsafe.IsNullRef(ref claimants))
-            claimants.Add(node);
-        else
-            claimantsByKey.Add(key, new(node));
+        CollectionsMarshal.GetValueRefOrAddDefault(claimantsByKey, key, out _).Add(node);
         touched?.Add(key);
     }
 
@@ -201,7 +198,7 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>(Colle
             }
             else
             {
-                var touched = new HashSet<TKey>(EqualityComparer);
+                var touched = TakeKeySetWithAccess();
                 var nodes = entry.Nodes;
                 for (int i = 0, ii = nodes.Count; i < ii; ++i)
                     RelinquishWithAccess(entry, nodes[i], touched);
@@ -210,6 +207,7 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>(Colle
                 for (int i = 0, ii = nodes.Count; i < ii; ++i)
                     ClaimWithAccess(entry, nodes[i], touched);
                 ReconcileWithAccess(touched);
+                GiveBackKeySetWithAccess(touched);
             }
             SetOperationFaultWithAccess();
         }
@@ -336,21 +334,23 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>(Colle
                 if (oldCount > 0 && e.NewStartingIndex >= 0 && e.OldStartingIndex != e.NewStartingIndex)
                 {
                     occurrences.MoveRange(e.OldStartingIndex, e.NewStartingIndex, oldCount);
-                    var contested = new HashSet<TKey>(EqualityComparer);
+                    var contested = TakeKeySetWithAccess();
                     for (var i = 0; i < oldCount; ++i)
                         if (entries.TryGetValue((TElement)e.OldItems![i]!, out var entry) && entry.Fault is null && entry.Claim.Key is { } key && claimantsByKey.TryGetValue(key, out var claimants) && claimants.Count > 1)
                             contested.Add(key);
                     ReconcileWithAccess(contested);
+                    GiveBackKeySetWithAccess(contested);
                 }
             }
             else
             {
-                var touched = new HashSet<TKey>(EqualityComparer);
+                var touched = TakeKeySetWithAccess();
                 for (var i = oldCount - 1; i >= 0; --i)
                     RemoveOccurrenceAtWithAccess(e.OldStartingIndex + i, touched);
                 for (var i = 0; i < newCount; ++i)
                     AddOccurrenceWithAccess((TElement)e.NewItems![i]!, e.NewStartingIndex + i, touched);
                 ReconcileWithAccess(touched);
+                GiveBackKeySetWithAccess(touched);
             }
             SetOperationFaultWithAccess();
         }
@@ -395,6 +395,27 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>(Colle
         foreach (var (key, claimants) in claimantsByKey)
             replacement.Add(key, WinningClaimantWithAccess(claimants).Item.Claim.Value);
         dictionary.Reset(replacement);
+    }
+
+    /// <summary>
+    /// Takes the set this query keeps for gathering the keys a change touches, or a new one where it is in use further up the stack, so that a change does not allocate a set of its own
+    /// </summary>
+    HashSet<TKey> TakeKeySetWithAccess()
+    {
+        var keySet = spareKeySet ?? new HashSet<TKey>(EqualityComparer);
+        spareKeySet = null;
+        return keySet;
+    }
+
+    /// <summary>
+    /// Keeps a set for the next change once it is emptied, unless it grew large, since emptying a set costs as much as its capacity and a large one would tax every change after the one that grew it
+    /// </summary>
+    void GiveBackKeySetWithAccess(HashSet<TKey> keySet)
+    {
+        if (keySet.Count > 64)
+            return;
+        keySet.Clear();
+        spareKeySet = keySet;
     }
 
     void ReconcileWithAccess(HashSet<TKey> keys)

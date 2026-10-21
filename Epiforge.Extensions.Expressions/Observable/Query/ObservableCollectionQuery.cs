@@ -354,7 +354,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     /// <summary>
     /// Brings this query's copy of an observed sequence up to date with a change the sequence announced and then announces it, reading the whole sequence again where the announcement does not say precisely what changed
     /// </summary>
-    private protected void FollowChange(ref List<TElement>? copy, NotifyCollectionChangedEventArgs e, IEnumerable<TElement> sequence)
+    private protected void FollowChange(ref List<TElement>? copy, NotifyCollectionChangedEventArgs e, IEnumerable sequence)
     {
         var kept = copy!;
         var previousCount = kept.Count;
@@ -365,10 +365,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
                 count = previousCount + newItems.Count;
                 if (count != previousCount)
                     OnPropertyChanging(countPropertyChangingEventArgs);
-                if (newItems.Count == 1)
-                    kept.Insert(e.NewStartingIndex, (TElement)newItems[0]!);
-                else
-                    kept.InsertRange(e.NewStartingIndex, newItems.Cast<TElement>().ToList());
+                ListEdits.InsertAll(kept, e.NewStartingIndex, newItems);
                 break;
             case NotifyCollectionChangedAction.Remove when e.OldItems is { } oldItems && e.OldStartingIndex >= 0 && e.OldStartingIndex + oldItems.Count <= kept.Count:
                 count = previousCount - oldItems.Count;
@@ -380,22 +377,21 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
                 count = previousCount - replacedItems.Count + replacementItems.Count;
                 if (count != previousCount)
                     OnPropertyChanging(countPropertyChangingEventArgs);
-                if (replacedItems.Count == 1 && count == previousCount)
-                    kept[e.OldStartingIndex] = (TElement)replacementItems[0]!;
+                if (count == previousCount)
+                    for (var i = 0; i < replacementItems.Count; ++i)
+                        kept[e.OldStartingIndex + i] = (TElement)replacementItems[i]!;
                 else
                 {
                     kept.RemoveRange(e.OldStartingIndex, replacedItems.Count);
-                    kept.InsertRange(e.OldStartingIndex, replacementItems.Cast<TElement>().ToList());
+                    ListEdits.InsertAll(kept, e.OldStartingIndex, replacementItems);
                 }
                 break;
             case NotifyCollectionChangedAction.Move when e.OldItems is { } movedItems && e.OldStartingIndex >= 0 && e.NewStartingIndex >= 0 && e.OldStartingIndex + movedItems.Count <= kept.Count && e.NewStartingIndex + movedItems.Count <= kept.Count:
                 count = previousCount;
-                var moved = kept.GetRange(e.OldStartingIndex, movedItems.Count);
-                kept.RemoveRange(e.OldStartingIndex, movedItems.Count);
-                kept.InsertRange(e.NewStartingIndex, moved);
+                ListEdits.MoveRange(kept, e.OldStartingIndex, e.NewStartingIndex, movedItems.Count);
                 break;
             default:
-                var reread = new List<TElement>(sequence);
+                var reread = sequence is IEnumerable<TElement> typedSequence ? new List<TElement>(typedSequence) : [.. sequence.Cast<TElement>()];
                 count = reread.Count;
                 if (count != previousCount)
                     OnPropertyChanging(countPropertyChangingEventArgs);
@@ -477,10 +473,10 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     void RaiseCollectionChanged(NotifyCollectionChangedEventArgs e)
     {
         var eventArgs = Logger?.IsEnabled(LogLevel.Trace) ?? false ? e.ToStringForLogging() : null;
-        Logger?.LogTrace(Collections.EventIds.Epiforge_Extensions_Collections_RaisingCollectionChanged, "Raising CollectionChanged: {EventArgs}", eventArgs);
+        Logger.WhenTracing()?.LogTrace(Collections.EventIds.Epiforge_Extensions_Collections_RaisingCollectionChanged, "Raising CollectionChanged: {EventArgs}", eventArgs);
         NotifyDependents(e);
         CollectionChanged?.Invoke(this, e);
-        Logger?.LogTrace(Collections.EventIds.Epiforge_Extensions_Collections_RaisedCollectionChanged, "Raised CollectionChanged: {EventArgs}", eventArgs);
+        Logger.WhenTracing()?.LogTrace(Collections.EventIds.Epiforge_Extensions_Collections_RaisedCollectionChanged, "Raised CollectionChanged: {EventArgs}", eventArgs);
     }
 
     private protected override void RaiseNotification(object eventArguments)

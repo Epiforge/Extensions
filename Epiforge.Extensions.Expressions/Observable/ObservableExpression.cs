@@ -358,7 +358,7 @@ abstract class ObservableExpression :
             Abandon();
             throw;
         }
-        observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionInitialized, "Initialized observation of {Expression}", Expression);
+        observer.TraceLogger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionInitialized, "Initialized observation of {Expression}", Expression);
         Relinquish(owner);
     }
 
@@ -399,7 +399,7 @@ abstract class ObservableExpression :
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     protected void RemovedFromCache() =>
-        observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionDisposed, "Disposed observation of {Expression}", Expression);
+        observer.TraceLogger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionDisposed, "Disposed observation of {Expression}", Expression);
 
     internal ObservableExpressionSubscription SubscribeDependent(IObservableExpressionDependent dependent)
     {

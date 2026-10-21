@@ -21,7 +21,7 @@ sealed class ObservableCollectionQueryList(CollectionObserver collectionObserver
     void CollectionChangedNotifierCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         using var changeHold = HoldOwnChanges();
-        FollowChange(ref copy, e, List.Cast<object?>());
+        FollowChange(ref copy, e, List);
     }
 
     protected override bool Dispose(bool disposing)

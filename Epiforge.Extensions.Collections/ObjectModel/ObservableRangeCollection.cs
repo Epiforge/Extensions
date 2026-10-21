@@ -131,6 +131,28 @@ public class ObservableRangeCollection<T> :
         if (RaiseCollectionChangedEventsForIndividualElements)
             foreach (var item in items)
                 InsertItem(++index, item);
+        else if (items is IList<T> { Count: 1 } single)
+        {
+            var item = single[0];
+            CheckReentrancy();
+            BackingList.Insert(originalIndex, item);
+            NotifyCountChanged();
+            NotifyIndexerChanged();
+            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, (object?)item, originalIndex));
+        }
+        else if (items is ICollection<T> collection)
+        {
+            if (collection.Count > 0)
+            {
+                var array = new T[collection.Count];
+                collection.CopyTo(array, 0);
+                CheckReentrancy();
+                BackingList.InsertRange(originalIndex, array);
+                NotifyCountChanged();
+                NotifyIndexerChanged();
+                OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, array, originalIndex));
+            }
+        }
         else
         {
             var list = new List<T>(items);
@@ -233,9 +255,9 @@ public class ObservableRangeCollection<T> :
     {
         ArgumentNullException.ThrowIfNull(e);
         var eventArgs = logger?.IsEnabled(LogLevel.Trace) ?? false ? e.ToStringForLogging() : null;
-        logger?.LogTrace(EventIds.Epiforge_Extensions_Collections_RaisingCollectionChanged, "Raising CollectionChanged: {EventArgs}", eventArgs);
+        logger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Collections_RaisingCollectionChanged, "Raising CollectionChanged: {EventArgs}", eventArgs);
         base.OnCollectionChanged(e);
-        logger?.LogTrace(EventIds.Epiforge_Extensions_Collections_RaisedCollectionChanged, "Raised CollectionChanged: {EventArgs}", eventArgs);
+        logger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Collections_RaisedCollectionChanged, "Raised CollectionChanged: {EventArgs}", eventArgs);
     }
 
     /// <inheritdoc/>
@@ -347,6 +369,16 @@ public class ObservableRangeCollection<T> :
             if (RaiseCollectionChangedEventsForIndividualElements)
                 for (var i = 0; i < count; ++i)
                     RemoveAt(index);
+            else if (count == 1)
+            {
+                CheckReentrancy();
+                var backingList = BackingList;
+                var removedItem = backingList[index];
+                backingList.RemoveAt(index);
+                NotifyCountChanged();
+                NotifyIndexerChanged();
+                OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, (object?)removedItem, index));
+            }
             else
             {
                 CheckReentrancy();
@@ -415,7 +447,7 @@ public class ObservableRangeCollection<T> :
                 backingList.InsertRange(index, list);
             }
             NotifyReplacement(oldItems, list, index);
-            return [..oldItems];
+            return Array.AsReadOnly(oldItems);
         }
     }
 

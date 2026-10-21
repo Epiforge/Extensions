@@ -215,12 +215,12 @@ class DirectObservableExpression<TArgument, TResult> :
             var value = evaluate(argument, values, noDeferredGroups, noLinks, held);
             if (!IsCurrentResult(value))
                 Evaluation = (null, Box(value));
-            observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{Expression} evaluated directly: {Value}", Expression, value);
+            observer.TraceLogger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{Expression} evaluated directly: {Value}", Expression, value);
         }
         catch (Exception ex)
         {
             Evaluation = (ex, defaultResult);
-            observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, ex, "{Expression} faulted: {Fault}", Expression, ex);
+            observer.TraceLogger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, ex, "{Expression} faulted: {Fault}", Expression, ex);
         }
     }
 
@@ -316,7 +316,7 @@ class DeferringDirectObservableExpression<TArgument, TResult> :
                     continue;
                 if (!IsCurrentResult(value))
                     Evaluation = (null, Box(value));
-                observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{Expression} evaluated directly: {Value}", Expression, value);
+                observer.TraceLogger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{Expression} evaluated directly: {Value}", Expression, value);
                 return;
             }
             catch (Exception ex)
@@ -327,7 +327,7 @@ class DeferringDirectObservableExpression<TArgument, TResult> :
                 if (again)
                     continue;
                 Evaluation = (ex, defaultResult);
-                observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, ex, "{Expression} faulted: {Fault}", Expression, ex);
+                observer.TraceLogger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, ex, "{Expression} faulted: {Fault}", Expression, ex);
                 return;
             }
         }

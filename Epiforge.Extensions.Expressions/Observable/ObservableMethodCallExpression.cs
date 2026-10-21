@@ -50,30 +50,30 @@ sealed class ObservableMethodCallExpression(ExpressionObserver observer, MethodC
             if (objectFault is not null)
             {
                 Evaluation = (objectFault, defaultResult);
-                observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, objectFault, "{MethodCallExpression} object faulted: {Fault}", MethodCallExpression, objectFault);
+                observer.TraceLogger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, objectFault, "{MethodCallExpression} object faulted: {Fault}", MethodCallExpression, objectFault);
             }
             else if (arguments is { } faultedArguments && FirstFault(faultedArguments) is { } argumentFault)
             {
                 Evaluation = (argumentFault, defaultResult);
-                observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, argumentFault, "{MethodCallExpression} argument faulted: {Fault}", MethodCallExpression, argumentFault);
+                observer.TraceLogger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, argumentFault, "{MethodCallExpression} argument faulted: {Fault}", MethodCallExpression, argumentFault);
             }
             else if (method is { IsStatic: false } && objectResult is null)
             {
                 var nullReference = new NullReferenceException();
                 Evaluation = (nullReference, defaultResult);
-                observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, nullReference, "{MethodCallExpression} object was null: {Fault}", MethodCallExpression, nullReference);
+                observer.TraceLogger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, nullReference, "{MethodCallExpression} object was null: {Fault}", MethodCallExpression, nullReference);
             }
             else
             {
                 var value = methodInvoker is { } invoker ? Invoke(invoker, objectResult, arguments) : null;
                 Evaluation = (null, value);
-                observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{MethodCallExpression} evaluated: {Value}", MethodCallExpression, value);
+                observer.TraceLogger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{MethodCallExpression} evaluated: {Value}", MethodCallExpression, value);
             }
         }
         catch (Exception ex)
         {
             Evaluation = (ex, defaultResult);
-            observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, ex, "{MethodCallExpression} faulted: {Fault}", MethodCallExpression, ex);
+            observer.TraceLogger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, ex, "{MethodCallExpression} faulted: {Fault}", MethodCallExpression, ex);
         }
     }
 

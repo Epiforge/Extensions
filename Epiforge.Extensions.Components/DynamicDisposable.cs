@@ -60,7 +60,7 @@ public abstract class DynamicDisposable :
     /// </summary>
     public void Dispose()
     {
-        Logger?.LogTrace(EventIds.Epiforge_Extensions_Components_DisposeCalled, "Dispose called");
+        Logger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Components_DisposeCalled, "Dispose called");
         if (Interlocked.CompareExchange(ref disposalClaim, 1, 0) != 0)
             return;
         var e = EventArgs.Empty;
@@ -97,7 +97,7 @@ public abstract class DynamicDisposable :
     /// </summary>
     public async ValueTask DisposeAsync()
     {
-        Logger?.LogTrace(EventIds.Epiforge_Extensions_Components_DisposeCalled, "DisposeAsync called");
+        Logger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Components_DisposeCalled, "DisposeAsync called");
         if (Interlocked.CompareExchange(ref disposalClaim, 1, 0) != 0)
             return;
         var e = EventArgs.Empty;
@@ -138,23 +138,23 @@ public abstract class DynamicDisposable :
 
     void OnDisposalOverridden(EventArgs e)
     {
-        Logger?.LogTrace(EventIds.Epiforge_Extensions_Components_RaisingDisposalOverridden, "Raising DisposalOverridden event");
+        Logger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Components_RaisingDisposalOverridden, "Raising DisposalOverridden event");
         DisposalOverridden?.Invoke(this, e);
-        Logger?.LogTrace(EventIds.Epiforge_Extensions_Components_RaisedDisposalOverridden, "Raised DisposalOverridden event");
+        Logger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Components_RaisedDisposalOverridden, "Raised DisposalOverridden event");
     }
 
     void OnDisposed(EventArgs e)
     {
-        Logger?.LogTrace(EventIds.Epiforge_Extensions_Components_RaisingDisposed, "Raising Disposed event");
+        Logger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Components_RaisingDisposed, "Raising Disposed event");
         Disposed?.Invoke(this, e);
-        Logger?.LogTrace(EventIds.Epiforge_Extensions_Components_RaisedDisposed, "Raised Disposed event");
+        Logger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Components_RaisedDisposed, "Raised Disposed event");
     }
 
     void OnDisposing(EventArgs e)
     {
-        Logger?.LogTrace(EventIds.Epiforge_Extensions_Components_RaisingDisposing, "Raising Disposing event");
+        Logger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Components_RaisingDisposing, "Raising Disposing event");
         Disposing?.Invoke(this, e);
-        Logger?.LogTrace(EventIds.Epiforge_Extensions_Components_RaisedDisposing, "Raised Disposing event");
+        Logger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Components_RaisedDisposing, "Raised Disposing event");
     }
 
     /// <summary>

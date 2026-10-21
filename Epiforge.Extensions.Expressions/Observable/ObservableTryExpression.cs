@@ -50,7 +50,7 @@ sealed class ObservableTryExpression(ExpressionObserver observer, TryExpression 
         if (bodyFault is null)
         {
             Evaluation = (null, bodyResult);
-            observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{TryExpression} evaluated: {Value}", TryExpression, bodyResult);
+            observer.TraceLogger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{TryExpression} evaluated: {Value}", TryExpression, bodyResult);
             return;
         }
         var catchBlocks = TryExpression.Handlers;
@@ -61,13 +61,13 @@ sealed class ObservableTryExpression(ExpressionObserver observer, TryExpression 
                 if (handlers![i] is { } handler)
                 {
                     Evaluation = handler.Evaluation;
-                    observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{TryExpression} body faulted and was handled: {Fault}", TryExpression, bodyFault);
+                    observer.TraceLogger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{TryExpression} body faulted and was handled: {Fault}", TryExpression, bodyFault);
                     return;
                 }
                 break;
             }
         Evaluation = (bodyFault, defaultResult);
-        observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, bodyFault, "{TryExpression} body faulted: {Fault}", TryExpression, bodyFault);
+        observer.TraceLogger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, bodyFault, "{TryExpression} body faulted: {Fault}", TryExpression, bodyFault);
     }
 
     protected override void OnInitialization()

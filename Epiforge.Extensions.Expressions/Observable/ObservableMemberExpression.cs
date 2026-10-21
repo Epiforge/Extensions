@@ -51,7 +51,7 @@ sealed class ObservableMemberExpression(ExpressionObserver observer, MemberExpre
             if (observableExpressionFault is not null)
             {
                 Evaluation = (observableExpressionFault, defaultResult);
-                observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, observableExpressionFault, "{MemberExpression} faulted: {Fault}", MemberExpression, observableExpressionFault);
+                observer.TraceLogger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, observableExpressionFault, "{MemberExpression} faulted: {Fault}", MemberExpression, observableExpressionFault);
             }
             else if (getMethod is not null)
             {
@@ -65,20 +65,20 @@ sealed class ObservableMemberExpression(ExpressionObserver observer, MemberExpre
                 {
                     var nullReference = new NullReferenceException();
                     Evaluation = (nullReference, defaultResult);
-                    observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, nullReference, "{MemberExpression} object was null: {Fault}", MemberExpression, nullReference);
+                    observer.TraceLogger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, nullReference, "{MemberExpression} object was null: {Fault}", MemberExpression, nullReference);
                 }
                 else
                 {
                     var value = getMethodInvoker!.Invoke(observableExpressionResult);
                     Evaluation = (null, value);
-                    observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{MemberExpression} evaluated: {Value}", MemberExpression, value);
+                    observer.TraceLogger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{MemberExpression} evaluated: {Value}", MemberExpression, value);
                 }
             }
             else if (field is { IsStatic: false } && observableExpressionResult is null)
             {
                 var nullReference = new NullReferenceException();
                 Evaluation = (nullReference, defaultResult);
-                observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, nullReference, "{MemberExpression} object was null: {Fault}", MemberExpression, nullReference);
+                observer.TraceLogger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, nullReference, "{MemberExpression} object was null: {Fault}", MemberExpression, nullReference);
             }
             else if (field is not null)
             {
@@ -88,7 +88,7 @@ sealed class ObservableMemberExpression(ExpressionObserver observer, MemberExpre
                 {
                     UnsubscribeFromValueNotifications();
                     Evaluation = (null, value);
-                    observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{MemberExpression} evaluated: {Value}", MemberExpression, value);
+                    observer.TraceLogger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{MemberExpression} evaluated: {Value}", MemberExpression, value);
                     SubscribeToValueNotifications();
                 }
             }
@@ -96,7 +96,7 @@ sealed class ObservableMemberExpression(ExpressionObserver observer, MemberExpre
         catch (Exception ex)
         {
             Evaluation = (ex, defaultResult);
-            observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, ex, "{MemberExpression} faulted: {Fault}", MemberExpression, ex);
+            observer.TraceLogger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, ex, "{MemberExpression} faulted: {Fault}", MemberExpression, ex);
         }
     }
 

@@ -46,6 +46,22 @@ public class StandingFaults
     }
 
     [TestMethod]
+    [DataRow("element at")]
+    [DataRow("single")]
+    public void AScalarOverASourceWithAnIndexerPenaltyKeepsAStandingFault(string scalar)
+    {
+        var source = new ObservableRangeCollection<int>([1, 2]);
+        var collectionObserver = CollectionObserverHelpers.Create();
+        using (var sourceQuery = collectionObserver.ObserveEnumerable<int>(source))
+        {
+            using var query = scalar == "element at" ? sourceQuery.ObserveElementAt(5) : sourceQuery.ObserveSingle();
+            AssertTheFaultStands(query, nameof(IObservableScalarQuery<int>.Evaluation), () => query.Evaluation.Fault, () => source.Add(3));
+        }
+        Assert.AreEqual(0, collectionObserver.CachedObservableQueries);
+        Assert.AreEqual(0, collectionObserver.ExpressionObserver.CachedObservableExpressions);
+    }
+
+    [TestMethod]
     public void ASingleOverADictionaryKeepsAStandingFault()
     {
         var source = new ObservableDictionary<int, int> { { 1, 1 }, { 2, 2 } };

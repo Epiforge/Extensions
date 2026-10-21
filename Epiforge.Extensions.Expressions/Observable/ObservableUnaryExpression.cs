@@ -63,19 +63,19 @@ sealed class ObservableUnaryExpression(ExpressionObserver observer, UnaryExpress
             if (operandFault is not null)
             {
                 Evaluation = (operandFault, defaultResult);
-                observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, operandFault, "{UnaryExpression} operand faulted: {Fault}", UnaryExpression, operandFault);
+                observer.TraceLogger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, operandFault, "{UnaryExpression} operand faulted: {Fault}", UnaryExpression, operandFault);
             }
             else
             {
                 var value = @delegate?.Invoke(operandResult);
                 Evaluation = (null, value);
-                observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{UnaryExpression} evaluated: {Value}", UnaryExpression, value);
+                observer.TraceLogger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionEvaluated, "{UnaryExpression} evaluated: {Value}", UnaryExpression, value);
             }
         }
         catch (Exception ex)
         {
             Evaluation = (ex, defaultResult);
-            observer.TraceLogger?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, ex, "{UnaryExpression} faulted: {Fault}", UnaryExpression, ex);
+            observer.TraceLogger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Expressions_ExpressionFaulted, ex, "{UnaryExpression} faulted: {Fault}", UnaryExpression, ex);
         }
     }
 

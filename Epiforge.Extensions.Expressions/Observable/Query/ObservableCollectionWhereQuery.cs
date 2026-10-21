@@ -306,7 +306,7 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
                 case NotifyCollectionChangedAction.Add:
                 case NotifyCollectionChangedAction.Replace:
                 case NotifyCollectionChangedAction.Remove:
-                    var oldItems = new List<TElement>();
+                    var oldItems = new ChangedElements<TElement>();
                     if (e.OldItems is not null && e.OldStartingIndex >= 0)
                         for (var i = e.OldItems.Count - 1; i >= 0; --i)
                         {
@@ -324,7 +324,8 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
                                 oldItems.Add(element);
                             observableExpression.Dispose();
                         }
-                    var newItems = new List<TElement>();
+                    oldItems.Reverse();
+                    var newItems = new ChangedElements<TElement>();
                     if (e.NewItems is not null && e.NewStartingIndex >= 0)
                         for (var i = 0; i < e.NewItems.Count; ++i)
                         {
@@ -351,21 +352,18 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
                     if (newItems.Count > 0)
                     {
                         var translatedIndex = memberships.PrefixWeightBefore(e.NewStartingIndex);
-                        if (oldItems.Count > 0)
-                            eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, newItems.AsReadOnly(), oldItems.AsReadOnly(), translatedIndex);
-                        else
-                            eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, newItems.AsReadOnly(), translatedIndex);
+                        eventArgs = oldItems.Count > 0 ? newItems.ToReplacementOf(oldItems, translatedIndex) : newItems.ToAddition(translatedIndex);
                         if (TryBeginEnumerationSnapshotPatchWithAccess(out var snapshot))
                         {
                             if (oldItems.Count > 0)
                                 snapshot.RemoveRange(translatedIndex, oldItems.Count);
-                            snapshot.InsertRange(translatedIndex, newItems);
+                            newItems.InsertInto(snapshot, translatedIndex);
                         }
                     }
                     else if (oldItems.Count > 0)
                     {
                         var translatedIndex = memberships.PrefixWeightBefore(e.OldStartingIndex);
-                        eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, oldItems.AsReadOnly(), translatedIndex);
+                        eventArgs = oldItems.ToRemoval(translatedIndex);
                         if (TryBeginEnumerationSnapshotPatchWithAccess(out var snapshot))
                             snapshot.RemoveRange(translatedIndex, oldItems.Count);
                     }
@@ -375,7 +373,7 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
                     if (e.OldItems is not null && e.OldItems.Count > 0)
                     {
                         var oldStartingIndex = memberships.PrefixWeightBefore(e.OldStartingIndex);
-                        var movedItems = new List<TElement>();
+                        var movedItems = new ChangedElements<TElement>();
                         var movedNode = memberships.NodeAt(e.OldStartingIndex);
                         for (var i = 0; i < e.OldItems.Count && movedNode is not null; ++i)
                         {
@@ -387,11 +385,11 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
                         var newStartingIndex = memberships.PrefixWeightBefore(e.NewStartingIndex);
                         if (oldStartingIndex != newStartingIndex && movedItems.Count > 0)
                         {
-                            eventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Move, movedItems.AsReadOnly(), newStartingIndex, oldStartingIndex);
+                            eventArgs = movedItems.ToMove(newStartingIndex, oldStartingIndex);
                             if (TryBeginEnumerationSnapshotPatchWithAccess(out var snapshot))
                             {
                                 snapshot.RemoveRange(oldStartingIndex, movedItems.Count);
-                                snapshot.InsertRange(newStartingIndex, movedItems);
+                                movedItems.InsertInto(snapshot, newStartingIndex);
                             }
                         }
                     }
