@@ -21,6 +21,7 @@ public class OperatorChangeCostBenchmarks
     BenchmarkPerson replacement = null!;
     ObservableRangeCollection<BenchmarkPerson> source = null!;
     IObservableCollectionQuery<BenchmarkPerson> sourceQuery = null!;
+    IObservableCollectionQuery<BenchmarkPerson> takeQuery = null!;
     ObservableRangeCollection<BenchmarkTeam> teams = null!;
     IObservableCollectionQuery<BenchmarkTeam> teamsQuery = null!;
 
@@ -39,6 +40,7 @@ public class OperatorChangeCostBenchmarks
     public void Cleanup()
     {
         query?.Dispose();
+        takeQuery?.Dispose();
         sourceQuery?.Dispose();
         teamsQuery?.Dispose();
     }
@@ -138,6 +140,14 @@ public class OperatorChangeCostBenchmarks
         query = sourceQuery.ObserveSum(person => person.Rank);
     }
 
+    [GlobalSetup(Targets = [nameof(TakeThenSelectAfterAnAdditionAndARemovalBeyondIt), nameof(TakeThenSelectAfterAnInsertionAndARemovalAtItsStart)])]
+    public void SetUpTakeThenSelect()
+    {
+        SetUpSource(i => i);
+        takeQuery = sourceQuery.ObserveTake(10);
+        query = takeQuery.ObserveSelect(person => person.Rank);
+    }
+
     [GlobalSetup(Targets = [nameof(ToDictionaryAfterAnAdditionAndARemoval), nameof(ToDictionaryAfterAKeyChange)])]
     public void SetUpToDictionary()
     {
@@ -187,6 +197,20 @@ public class OperatorChangeCostBenchmarks
     [Benchmark]
     public void SumAfterAValueChange() =>
         Next().Rank ^= 2;
+
+    [Benchmark]
+    public void TakeThenSelectAfterAnAdditionAndARemovalBeyondIt()
+    {
+        source.Add(added);
+        source.RemoveAt(elementCount);
+    }
+
+    [Benchmark]
+    public void TakeThenSelectAfterAnInsertionAndARemovalAtItsStart()
+    {
+        source.Insert(0, added);
+        source.RemoveAt(0);
+    }
 
     [Benchmark]
     public void ToDictionaryAfterAKeyChange()

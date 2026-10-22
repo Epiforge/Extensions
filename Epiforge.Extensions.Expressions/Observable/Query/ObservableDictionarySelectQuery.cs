@@ -50,6 +50,9 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
         }
     }
 
+    internal override IEqualityComparer<TKey> KeyComparer =>
+        EqualityComparer;
+
     public override IEnumerable<TKey> Keys
     {
         get

@@ -16,6 +16,9 @@ sealed class ObservableDictionaryUsingSynchronizationContextQuery<TKey, TValue>(
     internal override IEqualityComparer<TKey> KeyComparer =>
         source.KeyComparer;
 
+    private protected override int CountAtInitialization =>
+        dictionary!.Count;
+
     private protected override int CurrentCount =>
         ReadOnContext(SynchronizationContext, () => dictionary!.Count);
 
@@ -79,7 +82,7 @@ sealed class ObservableDictionaryUsingSynchronizationContextQuery<TKey, TValue>(
     {
         using var changeHold = HoldChangesOf(source);
 #pragma warning disable IDE0028 // Simplify collection initialization
-        dictionary = new();
+        dictionary = new(source.KeyComparer);
 #pragma warning restore IDE0028 // Simplify collection initialization
         dictionary.AddRange(source);
         source.DictionaryChanged += SourceDictionaryChanged;

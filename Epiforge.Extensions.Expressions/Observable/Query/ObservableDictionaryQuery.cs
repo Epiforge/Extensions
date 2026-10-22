@@ -203,6 +203,12 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     private protected abstract int CurrentCount { get; }
 
     /// <summary>
+    /// Gets the number of key-value pairs this query holds as it finishes initializing, before anything but the initializing thread can reach it
+    /// </summary>
+    private protected virtual int CountAtInitialization =>
+        CurrentCount;
+
+    /// <summary>
     /// Gets whether this query announces its count, which it does from the notifications it delivers, and so only where it delivers them for every change
     /// </summary>
     private protected virtual bool AnnouncesCount =>
@@ -429,7 +435,7 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     private protected override void OnInitialized()
     {
         if (AnnouncesCount)
-            announcedCount = CurrentCount;
+            announcedCount = CountAtInitialization;
     }
 
     protected virtual void OnCollectionChanged(NotifyCollectionChangedEventArgs e)

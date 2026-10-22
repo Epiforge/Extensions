@@ -4,7 +4,7 @@ namespace Epiforge.Extensions.Expressions.Observable.Query;
 /// Converts each value of the dictionary query it is built over to a type, either casting it or keeping it only where it is of the type, keeping the results and nothing per value besides, since a conversion's result is fixed by the value and nothing about a value can change it
 /// </summary>
 /// <remarks>
-/// A cast was a projection by lambdas doing the cast, and a type filter was a filter by a lambda testing the type followed by that projection, each observing every value as a projection or a filter must, though nothing those observations could hear would change what they yielded. This keeps their results, faults and announcements: a value which cannot be cast is left out and is a fault of its own, named by its key; a value which is not of the type is left out of a type filter without a fault; and the results look keys up by default equality, as the projection's did
+/// A cast was a projection by lambdas doing the cast, and a type filter was a filter by a lambda testing the type followed by that projection, each observing every value as a projection or a filter must, though nothing those observations could hear would change what they yielded. This keeps their results, faults and announcements: a value which cannot be cast is left out and is a fault of its own, named by its key; a value which is not of the type is left out of a type filter without a fault; and the results look keys up by the source's comparer
 /// </remarks>
 sealed class ObservableDictionaryConversionQuery<TKey, TValue, TResult>(CollectionObserver collectionObserver, ObservableDictionaryQuery<TKey, TValue> source, bool isFilter) :
     ObservableDictionaryQuery<TKey, TResult>(collectionObserver)
@@ -46,6 +46,9 @@ sealed class ObservableDictionaryConversionQuery<TKey, TValue, TResult>(Collecti
                 return result.Count;
         }
     }
+
+    internal override IEqualityComparer<TKey> KeyComparer =>
+        source.KeyComparer;
 
     public override IEnumerable<TKey> Keys
     {
@@ -176,7 +179,7 @@ sealed class ObservableDictionaryConversionQuery<TKey, TValue, TResult>(Collecti
         lock (access)
         {
             FaultList? faultList = null;
-            result = new(source.Count, EqualityComparer<TKey>.Default);
+            result = new(source.Count, source.KeyComparer);
             foreach (var keyValuePair in source)
                 ConvertInto(keyValuePair, result, ref faultList, null);
             OperationFault = faultList?.Fault;
@@ -215,7 +218,7 @@ sealed class ObservableDictionaryConversionQuery<TKey, TValue, TResult>(Collecti
             {
                 if (released)
                     return;
-                var newResult = new ObservableDictionary<TKey, TResult>(source.Count, EqualityComparer<TKey>.Default);
+                var newResult = new ObservableDictionary<TKey, TResult>(source.Count, source.KeyComparer);
                 foreach (var keyValuePair in source)
                     ConvertInto(keyValuePair, newResult, ref faultList, null);
                 DiscardSnapshots();

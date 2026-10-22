@@ -255,6 +255,12 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     /// </summary>
     private protected abstract int CurrentCount { get; }
 
+    /// <summary>
+    /// Gets the number of elements this query holds as it finishes initializing, before anything but the initializing thread can reach it
+    /// </summary>
+    private protected virtual int CountAtInitialization =>
+        CurrentCount;
+
     internal virtual bool HasEnumerationPenalty =>
         false;
 
@@ -512,7 +518,7 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     private protected override void OnInitialized()
     {
         if (AnnouncesCount)
-            announcedCount = CurrentCount;
+            announcedCount = CountAtInitialization;
     }
 
     protected override void OnPropertyChanged(PropertyChangedEventArgs e)

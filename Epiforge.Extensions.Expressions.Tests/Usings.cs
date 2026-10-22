@@ -8,6 +8,9 @@ global using Microsoft.VisualStudio.TestTools.UnitTesting;
 global using Nito.AsyncEx;
 global using System.Collections;
 global using System.Collections.Concurrent;
+#if IS_NET_8_0_OR_GREATER
+global using System.Collections.Frozen;
+#endif
 global using System.Collections.Immutable;
 global using System.Collections.ObjectModel;
 global using System.Collections.Specialized;

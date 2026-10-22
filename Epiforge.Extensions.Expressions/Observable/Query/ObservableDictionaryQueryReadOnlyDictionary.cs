@@ -23,6 +23,15 @@ sealed class ObservableDictionaryQueryReadOnlyDictionary<TKey, TValue>(Collectio
         {
             IHashKeys<TKey> hashKeys => hashKeys.Comparer,
             Dictionary<TKey, TValue> dictionary => dictionary.Comparer,
+            ConcurrentDictionary<TKey, TValue> concurrentDictionary => concurrentDictionary.Comparer,
+            ImmutableDictionary<TKey, TValue> immutableDictionary => immutableDictionary.KeyComparer,
+#if IS_NET_8_0_OR_GREATER
+            FrozenDictionary<TKey, TValue> frozenDictionary => frozenDictionary.Comparer,
+#endif
+            SortedDictionary<TKey, TValue> sortedDictionary => OrderedKeyEquality<TKey>.For(sortedDictionary.Comparer),
+            SortedList<TKey, TValue> sortedList => OrderedKeyEquality<TKey>.For(sortedList.Comparer),
+            ImmutableSortedDictionary<TKey, TValue> immutableSortedDictionary => OrderedKeyEquality<TKey>.For(immutableSortedDictionary.KeyComparer),
+            ObservableSortedDictionary<TKey, TValue> observableSortedDictionary => OrderedKeyEquality<TKey>.For(observableSortedDictionary.Comparer),
             _ => EqualityComparer<TKey>.Default
         };
 

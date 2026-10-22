@@ -9,6 +9,9 @@ sealed class ObservableCollectionUsingSynchronizationContextEventuallyQuery<TEle
     public override TElement this[int index] =>
         ReadOnContext(SynchronizationContext, () => elements![index]);
 
+    private protected override int CountAtInitialization =>
+        elements!.Count;
+
     private protected override int CurrentCount =>
         ReadOnContext(SynchronizationContext, () => elements!.Count);
 

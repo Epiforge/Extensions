@@ -76,7 +76,7 @@ sealed class ObservableDictionaryConcurrentQuery<TKey, TValue>(CollectionObserve
     protected override void OnInitialization()
     {
         using var changeHold = HoldChangesOf(source);
-        observableConcurrentDictionary = new ObservableConcurrentDictionary<TKey, TValue>(source);
+        observableConcurrentDictionary = new ObservableConcurrentDictionary<TKey, TValue>(source, source.KeyComparer);
         OperationFault = source.OperationFault;
         source.DictionaryChanged += SourceDictionaryChanged;
         observableConcurrentDictionary.CollectionChanged += ObservableConcurrentDictionaryCollectionChanged;
