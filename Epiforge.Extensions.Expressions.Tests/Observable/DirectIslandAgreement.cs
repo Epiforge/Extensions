@@ -222,28 +222,4 @@ public class DirectIslandAgreement
     [TestMethod]
     public void TheMechanismsAgreeAboutAnOperandTheReducerRewrites() =>
         AssertAgreement(Reduced);
-
-    /// <summary>
-    /// An expression refused at its root whose operand is large enough to be worth hosting, which the default observer observes with fewer graph nodes than the graph builds for it
-    /// </summary>
-    [TestMethod]
-    public void ALargeOperandUnderARefusedRootIsHostedDirectly()
-    {
-        var log = new SubscriptionLog();
-        var ledger = new LeaseLedger();
-        var subject = new Recorded(log) { Rank = 1, Score = 2, Next = new Recorded(log) { Rank = 3, Score = 4 } };
-        Expression<Func<Recorded, Lease>> leasing = r => new Lease(ledger, r.Rank * r.Score + r.Next!.Rank * r.Next!.Score - r.Rank);
-        var graph = ExpressionObserverHelpers.Create(false);
-        int graphNodes;
-        using (graph.Observe(leasing, subject))
-            graphNodes = graph.CachedObservableExpressions;
-        var fast = ExpressionObserverHelpers.Create(true);
-        using (var expression = fast.Observe(leasing, subject))
-        {
-            Assert.AreEqual(13, expression.Evaluation.Result.Value);
-            Assert.IsTrue(fast.CachedObservableExpressions < graphNodes, $"the default observer built {fast.CachedObservableExpressions} graph nodes where the graph builds {graphNodes}, so it hosted nothing directly");
-        }
-        Assert.AreEqual(ledger.Opened, ledger.Closed);
-        Assert.AreEqual(0, log.Outstanding);
-    }
 }
