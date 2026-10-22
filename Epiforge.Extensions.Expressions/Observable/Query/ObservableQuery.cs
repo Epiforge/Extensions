@@ -189,11 +189,6 @@ abstract class ObservableQuery :
     NotificationDeferralState? deferralState;
     int dependentSequence;
     ObservableQuerySubscription? firstDependent;
-#if IS_NET_9_0_OR_GREATER
-    readonly Lock lifetimeAccess = new();
-#else
-    readonly object lifetimeAccess = new();
-#endif
     bool isInitialized;
     ObservableQuerySubscription? lastDependent;
 
@@ -488,9 +483,12 @@ abstract class ObservableQuery :
     private protected OwnChangeHold HoldOwnChanges() =>
         new(this);
 
+    /// <summary>
+    /// Initializes this query once, holding the query's own monitor as the lock on its lifetime, which nothing outside the library can take since a query is handed out only behind a scoped wrapper, so that the lock allocates nothing
+    /// </summary>
     internal void Initialize()
     {
-        lock (lifetimeAccess)
+        lock (this)
         {
             if (isInitialized)
                 return;
@@ -597,7 +595,7 @@ abstract class ObservableQuery :
     /// </summary>
     internal void Release()
     {
-        lock (lifetimeAccess)
+        lock (this)
             Dispose();
     }
 
