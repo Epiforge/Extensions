@@ -162,6 +162,9 @@ public class ExpressionObserverOptions
     /// <summary>
     /// Specifies that property change notifications for the specified property will be ignored
     /// </summary>
+    /// <remarks>
+    /// An ignored property is treated as a static property is: it is read once and kept, and read again when what it is read through moves to another object. When it is read again is not specified, and it may differ between an observation evaluated directly and one evaluated by a graph, which can only matter for a value which changed without its change being followed
+    /// </remarks>
     /// <param name="property">The property for which property change notifications will be ignored</param>
     /// <returns><c>true</c> if this has resulted in a change in the options; otherwise, <c>false</c></returns>
     public bool AddIgnoredPropertyChangeNotification(PropertyInfo property) =>

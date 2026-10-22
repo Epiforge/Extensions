@@ -31,7 +31,7 @@ public enum DirectSubscriptionIneligibility
     DeferredBranch,
 
     /// <summary>
-    /// Change notifications for a property are ignored, so the graph reads its value once and keeps that value, where a fast path would read it afresh on every evaluation
+    /// Change notifications for a property are ignored and it is read through a value type which can change, which is never the same object when read again, so the fast path cannot tell when what it is read through has moved
     /// </summary>
     IgnoredChangeNotification,
 
