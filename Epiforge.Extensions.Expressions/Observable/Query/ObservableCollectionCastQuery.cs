@@ -52,6 +52,9 @@ sealed class ObservableCollectionCastQuery<TElement, TResult>(CollectionObserver
         }
     }
 
+    private protected override int CountAtInitialization =>
+        results.Count;
+
     private protected override int CurrentCount
     {
         get

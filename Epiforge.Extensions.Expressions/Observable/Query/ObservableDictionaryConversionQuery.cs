@@ -38,6 +38,9 @@ sealed class ObservableDictionaryConversionQuery<TKey, TValue, TResult>(Collecti
         }
     }
 
+    private protected override int CountAtInitialization =>
+        result.Count;
+
     private protected override int CurrentCount
     {
         get

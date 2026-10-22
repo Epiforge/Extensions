@@ -77,6 +77,9 @@ sealed class ObservableCollectionLookupQuery<TKey, TElement> :
         set => throw new NotSupportedException();
     }
 
+    private protected override int CountAtInitialization =>
+        groupings.Count;
+
     private protected override int CurrentCount
     {
         get

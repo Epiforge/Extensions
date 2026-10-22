@@ -33,6 +33,9 @@ sealed class ObservableCollectionIndividualChangesQuery<TElement> :
         }
     }
 
+    private protected override int CountAtInitialization =>
+        elements.Count;
+
     private protected override int CurrentCount
     {
         get

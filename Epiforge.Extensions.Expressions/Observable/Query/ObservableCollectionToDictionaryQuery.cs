@@ -105,6 +105,9 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>(Colle
     internal override IEqualityComparer<TKey> KeyComparer =>
         EqualityComparer;
 
+    private protected override int CountAtInitialization =>
+        dictionary.Count;
+
     private protected override int CurrentCount
     {
         get

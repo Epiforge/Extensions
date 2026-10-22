@@ -86,6 +86,9 @@ sealed class ObservableCollectionSelectQuery<TElement, TResult>(CollectionObserv
         }
     }
 
+    private protected override int CountAtInitialization =>
+        positions.Count;
+
     private protected override int CurrentCount
     {
         get

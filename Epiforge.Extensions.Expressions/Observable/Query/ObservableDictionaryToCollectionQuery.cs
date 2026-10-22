@@ -23,6 +23,9 @@ sealed class ObservableDictionaryToCollectionQuery<TElement, TKey, TValue>(Colle
         }
     }
 
+    private protected override int CountAtInitialization =>
+        elements.Count;
+
     private protected override int CurrentCount
     {
         get

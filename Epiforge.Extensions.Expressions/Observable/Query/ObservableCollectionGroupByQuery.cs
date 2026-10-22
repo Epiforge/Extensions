@@ -40,6 +40,9 @@ sealed class ObservableCollectionGroupByQuery<TKey, TElement> :
         }
     }
 
+    private protected override int CountAtInitialization =>
+        groupings.Count;
+
     private protected override int CurrentCount
     {
         get

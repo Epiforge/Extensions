@@ -31,6 +31,9 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue>(CollectionObserver col
         }
     }
 
+    private protected override int CountAtInitialization =>
+        result.Count;
+
     private protected override int CurrentCount
     {
         get

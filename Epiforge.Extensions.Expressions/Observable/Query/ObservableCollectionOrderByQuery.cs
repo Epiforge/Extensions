@@ -82,6 +82,9 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
         }
     }
 
+    private protected override int CountAtInitialization =>
+        results.Count;
+
     private protected override int CurrentCount
     {
         get

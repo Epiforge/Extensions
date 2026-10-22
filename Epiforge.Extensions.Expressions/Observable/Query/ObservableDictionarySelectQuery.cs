@@ -41,6 +41,9 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
         }
     }
 
+    private protected override int CountAtInitialization =>
+        result.Count;
+
     private protected override int CurrentCount
     {
         get
