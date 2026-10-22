@@ -36,6 +36,7 @@ This library provides a number of extension methods for collections and dictiona
   * `ResetRemovingAll` - Removes all objects from the collection that satisfy a predicate, announcing it with a single event
 * `ReadOnlyObservableRangeDictionary<TKey, TValue>` is a read-only wrapper for any classes implementing `IReadOnlyObservableRangeDictionary<TKey, TValue>`. It subscribes to what it wraps, so dispose of it when you are done with it.
 * `ReadOnlyObservableRangeCollection<T>` is a read-only wrapper for any classes implementing `IReadOnlyObservableRangeCollection<T>`. It subscribes to what it wraps, so dispose of it when you are done with it.
+* `ObservableRangeCollection<T>`, `ObservableDictionary<TKey, TValue>` and `ObservableSortedDictionary<TKey, TValue>` announce `Count` as changed before the notification describing the change it belongs to, the dictionaries having announced it as changing first, while it still read what it was; and when one change takes several notifications to describe, as a `ReplaceRange` given a different number of elements does, each is delivered while the collection is as that notification leaves it, so a handler reading the collection finds what it has been told.
 
 # Specialized
 * `EquatableList<T>` is an immutable list of items which may be compared with other instances of the same type and produces a hash code based on the permutation of its contents.
