@@ -10,6 +10,43 @@ sealed class ObservableCollectionCastQuery<TElement, TResult>(CollectionObserver
     ObservableCollectionQuery<TResult>(collectionObserver),
     IObservableQueryDependent
 {
+    sealed class ResultsEnumerator :
+        IEnumerator<TResult>
+    {
+        internal ResultsEnumerator(ObservableCollectionCastQuery<TElement, TResult> query, List<TResult> results)
+        {
+            this.query = query;
+            this.results = results;
+            enumerator = results.GetEnumerator();
+        }
+
+        List<TResult>.Enumerator enumerator;
+        bool isDisposed;
+        readonly ObservableCollectionCastQuery<TElement, TResult> query;
+        readonly List<TResult> results;
+
+        public TResult Current =>
+            enumerator.Current;
+
+        object? IEnumerator.Current =>
+            enumerator.Current;
+
+        public void Dispose()
+        {
+            if (isDisposed)
+                return;
+            isDisposed = true;
+            enumerator.Dispose();
+            query.EnumerationEnded();
+        }
+
+        public bool MoveNext() =>
+            enumerator.MoveNext();
+
+        public void Reset() =>
+            enumerator = results.GetEnumerator();
+    }
+
     /// <summary>
     /// Casts an element as the language does, yielding the fault of a cast which cannot be made
     /// </summary>
@@ -31,12 +68,13 @@ sealed class ObservableCollectionCastQuery<TElement, TResult>(CollectionObserver
 
     readonly object access = new();
     readonly IEqualityComparer<TElement> elementComparer = EqualityComparer<TElement>.Default;
-    /// <summary>
-    /// The results in order, copied for an enumeration and kept until they change, so that enumerating does not copy them again while nothing has
-    /// </summary>
-    TResult[]? enumerationSnapshot;
+    int liveEnumerations;
     bool released;
-    readonly List<TResult> results = [];
+    /// <summary>
+    /// The results in order, which an enumeration reads where they are rather than a copy of them, so that enumerating copies nothing unless they change while it is under way
+    /// </summary>
+    List<TResult> results = [];
+    bool resultsLent;
     ObservableQuerySubscription? sourceSubscription;
 
     public override TResult this[int index]
@@ -88,7 +126,6 @@ sealed class ObservableCollectionCastQuery<TElement, TResult>(CollectionObserver
                 {
                     released = true;
                     source.UnsubscribeDependent(sourceSubscription!);
-                    enumerationSnapshot = null;
                 }
                 RemovedFromCache();
             }
@@ -97,10 +134,17 @@ sealed class ObservableCollectionCastQuery<TElement, TResult>(CollectionObserver
         return true;
     }
 
+    void EnumerationEnded() =>
+        Interlocked.Decrement(ref liveEnumerations);
+
     public override IEnumerator<TResult> GetEnumerator()
     {
         lock (access)
-            return ((IEnumerable<TResult>)(enumerationSnapshot ??= [.. results])).GetEnumerator();
+        {
+            resultsLent = true;
+            Interlocked.Increment(ref liveEnumerations);
+            return new ResultsEnumerator(this, results);
+        }
     }
 
     void IObservableQueryDependent.OnDependencyCollectionChanged(ObservableQuerySubscription subscription, NotifyCollectionChangedEventArgs e) =>
@@ -144,10 +188,22 @@ sealed class ObservableCollectionCastQuery<TElement, TResult>(CollectionObserver
                 CastInto(element, results.Count, ref faultList, null);
     }
 
+    /// <summary>
+    /// Readies the results to be changed, replacing them with a copy where they have been lent to an enumeration which is still under way, so that it goes on reading them as they were
+    /// </summary>
+    void PrepareResultsForChangeWithAccess()
+    {
+        if (!resultsLent)
+            return;
+        if (Volatile.Read(ref liveEnumerations) > 0)
+            results = [.. results];
+        resultsLent = false;
+    }
+
     NotifyCollectionChangedEventArgs ResetWithAccess()
     {
+        PrepareResultsForChangeWithAccess();
         results.Clear();
-        enumerationSnapshot = null;
         FaultList? faultList = null;
         CastAllWithAccess(ref faultList);
         OperationFault = faultList?.Fault;
@@ -161,6 +217,7 @@ sealed class ObservableCollectionCastQuery<TElement, TResult>(CollectionObserver
         {
             if (released)
                 return;
+            PrepareResultsForChangeWithAccess();
             FaultList? faultList = null;
             NotifyCollectionChangedEventArgs? eventArgs = null;
             switch (e.Action)
@@ -220,10 +277,7 @@ sealed class ObservableCollectionCastQuery<TElement, TResult>(CollectionObserver
                     break;
             }
             if (eventArgs is not null)
-            {
-                enumerationSnapshot = null;
                 OnCollectionChanged(eventArgs);
-            }
         }
     }
 

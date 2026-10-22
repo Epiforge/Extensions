@@ -6,6 +6,36 @@ namespace Epiforge.Extensions.Expressions.Tests.Observable.Query;
 [TestClass]
 public class CastQueries
 {
+    static int[] Enumerate(IEnumerable<int> query)
+    {
+        var read = new List<int>();
+        foreach (var element in query)
+            read.Add(element);
+        return [.. read];
+    }
+
+    static int[] ReadAcross(IEnumerable<int> query, Action change)
+    {
+        var read = new List<int>();
+        using (var enumerator = query.GetEnumerator())
+        {
+            Assert.IsTrue(enumerator.MoveNext());
+            read.Add(enumerator.Current);
+            change();
+            while (enumerator.MoveNext())
+                read.Add(enumerator.Current);
+        }
+        return [.. read];
+    }
+
+    static int[] ReadRest(IEnumerator<int> enumerator)
+    {
+        var read = new List<int>();
+        while (enumerator.MoveNext())
+            read.Add(enumerator.Current);
+        return [.. read];
+    }
+
     static string Describe(Exception? fault) =>
         fault switch
         {
@@ -157,6 +187,97 @@ public class CastQueries
         widened.Dispose();
         boxed.Dispose();
         nullable.Dispose();
+        sourceQuery.Dispose();
+    }
+
+    [TestMethod]
+    public void AnEnumerationUnderWayReadsTheResultsAsTheyWereWhenItBeganThroughEveryKindOfChange()
+    {
+        var collectionObserver = new CollectionObserver();
+        var source = new ObservableRangeCollection<object?>([1, 2, 3, 4]);
+        var sourceQuery = collectionObserver.ObserveReadOnlyList(source);
+        var cast = sourceQuery.ObserveCast<int>();
+
+        void assertAcross(string step, Action change, int[] before, int[] after)
+        {
+            CollectionAssert.AreEqual(before, ReadAcross(cast, change), $"{step}: read across");
+            CollectionAssert.AreEqual(after, Enumerate(cast), $"{step}: enumerated after");
+            CollectionAssert.AreEqual(after, Enumerable.Range(0, cast.Count).Select(i => cast[i]).ToArray(), $"{step}: indexed after");
+        }
+
+        assertAcross("added", () => source.Add(5), [1, 2, 3, 4], [1, 2, 3, 4, 5]);
+        assertAcross("removed", () => source.RemoveAt(0), [1, 2, 3, 4, 5], [2, 3, 4, 5]);
+        assertAcross("replaced", () => source[0] = 6, [2, 3, 4, 5], [6, 3, 4, 5]);
+        assertAcross("moved", () => source.Move(0, 3), [6, 3, 4, 5], [3, 4, 5, 6]);
+        assertAcross("added one which cannot be cast", () => source.Add("seven"), [3, 4, 5, 6], [3, 4, 5, 6, 0]);
+        assertAcross("reset", () => source.Reset([7, 8]), [3, 4, 5, 6, 0], [7, 8]);
+        assertAcross("cleared", source.Clear, [7, 8], []);
+        cast.Dispose();
+        sourceQuery.Dispose();
+    }
+
+    [TestMethod]
+    public void EnumerationsKeepWhatTheyBeganWithWhetherOrNotTheyAreDisposed()
+    {
+        var collectionObserver = new CollectionObserver();
+        var source = new ObservableRangeCollection<object?>([1, 2]);
+        var sourceQuery = collectionObserver.ObserveReadOnlyList(source);
+        var cast = sourceQuery.ObserveCast<int>();
+        CollectionAssert.AreEqual(new[] { 1, 2 }, Enumerate(cast));
+        source.Add(3);
+        CollectionAssert.AreEqual(new[] { 1, 2, 3 }, Enumerate(cast), "after an enumeration which has ended");
+        var undisposed = cast.GetEnumerator();
+        Assert.IsTrue(undisposed.MoveNext());
+        Assert.AreEqual(1, undisposed.Current);
+        source.Add(4);
+        var overlapping = cast.GetEnumerator();
+        Assert.IsTrue(overlapping.MoveNext());
+        Assert.AreEqual(1, overlapping.Current);
+        source.RemoveAt(0);
+        source[0] = 5;
+        CollectionAssert.AreEqual(new[] { 5, 3, 4 }, Enumerate(cast), "while two enumerations are under way");
+        CollectionAssert.AreEqual(new[] { 2, 3, 4 }, ReadRest(overlapping), "the overlapping enumeration");
+        overlapping.Dispose();
+        source.Add(6);
+        CollectionAssert.AreEqual(new[] { 5, 3, 4, 6 }, Enumerate(cast), "after the overlapping enumeration was disposed");
+        CollectionAssert.AreEqual(new[] { 2, 3 }, ReadRest(undisposed), "the enumeration never disposed");
+        source.Add(7);
+        CollectionAssert.AreEqual(new[] { 5, 3, 4, 6, 7 }, Enumerate(cast), "after the enumeration never disposed was read to its end");
+        cast.Dispose();
+        sourceQuery.Dispose();
+    }
+
+    [TestMethod]
+    public void AnAggregateOverACastFollowsEveryKindOfChange()
+    {
+        var collectionObserver = new CollectionObserver();
+        var source = new ObservableRangeCollection<object?>([1, 2, 3]);
+        var sourceQuery = collectionObserver.ObserveReadOnlyList(source);
+        var cast = sourceQuery.ObserveCast<int>();
+        var sum = cast.ObserveAggregate(() => 0, (accumulate, element) => accumulate + element, accumulate => accumulate);
+
+        void assertSum(string step, int expected)
+        {
+            Assert.IsNull(sum.Evaluation.Fault, step);
+            Assert.AreEqual(expected, sum.Evaluation.Result, step);
+            Assert.AreEqual(expected, Enumerate(cast).Sum(), $"{step}: enumerated");
+        }
+
+        assertSum("initial", 6);
+        source.Add(4);
+        assertSum("added", 10);
+        source.RemoveAt(0);
+        assertSum("removed", 9);
+        source[0] = 10;
+        assertSum("replaced", 17);
+        source.Move(0, 2);
+        assertSum("moved", 17);
+        source.Reset([5, 6]);
+        assertSum("reset", 11);
+        source.Clear();
+        assertSum("cleared", 0);
+        sum.Dispose();
+        cast.Dispose();
         sourceQuery.Dispose();
     }
 }

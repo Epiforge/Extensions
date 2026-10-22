@@ -1,10 +1,10 @@
 ﻿namespace Epiforge.Extensions.Benchmarking;
 
 /// <summary>
-/// Prices a cast over a thousand people as a query is built, disposed and changed through it, alone and in a chain shaped like the one GS5 sums a person's time through, against a projection doing the same conversion, and a type filter over a thousand elements of which half pass it, with a cast and a type filter over dictionaries of a thousand values built and disposed likewise
+/// Prices a cast over a thousand people as a query is built, disposed and changed through it, alone and in a chain shaped like the one GS5 sums a person's time through, against a projection doing the same conversion, and a type filter over a thousand elements of which half pass it, with a cast and a type filter over dictionaries of a thousand values built and disposed likewise, and each under an aggregate as a change reaches it
 /// </summary>
 /// <remarks>
-/// The chain converts each person to <see cref="object"/> and back, projects the rank, converts that to <see cref="object"/> and back to <see cref="int"/> and sums it, which is the shape of GS5's person total: a cast either side of a projection, twice over, and an aggregate at the end. The projection arm uses a selector with the same body as the cast's, so that what a cast pays over what a conversion needs can be read from the difference. The type filter tests for an interface, as GS5's do, over people alternating with text
+/// The chain converts each person to <see cref="object"/> and back, projects the rank, converts that to <see cref="object"/> and back to <see cref="int"/> and sums it, which is the shape of GS5's person total: a cast either side of a projection, twice over, and an aggregate at the end. The projection arm uses a selector with the same body as the cast's, so that what a cast pays over what a conversion needs can be read from the difference. The type filter tests for an interface, as GS5's do, over people alternating with text. The aggregate arms are shaped like GS5's rate sum, a cast of projected values under an aggregate, which reads every element of what it is over after every change, so that what reading a cast or a type filter costs once it has changed is priced
 /// </remarks>
 [MemoryDiagnoser]
 public class CastCostBenchmarks
@@ -13,6 +13,7 @@ public class CastCostBenchmarks
 
     BenchmarkPerson added = null!;
     int cursor;
+    BenchmarkPerson displaced = null!;
     ObservableRangeCollection<object> mixed = null!;
     IObservableDictionaryQuery<int, object> mixedByIndexQuery = null!;
     IObservableCollectionQuery<object> mixedQuery = null!;
@@ -21,6 +22,18 @@ public class CastCostBenchmarks
     ObservableRangeCollection<BenchmarkPerson> source = null!;
     IObservableCollectionQuery<BenchmarkPerson> sourceQuery = null!;
     IDisposable standing = null!;
+
+    [Benchmark]
+    public void AggregateOverACastAfterAValueChange()
+    {
+        var person = source[cursor];
+        cursor = cursor + 1 == elementCount ? 0 : cursor + 1;
+        person.Rank ^= 2;
+    }
+
+    [Benchmark]
+    public void AggregateOverATypeFilterAfterAReplacement() =>
+        mixed[0] = mixed[0] == added ? displaced : added;
 
     [Benchmark]
     public void CastAfterAnAdditionAndARemoval()
@@ -123,6 +136,33 @@ public class CastCostBenchmarks
         peopleByIndexQuery = observer.ObserveReadOnlyDictionary(new ObservableDictionary<int, BenchmarkPerson>(byIndex));
         mixedByIndexQuery = observer.ObserveReadOnlyDictionary(new ObservableDictionary<int, object>(alternatingByIndex));
         added = new BenchmarkPerson("Added", 0);
+        displaced = people[0];
+    }
+
+    [GlobalSetup(Target = nameof(AggregateOverACastAfterAValueChange))]
+    public void SetUpAggregateOverACast()
+    {
+        SetUpSource();
+        var ranks = sourceQuery.ObserveSelect(person => (object)person.Rank);
+        var cast = ranks.ObserveCast<int>();
+        var total = cast.ObserveAggregate(() => 0L, (sum, rank) => sum + rank, sum => sum);
+        total.Disposed += (sender, e) =>
+        {
+            cast.Dispose();
+            ranks.Dispose();
+        };
+        standing = total;
+    }
+
+    [GlobalSetup(Target = nameof(AggregateOverATypeFilterAfterAReplacement))]
+    public void SetUpAggregateOverATypeFilter()
+    {
+        SetUpSource();
+        var people = mixedQuery.ObserveOfType<BenchmarkPerson>();
+        var total = people.ObserveAggregate(() => 0L, (sum, person) => sum + person.Rank, sum => sum);
+        total.Disposed += (sender, e) =>
+            people.Dispose();
+        standing = total;
     }
 
     [GlobalSetup(Targets = [nameof(CastBuiltAndDisposed), nameof(ChainBuiltAndDisposed), nameof(DictionaryCastBuiltAndDisposed), nameof(DictionaryOfTypeBuiltAndDisposed), nameof(OfTypeBuiltAndDisposed), nameof(ProjectionBuiltAndDisposed)])]

@@ -9,6 +9,36 @@ public class OfTypeQueries
     sealed class Distinguished(SubscriptionLog log) :
         Recorded(log);
 
+    static int[] Enumerate(IEnumerable<int> query)
+    {
+        var read = new List<int>();
+        foreach (var element in query)
+            read.Add(element);
+        return [.. read];
+    }
+
+    static int[] ReadAcross(IEnumerable<int> query, Action change)
+    {
+        var read = new List<int>();
+        using (var enumerator = query.GetEnumerator())
+        {
+            Assert.IsTrue(enumerator.MoveNext());
+            read.Add(enumerator.Current);
+            change();
+            while (enumerator.MoveNext())
+                read.Add(enumerator.Current);
+        }
+        return [.. read];
+    }
+
+    static int[] ReadRest(IEnumerator<int> enumerator)
+    {
+        var read = new List<int>();
+        while (enumerator.MoveNext())
+            read.Add(enumerator.Current);
+        return [.. read];
+    }
+
     static string Describe(Exception? fault) =>
         fault switch
         {
@@ -210,5 +240,97 @@ public class OfTypeQueries
         sourceQuery.Dispose();
         Assert.AreEqual(0, collectionObserver.CachedObservableQueries);
         Assert.AreEqual(0, collectionObserver.ExpressionObserver.CachedObservableExpressions);
+    }
+
+    [TestMethod]
+    public void AnEnumerationUnderWayReadsTheResultsAsTheyWereWhenItBeganThroughEveryKindOfChange()
+    {
+        var collectionObserver = new CollectionObserver();
+        var source = new ObservableRangeCollection<object?>([1, "two", 3, 4]);
+        var sourceQuery = collectionObserver.ObserveReadOnlyList(source);
+        var ofType = sourceQuery.ObserveOfType<int>();
+
+        void assertAcross(string step, Action change, int[] before, int[] after)
+        {
+            CollectionAssert.AreEqual(before, ReadAcross(ofType, change), $"{step}: read across");
+            CollectionAssert.AreEqual(after, Enumerate(ofType), $"{step}: enumerated after");
+            CollectionAssert.AreEqual(after, Enumerable.Range(0, ofType.Count).Select(i => ofType[i]).ToArray(), $"{step}: indexed after");
+        }
+
+        assertAcross("added", () => source.Add(5), [1, 3, 4], [1, 3, 4, 5]);
+        assertAcross("added one of another type", () => source.Add("six"), [1, 3, 4, 5], [1, 3, 4, 5]);
+        assertAcross("removed", () => source.RemoveAt(0), [1, 3, 4, 5], [3, 4, 5]);
+        assertAcross("replaced", () => source[1] = 6, [3, 4, 5], [6, 4, 5]);
+        assertAcross("replaced one of another type", () => source[0] = 7, [6, 4, 5], [7, 6, 4, 5]);
+        assertAcross("moved", () => source.Move(0, 3), [7, 6, 4, 5], [6, 4, 5, 7]);
+        assertAcross("reset", () => source.Reset([8, "nine", 10]), [6, 4, 5, 7], [8, 10]);
+        assertAcross("cleared", source.Clear, [8, 10], []);
+        ofType.Dispose();
+        sourceQuery.Dispose();
+    }
+
+    [TestMethod]
+    public void EnumerationsKeepWhatTheyBeganWithWhetherOrNotTheyAreDisposed()
+    {
+        var collectionObserver = new CollectionObserver();
+        var source = new ObservableRangeCollection<object?>([1, "a", 2]);
+        var sourceQuery = collectionObserver.ObserveReadOnlyList(source);
+        var ofType = sourceQuery.ObserveOfType<int>();
+        CollectionAssert.AreEqual(new[] { 1, 2 }, Enumerate(ofType));
+        source.Add(3);
+        CollectionAssert.AreEqual(new[] { 1, 2, 3 }, Enumerate(ofType), "after an enumeration which has ended");
+        var undisposed = ofType.GetEnumerator();
+        Assert.IsTrue(undisposed.MoveNext());
+        Assert.AreEqual(1, undisposed.Current);
+        source.Add(4);
+        var overlapping = ofType.GetEnumerator();
+        Assert.IsTrue(overlapping.MoveNext());
+        Assert.AreEqual(1, overlapping.Current);
+        source.RemoveAt(0);
+        source[0] = 5;
+        CollectionAssert.AreEqual(new[] { 5, 2, 3, 4 }, Enumerate(ofType), "while two enumerations are under way");
+        CollectionAssert.AreEqual(new[] { 2, 3, 4 }, ReadRest(overlapping), "the overlapping enumeration");
+        overlapping.Dispose();
+        source.Add(6);
+        CollectionAssert.AreEqual(new[] { 5, 2, 3, 4, 6 }, Enumerate(ofType), "after the overlapping enumeration was disposed");
+        CollectionAssert.AreEqual(new[] { 2, 3 }, ReadRest(undisposed), "the enumeration never disposed");
+        source.Add(7);
+        CollectionAssert.AreEqual(new[] { 5, 2, 3, 4, 6, 7 }, Enumerate(ofType), "after the enumeration never disposed was read to its end");
+        ofType.Dispose();
+        sourceQuery.Dispose();
+    }
+
+    [TestMethod]
+    public void AnAggregateOverATypeFilterFollowsEveryKindOfChange()
+    {
+        var collectionObserver = new CollectionObserver();
+        var source = new ObservableRangeCollection<object?>([1, "two", 3]);
+        var sourceQuery = collectionObserver.ObserveReadOnlyList(source);
+        var ofType = sourceQuery.ObserveOfType<int>();
+        var sum = ofType.ObserveAggregate(() => 0, (accumulate, element) => accumulate + element, accumulate => accumulate);
+
+        void assertSum(string step, int expected)
+        {
+            Assert.IsNull(sum.Evaluation.Fault, step);
+            Assert.AreEqual(expected, sum.Evaluation.Result, step);
+            Assert.AreEqual(expected, Enumerate(ofType).Sum(), $"{step}: enumerated");
+        }
+
+        assertSum("initial", 4);
+        source.Add(4);
+        assertSum("added", 8);
+        source.RemoveAt(0);
+        assertSum("removed", 7);
+        source[0] = 10;
+        assertSum("replaced one of another type", 17);
+        source.Move(0, 2);
+        assertSum("moved", 17);
+        source.Reset([5, "six", 6]);
+        assertSum("reset", 11);
+        source.Clear();
+        assertSum("cleared", 0);
+        sum.Dispose();
+        ofType.Dispose();
+        sourceQuery.Dispose();
     }
 }
