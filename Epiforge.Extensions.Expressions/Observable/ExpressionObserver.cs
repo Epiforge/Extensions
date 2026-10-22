@@ -1159,14 +1159,14 @@ public class ExpressionObserver :
             var reached = Expression.Parameter(typeof(bool[]), "reached");
             var links = Expression.Parameter(typeof(object[]), "links");
             var held = Expression.Parameter(typeof(object[]), "held");
-            var rewriter = new FixedSubexpressionRewriter(values, reached, links, held, plan.DeferredGroups, plan.Links, plan.Held);
+            var rewriter = new FixedSubexpressionRewriter(values, reached, links, held, plan.DeferredGroups, plan.Links, plan.Held, plan.Recaptured);
             var body = rewriter.Visit(observed.Body)!;
             var fixedSubexpressions = rewriter.FixedSubexpressions;
             var subscriptions = plan.Subscriptions;
             var sites = new DirectSubscriptionSite[subscriptions.Count];
             for (var i = 0; i < sites.Length; ++i)
                 sites[i] = Site(subscriptions[i], observed, fixedSubexpressions, plan.Links);
-            evaluator = new DirectEvaluator(lambdaExpression, CompileEvaluation<TArgument, TResult>(body, observed.Parameters[0], values, reached, links, held), [.. fixedSubexpressions], sites, plan.DeferredGroups.Count, plan.Links.Count, plan.Held);
+            evaluator = new DirectEvaluator(lambdaExpression, CompileEvaluation<TArgument, TResult>(body, observed.Parameters[0], values, reached, links, held), [.. fixedSubexpressions], sites, plan.DeferredGroups.Count, plan.Links.Count, plan.Held, plan.Recaptured.Count);
         }
         compiled.AddOrUpdate(lambdaExpression, evaluator);
         return evaluator;

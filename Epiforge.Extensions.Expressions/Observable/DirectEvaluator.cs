@@ -13,13 +13,13 @@ sealed class DirectEvaluator
         LinkSites = [];
     }
 
-    internal DirectEvaluator(LambdaExpression lambdaExpression, Delegate evaluate, Expression[] fixedSubexpressions, DirectSubscriptionSite[] sites, int deferredGroupCount, int linkCount, IReadOnlyList<(Expression Expression, bool Disposed)> held)
+    internal DirectEvaluator(LambdaExpression lambdaExpression, Delegate evaluate, Expression[] fixedSubexpressions, DirectSubscriptionSite[] sites, int deferredGroupCount, int linkCount, IReadOnlyList<(Expression Expression, bool Disposed)> held, int recapturedCount)
     {
         DeferredGroupCount = deferredGroupCount;
         Evaluate = evaluate;
         LambdaExpression = lambdaExpression;
         FixedSubexpressions = fixedSubexpressions;
-        HeldCount = held.Count;
+        HeldCount = held.Count + 2 * recapturedCount;
         var disposedHeldSlots = new List<int>();
         for (var i = 0; i < held.Count; ++i)
             if (held[i].Disposed)

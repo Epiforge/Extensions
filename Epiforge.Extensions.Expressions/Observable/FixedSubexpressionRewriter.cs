@@ -31,7 +31,7 @@ sealed class FixedSubexpressionRewriter :
     static readonly MethodInfo unwrapMethod = typeof(DirectObservableExpression).GetMethod(nameof(DirectObservableExpression.Unwrap), BindingFlags.NonPublic | BindingFlags.Static)!;
     static readonly ConstantExpression unresolved = Expression.Constant(DirectObservableExpression.Unresolved, typeof(object));
 
-    internal FixedSubexpressionRewriter(ParameterExpression values, ParameterExpression reached, ParameterExpression links, ParameterExpression held, IReadOnlyList<Expression> deferredGroups, IReadOnlyList<Expression> linkTargets, IReadOnlyList<(Expression Expression, bool Disposed)> heldSubexpressions)
+    internal FixedSubexpressionRewriter(ParameterExpression values, ParameterExpression reached, ParameterExpression links, ParameterExpression held, IReadOnlyList<Expression> deferredGroups, IReadOnlyList<Expression> linkTargets, IReadOnlyList<(Expression Expression, bool Disposed)> heldSubexpressions, IReadOnlyList<MemberExpression> recaptured)
     {
         this.deferredGroups = deferredGroups;
         this.held = held;
@@ -39,6 +39,7 @@ sealed class FixedSubexpressionRewriter :
         this.links = links;
         this.linkTargets = linkTargets;
         this.reached = reached;
+        this.recaptured = recaptured;
         this.values = values;
     }
 
@@ -49,6 +50,7 @@ sealed class FixedSubexpressionRewriter :
     readonly ParameterExpression links;
     readonly IReadOnlyList<Expression> linkTargets;
     readonly ParameterExpression reached;
+    readonly IReadOnlyList<MemberExpression> recaptured;
     readonly ParameterExpression values;
     int tries;
     Expression? wrapping;
@@ -98,6 +100,58 @@ sealed class FixedSubexpressionRewriter :
         );
         return Expression.Convert(Expression.Call(unwrapMethod, Expression.Condition(Expression.ReferenceEqual(Expression.ArrayIndex(held, index), unresolved), resolving, Expression.ArrayIndex(held, index), typeof(object))), type);
     }
+
+    /// <summary>
+    /// Yields a read held for as long as what it is read through is the same object, which keeps that object in the slot after the read's own and reads again whenever an evaluation reaches it through another
+    /// </summary>
+    /// <remarks>
+    /// The slots follow those of the held subexpressions, two to a read, both starting unresolved, which no object an evaluation reaches can be. A fault is kept as a held subexpression's is, and thrown again for as long as the read is reached through the object it was thrown reading
+    /// </remarks>
+    Expression Recapture(int read, MemberExpression memberExpression)
+    {
+        ++tries;
+        var valueIndex = Expression.Constant(heldSubexpressions.Count + 2 * read);
+        var targetIndex = Expression.Constant(heldSubexpressions.Count + 2 * read + 1);
+        var target = Expression.Variable(memberExpression.Expression!.Type, "target");
+        var fault = Expression.Parameter(typeof(Exception), "fault");
+        var reading = Expression.Block
+        (
+            typeof(void),
+            Expression.Assign(Expression.ArrayAccess(held, targetIndex), Expression.Convert(target, typeof(object))),
+            Expression.TryCatch
+            (
+                Expression.Block(typeof(void), Expression.Assign(Expression.ArrayAccess(held, valueIndex), Expression.Convert(memberExpression.Update(target), typeof(object)))),
+                Expression.Catch(fault, Expression.Block(typeof(void), Expression.Assign(Expression.ArrayAccess(held, valueIndex), Expression.New(slotFaultConstructor, fault)), Expression.Rethrow()))
+            )
+        );
+        return Expression.Block
+        (
+            memberExpression.Type,
+            [target],
+            Expression.Assign(target, Visit(memberExpression.Expression)!),
+            Expression.IfThen(Expression.OrElse(Expression.ReferenceEqual(Expression.ArrayIndex(held, valueIndex), unresolved), Expression.ReferenceNotEqual(Expression.ArrayIndex(held, targetIndex), Expression.Convert(target, typeof(object)))), reading),
+            Expression.Convert(Expression.Call(unwrapMethod, Expression.ArrayIndex(held, valueIndex)), memberExpression.Type)
+        );
+    }
+
+    int RecapturedOf(MemberExpression memberExpression)
+    {
+        for (int i = 0, ii = recaptured.Count; i < ii; ++i)
+            if (ExpressionEqualityComparer.Default.Equals(recaptured[i], memberExpression))
+                return i;
+        return -1;
+    }
+
+    /// <summary>
+    /// Yields a call to a property's get method as the read of that property the analyzer rewrote it into, so that a recaptured read is found however the caller wrote it
+    /// </summary>
+    static MemberExpression? AsRead(Expression node) =>
+        node switch
+        {
+            MemberExpression memberExpression => memberExpression,
+            MethodCallExpression { Object: { } target, Arguments.Count: 0 } methodCallExpression when ExpressionObserverOptions.PropertyGetMethodToProperty.GetOrAdd(methodCallExpression.Method, ExpressionObserverOptions.GetPropertyFromGetMethod) is { } property => Expression.MakeMemberAccess(target, property),
+            _ => null
+        };
 
     /// <summary>
     /// Whether a property read on an instance of a type is made on the instance itself rather than on a copy of it, which primitives are exempt from because nothing can change them
@@ -158,6 +212,7 @@ sealed class FixedSubexpressionRewriter :
         }
         var visited = node switch
         {
+            MemberExpression or MethodCallExpression when recaptured.Count > 0 && AsRead(node) is { } read && RecapturedOf(read) is var recapturedRead && recapturedRead >= 0 => Recapture(recapturedRead, read),
             MemberExpression memberExpression when DirectSubscriptionAnalyzer.IsFixed(memberExpression) => Substitute(memberExpression),
             UnaryExpression { NodeType: ExpressionType.Quote } => node,
             _ => base.Visit(node)!

@@ -92,7 +92,7 @@ public class DirectSubscriptionExecution
     }
 
     [TestMethod]
-    public void AnIgnoredPropertyChangeNotificationThroughAChangeableTargetBuildsTheGraph()
+    public void AnIgnoredPropertyChangeNotificationThroughAChangeableTargetTakesTheFastPath()
     {
         var options = new ExpressionObserverOptions();
         options.AddIgnoredPropertyChangeNotification(typeof(Recorded).GetProperty(nameof(Recorded.Rank))!);
@@ -102,7 +102,7 @@ public class DirectSubscriptionExecution
         using (var expr = observer.Observe(s => s.Next!.Rank * 2, subject))
         {
             Assert.AreEqual(8, expr.Evaluation.Result);
-            Assert.AreNotEqual(0, observer.CachedObservableExpressions, "the analyzer admitted a read of an ignored property through something which can change");
+            Assert.AreEqual(0, observer.CachedObservableExpressions, "the analyzer refused a read of an ignored property through something which can change");
         }
         Assert.AreEqual(0, observer.CachedObservableExpressions);
         Assert.AreEqual(0, log.Outstanding);

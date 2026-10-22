@@ -4,7 +4,7 @@
 /// What each mechanism does with a property whose change notifications the observer has been told to ignore
 /// </summary>
 /// <remarks>
-/// The graph's node for such a property subscribes to nothing, so it reads the property when it is first evaluated and keeps what it read for the life of the observation, however often the property changes afterwards. The analyzer refused every expression reading one, because a fast path with no value of its own would have read it afresh on every evaluation and reported a value the graph had stopped reporting. It is now admitted where nothing it is read through can change, and held: read once, kept, and no subscription planned for it, which is what the graph attaches
+/// The graph's node for such a property subscribes to nothing, so it reads the property when it is first evaluated and keeps what it read for the life of the observation, however often the property changes afterwards. The analyzer refused every expression reading one, because a fast path with no value of its own would have read it afresh on every evaluation and reported a value the graph had stopped reporting. It is now admitted where nothing it is read through can change, and held: read once, kept, and no subscription planned for it, which is what the graph attaches. Where what it is read through can change, it is admitted too, held for as long as that stays the same object and read again when it moves, as <see cref="IgnoredNotificationAgreement"/> pins
 /// </remarks>
 [TestClass]
 public class IgnoredNotifications
@@ -49,10 +49,10 @@ public class IgnoredNotifications
     }
 
     /// <summary>
-    /// A read through something which can change, which the graph re-reads when that something moves and keeps between those moves, and which the fast path therefore still refuses
+    /// A read through something which can change, which the graph re-reads when that something moves and keeps between those moves, and which the fast path holds for as long as that something is the same object
     /// </summary>
     [TestMethod]
-    public void AnIgnoredPropertyIsRefusedWhenWhatItIsReadThroughCanChange()
+    public void AnIgnoredPropertyIsAdmittedWhenWhatItIsReadThroughCanChange()
     {
         var log = new SubscriptionLog();
         var subject = new Recorded(log) { Rank = 1, Next = new Recorded(log) { Rank = 1 } };
@@ -60,7 +60,7 @@ public class IgnoredNotifications
         using (var expression = observer.Observe(s => s.Next!.Rank > 0, subject))
         {
             Assert.IsTrue(expression.Evaluation.Result);
-            Assert.AreNotEqual(0, observer.CachedObservableExpressions, "the analyzer admitted a read of an ignored property through something which can change");
+            Assert.AreEqual(0, observer.CachedObservableExpressions, "the analyzer refused a read of an ignored property through something which can change");
         }
         Assert.AreEqual(0, log.Outstanding);
     }

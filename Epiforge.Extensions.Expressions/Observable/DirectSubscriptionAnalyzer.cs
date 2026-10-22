@@ -75,6 +75,7 @@ public sealed class DirectSubscriptionAnalyzer
         internal readonly List<Expression> DeferredGroups = [];
         internal readonly List<(Expression Expression, bool Disposed)> Held = [];
         internal readonly List<Expression> Links = [];
+        internal readonly List<MemberExpression> Recaptured = [];
         internal readonly List<DirectSubscription> Subscriptions = [];
 
         internal int CurrentGroup;
@@ -94,6 +95,17 @@ public sealed class DirectSubscriptionAnalyzer
                 if (ExpressionEqualityComparer.Default.Equals(Held[i].Expression, expression))
                     return;
             Held.Add((expression, disposed));
+        }
+
+        /// <summary>
+        /// Records a read the observation is to hold for as long as what it is read through stays the same object and to read again when that moves, sameness being expression equality as it is for a held subexpression
+        /// </summary>
+        internal void AddRecaptured(MemberExpression memberExpression)
+        {
+            for (int i = 0, ii = Recaptured.Count; i < ii; ++i)
+                if (ExpressionEqualityComparer.Default.Equals(Recaptured[i], memberExpression))
+                    return;
+            Recaptured.Add(memberExpression);
         }
 
         internal void AddLink(Expression target)
@@ -294,11 +306,15 @@ public sealed class DirectSubscriptionAnalyzer
     /// <remarks>
     /// A property whose change notifications are ignored is the same case reached by another road. The graph's node for one subscribes to nothing, so it reads the property when it is first evaluated and keeps what it read for the life of the observation, however often the property changes afterwards. Reading it afresh on every evaluation is what the fast path would otherwise do and is what the refusal of these existed to prevent; holding it reads it once, which is what the graph does
     /// </remarks>
+    /// <remarks>
+    /// So is a property read on something which cannot change and whose type cannot notify. The graph's node for it attaches to nothing, the value it is read on being of a sealed type implementing none of the notification interfaces, and what it is read on never announces, so it is read once and kept
+    /// </remarks>
     bool IsInvariant(Expression expression) =>
         IsFixed(expression) || expression switch
         {
             MethodCallExpression methodCallExpression => (methodCallExpression.Object is not { } target || IsInvariant(target)) && AreInvariant(methodCallExpression.Arguments),
             MemberExpression { Member: PropertyInfo property } memberExpression when isIgnoredPropertyChangeNotification(property) => memberExpression.Expression is not { } target || IsInvariant(target),
+            MemberExpression { Member: PropertyInfo, Expression: { } target } when CannotNotify(target.Type) => IsInvariant(target),
             NewExpression newExpression => AreInvariant(newExpression.Arguments),
             UnaryExpression unaryExpression when unaryExpression.Method is null && unaryExpression.NodeType is ExpressionType.Convert or ExpressionType.ConvertChecked => IsInvariant(unaryExpression.Operand),
             _ => false
@@ -485,7 +501,7 @@ public sealed class DirectSubscriptionAnalyzer
     /// Determines whether an expression reading a member can be observed by subscribing directly to its change sources, and when it can, plans the subscription that read takes
     /// </summary>
     /// <remarks>
-    /// A read of a property whose change notifications are ignored is admitted when nothing it is read through can change, and is then held rather than planned: the observation reads it when an evaluation first reaches it and keeps what it read, which is what the graph's node for it does, and it plans no subscription of its own, which is what the graph's node attaches. A read through something which can change stays refused, because there the graph re-reads the property when that something moves and keeps its value between those moves, where the fast path would read it afresh whenever anything at all announced
+    /// A read of a property whose change notifications are ignored is treated as a static property is, as something nothing announces a change to, and so is captured and kept rather than followed. Where nothing it is read through can change, it is held: the observation reads it when an evaluation first reaches it and keeps what it read, which is what the graph's node for it does, and it plans no subscription of its own, which is what the graph's node attaches. Where what it is read through can change, it is held for as long as that is the same object and read again when an evaluation reaches it through another, the subscriptions of what it is read through being planned as they would be for any read. The graph re-reads it when its node for what it is read through announces, which can be at a different moment, but a moment of capture is not promised by either mechanism for a value nothing announces, and the two never differ about a value which announced. A read through a value type is refused, because a value read again is never the same object
     /// </remarks>
     DirectSubscriptionAnalysis AnalyzeMember(MemberExpression memberExpression, Planner? planner)
     {
@@ -494,7 +510,12 @@ public sealed class DirectSubscriptionAnalyzer
         if (memberExpression.Member is PropertyInfo ignoredProperty && isIgnoredPropertyChangeNotification(ignoredProperty))
         {
             if (!IsInvariant(memberExpression))
-                return new(memberExpression, DirectSubscriptionIneligibility.IgnoredChangeNotification);
+            {
+                if (memberExpression.Expression!.Type.IsValueType)
+                    return new(memberExpression, DirectSubscriptionIneligibility.IgnoredChangeNotification);
+                planner?.AddRecaptured(memberExpression);
+                return AnalyzeNode(memberExpression.Expression, planner);
+            }
             planner?.AddHeld(memberExpression, false);
             return memberExpression.Expression is { } ignoredTarget ? AnalyzeNode(ignoredTarget, planner) : DirectSubscriptionAnalysis.Eligible;
         }
@@ -698,7 +719,7 @@ public sealed class DirectSubscriptionAnalyzer
         ArgumentNullException.ThrowIfNull(expression);
         var planner = new Planner();
         var analysis = Resolved(expression, planner);
-        return analysis.IsEligible ? new(analysis, planner.Subscriptions.ToArray(), planner.DeferredGroups.ToArray(), planner.Links.ToArray(), planner.Held.ToArray()) : new(analysis, null, null, null, null);
+        return analysis.IsEligible ? new(analysis, planner.Subscriptions.ToArray(), planner.DeferredGroups.ToArray(), planner.Links.ToArray(), planner.Held.ToArray(), planner.Recaptured.ToArray()) : new(analysis, null, null, null, null, null);
     }
 
     DirectSubscriptionAnalysis Resolved(Expression expression, Planner planner)

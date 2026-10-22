@@ -8,18 +8,20 @@
 /// </remarks>
 public readonly record struct DirectSubscriptionPlan
 {
-    internal DirectSubscriptionPlan(DirectSubscriptionAnalysis analysis, IReadOnlyList<DirectSubscription>? subscriptions, IReadOnlyList<Expression>? deferredGroups, IReadOnlyList<Expression>? links, IReadOnlyList<(Expression Expression, bool Disposed)>? held)
+    internal DirectSubscriptionPlan(DirectSubscriptionAnalysis analysis, IReadOnlyList<DirectSubscription>? subscriptions, IReadOnlyList<Expression>? deferredGroups, IReadOnlyList<Expression>? links, IReadOnlyList<(Expression Expression, bool Disposed)>? held, IReadOnlyList<MemberExpression>? recaptured)
     {
         Analysis = analysis;
         this.deferredGroups = deferredGroups;
         this.held = held;
         this.links = links;
+        this.recaptured = recaptured;
         this.subscriptions = subscriptions;
     }
 
     readonly IReadOnlyList<Expression>? deferredGroups;
     readonly IReadOnlyList<(Expression Expression, bool Disposed)>? held;
     readonly IReadOnlyList<Expression>? links;
+    readonly IReadOnlyList<MemberExpression>? recaptured;
     readonly IReadOnlyList<DirectSubscription>? subscriptions;
 
     /// <summary>
@@ -27,6 +29,12 @@ public readonly record struct DirectSubscriptionPlan
     /// </summary>
     internal IReadOnlyList<(Expression Expression, bool Disposed)> Held =>
         held ?? [];
+
+    /// <summary>
+    /// Gets the reads the observation holds for as long as what each is read through stays the same object, reading each again when that moves
+    /// </summary>
+    internal IReadOnlyList<MemberExpression> Recaptured =>
+        recaptured ?? [];
 
     /// <summary>
     /// Gets whether the expression can be observed by subscribing directly to its change sources, and when it cannot, which part of it is responsible
