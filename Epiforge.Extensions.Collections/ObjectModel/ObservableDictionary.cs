@@ -700,11 +700,11 @@ public class ObservableDictionary<TKey, TValue> :
         }
         foreach (var keyValuePair in newKeyValuePairs)
             gd.Add(keyValuePair.Key, keyValuePair.Value);
+        if (countChanging)
+            NotifyCountChanged();
         NotifyIndexerChanged();
         if (IsChangeObserved)
             OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Replace, newKeyValuePairs, removingKeyValuePairs));
-        if (countChanging)
-            NotifyCountChanged();
         return [..removedKeys];
     }
 
@@ -717,9 +717,9 @@ public class ObservableDictionary<TKey, TValue> :
         if (countChanging)
             NotifyCountChanging();
         gd = comparer is null ? [] : new Dictionary<TKey, TValue>(comparer);
-        CastAndNotifyReset();
         if (countChanging)
             NotifyCountChanged();
+        CastAndNotifyReset();
     }
 
     /// <summary>
@@ -733,9 +733,9 @@ public class ObservableDictionary<TKey, TValue> :
         if (countChanging)
             NotifyCountChanging();
         gd = comparer is null ? new Dictionary<TKey, TValue>(dictionary) : new Dictionary<TKey, TValue>(dictionary, comparer);
-        CastAndNotifyReset();
         if (countChanging)
             NotifyCountChanged();
+        CastAndNotifyReset();
     }
 
     /// <summary>

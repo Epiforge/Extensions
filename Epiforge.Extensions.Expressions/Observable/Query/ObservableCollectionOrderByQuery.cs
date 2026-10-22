@@ -42,8 +42,16 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
     readonly NullableKeyDictionary<TElement, ObservableCollectionOrderingComparer<TElement>.Entry> entries;
     readonly FaultList faults = new();
     bool faultsChanged;
+    /// <summary>
+    /// Whether this query is following a change of its source, during which it delivers a notification for each step it takes, so that a change its subscribers make to the source in the meantime waits until this one has been followed
+    /// </summary>
+    bool followingSourceChange;
     PropertyChangedEventHandler? keyEvaluationChangedHandler;
     readonly Expression<Func<TElement, IComparable>>[] keySelectors;
+    /// <summary>
+    /// The changes the source announced while this query was following another, in the order they were announced, made with the first of them
+    /// </summary>
+    Queue<NotifyCollectionChangedEventArgs>? pendingSourceChanges;
     readonly PrefixWeightedSequence<ObservableCollectionOrderingComparer<TElement>.Entry> positions;
     bool released;
     readonly ObservableRangeCollection<TElement> results;
@@ -74,7 +82,7 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
         }
     }
 
-    public override int Count
+    private protected override int CurrentCount
     {
         get
         {
@@ -413,24 +421,34 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
         return rankQuery.AsScoped();
     }
 
-    void IObservableQueryDependent.OnDependencyCollectionChanged(ObservableQuerySubscription subscription, NotifyCollectionChangedEventArgs e)
+    /// <summary>
+    /// Follows a change of the source one distinct element at a time, delivering the notification of each step before taking the next, so that a subscriber finds this query as each notification leaves it
+    /// </summary>
+    void FollowSourceChange(NotifyCollectionChangedEventArgs e)
     {
-        using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
-        lock (access)
+        if (e.Action is NotifyCollectionChangedAction.Reset)
         {
-            if (released)
-                return;
-            if (e.Action is NotifyCollectionChangedAction.Reset)
+            lock (access)
             {
+                if (released)
+                    return;
                 ReleaseEntriesWithAccess();
                 var ordered = new List<TElement>();
                 PlaceAllWithAccess(ObserveSourceWithAccess(), ordered);
                 results.Reset(ordered);
+                TakeFaultWithAccess();
             }
-            else if (e.Action is not NotifyCollectionChangedAction.Move)
+            return;
+        }
+        if (e.Action is not NotifyCollectionChangedAction.Move)
+        {
+            if (e.OldItems is { } oldItems && oldItems.Count > 0)
             {
-                if (e.OldItems is { } oldItems && oldItems.Count > 0)
+                var removingByElement = false;
+                lock (access)
                 {
+                    if (released)
+                        return;
                     if (oldItems.Count == results.Count + withheldOccurrences)
                     {
                         ReleaseEntriesWithAccess();
@@ -439,11 +457,28 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
                     else if (oldItems.Count == 1)
                         RemoveElementOccurrencesWithAccess((TElement)oldItems[0]!, 1);
                     else
-                        foreach (var elements in oldItems.Cast<TElement>().GroupBy(element => element))
-                            RemoveElementOccurrencesWithAccess(elements.Key, elements.Count());
+                        removingByElement = true;
                 }
-                if (e.NewItems is { } newItems && newItems.Count > 0)
+                RaiseNotificationsDeferredSoFar();
+                if (removingByElement)
+                    foreach (var elements in oldItems.Cast<TElement>().GroupBy(element => element))
+                    {
+                        lock (access)
+                        {
+                            if (released)
+                                return;
+                            RemoveElementOccurrencesWithAccess(elements.Key, elements.Count());
+                        }
+                        RaiseNotificationsDeferredSoFar();
+                    }
+            }
+            if (e.NewItems is { } newItems && newItems.Count > 0)
+            {
+                var insertingByElement = false;
+                lock (access)
                 {
+                    if (released)
+                        return;
                     if (results.Count == 0)
                     {
                         var firstOccurrences = new List<ObservableCollectionOrderingComparer<TElement>.Entry>();
@@ -456,11 +491,45 @@ sealed class ObservableCollectionOrderByQuery<TElement> :
                     else if (newItems.Count == 1)
                         InsertElementOccurrencesWithAccess((TElement)newItems[0]!, 1, null);
                     else
-                        foreach (var elements in newItems.Cast<TElement>().GroupBy(element => element))
-                            InsertElementOccurrencesWithAccess(elements.Key, elements.Count(), elements);
+                        insertingByElement = true;
                 }
+                RaiseNotificationsDeferredSoFar();
+                if (insertingByElement)
+                    foreach (var elements in newItems.Cast<TElement>().GroupBy(element => element))
+                    {
+                        lock (access)
+                        {
+                            if (released)
+                                return;
+                            InsertElementOccurrencesWithAccess(elements.Key, elements.Count(), elements);
+                        }
+                        RaiseNotificationsDeferredSoFar();
+                    }
             }
-            TakeFaultWithAccess();
+        }
+        lock (access)
+            if (!released)
+                TakeFaultWithAccess();
+    }
+
+    void IObservableQueryDependent.OnDependencyCollectionChanged(ObservableQuerySubscription subscription, NotifyCollectionChangedEventArgs e)
+    {
+        using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
+        if (followingSourceChange)
+        {
+            (pendingSourceChanges ??= new()).Enqueue(e);
+            return;
+        }
+        followingSourceChange = true;
+        try
+        {
+            FollowSourceChange(e);
+            while (pendingSourceChanges is { Count: > 0 } pending)
+                FollowSourceChange(pending.Dequeue());
+        }
+        finally
+        {
+            followingSourceChange = false;
         }
     }
 

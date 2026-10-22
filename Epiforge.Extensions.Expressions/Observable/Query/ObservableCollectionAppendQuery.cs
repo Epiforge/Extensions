@@ -10,7 +10,7 @@ sealed class ObservableCollectionAppendQuery<TElement>(CollectionObserver collec
     public override TElement this[int index] =>
         index == sequenceCount ? Appended : sequence[index];
 
-    public override int Count =>
+    private protected override int CurrentCount =>
         sequenceCount + 1;
 
     internal override bool ChangesThroughOthers =>

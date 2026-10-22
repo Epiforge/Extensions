@@ -157,9 +157,21 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
             });
     }
 
+    /// <summary>
+    /// Stands among the deferred notifications for an announcement of the count, made for a change of which nothing is told in any other way
+    /// </summary>
+    static readonly object countAnnouncement = new();
+    /// <summary>
+    /// The name a collection gives its indexer when it announces that the elements it holds have changed
+    /// </summary>
+    const string indexerPropertyName = "Item[]";
     static readonly PropertyChangedEventArgs operationFaultPropertyChangedEventArgs = new(nameof(OperationFault));
     static readonly PropertyChangingEventArgs operationFaultPropertyChangingEventArgs = new(nameof(OperationFault));
 
+    /// <summary>
+    /// The count this query last announced, from which it tells whether a change it announces changes the count, kept as -2 less it while the count is announced as changing, so that <see cref="Count"/> then reads it and a subscriber finds the count the change is leaving; -1 until the query is initialized, and for a query which does not announce its count
+    /// </summary>
+    int announcedCount = -1;
     Dictionary<IObservableCollectionQuery<TElement>, ObservableCollectionConcatQuery<TElement>>? cachedConcatQueries;
     Dictionary<Expression, ObservableQuery>? cachedSelectQueries;
     Dictionary<Expression, ObservableQuery>? cachedSelectManyQueries;
@@ -229,13 +241,19 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
         }
     }
 
-    public abstract int Count { get; }
+    public int Count =>
+        Volatile.Read(ref announcedCount) is < -1 and var changing ? -2 - changing : CurrentCount;
 
     int ICollection.Count =>
         Count;
 
     int IReadOnlyCollection<TElement>.Count =>
         Count;
+
+    /// <summary>
+    /// Gets the number of elements this query holds now
+    /// </summary>
+    private protected abstract int CurrentCount { get; }
 
     internal virtual bool HasEnumerationPenalty =>
         false;
@@ -381,27 +399,16 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     private protected void FollowChange(ref List<TElement>? copy, NotifyCollectionChangedEventArgs e, IEnumerable sequence)
     {
         var kept = copy!;
-        var previousCount = kept.Count;
-        int count;
         switch (e.Action)
         {
             case NotifyCollectionChangedAction.Add when e.NewItems is { } newItems && e.NewStartingIndex >= 0 && e.NewStartingIndex <= kept.Count:
-                count = previousCount + newItems.Count;
-                if (count != previousCount)
-                    OnPropertyChanging(countPropertyChangingEventArgs);
                 ListEdits.InsertAll(kept, e.NewStartingIndex, newItems);
                 break;
             case NotifyCollectionChangedAction.Remove when e.OldItems is { } oldItems && e.OldStartingIndex >= 0 && e.OldStartingIndex + oldItems.Count <= kept.Count:
-                count = previousCount - oldItems.Count;
-                if (count != previousCount)
-                    OnPropertyChanging(countPropertyChangingEventArgs);
                 kept.RemoveRange(e.OldStartingIndex, oldItems.Count);
                 break;
             case NotifyCollectionChangedAction.Replace when e.OldItems is { } replacedItems && e.NewItems is { } replacementItems && e.OldStartingIndex >= 0 && e.OldStartingIndex + replacedItems.Count <= kept.Count:
-                count = previousCount - replacedItems.Count + replacementItems.Count;
-                if (count != previousCount)
-                    OnPropertyChanging(countPropertyChangingEventArgs);
-                if (count == previousCount)
+                if (replacedItems.Count == replacementItems.Count)
                     for (var i = 0; i < replacementItems.Count; ++i)
                         kept[e.OldStartingIndex + i] = (TElement)replacementItems[i]!;
                 else
@@ -411,19 +418,12 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
                 }
                 break;
             case NotifyCollectionChangedAction.Move when e.OldItems is { } movedItems && e.OldStartingIndex >= 0 && e.NewStartingIndex >= 0 && e.OldStartingIndex + movedItems.Count <= kept.Count && e.NewStartingIndex + movedItems.Count <= kept.Count:
-                count = previousCount;
                 ListEdits.MoveRange(kept, e.OldStartingIndex, e.NewStartingIndex, movedItems.Count);
                 break;
             default:
-                var reread = sequence is IEnumerable<TElement> typedSequence ? new List<TElement>(typedSequence) : [.. sequence.Cast<TElement>()];
-                count = reread.Count;
-                if (count != previousCount)
-                    OnPropertyChanging(countPropertyChangingEventArgs);
-                copy = reread;
+                copy = sequence is IEnumerable<TElement> typedSequence ? new List<TElement>(typedSequence) : [.. sequence.Cast<TElement>()];
                 break;
         }
-        if (count != previousCount)
-            OnPropertyChanged(countPropertyChangedEventArgs);
         OnCollectionChanged(e);
     }
 
@@ -478,8 +478,23 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     int IList.IndexOf(object? value) =>
         value is TElement element ? IndexOf(element) : -1;
 
+    /// <summary>
+    /// Gets whether this query announces its count, which it does from the collection notifications it delivers, and so only where it delivers them for every change
+    /// </summary>
+    private protected virtual bool AnnouncesCount =>
+        true;
+
     private protected bool IsChangeObserved =>
         CollectionChanged is not null || HasDependents;
+
+    /// <summary>
+    /// Announces the count a change leaves where no notification describing the change will be delivered, because nothing is listening for one, so that a subscriber listening only for the count is still told
+    /// </summary>
+    private protected void AnnounceCountOfUnobservedChange()
+    {
+        if (!IsChangeObserved && !DeferNotification(countAnnouncement))
+            AnnounceCount();
+    }
 
     protected void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
     {
@@ -494,8 +509,59 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     {
     }
 
+    private protected override void OnInitialized()
+    {
+        if (AnnouncesCount)
+            announcedCount = CurrentCount;
+    }
+
+    protected override void OnPropertyChanged(PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(Count) || announcedCount == -1)
+            base.OnPropertyChanged(e);
+    }
+
+    private protected override void OnRaisingPropertyChanged(PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == indexerPropertyName)
+            AnnounceCount();
+    }
+
+    protected override void OnPropertyChanging(PropertyChangingEventArgs e)
+    {
+        if (e.PropertyName != nameof(Count) || announcedCount == -1)
+            base.OnPropertyChanging(e);
+    }
+
+    /// <summary>
+    /// Announces the count a change leaves, before the first of the notifications describing it, as a collection which changes in place does, so that the count is announced as changing while it still reads what it was and as changed once it reads what the change leaves
+    /// </summary>
+    /// <remarks>
+    /// The count announced is the one this query holds, which is the one the change leaves because a query delivers each notification while it is as that notification leaves it
+    /// </remarks>
+    void AnnounceCount()
+    {
+        var announced = announcedCount;
+        if (announced < 0)
+            return;
+        var count = CurrentCount;
+        if (count == announced)
+            return;
+        Volatile.Write(ref announcedCount, -2 - announced);
+        try
+        {
+            RaisePropertyChanging(countPropertyChangingEventArgs);
+        }
+        finally
+        {
+            Volatile.Write(ref announcedCount, count);
+        }
+        RaisePropertyChanged(countPropertyChangedEventArgs);
+    }
+
     void RaiseCollectionChanged(NotifyCollectionChangedEventArgs e)
     {
+        AnnounceCount();
         var eventArgs = Logger?.IsEnabled(LogLevel.Trace) ?? false ? e.ToStringForLogging() : null;
         Logger.WhenTracing()?.LogTrace(Collections.EventIds.Epiforge_Extensions_Collections_RaisingCollectionChanged, "Raising CollectionChanged: {EventArgs}", eventArgs);
         NotifyDependents(e);
@@ -505,7 +571,9 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
 
     private protected override void RaiseNotification(object eventArguments)
     {
-        if (eventArguments is NotifyCollectionChangedEventArgs collectionChangedEventArgs)
+        if (ReferenceEquals(eventArguments, countAnnouncement))
+            AnnounceCount();
+        else if (eventArguments is NotifyCollectionChangedEventArgs collectionChangedEventArgs)
             RaiseCollectionChanged(collectionChangedEventArgs);
         else
             base.RaiseNotification(eventArguments);

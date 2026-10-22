@@ -18,7 +18,7 @@ sealed class ObservableCollectionUsingSynchronizationCallbackEventuallyQuery<TEl
     public override TElement this[int index] =>
         elements![index];
 
-    public override int Count =>
+    private protected override int CurrentCount =>
         elements!.Count;
 
     protected override bool Dispose(bool disposing)

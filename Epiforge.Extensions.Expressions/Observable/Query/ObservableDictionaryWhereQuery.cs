@@ -6,9 +6,17 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue>(CollectionObserver col
 {
     readonly object access = new();
     IReadOnlyList<KeyValuePair<TKey, TValue>>? enumerationSnapshot;
+    /// <summary>
+    /// Whether this query is following a change of its source, during which it delivers a notification for each key it changes, so that a change its subscribers make to the source in the meantime waits until this one has been followed
+    /// </summary>
+    bool followingSourceChange;
     IReadOnlyList<TKey>? keysSnapshot;
     PropertyChangedEventHandler? observableExpressionPropertyChangedHandler;
     readonly Dictionary<TKey, (IObservableExpression<KeyValuePair<TKey, TValue>, bool> ObservableExpression, Exception? CommittedFault, bool IsIncluded)> observableExpressions = new(source.KeyComparer);
+    /// <summary>
+    /// The changes the source announced while this query was following another, in the order they were announced, made with the first of them
+    /// </summary>
+    Queue<NotifyDictionaryChangedEventArgs<TKey, TValue>>? pendingSourceChanges;
     bool released;
     readonly ObservableDictionary<TKey, TValue> result = new(source.KeyComparer);
     IReadOnlyList<TValue>? valuesSnapshot;
@@ -23,7 +31,7 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue>(CollectionObserver col
         }
     }
 
-    public override int Count
+    private protected override int CurrentCount
     {
         get
         {
@@ -255,13 +263,36 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue>(CollectionObserver col
     void SourceDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e)
     {
         using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
-        lock (access)
+        if (followingSourceChange)
         {
-            if (released)
-                return;
-            var expressionObserver = collectionObserver.ExpressionObserver;
-            if (e.Action is NotifyDictionaryChangedAction.Reset)
+            (pendingSourceChanges ??= new()).Enqueue(e);
+            return;
+        }
+        followingSourceChange = true;
+        try
+        {
+            FollowSourceChange(e);
+            while (pendingSourceChanges is { Count: > 0 } pending)
+                FollowSourceChange(pending.Dequeue());
+        }
+        finally
+        {
+            followingSourceChange = false;
+        }
+    }
+
+    /// <summary>
+    /// Follows a change of the source one key at a time, delivering the notification of each key before taking the next, so that a subscriber finds this query as each notification leaves it
+    /// </summary>
+    void FollowSourceChange(NotifyDictionaryChangedEventArgs<TKey, TValue> e)
+    {
+        var expressionObserver = collectionObserver.ExpressionObserver;
+        if (e.Action is NotifyDictionaryChangedAction.Reset)
+        {
+            lock (access)
             {
+                if (released)
+                    return;
                 foreach (var (observableExpression, _, _) in observableExpressions.Values)
                 {
                     observableExpression.PropertyChanged -= ObservableExpressionPropertyChangedHandler;
@@ -283,45 +314,57 @@ sealed class ObservableDictionaryWhereQuery<TKey, TValue>(CollectionObserver col
                 ResetResultWithAccess(newResult);
                 OperationFault = faultList.Fault;
             }
-            else
-            {
-                FaultList? faultList = null;
-                foreach (var keyValuePair in e.OldItems)
-                {
-                    var key = keyValuePair.Key;
-                    if (!observableExpressions.TryGetValue(key, out var committed))
-                        continue;
-                    if (committed.CommittedFault is not null)
-                    {
-                        faultList ??= new FaultList(OwnOperationFault);
-                        faultList.RemoveKey(key, source.KeyComparer);
-                    }
-                    else if (committed.IsIncluded)
-                        RemoveFromResultWithAccess(key);
-                    committed.ObservableExpression.PropertyChanged -= ObservableExpressionPropertyChangedHandler;
-                    committed.ObservableExpression.Dispose();
-                    observableExpressions.Remove(key);
-                }
-                foreach (var keyValuePair in e.NewItems)
-                {
-                    var key = keyValuePair.Key;
-                    var observableExpression = expressionObserver.ObserveWithoutOptimization(Predicate, keyValuePair);
-                    observableExpression.PropertyChanged += ObservableExpressionPropertyChangedHandler;
-                    var (fault, predicateResult) = observableExpression.Evaluation;
-                    var isIncluded = fault is null && predicateResult;
-                    if (fault is not null)
-                    {
-                        faultList ??= new FaultList(OwnOperationFault);
-                        faultList.Check(observableExpression);
-                    }
-                    else if (isIncluded)
-                        AddToResultWithAccess(key, keyValuePair.Value);
-                    observableExpressions.Add(key, (observableExpression, fault, isIncluded));
-                }
-                if (faultList is not null)
-                    OperationFault = faultList.Fault;
-            }
+            return;
         }
+        FaultList? keyFaultList = null;
+        foreach (var keyValuePair in e.OldItems)
+        {
+            lock (access)
+            {
+                if (released)
+                    return;
+                var key = keyValuePair.Key;
+                if (!observableExpressions.TryGetValue(key, out var committed))
+                    continue;
+                if (committed.CommittedFault is not null)
+                {
+                    keyFaultList ??= new FaultList(OwnOperationFault);
+                    keyFaultList.RemoveKey(key, source.KeyComparer);
+                }
+                else if (committed.IsIncluded)
+                    RemoveFromResultWithAccess(key);
+                committed.ObservableExpression.PropertyChanged -= ObservableExpressionPropertyChangedHandler;
+                committed.ObservableExpression.Dispose();
+                observableExpressions.Remove(key);
+            }
+            RaiseNotificationsDeferredSoFar();
+        }
+        foreach (var keyValuePair in e.NewItems)
+        {
+            lock (access)
+            {
+                if (released)
+                    return;
+                var key = keyValuePair.Key;
+                var observableExpression = expressionObserver.ObserveWithoutOptimization(Predicate, keyValuePair);
+                observableExpression.PropertyChanged += ObservableExpressionPropertyChangedHandler;
+                var (fault, predicateResult) = observableExpression.Evaluation;
+                var isIncluded = fault is null && predicateResult;
+                if (fault is not null)
+                {
+                    keyFaultList ??= new FaultList(OwnOperationFault);
+                    keyFaultList.Check(observableExpression);
+                }
+                else if (isIncluded)
+                    AddToResultWithAccess(key, keyValuePair.Value);
+                observableExpressions.Add(key, (observableExpression, fault, isIncluded));
+            }
+            RaiseNotificationsDeferredSoFar();
+        }
+        if (keyFaultList is not null)
+            lock (access)
+                if (!released)
+                    OperationFault = keyFaultList.Fault;
     }
 
     public override string ToString() =>

@@ -37,7 +37,7 @@ sealed class ObservableCollectionOfTypeQuery<TElement, TResult>(CollectionObserv
         }
     }
 
-    public override int Count =>
+    private protected override int CurrentCount =>
         count;
 
     internal override bool HasIndexerPenalty =>
@@ -136,9 +136,6 @@ sealed class ObservableCollectionOfTypeQuery<TElement, TResult>(CollectionObserv
             sourceSubscription = source.SubscribeDependent(this);
         }
     }
-
-    void SetCount(int value) =>
-        SetBackedProperty(ref count, in value, countPropertyChangingEventArgs, countPropertyChangedEventArgs);
 
     void SourceCollectionChanged(NotifyCollectionChangedEventArgs e)
     {
@@ -241,7 +238,7 @@ sealed class ObservableCollectionOfTypeQuery<TElement, TResult>(CollectionObserv
             {
                 enumerationSnapshot = null;
                 if (eventArgs.Action != NotifyCollectionChangedAction.Move)
-                    SetCount(results.Count);
+                    count = results.Count;
                 OnCollectionChanged(eventArgs);
             }
         }

@@ -9,7 +9,7 @@ sealed class ObservableCollectionUsingSynchronizationContextEventuallyQuery<TEle
     public override TElement this[int index] =>
         ReadOnContext(SynchronizationContext, () => elements![index]);
 
-    public override int Count =>
+    private protected override int CurrentCount =>
         ReadOnContext(SynchronizationContext, () => elements!.Count);
 
     internal override bool HasIndexerPenalty =>

@@ -13,7 +13,10 @@ sealed class ObservableCollectionQueryReadOnlyList<TElement>(CollectionObserver 
     public override TElement this[int index] =>
         copy is { } kept ? kept[index] : ReadOnlyList[index];
 
-    public override int Count =>
+    private protected override bool AnnouncesCount =>
+        ReadOnlyList is INotifyCollectionChanged;
+
+    private protected override int CurrentCount =>
         copy?.Count ?? ReadOnlyList.Count;
 
     private protected override ObservableQuery? ChangeLockHolder =>

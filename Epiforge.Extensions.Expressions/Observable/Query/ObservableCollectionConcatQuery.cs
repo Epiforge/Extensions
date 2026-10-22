@@ -30,7 +30,7 @@ sealed class ObservableCollectionConcatQuery<TElement>(CollectionObserver collec
         }
     }
 
-    public override int Count =>
+    private protected override int CurrentCount =>
         count;
 
     internal override bool ChangesThroughOthers =>
@@ -92,7 +92,7 @@ sealed class ObservableCollectionConcatQuery<TElement>(CollectionObserver collec
             else
                 firstCount += (e.NewItems?.Count ?? 0) - (e.OldItems?.Count ?? 0);
             if (e.Action is not NotifyCollectionChangedAction.Move)
-                SetCount();
+                count = firstCount + secondCount;
             OnCollectionChanged(e);
         }
     }
@@ -147,7 +147,7 @@ sealed class ObservableCollectionConcatQuery<TElement>(CollectionObserver collec
             else
                 secondCount += (e.NewItems?.Count ?? 0) - (e.OldItems?.Count ?? 0);
             if (e.Action is not NotifyCollectionChangedAction.Move)
-                SetCount();
+                count = firstCount + secondCount;
             OnCollectionChanged(e.Action switch
             {
                 NotifyCollectionChangedAction.Add => new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, e.NewItems, firstCount + e.NewStartingIndex),
@@ -167,12 +167,6 @@ sealed class ObservableCollectionConcatQuery<TElement>(CollectionObserver collec
             using var changeHold = HoldOwnChanges();
             SetOperationFault();
         }
-    }
-
-    void SetCount()
-    {
-        var value = firstCount + secondCount;
-        SetBackedProperty(ref count, in value, countPropertyChangingEventArgs, countPropertyChangedEventArgs);
     }
 
     void SetOperationFault()

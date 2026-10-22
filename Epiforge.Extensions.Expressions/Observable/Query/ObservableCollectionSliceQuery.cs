@@ -27,7 +27,7 @@ sealed class ObservableCollectionSliceQuery<TElement>(CollectionObserver collect
         }
     }
 
-    public override int Count =>
+    private protected override int CurrentCount =>
         count;
 
     internal override bool ChangesThroughOthers =>
@@ -92,7 +92,7 @@ sealed class ObservableCollectionSliceQuery<TElement>(CollectionObserver collect
     {
         sourceCount = source.Count;
         var (_, length) = GetOffsetAndLength();
-        SetBackedProperty(ref count, in length, countPropertyChangingEventArgs, countPropertyChangedEventArgs);
+        count = length;
     }
 
     void SourcePropertyChanged(object? sender, PropertyChangedEventArgs e)

@@ -13,7 +13,10 @@ sealed class ObservableCollectionQueryEnumerable(CollectionObserver collectionOb
     public override object? this[int index] =>
         copy is { } kept ? kept[index] : Enumerable.Cast<object?>().ElementAt(index);
 
-    public override int Count =>
+    private protected override bool AnnouncesCount =>
+        copy is not null;
+
+    private protected override int CurrentCount =>
         copy?.Count ?? Enumerable.Cast<object?>().Count();
 
     internal override bool HasEnumerationPenalty =>

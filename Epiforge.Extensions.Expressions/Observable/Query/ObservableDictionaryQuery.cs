@@ -119,9 +119,21 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
         internal static readonly Expression<Func<TKey, TValue, TValue>> Selector = (key, value) => value;
     }
 
+    /// <summary>
+    /// Stands among the deferred notifications for an announcement of the count, made for a change of which nothing is told in any other way
+    /// </summary>
+    static readonly object countAnnouncement = new();
+    /// <summary>
+    /// The name a dictionary gives its indexer when it announces that the values it holds have changed
+    /// </summary>
+    const string indexerPropertyName = "Item[]";
     static readonly PropertyChangedEventArgs operationFaultPropertyChangedEventArgs = new(nameof(OperationFault));
     static readonly PropertyChangingEventArgs operationFaultPropertyChangingEventArgs = new(nameof(OperationFault));
 
+    /// <summary>
+    /// The count this query last announced, from which it tells whether a change it announces changes the count, kept as -2 less it while the count is announced as changing, so that <see cref="Count"/> then reads it and a subscriber finds the count the change is leaving; -1 until the query is initialized, and for a query which does not announce its count
+    /// </summary>
+    int announcedCount = -1;
     Dictionary<(object seedFactory, object func, object resultSelector), ObservableQuery>? cachedAggregateQueries;
     Dictionary<Expression, ObservableDictionaryAllQuery<TKey, TValue>>? cachedAllQueries;
     NullableKeyDictionary<Expression?, ObservableDictionaryAnyQuery<TKey, TValue>>? cachedAnyQueries;
@@ -182,7 +194,19 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
         }
     }
 
-    public abstract int Count { get; }
+    public int Count =>
+        Volatile.Read(ref announcedCount) is < -1 and var changing ? -2 - changing : CurrentCount;
+
+    /// <summary>
+    /// Gets the number of key-value pairs this query holds now
+    /// </summary>
+    private protected abstract int CurrentCount { get; }
+
+    /// <summary>
+    /// Gets whether this query announces its count, which it does from the notifications it delivers, and so only where it delivers them for every change
+    /// </summary>
+    private protected virtual bool AnnouncesCount =>
+        true;
 
     public bool IsReadOnly =>
         true;
@@ -393,6 +417,21 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
     {
     }
 
+    /// <summary>
+    /// Announces the count a change leaves where no notification describing the change will be delivered, because nothing is listening for one, so that a subscriber listening only for the count is still told
+    /// </summary>
+    private protected void AnnounceCountOfUnobservedChange()
+    {
+        if (collectionChanged is null && dictionaryChanged is null && dictionaryChangedBoxed is null && !DeferNotification(countAnnouncement))
+            AnnounceCount();
+    }
+
+    private protected override void OnInitialized()
+    {
+        if (AnnouncesCount)
+            announcedCount = CurrentCount;
+    }
+
     protected virtual void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
     {
         ArgumentNullException.ThrowIfNull(e);
@@ -412,8 +451,53 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
             RaiseDictionaryChangedBoxed(e);
     }
 
+    protected override void OnPropertyChanged(PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(Count) || announcedCount == -1)
+            base.OnPropertyChanged(e);
+    }
+
+    private protected override void OnRaisingPropertyChanged(PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == indexerPropertyName)
+            AnnounceCount();
+    }
+
+    protected override void OnPropertyChanging(PropertyChangingEventArgs e)
+    {
+        if (e.PropertyName != nameof(Count) || announcedCount == -1)
+            base.OnPropertyChanging(e);
+    }
+
+    /// <summary>
+    /// Announces the count a change leaves, before the first of the notifications describing it, as a dictionary which changes in place does, so that the count is announced as changing while it still reads what it was and as changed once it reads what the change leaves
+    /// </summary>
+    /// <remarks>
+    /// The count announced is the one this query holds, which is the one the change leaves because a query delivers each notification while it is as that notification leaves it
+    /// </remarks>
+    void AnnounceCount()
+    {
+        var announced = announcedCount;
+        if (announced < 0)
+            return;
+        var count = CurrentCount;
+        if (count == announced)
+            return;
+        Volatile.Write(ref announcedCount, -2 - announced);
+        try
+        {
+            RaisePropertyChanging(countPropertyChangingEventArgs);
+        }
+        finally
+        {
+            Volatile.Write(ref announcedCount, count);
+        }
+        RaisePropertyChanged(countPropertyChangedEventArgs);
+    }
+
     void RaiseCollectionChanged(NotifyCollectionChangedEventArgs e)
     {
+        AnnounceCount();
         var eventArgs = Logger?.IsEnabled(LogLevel.Trace) ?? false ? e.ToStringForLogging() : null;
         Logger.WhenTracing()?.LogTrace(Collections.EventIds.Epiforge_Extensions_Collections_RaisingCollectionChanged, "Raising CollectionChanged: {EventArgs}", eventArgs);
         collectionChanged?.Invoke(this, e);
@@ -422,17 +506,23 @@ abstract class ObservableDictionaryQuery<TKey, TValue>(CollectionObserver collec
 
     void RaiseDictionaryChanged(NotifyDictionaryChangedEventArgs<TKey, TValue> e)
     {
+        AnnounceCount();
         Logger.WhenTracing()?.LogTrace(Collections.EventIds.Epiforge_Extensions_Collections_RaisingDictionaryChanged, "Raising DictionaryChanged: {EventArgs}", e);
         dictionaryChanged?.Invoke(this, e);
         Logger.WhenTracing()?.LogTrace(Collections.EventIds.Epiforge_Extensions_Collections_RaisedDictionaryChanged, "Raised DictionaryChanged: {EventArgs}", e);
     }
 
-    void RaiseDictionaryChangedBoxed(NotifyDictionaryChangedEventArgs<object?, object?> e) =>
+    void RaiseDictionaryChangedBoxed(NotifyDictionaryChangedEventArgs<object?, object?> e)
+    {
+        AnnounceCount();
         dictionaryChangedBoxed?.Invoke(this, e);
+    }
 
     private protected override void RaiseNotification(object eventArguments)
     {
-        if (eventArguments is DeferredDictionaryChangedBoxed deferredDictionaryChangedBoxed)
+        if (ReferenceEquals(eventArguments, countAnnouncement))
+            AnnounceCount();
+        else if (eventArguments is DeferredDictionaryChangedBoxed deferredDictionaryChangedBoxed)
             RaiseDictionaryChangedBoxed(deferredDictionaryChangedBoxed.EventArguments);
         else if (eventArguments is NotifyDictionaryChangedEventArgs<TKey, TValue> dictionaryChangedEventArgs)
             RaiseDictionaryChanged(dictionaryChangedEventArgs);

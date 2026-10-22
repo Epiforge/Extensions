@@ -82,7 +82,7 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
         }
     }
 
-    public override int Count =>
+    private protected override int CurrentCount =>
         count;
 
     internal override bool HasIndexerPenalty =>
@@ -139,9 +139,11 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
             else
                 snapshot!.RemoveAt(translatedIndex);
         }
-        SetCount(count + (newResult ? 1 : -1));
+        count += newResult ? 1 : -1;
         if (isChangeObserved)
             OnCollectionChanged(new NotifyCollectionChangedEventArgs(newResult ? NotifyCollectionChangedAction.Add : NotifyCollectionChangedAction.Remove, node.Item.Argument, translatedIndex));
+        else
+            AnnounceCountOfUnobservedChange();
     }
 
     public override IEnumerator<TElement> GetEnumerator()
@@ -278,9 +280,6 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
         snapshot = null;
         return false;
     }
-
-    void SetCount(int value) =>
-        SetBackedProperty(ref count, in value, countPropertyChangingEventArgs, countPropertyChangedEventArgs);
 
     [SuppressMessage("Maintainability", "CA1502: Avoid excessive complexity", Justification = @"Splitting this up into more methods is ¯\_(ツ)_/¯")]
     void IObservableQueryDependent.OnDependencyCollectionChanged(ObservableQuerySubscription subscription, NotifyCollectionChangedEventArgs e) =>
@@ -432,7 +431,7 @@ sealed class ObservableCollectionWhereQuery<TElement>(CollectionObserver collect
             if (eventArgs is not null)
             {
                 if (eventArgs.Action != NotifyCollectionChangedAction.Move)
-                    SetCount(newCount);
+                    count = newCount;
                 OnCollectionChanged(eventArgs);
             }
         }

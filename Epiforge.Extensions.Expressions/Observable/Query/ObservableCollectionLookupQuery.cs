@@ -77,7 +77,7 @@ sealed class ObservableCollectionLookupQuery<TKey, TElement> :
         set => throw new NotSupportedException();
     }
 
-    public override int Count
+    private protected override int CurrentCount
     {
         get
         {

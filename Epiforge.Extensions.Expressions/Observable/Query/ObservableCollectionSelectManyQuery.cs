@@ -41,7 +41,7 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
         }
     }
 
-    public override int Count =>
+    private protected override int CurrentCount =>
         count;
 
     internal override bool HasIndexerPenalty =>
@@ -59,26 +59,16 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
             enumerationSnapshot = null;
             copies[enumerable] = copy = FollowInnerChange(copy, e, enumerable);
             var newWeight = copy.Count;
-            if (e.Action is NotifyCollectionChangedAction.Reset)
+            if (e.Action is NotifyCollectionChangedAction.Reset || nodes.Count > 1)
             {
                 for (int i = 0, ii = nodes.Count; i < ii; ++i)
                     positions.SetWeight(nodes[i], newWeight);
-                SetCount(positions.TotalWeight);
-                OnCollectionChanged(e);
+                count = positions.TotalWeight;
+                OnCollectionChanged(e.Action is NotifyCollectionChangedAction.Reset ? e : new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
                 return;
             }
-            if (nodes.Count == 1)
-                TranslateInnerChangeWithAccess(nodes[0], newWeight, e);
-            else
-            {
-                var orderedNodes = new List<(int Index, PrefixWeightedSequenceNode<IEnumerable<TResult>?> Node)>(nodes.Count);
-                for (int i = 0, ii = nodes.Count; i < ii; ++i)
-                    orderedNodes.Add((positions.IndexOf(nodes[i]), nodes[i]));
-                orderedNodes.Sort((first, second) => first.Index.CompareTo(second.Index));
-                for (int i = 0, ii = orderedNodes.Count; i < ii; ++i)
-                    TranslateInnerChangeWithAccess(orderedNodes[i].Node, newWeight, e);
-            }
-            SetCount(positions.TotalWeight);
+            TranslateInnerChangeWithAccess(nodes[0], newWeight, e);
+            count = positions.TotalWeight;
         }
     }
 
@@ -323,14 +313,11 @@ sealed class ObservableCollectionSelectManyQuery<TElement, TResult>(CollectionOb
             if (eventArgs is not null)
             {
                 if (eventArgs.Action is not NotifyCollectionChangedAction.Move)
-                    SetCount(positions.TotalWeight);
+                    count = positions.TotalWeight;
                 OnCollectionChanged(eventArgs);
             }
         }
     }
-
-    void SetCount(int value) =>
-        SetBackedProperty(ref count, in value, countPropertyChangingEventArgs, countPropertyChangedEventArgs);
 
     public override string ToString() =>
         $"reduction of mapping {source} with {Selector}";

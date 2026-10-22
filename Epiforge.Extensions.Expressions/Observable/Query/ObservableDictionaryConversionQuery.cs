@@ -12,8 +12,16 @@ sealed class ObservableDictionaryConversionQuery<TKey, TValue, TResult>(Collecti
 {
     readonly object access = new();
     IReadOnlyList<KeyValuePair<TKey, TResult>>? enumerationSnapshot;
+    /// <summary>
+    /// Whether this query is following a change of its source, during which it delivers a notification for each key it changes, so that a change its subscribers make to the source in the meantime waits until this one has been followed
+    /// </summary>
+    bool followingSourceChange;
     internal readonly bool IsFilter = isFilter;
     IReadOnlyList<TKey>? keysSnapshot;
+    /// <summary>
+    /// The changes the source announced while this query was following another, in the order they were announced, made with the first of them
+    /// </summary>
+    Queue<NotifyDictionaryChangedEventArgs<TKey, TValue>>? pendingSourceChanges;
     bool released;
     /// <summary>
     /// The results, made when the query is initialized so that they can be sized for the source
@@ -30,7 +38,7 @@ sealed class ObservableDictionaryConversionQuery<TKey, TValue, TResult>(Collecti
         }
     }
 
-    public override int Count
+    private protected override int CurrentCount
     {
         get
         {
@@ -195,47 +203,86 @@ sealed class ObservableDictionaryConversionQuery<TKey, TValue, TResult>(Collecti
     void ResultPropertyChanging(object? sender, PropertyChangingEventArgs e) =>
         OnPropertyChanging(e);
 
-    void SourceDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e)
+    /// <summary>
+    /// Follows a change of the source one key at a time, delivering the notification of each key before taking the next, so that a subscriber finds this query as each notification leaves it
+    /// </summary>
+    void FollowSourceChange(NotifyDictionaryChangedEventArgs<TKey, TValue> e)
     {
-        using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
-        lock (access)
+        FaultList? faultList = null;
+        if (e.Action is NotifyDictionaryChangedAction.Reset)
         {
-            if (released)
-                return;
-            FaultList? faultList = null;
-            if (e.Action is NotifyDictionaryChangedAction.Reset)
+            lock (access)
             {
+                if (released)
+                    return;
                 var newResult = new ObservableDictionary<TKey, TResult>(source.Count, EqualityComparer<TKey>.Default);
                 foreach (var keyValuePair in source)
                     ConvertInto(keyValuePair, newResult, ref faultList, null);
                 DiscardSnapshots();
                 result.Reset(newResult);
                 OperationFault = faultList?.Fault;
-                return;
             }
-            var keyComparer = source.KeyComparer;
-            foreach (var keyValuePair in e.OldItems)
+            return;
+        }
+        var keyComparer = source.KeyComparer;
+        foreach (var keyValuePair in e.OldItems)
+        {
+            if (TryConvert(keyValuePair.Value, out _, out var fault))
             {
-                if (TryConvert(keyValuePair.Value, out _, out var fault))
+                lock (access)
                 {
+                    if (released)
+                        return;
                     DiscardSnapshots();
                     result.Remove(keyValuePair.Key);
                 }
-                else if (fault is not null)
-                    (faultList ??= new(OwnOperationFault)).RemoveKey(keyValuePair.Key, keyComparer);
+                RaiseNotificationsDeferredSoFar();
             }
-            foreach (var keyValuePair in e.NewItems)
+            else if (fault is not null)
+                lock (access)
+                    (faultList ??= new(OwnOperationFault)).RemoveKey(keyValuePair.Key, keyComparer);
+        }
+        foreach (var keyValuePair in e.NewItems)
+        {
+            if (TryConvert(keyValuePair.Value, out var converted, out var fault))
             {
-                if (TryConvert(keyValuePair.Value, out var converted, out var fault))
+                lock (access)
                 {
+                    if (released)
+                        return;
                     DiscardSnapshots();
                     result.Add(keyValuePair.Key, converted);
                 }
-                else if (fault is not null)
-                    (faultList ??= new(OwnOperationFault)).Add(new EvaluationFaultException(keyValuePair.Key, fault));
+                RaiseNotificationsDeferredSoFar();
             }
-            if (faultList is not null)
-                OperationFault = faultList.Fault;
+            else if (fault is not null)
+                lock (access)
+                    (faultList ??= new(OwnOperationFault)).Add(new EvaluationFaultException(keyValuePair.Key, fault));
+        }
+        if (faultList is not null)
+            lock (access)
+                if (!released)
+                    OperationFault = faultList.Fault;
+    }
+
+    void SourceDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TKey, TValue> e)
+    {
+        using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
+        if (followingSourceChange)
+        {
+            (pendingSourceChanges ??= new()).Enqueue(e);
+            return;
+        }
+        followingSourceChange = true;
+        try
+        {
+            FollowSourceChange(e);
+            while (pendingSourceChanges is { Count: > 0 } pending)
+                FollowSourceChange(pending.Dequeue());
+        }
+        finally
+        {
+            followingSourceChange = false;
         }
     }
 

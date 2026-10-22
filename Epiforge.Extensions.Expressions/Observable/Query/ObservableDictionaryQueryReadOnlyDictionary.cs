@@ -12,7 +12,10 @@ sealed class ObservableDictionaryQueryReadOnlyDictionary<TKey, TValue>(Collectio
     public override TValue this[TKey key] =>
         copy is { } kept ? kept[key] : ReadOnlyDictionary[key];
 
-    public override int Count =>
+    private protected override bool AnnouncesCount =>
+        copy is not null;
+
+    private protected override int CurrentCount =>
         copy?.Count ?? ReadOnlyDictionary.Count;
 
     internal override IEqualityComparer<TKey> KeyComparer =>
@@ -147,9 +150,7 @@ sealed class ObservableDictionaryQueryReadOnlyDictionary<TKey, TValue>(Collectio
                     var (key, value) = e.NewItems[0];
                     if (kept.ContainsKey(key) || !ReadOnlyDictionary.TryGetValue(key, out var present) || !IsSame(present, value))
                         return false;
-                    OnPropertyChanging(countPropertyChangingEventArgs);
                     kept.Add(key, value);
-                    OnPropertyChanged(countPropertyChangedEventArgs);
                     break;
                 }
             case NotifyDictionaryChangedAction.Remove when e.OldItems.Count is 1 && e.NewItems.Count is 0:
@@ -157,9 +158,7 @@ sealed class ObservableDictionaryQueryReadOnlyDictionary<TKey, TValue>(Collectio
                     var (key, value) = e.OldItems[0];
                     if (ReadOnlyDictionary.ContainsKey(key) || !kept.TryGetValue(key, out var keptValue) || !IsSame(keptValue, value))
                         return false;
-                    OnPropertyChanging(countPropertyChangingEventArgs);
                     kept.Remove(key);
-                    OnPropertyChanged(countPropertyChangedEventArgs);
                     break;
                 }
             case NotifyDictionaryChangedAction.Replace when e.NewItems.Count is 1 && e.OldItems.Count is 1:
@@ -269,38 +268,30 @@ sealed class ObservableDictionaryQueryReadOnlyDictionary<TKey, TValue>(Collectio
             else if (!isPresent && wasPresent)
                 (removed ??= []).Add(new(key, keptValue!));
         }
-        var countChanges = (added?.Count ?? 0) != (removed?.Count ?? 0);
-        if (countChanges)
-            OnPropertyChanging(countPropertyChangingEventArgs);
         if (removed is not null)
+        {
             foreach (var keyValuePair in removed)
                 kept.Remove(keyValuePair.Key);
+            OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Remove, removed));
+        }
         if (replacements is not null)
+        {
             foreach (var keyValuePair in replacements)
                 kept[keyValuePair.Key] = keyValuePair.Value;
+            OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Replace, replacements, replaced));
+        }
         if (added is not null)
+        {
             foreach (var keyValuePair in added)
                 kept.Add(keyValuePair.Key, keyValuePair.Value);
-        if (countChanges)
-            OnPropertyChanged(countPropertyChangedEventArgs);
-        if (removed is not null)
-            OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Remove, removed));
-        if (replacements is not null)
-            OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Replace, replacements, replaced));
-        if (added is not null)
             OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Add, added));
+        }
     }
 
     void Reconcile()
     {
         using var changeHold = HoldOwnChanges();
-        var reread = new Dictionary<TKey, TValue>(ReadOnlyDictionary, KeyComparer);
-        var countChanges = reread.Count != copy!.Count;
-        if (countChanges)
-            OnPropertyChanging(countPropertyChangingEventArgs);
-        copy = reread;
-        if (countChanges)
-            OnPropertyChanged(countPropertyChangedEventArgs);
+        copy = new Dictionary<TKey, TValue>(ReadOnlyDictionary, KeyComparer);
         OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Reset));
     }
 

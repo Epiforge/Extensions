@@ -23,7 +23,7 @@ sealed class ObservableDictionaryToCollectionQuery<TElement, TKey, TValue>(Colle
         }
     }
 
-    public override int Count
+    private protected override int CurrentCount
     {
         get
         {

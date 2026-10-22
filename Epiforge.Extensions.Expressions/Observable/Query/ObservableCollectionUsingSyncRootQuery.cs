@@ -10,7 +10,7 @@ sealed class ObservableCollectionUsingSyncRootQuery<TElement>(CollectionObserver
     public override TElement this[int index] =>
         elements![index];
 
-    public override int Count =>
+    private protected override int CurrentCount =>
         elements!.Count;
 
     public override object SyncRoot { get; } = syncRoot;

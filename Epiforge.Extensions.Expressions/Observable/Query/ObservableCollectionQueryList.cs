@@ -13,7 +13,10 @@ sealed class ObservableCollectionQueryList(CollectionObserver collectionObserver
     public override object? this[int index] =>
         copy is { } kept ? kept[index] : List[index];
 
-    public override int Count =>
+    private protected override bool AnnouncesCount =>
+        copy is not null;
+
+    private protected override int CurrentCount =>
         copy?.Count ?? List.Count;
 
     internal override bool HasEnumerationPenalty =>

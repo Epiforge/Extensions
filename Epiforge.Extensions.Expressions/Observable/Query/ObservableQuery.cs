@@ -340,6 +340,23 @@ abstract class ObservableQuery :
         return true;
     }
 
+    /// <summary>
+    /// Raises the notifications deferred so far by the outermost deferral scope, which a mutation producing more than one notification calls without holding the lock guarding its state between the steps that produce them, so that each notification is delivered while the query is as that notification leaves it rather than as the whole mutation leaves it
+    /// </summary>
+    private protected void RaiseNotificationsDeferredSoFar()
+    {
+        if (Volatile.Read(ref deferralState) is not { Depth: 1 } state || state.First is not { } first)
+            return;
+        var second = state.Second;
+        var third = state.Third;
+        var many = state.Many;
+        state.First = null;
+        state.Second = null;
+        state.Third = null;
+        state.Many = null;
+        RaiseDeferredNotifications(first, second, third, many);
+    }
+
     void EndNotificationDeferral()
     {
         var state = deferralState!;
@@ -478,6 +495,7 @@ abstract class ObservableQuery :
             if (isInitialized)
                 return;
             OnInitialization();
+            OnInitialized();
             isInitialized = true;
             collectionObserver.TraceLogger.WhenTracing()?.LogTrace(EventIds.Epiforge_Extensions_Expressions_QueryInitialized, "Initialized observation of {Query}", this);
         }
@@ -507,6 +525,20 @@ abstract class ObservableQuery :
     }
 
     protected abstract void OnInitialization();
+
+    /// <summary>
+    /// Called once this query has been initialized, before it is handed to anyone who could subscribe to it
+    /// </summary>
+    private protected virtual void OnInitialized()
+    {
+    }
+
+    /// <summary>
+    /// Called as a property change is about to be raised, so that a query may first announce what the change implies of another property
+    /// </summary>
+    private protected virtual void OnRaisingPropertyChanged(PropertyChangedEventArgs e)
+    {
+    }
 
     protected override void OnPropertyChanged(PropertyChangedEventArgs e)
     {
@@ -547,13 +579,14 @@ abstract class ObservableQuery :
             RaisePropertyChanging(propertyChangingEventArgs);
     }
 
-    void RaisePropertyChanged(PropertyChangedEventArgs e)
+    private protected void RaisePropertyChanged(PropertyChangedEventArgs e)
     {
+        OnRaisingPropertyChanged(e);
         NotifyDependents(e);
         base.OnPropertyChanged(e);
     }
 
-    void RaisePropertyChanging(PropertyChangingEventArgs e)
+    private protected void RaisePropertyChanging(PropertyChangingEventArgs e)
     {
         NotifyDependents(e);
         base.OnPropertyChanging(e);

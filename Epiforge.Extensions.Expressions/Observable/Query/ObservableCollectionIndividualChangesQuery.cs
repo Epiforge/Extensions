@@ -14,6 +14,14 @@ sealed class ObservableCollectionIndividualChangesQuery<TElement> :
     readonly object access;
     IReadOnlyList<TElement>? enumerationSnapshot;
     readonly ObservableRangeCollection<TElement> elements;
+    /// <summary>
+    /// Whether this query is following a change of its source, during which it delivers a notification for each step it takes, so that a change its subscribers make to the source in the meantime waits until this one has been followed
+    /// </summary>
+    bool followingSourceChange;
+    /// <summary>
+    /// The changes the source announced while this query was following another, in the order they were announced, made with the first of them
+    /// </summary>
+    Queue<NotifyCollectionChangedEventArgs>? pendingSourceChanges;
     readonly ObservableCollectionQuery<TElement> source;
 
     public override TElement this[int index]
@@ -25,7 +33,7 @@ sealed class ObservableCollectionIndividualChangesQuery<TElement> :
         }
     }
 
-    public override int Count
+    private protected override int CurrentCount
     {
         get
         {
@@ -88,10 +96,12 @@ sealed class ObservableCollectionIndividualChangesQuery<TElement> :
         }
     }
 
+    /// <summary>
+    /// Follows a change of the source one element at a time, delivering the notification of each step before taking the next, so that a subscriber finds this query as each notification leaves it
+    /// </summary>
     [SuppressMessage("Maintainability", "CA1502: Avoid excessive complexity")]
-    void SourceCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    void FollowSourceChange(NotifyCollectionChangedEventArgs e)
     {
-        using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
         if (e.Action is NotifyCollectionChangedAction.Reset)
             lock (access)
                 elements.Reset(source);
@@ -106,6 +116,7 @@ sealed class ObservableCollectionIndividualChangesQuery<TElement> :
                 {
                     lock (access)
                         elements.Move(extractionIndex, ++insertionIndex);
+                    RaiseNotificationsDeferredSoFar();
                     if (e.OldStartingIndex > e.NewStartingIndex)
                         ++extractionIndex;
                 }
@@ -115,6 +126,7 @@ sealed class ObservableCollectionIndividualChangesQuery<TElement> :
         {
             var index = e.OldStartingIndex;
             for (int i = 0, ii = Math.Max(replaceOldItems.Count, replaceNewItems.Count); i < ii; ++i)
+            {
                 lock (access)
                 {
                     if (i >= replaceOldItems.Count)
@@ -124,6 +136,8 @@ sealed class ObservableCollectionIndividualChangesQuery<TElement> :
                     else
                         elements[index + i] = (TElement)replaceNewItems[i]!;
                 }
+                RaiseNotificationsDeferredSoFar();
+            }
         }
         else
         {
@@ -132,17 +146,44 @@ sealed class ObservableCollectionIndividualChangesQuery<TElement> :
                 var count = oldItems.Count;
                 if (count > 0)
                     for (var i = 0; i < count; ++i)
+                    {
                         lock (access)
                             elements.RemoveAt(e.OldStartingIndex);
+                        RaiseNotificationsDeferredSoFar();
+                    }
             }
             if (e.NewItems is { } newItems && e.NewStartingIndex >= 0)
             {
                 var count = newItems.Count;
                 if (count > 0)
                     for (var i = 0; i < count; ++i)
+                    {
                         lock (access)
                             elements.Insert(e.NewStartingIndex + i, (TElement)newItems[i]!);
+                        RaiseNotificationsDeferredSoFar();
+                    }
             }
+        }
+    }
+
+    void SourceCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
+        if (followingSourceChange)
+        {
+            (pendingSourceChanges ??= new()).Enqueue(e);
+            return;
+        }
+        followingSourceChange = true;
+        try
+        {
+            FollowSourceChange(e);
+            while (pendingSourceChanges is { Count: > 0 } pending)
+                FollowSourceChange(pending.Dequeue());
+        }
+        finally
+        {
+            followingSourceChange = false;
         }
     }
 

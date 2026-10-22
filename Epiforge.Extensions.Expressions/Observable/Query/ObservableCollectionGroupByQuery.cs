@@ -40,7 +40,7 @@ sealed class ObservableCollectionGroupByQuery<TKey, TElement> :
         }
     }
 
-    public override int Count
+    private protected override int CurrentCount
     {
         get
         {

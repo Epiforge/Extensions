@@ -11,7 +11,7 @@ sealed class ObservableGrouping<TKey, TElement>(CollectionObserver collectionObs
     public override TElement this[int index] =>
         groupQuery[index];
 
-    public override int Count =>
+    private protected override int CurrentCount =>
         groupQuery.Count;
 
     internal override bool ChangesThroughOthers =>

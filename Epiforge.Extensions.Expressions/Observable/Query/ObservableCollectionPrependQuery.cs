@@ -10,7 +10,7 @@ sealed class ObservableCollectionPrependQuery<TElement>(CollectionObserver colle
     public override TElement this[int index] =>
         index == 0 ? Prepended : sequence[index - 1];
 
-    public override int Count =>
+    private protected override int CurrentCount =>
         sequenceCount + 1;
 
     internal override bool ChangesThroughOthers =>

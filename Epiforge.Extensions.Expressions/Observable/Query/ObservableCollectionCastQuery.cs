@@ -52,7 +52,7 @@ sealed class ObservableCollectionCastQuery<TElement, TResult>(CollectionObserver
         }
     }
 
-    public override int Count
+    private protected override int CurrentCount
     {
         get
         {
@@ -105,26 +105,12 @@ sealed class ObservableCollectionCastQuery<TElement, TResult>(CollectionObserver
 
     void IObservableQueryDependent.OnDependencyPropertyChanged(ObservableQuerySubscription subscription, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(Count))
-        {
-            using var changeHold = HoldOwnChanges();
-            OnPropertyChanged(e);
-        }
-        else if (e.PropertyName == nameof(OperationFault))
+        if (e.PropertyName == nameof(OperationFault))
         {
             using var changeHold = HoldOwnChanges();
             lock (access)
                 if (!released)
                     InheritOperationFault(source.OperationFault);
-        }
-    }
-
-    void IObservableQueryDependent.OnDependencyPropertyChanging(ObservableQuerySubscription subscription, PropertyChangingEventArgs e)
-    {
-        if (e.PropertyName == nameof(Count))
-        {
-            using var changeHold = HoldOwnChanges();
-            OnPropertyChanging(e);
         }
     }
 

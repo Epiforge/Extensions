@@ -72,10 +72,18 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>(Colle
     IReadOnlyList<KeyValuePair<TKey, TValue>>? enumerationSnapshot;
     readonly FaultList evaluationFaults = new();
     bool faultsChanged = true;
+    /// <summary>
+    /// Whether this query is following a change of its source, during which it delivers a notification for each key it changes, so that a change its subscribers make to the source in the meantime waits until this one has been followed
+    /// </summary>
+    bool followingSourceChange;
     IReadOnlyList<TKey>? keysSnapshot;
     int nullKeys;
     readonly PrefixWeightedSequence<Entry> occurrences = new();
     Expression<Func<TElement, Claim>>? pairSelector;
+    /// <summary>
+    /// The changes the source announced while this query was following another, in the order they were announced, made with the first of them
+    /// </summary>
+    Queue<NotifyCollectionChangedEventArgs>? pendingSourceChanges;
     bool released;
     int reportedDuplicateClaims;
     int reportedNullKeys;
@@ -97,7 +105,7 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>(Colle
     internal override IEqualityComparer<TKey> KeyComparer =>
         EqualityComparer;
 
-    public override int Count
+    private protected override int CurrentCount
     {
         get
         {
@@ -173,6 +181,7 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>(Colle
         using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
         if (sender is not IObservableExpression<TElement, Claim> observation || e.PropertyName != nameof(IObservableExpression<,>.Evaluation))
             return;
+        HashSet<TKey>? touched = null;
         lock (access)
         {
             if (released || !entries.TryGetValue(observation.Argument, out var entry) || !ReferenceEquals(entry.Observation, observation))
@@ -198,7 +207,7 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>(Colle
             }
             else
             {
-                var touched = TakeKeySetWithAccess();
+                touched = TakeKeySetWithAccess();
                 var nodes = entry.Nodes;
                 for (int i = 0, ii = nodes.Count; i < ii; ++i)
                     RelinquishWithAccess(entry, nodes[i], touched);
@@ -206,11 +215,12 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>(Colle
                 entry.Claim = fault is null ? claim : default;
                 for (int i = 0, ii = nodes.Count; i < ii; ++i)
                     ClaimWithAccess(entry, nodes[i], touched);
-                ReconcileWithAccess(touched);
-                GiveBackKeySetWithAccess(touched);
             }
-            SetOperationFaultWithAccess();
+            if (touched is null)
+                SetOperationFaultWithAccess();
         }
+        if (touched is not null)
+            Reconcile(touched);
     }
 
     public override bool Contains(KeyValuePair<TKey, TValue> item)
@@ -318,9 +328,12 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>(Colle
         return entry;
     }
 
-    void IObservableQueryDependent.OnDependencyCollectionChanged(ObservableQuerySubscription subscription, NotifyCollectionChangedEventArgs e)
+    /// <summary>
+    /// Follows a change of the source, changing the dictionary one key at a time and delivering the notification of each before the next, so that a subscriber finds this query as each notification leaves it
+    /// </summary>
+    void FollowSourceChange(NotifyCollectionChangedEventArgs e)
     {
-        using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
+        HashSet<TKey>? touched = null;
         lock (access)
         {
             if (released)
@@ -334,25 +347,45 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>(Colle
                 if (oldCount > 0 && e.NewStartingIndex >= 0 && e.OldStartingIndex != e.NewStartingIndex)
                 {
                     occurrences.MoveRange(e.OldStartingIndex, e.NewStartingIndex, oldCount);
-                    var contested = TakeKeySetWithAccess();
+                    touched = TakeKeySetWithAccess();
                     for (var i = 0; i < oldCount; ++i)
                         if (entries.TryGetValue((TElement)e.OldItems![i]!, out var entry) && entry.Fault is null && entry.Claim.Key is { } key && claimantsByKey.TryGetValue(key, out var claimants) && claimants.Count > 1)
-                            contested.Add(key);
-                    ReconcileWithAccess(contested);
-                    GiveBackKeySetWithAccess(contested);
+                            touched.Add(key);
                 }
             }
             else
             {
-                var touched = TakeKeySetWithAccess();
+                touched = TakeKeySetWithAccess();
                 for (var i = oldCount - 1; i >= 0; --i)
                     RemoveOccurrenceAtWithAccess(e.OldStartingIndex + i, touched);
                 for (var i = 0; i < newCount; ++i)
                     AddOccurrenceWithAccess((TElement)e.NewItems![i]!, e.NewStartingIndex + i, touched);
-                ReconcileWithAccess(touched);
-                GiveBackKeySetWithAccess(touched);
             }
-            SetOperationFaultWithAccess();
+            if (touched is null)
+                SetOperationFaultWithAccess();
+        }
+        if (touched is not null)
+            Reconcile(touched);
+    }
+
+    void IObservableQueryDependent.OnDependencyCollectionChanged(ObservableQuerySubscription subscription, NotifyCollectionChangedEventArgs e)
+    {
+        using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
+        if (followingSourceChange)
+        {
+            (pendingSourceChanges ??= new()).Enqueue(e);
+            return;
+        }
+        followingSourceChange = true;
+        try
+        {
+            FollowSourceChange(e);
+            while (pendingSourceChanges is { Count: > 0 } pending)
+                FollowSourceChange(pending.Dequeue());
+        }
+        finally
+        {
+            followingSourceChange = false;
         }
     }
 
@@ -418,13 +451,30 @@ sealed class ObservableCollectionToDictionaryQuery<TElement, TKey, TValue>(Colle
         spareKeySet = keySet;
     }
 
-    void ReconcileWithAccess(HashSet<TKey> keys)
+    /// <summary>
+    /// Brings the dictionary into line with the claims on the keys a change touched, one key at a time, delivering the notification of each before the next, and then sets the query's own fault
+    /// </summary>
+    void Reconcile(HashSet<TKey> touched)
     {
-        foreach (var key in keys)
-            if (claimantsByKey.TryGetValue(key, out var claimants))
-                dictionary[key] = WinningClaimantWithAccess(claimants).Item.Claim.Value;
-            else
-                dictionary.Remove(key);
+        foreach (var key in touched)
+        {
+            lock (access)
+            {
+                if (released)
+                    return;
+                if (claimantsByKey.TryGetValue(key, out var claimants))
+                    dictionary[key] = WinningClaimantWithAccess(claimants).Item.Claim.Value;
+                else
+                    dictionary.Remove(key);
+            }
+            RaiseNotificationsDeferredSoFar();
+        }
+        lock (access)
+        {
+            GiveBackKeySetWithAccess(touched);
+            if (!released)
+                SetOperationFaultWithAccess();
+        }
     }
 
     void ReleaseEntriesWithAccess()

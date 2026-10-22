@@ -11,9 +11,17 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
     readonly Dictionary<TKey, List<TSourceKey>> claimantsByProjectedKey = new(equalityComparer);
     int duplicateClaims;
     bool faultsChanged = true;
+    /// <summary>
+    /// Whether this query is following a change of its source, during which it delivers a notification for each key it changes, so that a change its subscribers make to the source in the meantime waits until this one has been followed
+    /// </summary>
+    bool followingSourceChange;
     int nullKeys;
     PropertyChangedEventHandler? observableExpressionPropertyChangedHandler;
     readonly Dictionary<TSourceKey, (IObservableExpression<KeyValuePair<TSourceKey, TSourceValue>, KeyValuePair<TKey, TValue>> ObservableExpression, Exception? CommittedFault, KeyValuePair<TKey, TValue> CommittedProjection)> observableExpressions = new(source.KeyComparer);
+    /// <summary>
+    /// The changes the source announced while this query was following another, in the order they were announced, made with the first of them
+    /// </summary>
+    Queue<NotifyDictionaryChangedEventArgs<TSourceKey, TSourceValue>>? pendingSourceChanges;
     bool released;
     int reportedDuplicateClaims;
     int reportedNullKeys;
@@ -33,7 +41,7 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
         }
     }
 
-    public override int Count
+    private protected override int CurrentCount
     {
         get
         {
@@ -79,6 +87,8 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
             claimants = [sourceKey];
             DiscardSnapshots();
             into.Add(key, projection.Value);
+            if (ReferenceEquals(into, result))
+                AnnounceCountOfUnobservedChange();
         }
     }
 
@@ -285,6 +295,7 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
             claimantsByProjectedKey.Remove(key);
             DiscardSnapshots();
             result.Remove(key);
+            AnnounceCountOfUnobservedChange();
             return;
         }
         --duplicateClaims;
@@ -335,12 +346,35 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
     void SourceDictionaryChanged(object? sender, NotifyDictionaryChangedEventArgs<TSourceKey, TSourceValue> e)
     {
         using var notificationDeferral = DeferNotificationsUntilMutationCompletes();
-        lock (access)
+        if (followingSourceChange)
         {
-            if (released)
-                return;
-            if (e.Action is NotifyDictionaryChangedAction.Reset)
+            (pendingSourceChanges ??= new()).Enqueue(e);
+            return;
+        }
+        followingSourceChange = true;
+        try
+        {
+            FollowSourceChange(e);
+            while (pendingSourceChanges is { Count: > 0 } pending)
+                FollowSourceChange(pending.Dequeue());
+        }
+        finally
+        {
+            followingSourceChange = false;
+        }
+    }
+
+    /// <summary>
+    /// Follows a change of the source one key at a time, delivering the notification of each key before taking the next, so that a subscriber finds this query as each notification leaves it
+    /// </summary>
+    void FollowSourceChange(NotifyDictionaryChangedEventArgs<TSourceKey, TSourceValue> e)
+    {
+        if (e.Action is NotifyDictionaryChangedAction.Reset)
+        {
+            lock (access)
             {
+                if (released)
+                    return;
                 faultsChanged = true;
                 claimantsByProjectedKey.Clear();
                 duplicateClaims = 0;
@@ -357,30 +391,46 @@ sealed class ObservableDictionarySelectQuery<TKey, TValue, TSourceKey, TSourceVa
                     ObserveSourceKeyValuePairWithAccess(sourceKeyValuePair, newResult);
                 DiscardSnapshots();
                 result.Reset(newResult);
+                AnnounceCountOfUnobservedChange();
 
                 claimantsByProjectedKey.TrimExcess();
                 observableExpressions.TrimExcess();
+                SetOperationFault();
             }
-            else
-            {
-                if (e.OldItems is { } oldItems)
-                    foreach (var keyValuePair in oldItems)
-                    {
-                        if (!observableExpressions.Remove(keyValuePair.Key!, out var committed))
-                            continue;
-                        if (committed.CommittedFault is null)
-                            RetractProjectionWithAccess(keyValuePair.Key!, committed.CommittedProjection);
-                        else
-                            faultsChanged = true;
-                        committed.ObservableExpression.PropertyChanged -= ObservableExpressionPropertyChangedHandler;
-                        committed.ObservableExpression.Dispose();
-                    }
-                if (e.NewItems is { } newItems)
-                    foreach (var keyValuePair in newItems)
-                        ObserveSourceKeyValuePairWithAccess(keyValuePair, result);
-            }
-            SetOperationFault();
+            return;
         }
+        if (e.OldItems is { } oldItems)
+            foreach (var keyValuePair in oldItems)
+            {
+                lock (access)
+                {
+                    if (released)
+                        return;
+                    if (!observableExpressions.Remove(keyValuePair.Key!, out var committed))
+                        continue;
+                    if (committed.CommittedFault is null)
+                        RetractProjectionWithAccess(keyValuePair.Key!, committed.CommittedProjection);
+                    else
+                        faultsChanged = true;
+                    committed.ObservableExpression.PropertyChanged -= ObservableExpressionPropertyChangedHandler;
+                    committed.ObservableExpression.Dispose();
+                }
+                RaiseNotificationsDeferredSoFar();
+            }
+        if (e.NewItems is { } newItems)
+            foreach (var keyValuePair in newItems)
+            {
+                lock (access)
+                {
+                    if (released)
+                        return;
+                    ObserveSourceKeyValuePairWithAccess(keyValuePair, result);
+                }
+                RaiseNotificationsDeferredSoFar();
+            }
+        lock (access)
+            if (!released)
+                SetOperationFault();
     }
 
     public override string ToString() =>

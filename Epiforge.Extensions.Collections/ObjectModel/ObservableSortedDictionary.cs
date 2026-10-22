@@ -617,11 +617,11 @@ public class ObservableSortedDictionary<TKey, TValue> :
         }
         foreach (var keyValuePair in newKeyValuePairs)
             gsd.Add(keyValuePair.Key, keyValuePair.Value);
+        if (countChanging)
+            NotifyCountChanged();
         NotifyIndexerChanged();
         if (IsChangeObserved)
             OnChanged(new NotifyDictionaryChangedEventArgs<TKey, TValue>(NotifyDictionaryChangedAction.Replace, newKeyValuePairs, removingKeyValuePairs));
-        if (countChanging)
-            NotifyCountChanged();
         return [..removedKeys];
     }
 
@@ -634,9 +634,9 @@ public class ObservableSortedDictionary<TKey, TValue> :
         if (countChanging)
             NotifyCountChanging();
         gsd = new SortedDictionary<TKey, TValue>(gsd.Comparer);
-        CastAndNotifyReset();
         if (countChanging)
             NotifyCountChanged();
+        CastAndNotifyReset();
     }
 
     /// <summary>
@@ -645,13 +645,14 @@ public class ObservableSortedDictionary<TKey, TValue> :
     /// <param name="dictionary">The dictionary from which to retrieve the initial elements</param>
     public virtual void Reset(IDictionary<TKey, TValue> dictionary)
     {
-        var countChanging = gsd.Count > 0;
+        ArgumentNullException.ThrowIfNull(dictionary);
+        var countChanging = gsd.Count != dictionary.Count;
         if (countChanging)
             NotifyCountChanging();
         gsd = new SortedDictionary<TKey, TValue>(dictionary, gsd.Comparer);
-        CastAndNotifyReset();
         if (countChanging)
             NotifyCountChanged();
+        CastAndNotifyReset();
     }
 
     /// <summary>

@@ -12,7 +12,7 @@ sealed class ObservableDictionaryConcurrentQuery<TKey, TValue>(CollectionObserve
     internal override IEqualityComparer<TKey> KeyComparer =>
         source.KeyComparer;
 
-    public override int Count =>
+    private protected override int CurrentCount =>
         observableConcurrentDictionary!.Count;
 
     public override IEnumerable<TKey> Keys =>
