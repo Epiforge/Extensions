@@ -13,6 +13,9 @@ sealed class ObservableDictionaryUsingSynchronizationContextEventuallyQuery<TKey
     internal override IEqualityComparer<TKey> KeyComparer =>
         source.KeyComparer;
 
+    private protected override int CountAsAnnounced =>
+        ReadOnContext(SynchronizationContext, () => base.CountAsAnnounced);
+
     private protected override int CountAtInitialization =>
         dictionary!.Count;
 

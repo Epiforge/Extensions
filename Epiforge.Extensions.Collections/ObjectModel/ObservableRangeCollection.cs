@@ -229,25 +229,41 @@ public class ObservableRangeCollection<T> :
     void NotifyIndexerChanged() =>
         OnPropertyChanged(CommonPropertyChangeNotificationEventArgs.IndexerChanged);
 
-    void NotifyReplacement(T[] oldItems, List<T> newItems, int index)
+    /// <summary>
+    /// Replaces the elements at an index with others, replacing as many as both have and then removing or inserting the rest, and announcing each step once it is taken, so that a subscriber finds the collection as each notification leaves it
+    /// </summary>
+    void ReplaceInSteps(int index, T[] oldItems, List<T> newItems)
     {
         if (oldItems.Length is 0 && newItems.Count is 0)
             return;
-        if (oldItems.Length != newItems.Count)
-            NotifyCountChanged();
-        NotifyIndexerChanged();
-        if (oldItems.Length == newItems.Count)
-        {
-            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, newItems, oldItems, index));
-            return;
-        }
+        var backingList = BackingList;
         var replaced = Math.Min(oldItems.Length, newItems.Count);
         if (replaced > 0)
+        {
+            CollectionsMarshal.AsSpan(newItems)[..replaced].CopyTo(CollectionsMarshal.AsSpan(backingList).Slice(index, replaced));
+            NotifyIndexerChanged();
+            if (oldItems.Length == newItems.Count)
+            {
+                OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, newItems, oldItems, index));
+                return;
+            }
             OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, newItems.GetRange(0, replaced), oldItems[..replaced], index));
+        }
         if (oldItems.Length > replaced)
+        {
+            backingList.RemoveRange(index + replaced, oldItems.Length - replaced);
+            NotifyCountChanged();
+            NotifyIndexerChanged();
             OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, oldItems[replaced..], index + replaced));
+        }
         else
-            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, newItems.GetRange(replaced, newItems.Count - replaced), index + replaced));
+        {
+            var inserted = newItems.GetRange(replaced, newItems.Count - replaced);
+            backingList.InsertRange(index + replaced, inserted);
+            NotifyCountChanged();
+            NotifyIndexerChanged();
+            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, inserted, index + replaced));
+        }
     }
 
     /// <inheritdoc/>
@@ -403,16 +419,8 @@ public class ObservableRangeCollection<T> :
         else
         {
             CheckReentrancy();
-            var oldItems = new T[Items.Count];
-            Items.CopyTo(oldItems, 0);
-            Items.Clear();
-            var list = new List<T>();
-            foreach (var element in items)
-            {
-                Items.Add(element);
-                list.Add(element);
-            }
-            NotifyReplacement(oldItems, list, 0);
+            var list = new List<T>(items);
+            ReplaceInSteps(0, [.. BackingList], list);
         }
     }
 
@@ -436,17 +444,8 @@ public class ObservableRangeCollection<T> :
             var list = collection is null ? [] : new List<T>(collection);
             if (count > 0 || list.Count > 0)
                 CheckReentrancy();
-            var backingList = BackingList;
-            var replacedItems = CollectionsMarshal.AsSpan(backingList).Slice(index, count);
-            var oldItems = replacedItems.ToArray();
-            if (list.Count == count)
-                CollectionsMarshal.AsSpan(list).CopyTo(replacedItems);
-            else
-            {
-                backingList.RemoveRange(index, count);
-                backingList.InsertRange(index, list);
-            }
-            NotifyReplacement(oldItems, list, index);
+            var oldItems = CollectionsMarshal.AsSpan(BackingList).Slice(index, count).ToArray();
+            ReplaceInSteps(index, oldItems, list);
             return Array.AsReadOnly(oldItems);
         }
     }

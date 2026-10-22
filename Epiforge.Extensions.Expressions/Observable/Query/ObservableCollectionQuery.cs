@@ -242,6 +242,12 @@ abstract class ObservableCollectionQuery<TElement>(CollectionObserver collection
     }
 
     public int Count =>
+        CountAsAnnounced;
+
+    /// <summary>
+    /// Gets the count as this query announces it: what it was while it is announced as changing, and what it is otherwise
+    /// </summary>
+    private protected virtual int CountAsAnnounced =>
         Volatile.Read(ref announcedCount) is < -1 and var changing ? -2 - changing : CurrentCount;
 
     int ICollection.Count =>
