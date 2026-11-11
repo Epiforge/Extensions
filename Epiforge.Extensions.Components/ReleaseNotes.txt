@@ -1,0 +1,1 @@
+`FastDefault` makes a value type's default through `RuntimeHelpers.GetUninitializedObject` on every runtime instead of invoking a generic method made for the type where the runtime can generate code, which on iOS under .NET 11, where that method runs in the interpreter, took 127 ns against 28.5 ns.

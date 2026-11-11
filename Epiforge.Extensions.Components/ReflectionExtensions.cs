@@ -5,8 +5,6 @@ namespace Epiforge.Extensions.Components;
 /// </summary>
 public static class ReflectionExtensions
 {
-    static readonly ConcurrentDictionary<Type, MethodInfo> getDefaultValueByType = new();
-
     static string EscapeCharacter(char c)
     {
         return c switch
@@ -51,18 +49,10 @@ public static class ReflectionExtensions
             _ => false
         };
 
-    static T? GetDefaultValue<T>() =>
-        default;
-
-    [RequiresDynamicCode("Constructs a generic method for the type")]
-    static MethodInfo GetDefaultValueByTypeValueFactory(Type type) =>
-        typeof(ReflectionExtensions).GetMethod(nameof(GetDefaultValue), BindingFlags.NonPublic | BindingFlags.Static)!.MakeGenericMethod(type);
-
     /// <summary>
     /// Returns the default value for the specified type as quickly as possible
     /// </summary>
     /// <param name="type">The type</param>
-    [UnconditionalSuppressMessage("AOT", "IL3050", Justification = "The code which needs dynamic code runs only where RuntimeFeature.IsDynamicCodeSupported is true, which the analyzer recognizes as a guard from .NET 9 on")]
     [UnconditionalSuppressMessage("Trimming", "IL2067", Justification = "The default of a value type is its instance with every field zeroed, which no constructor makes, so nothing a constructor needs has to survive trimming")]
     public static object? FastDefault(this Type type)
     {
@@ -71,8 +61,6 @@ public static class ReflectionExtensions
             return null;
         if (type == typeof(void) || type.IsByRefLike || type.ContainsGenericParameters)
             throw new ArgumentException($"{type} has no default value which can be boxed", nameof(type));
-        if (RuntimeFeature.IsDynamicCodeSupported)
-            return getDefaultValueByType.GetOrAdd(type, GetDefaultValueByTypeValueFactory).FastInvoke(null);
         return Nullable.GetUnderlyingType(type) is null ? RuntimeHelpers.GetUninitializedObject(type) : null;
     }
 
