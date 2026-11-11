@@ -8,9 +8,6 @@ public sealed class AppDelegate :
     UIApplicationDelegate
 {
     /// <inheritdoc/>
-    public override UIWindow? Window { get; set; }
-
-    /// <inheritdoc/>
     public override bool FinishedLaunching(UIApplication application, NSDictionary? launchOptions)
     {
 #if DEBUG
@@ -24,11 +21,6 @@ public sealed class AppDelegate :
         foreach (var line in lines)
             Console.WriteLine(line);
         File.WriteAllLines(report, lines);
-        Window = new UIWindow(UIScreen.MainScreen.Bounds)
-        {
-            RootViewController = new UIViewController()
-        };
-        Window.MakeKeyAndVisible();
         return true;
     }
 }

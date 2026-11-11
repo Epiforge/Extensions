@@ -4,15 +4,16 @@ namespace Epiforge.Extensions.AotProbe;
 /// Times what an evaluation costs on each mechanism, so that one build run with and without an interpreter, or with and without dynamic code, can be compared one route at a time
 /// </summary>
 /// <remarks>
-/// Each measure runs one warm-up round and then seven timed rounds, and reports the medians of the time and of the bytes allocated per element. The raising measure changes one person observed a thousand times on direct subscription, so it is a thousand evaluations; the changing measures change each of a thousand people observed once, on direct subscription and on the graph; the unobserved measure is the floor beneath those two
+/// Each measure warms up for at least a second and then runs fifteen timed rounds, and reports the median, least and greatest time and the median bytes allocated per element. The raising measure changes one person observed a thousand times on direct subscription, so it is a thousand evaluations; the changing measures change each of a thousand people observed once, on direct subscription and on the graph; the unobserved measure is the floor beneath those two; the invoking measure reads each of a thousand people's ranks through a fast invoker
 /// </remarks>
 static class ProbeTiming
 {
     const int elementCount = 1000;
     const int iterations = 200;
-    const int rounds = 7;
+    const int rounds = 15;
 
     static readonly Expression<Func<ProbePerson, bool>> rankIsPositive = person => person.Rank > 0;
+    static readonly TimeSpan warmUp = TimeSpan.FromSeconds(1);
 
     static void ChangeEveryRank(ProbePerson[] people)
     {
@@ -22,8 +23,13 @@ static class ProbeTiming
 
     static string Measure(string name, Action operation)
     {
-        for (var i = 0; i < iterations; ++i)
-            operation();
+        var warmingStarted = Stopwatch.GetTimestamp();
+        do
+        {
+            for (var i = 0; i < iterations; ++i)
+                operation();
+        }
+        while (Stopwatch.GetElapsedTime(warmingStarted) < warmUp);
         var nanoseconds = new double[rounds];
         var bytes = new double[rounds];
         for (var round = 0; round < rounds; ++round)
@@ -38,7 +44,7 @@ static class ProbeTiming
         }
         Array.Sort(nanoseconds);
         Array.Sort(bytes);
-        return string.Create(CultureInfo.InvariantCulture, $"timing {name}: {nanoseconds[rounds / 2]:F1} ns, {bytes[rounds / 2]:F1} B per element");
+        return string.Create(CultureInfo.InvariantCulture, $"timing {name}: {nanoseconds[rounds / 2]:F1} ns (min {nanoseconds[0]:F1}, max {nanoseconds[rounds - 1]:F1}), {bytes[rounds / 2]:F1} B per element");
     }
 
     static ProbePerson[] People() =>
@@ -66,5 +72,12 @@ static class ProbeTiming
             foreach (var observation in observations)
                 observation.Dispose();
         }
+        var invoker = typeof(ProbePerson).GetProperty(nameof(ProbePerson.Rank))!.GetMethod!.GetFastInvoker();
+        var invoked = People();
+        lines.Add(Measure("components invoke", () =>
+        {
+            foreach (var person in invoked)
+                invoker.Invoke(person);
+        }));
     }
 }
