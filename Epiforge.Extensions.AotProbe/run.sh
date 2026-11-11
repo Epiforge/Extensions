@@ -150,56 +150,48 @@ launch_ios() {
     xcrun simctl terminate "$udid" "$ios_bundle" 2>/dev/null
 }
 
-if has_step ios && on_apple_host; then
-    for variant in Debug Release Release-interpreter; do
+ios_round() {
+    local framework=$1 runtime=$2 variants=$3 compared=$4 variant configuration extra app launch
+    for variant in $variants; do
         configuration=${variant%%-*}
-        case "$variant" in
-            Release-interpreter) extra="-p:UseInterpreter=true" ;;
-            *) extra="" ;;
-        esac
-        note "Mono iOS $variant build"
-        if ! build_ios net10.0-ios "$configuration" "$out/ios-$variant-build.txt" "$extra"; then
-            note "Mono iOS $variant build failed; see $out/ios-$variant-build.txt"
+        extra=""
+        case "$variant" in *-interpreter*) extra="$extra -p:UseInterpreter=true" ;; esac
+        case "$variant" in *-nodynamic) extra="$extra -p:DynamicCodeSupport=false" ;; esac
+        rm -rf "$out/$runtime/$variant"
+        mkdir -p "$out/$runtime/$variant"
+        note "$runtime iOS $variant build"
+        if ! build_ios "$framework" "$configuration" "$out/$runtime/$variant/build.txt" "$extra"; then
+            note "$runtime iOS $variant build failed; see $out/$runtime/$variant/build.txt"
             continue
         fi
         app=$(built_app "$ios_project/bin/$configuration")
-        ls -la "$app" > "$out/ios-$variant-app.txt"
-        note "Mono iOS $variant launch"
-        launch_ios "$app" "$out/probe-ios-$variant.txt"
-    done
-fi
-
-if has_step coreclr && on_apple_host; then
-    for variant in Debug Release Release-nodynamic; do
-        configuration=${variant%%-*}
-        case "$variant" in
-            Release-nodynamic) extra="-p:DynamicCodeSupport=false" ;;
-            *) extra="" ;;
-        esac
-        rm -rf "$out/$variant"
-        mkdir -p "$out/$variant"
-        note "CoreCLR iOS $variant build"
-        if ! build_ios net11.0-ios "$configuration" "$out/$variant/build.txt" "$extra"; then
-            note "CoreCLR iOS $variant build failed; see $out/$variant/build.txt"
-            continue
-        fi
-        app=$(built_app "$ios_project/bin/$configuration")
-        find "$app" -type f -exec ls -l {} + > "$out/$variant/app.txt"
-        cp -R "$app" "$out/$variant/"
+        find "$app" -type f -exec ls -l {} + > "$out/$runtime/$variant/app.txt"
+        cp -R "$app" "$out/$runtime/$variant/"
     done
     for launch in 1 2 3; do
-        for variant in Debug Release Release-nodynamic; do
-            if [ "$variant" = Debug ] && [ $launch -gt 1 ]; then
-                continue
+        for variant in $variants; do
+            if [ $launch -gt 1 ]; then
+                case " $compared " in
+                    *" $variant "*) ;;
+                    *) continue ;;
+                esac
             fi
-            app=$(find "$out/$variant" -maxdepth 1 -type d -name "*.app" 2>/dev/null | head -1)
+            app=$(find "$out/$runtime/$variant" -maxdepth 1 -type d -name "*.app" 2>/dev/null | head -1)
             if [ -z "$app" ]; then
                 continue
             fi
-            note "CoreCLR iOS $variant launch $launch"
-            launch_ios "$app" "$out/$variant/probe-$launch.txt"
+            note "$runtime iOS $variant launch $launch"
+            launch_ios "$app" "$out/$runtime/$variant/probe-$launch.txt"
         done
     done
+}
+
+if has_step ios && on_apple_host; then
+    ios_round net10.0-ios mono "Release Release-interpreter Release-interpreter-nodynamic" "Release-interpreter Release-interpreter-nodynamic"
+fi
+
+if has_step coreclr && on_apple_host; then
+    ios_round net11.0-ios coreclr "Debug Release Release-nodynamic" "Release Release-nodynamic"
 fi
 
 note "done"
