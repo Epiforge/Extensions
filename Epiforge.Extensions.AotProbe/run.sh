@@ -3,10 +3,10 @@ set -u
 cd "$(dirname "$0")/.." || exit 1
 label=${1:-}
 case "$label" in
-    ""|env|suites|probe|ios) echo "usage: bash Epiforge.Extensions.AotProbe/run.sh <label> [env] [suites] [probe] [ios]  (results go to TestResults/Aot/<label>)"; exit 2 ;;
+    ""|env|suites|probe|ios|coreclr) echo "usage: bash Epiforge.Extensions.AotProbe/run.sh <label> [env] [suites] [probe] [ios] [coreclr]  (results go to TestResults/Aot/<label>)"; exit 2 ;;
 esac
 shift
-steps=${*:-env suites probe ios}
+steps=${*:-env suites probe ios coreclr}
 out=TestResults/Aot/$label
 mkdir -p "$out"
 exec > >(tee -a "$out/run.log") 2>&1
@@ -93,59 +93,105 @@ if has_step probe; then
     fi
 fi
 
-if has_step ios; then
+ios_project=Epiforge.Extensions.AotProbe.iOS
+ios_bundle=com.epiforge.extensions.aotprobe
+udid=""
+
+on_apple_host() {
     if [ "$os" != osx ]; then
-        note "the iOS step needs macOS with Xcode and the .NET iOS workload; skipped"
-        exit 0
+        note "the iOS steps need macOS with Xcode and the .NET iOS workload; skipped"
+        return 1
     fi
-    project=Epiforge.Extensions.AotProbe.iOS
-    bundle=com.epiforge.extensions.aotprobe
-    simulator=iossimulator-$arch
-    udid=$(xcrun simctl list devices available | awk '/^-- iOS/ { section = 1; first = "" } /iPhone/ && section && first == "" { first = $0; chosen = $0 } END { print chosen }' | sed -E 's/.*\(([0-9A-F-]{36})\).*/\1/')
     if [ -z "$udid" ]; then
-        note "no available iPhone simulator"
-        exit 5
+        udid=$(xcrun simctl list devices available | awk '/^-- iOS/ { section = 1; first = "" } /iPhone/ && section && first == "" { first = $0; chosen = $0 } END { print chosen }' | sed -E 's/.*\(([0-9A-F-]{36})\).*/\1/')
+        if [ -z "$udid" ]; then
+            note "no available iPhone simulator"
+            return 1
+        fi
+        note "simulator $udid: $(xcrun simctl list devices available | grep "$udid")"
+        xcrun simctl boot "$udid" 2>/dev/null
+        xcrun simctl bootstatus "$udid" -b > /dev/null
     fi
-    note "simulator $udid: $(xcrun simctl list devices available | grep "$udid")"
-    xcrun simctl boot "$udid" 2>/dev/null
-    xcrun simctl bootstatus "$udid" -b > /dev/null
-    for variant in Debug Release Release-interpreter; do
-        configuration=${variant%%-*}
-        case "$variant" in
-            Release-interpreter) extra="-p:UseInterpreter=true" ;;
-            *) extra="" ;;
-        esac
-        note "iOS $variant build"
-        rm -rf "$project/bin/$configuration" "$project/obj/$configuration"
-        if ! dotnet build "$project" -c "$configuration" -r "$simulator" $extra > "$out/ios-$variant-build.txt" 2>&1; then
-            note "iOS $variant build failed; see $out/ios-$variant-build.txt"
-            continue
-        fi
-        app=$(find "$project/bin/$configuration" -type d -name "*.app" | head -1)
-        ls -la "$app" > "$out/ios-$variant-app.txt"
-        xcrun simctl terminate "$udid" "$bundle" 2>/dev/null
-        xcrun simctl uninstall "$udid" "$bundle" 2>/dev/null
-        if ! xcrun simctl install "$udid" "$app"; then
-            note "iOS $variant install failed"
-            echo "install failed" > "$out/probe-ios-$variant.txt"
-            continue
-        fi
-        note "iOS $variant launch"
-        xcrun simctl launch "$udid" "$bundle" > /dev/null
-        report="$(xcrun simctl get_app_container "$udid" "$bundle" data)/Documents/aot-probe.txt"
-        waited=0
-        until grep -q '^summary' "$report" 2>/dev/null || [ $waited -ge 300 ]; do
-            sleep 2
-            waited=$((waited + 2))
-        done
-        if [ -f "$report" ]; then
-            cp "$report" "$out/probe-ios-$variant.txt"
-        else
-            echo "no report" > "$out/probe-ios-$variant.txt"
-        fi
-        tail -1 "$out/probe-ios-$variant.txt"
-        xcrun simctl terminate "$udid" "$bundle" 2>/dev/null
+    return 0
+}
+
+build_ios() {
+    local framework=$1 configuration=$2 log=$3 extra=$4
+    rm -rf "$ios_project/bin/$configuration" "$ios_project/obj/$configuration"
+    dotnet build "$ios_project" -c "$configuration" -f "$framework" -r "iossimulator-$arch" $extra > "$log" 2>&1
+}
+
+built_app() {
+    find "$1" -type d -name "*.app" | head -1
+}
+
+launch_ios() {
+    local app=$1 copy=$2 report waited
+    xcrun simctl terminate "$udid" "$ios_bundle" 2>/dev/null
+    xcrun simctl uninstall "$udid" "$ios_bundle" 2>/dev/null
+    if ! xcrun simctl install "$udid" "$app"; then
+        note "install of $app failed"
+        echo "install failed" > "$copy"
+        return 1
+    fi
+    xcrun simctl launch "$udid" "$ios_bundle" > /dev/null
+    report="$(xcrun simctl get_app_container "$udid" "$ios_bundle" data)/Documents/aot-probe.txt"
+    waited=0
+    until grep -q '^summary' "$report" 2>/dev/null || [ $waited -ge 600 ]; do
+        sleep 2
+        waited=$((waited + 2))
     done
+    if [ -f "$report" ]; then
+        cp "$report" "$copy"
+    else
+        echo "no report" > "$copy"
+    fi
+    tail -1 "$copy"
+    xcrun simctl terminate "$udid" "$ios_bundle" 2>/dev/null
+}
+
+ios_round() {
+    local framework=$1 runtime=$2 variants=$3 compared=$4 variant configuration extra app launch
+    for variant in $variants; do
+        configuration=${variant%%-*}
+        extra=""
+        case "$variant" in *-interpreter*) extra="$extra -p:UseInterpreter=true" ;; esac
+        case "$variant" in *-nodynamic) extra="$extra -p:DynamicCodeSupport=false" ;; esac
+        rm -rf "$out/$runtime/$variant"
+        mkdir -p "$out/$runtime/$variant"
+        note "$runtime iOS $variant build"
+        if ! build_ios "$framework" "$configuration" "$out/$runtime/$variant/build.txt" "$extra"; then
+            note "$runtime iOS $variant build failed; see $out/$runtime/$variant/build.txt"
+            continue
+        fi
+        app=$(built_app "$ios_project/bin/$configuration")
+        find "$app" -type f -exec ls -l {} + > "$out/$runtime/$variant/app.txt"
+        cp -R "$app" "$out/$runtime/$variant/"
+    done
+    for launch in 1 2 3; do
+        for variant in $variants; do
+            if [ $launch -gt 1 ]; then
+                case " $compared " in
+                    *" $variant "*) ;;
+                    *) continue ;;
+                esac
+            fi
+            app=$(find "$out/$runtime/$variant" -maxdepth 1 -type d -name "*.app" 2>/dev/null | head -1)
+            if [ -z "$app" ]; then
+                continue
+            fi
+            note "$runtime iOS $variant launch $launch"
+            launch_ios "$app" "$out/$runtime/$variant/probe-$launch.txt"
+        done
+    done
+}
+
+if has_step ios && on_apple_host; then
+    ios_round net10.0-ios mono "Release Release-interpreter Release-interpreter-nodynamic" "Release-interpreter Release-interpreter-nodynamic"
+fi
+
+if has_step coreclr && on_apple_host; then
+    ios_round net11.0-ios coreclr "Debug Release Release-nodynamic" "Release Release-nodynamic"
 fi
 
 note "done"

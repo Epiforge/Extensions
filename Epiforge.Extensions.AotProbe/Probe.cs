@@ -110,6 +110,12 @@ public static class Probe
         });
     }
 
+    static string CompileOutcome()
+    {
+        Expression<Func<int>> fortyTwo = () => 42;
+        return fortyTwo.Compile().Target?.GetType().Name ?? "no target";
+    }
+
     static string Describe(Exception ex)
     {
         var innermost = ex;
@@ -168,7 +174,9 @@ public static class Probe
             $"os {RuntimeInformation.OSDescription}",
             $"IsDynamicCodeSupported {RuntimeFeature.IsDynamicCodeSupported}",
             $"IsDynamicCodeCompiled {RuntimeFeature.IsDynamicCodeCompiled}",
-            $"DynamicMethod {DynamicMethodOutcome()}"
+            $"DynamicMethod {DynamicMethodOutcome()}",
+            $"Compile {CompileOutcome()}",
+            $"CanEmitObjectArrayDelegate {SwitchOutcome("System.Linq.Expressions.CanEmitObjectArrayDelegate")}"
         };
         foreach (var direct in new[] { true, false })
         {
@@ -188,4 +196,7 @@ public static class Probe
         lines.Add($"summary {passed} passed, {failed} failed");
         return lines;
     }
+
+    static string SwitchOutcome(string name) =>
+        AppContext.TryGetSwitch(name, out var isEnabled) ? isEnabled.ToString() : "unset";
 }
